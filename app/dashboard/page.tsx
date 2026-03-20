@@ -2,9 +2,13 @@
 
 import { useMemo, useState } from "react";
 
+type LaunchMode = "existing" | "new";
+
 export default function DashboardPage() {
   const [accessCode, setAccessCode] = useState("");
   const [unlocked, setUnlocked] = useState(false);
+
+  const [mode, setMode] = useState<LaunchMode>("existing");
 
   const [existingAdId, setExistingAdId] = useState("");
   const [message, setMessage] = useState("");
@@ -27,17 +31,24 @@ export default function DashboardPage() {
     }
   }
 
-  const usingExistingAd = existingAdId.trim().length > 0;
-
   const validationError = useMemo(() => {
     if (!Number.isFinite(budget) || budget < 1) {
       return "Daily Budget must be at least €1.";
     }
+
     if (![7, 14, 30].includes(days)) {
       return "Audience Window must be 7, 14, or 30 days.";
     }
 
-    if (usingExistingAd) {
+    if (mode === "existing") {
+      if (!existingAdId.trim()) {
+        return "Existing Ad ID is required.";
+      }
+
+      if (!/^\d+$/.test(existingAdId.trim())) {
+        return "Existing Ad ID should contain only numbers.";
+      }
+
       return "";
     }
 
@@ -47,9 +58,14 @@ export default function DashboardPage() {
     if (!productName.trim()) return "Product Name is required.";
 
     return "";
-  }, [usingExistingAd, message, link, productName, budget, days]);
+  }, [mode, existingAdId, message, link, productName, budget, days]);
 
   const isFormValid = !validationError;
+
+  function resetResultAndError() {
+    setFormError("");
+    setResult(null);
+  }
 
   if (!unlocked) {
     return (
@@ -116,21 +132,31 @@ export default function DashboardPage() {
     setFormError("");
 
     try {
+      const payload =
+        mode === "existing"
+          ? {
+              audienceName: `Visitors ${days}d`,
+              retentionSeconds: days * 86400,
+              dailyBudget: budget * 100,
+              existingAdId: existingAdId.trim(),
+            }
+          : {
+              audienceName: `Visitors ${days}d`,
+              retentionSeconds: days * 86400,
+              dailyBudget: budget * 100,
+              existingAdId: "",
+              message: message.trim(),
+              link: link.trim(),
+              name: productName.trim(),
+              description: description.trim(),
+            };
+
       const res = await fetch("/api/meta/launch-retargeting", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          audienceName: `Visitors ${days}d`,
-          retentionSeconds: days * 86400,
-          dailyBudget: budget * 100,
-          existingAdId: existingAdId.trim(),
-          message: message.trim(),
-          link: link.trim(),
-          name: productName.trim(),
-          description: description.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -152,36 +178,82 @@ export default function DashboardPage() {
   }
 
   return (
-    <main style={{ padding: 40, maxWidth: 700, margin: "0 auto" }}>
+    <main style={{ padding: 40, maxWidth: 760, margin: "0 auto" }}>
       <h1 style={{ fontSize: 28, marginBottom: 8 }}>
-        🚀 One-Click Retargeting
+        🚀 One-Click Meta Retargeting
       </h1>
-      <p style={{ opacity: 0.7 }}>Launch retargeting ads in seconds.</p>
+      <p style={{ opacity: 0.7 }}>
+        Launch retargeting ads in seconds.
+      </p>
 
-      <div style={{ display: "grid", gap: 16, marginTop: 24 }}>
-        <div>
-          <label
-            htmlFor="existingAdId"
-            style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-          >
-            Existing Ad ID (optional)
-          </label>
-          <input
-            id="existingAdId"
-            placeholder="Paste an existing Meta Ad ID to reuse its creative"
-            value={existingAdId}
-            onChange={(e) => {
-              setExistingAdId(e.target.value);
-              setFormError("");
-            }}
-            style={inputStyle}
-          />
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-            If filled, the tool will reuse the creative from that ad.
-          </div>
+      <div
+        style={{
+          marginTop: 24,
+          padding: 16,
+          borderRadius: 12,
+          border: "1px solid #222",
+          background: "#0b0b0b",
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+          Launch Mode
         </div>
 
-        {!usingExistingAd && (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("existing");
+              resetResultAndError();
+            }}
+            style={modeButtonStyle(mode === "existing")}
+          >
+            Retarget Winning Ad
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode("new");
+              resetResultAndError();
+            }}
+            style={modeButtonStyle(mode === "new")}
+          >
+            Create New Ad
+          </button>
+        </div>
+
+        <div style={{ fontSize: 13, opacity: 0.72, marginTop: 10 }}>
+          {mode === "existing"
+            ? "Reuse the creative from an existing Meta ad. This is the main workflow."
+            : "Create a new retargeting ad from scratch."}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gap: 16, marginTop: 24 }}>
+        {mode === "existing" ? (
+          <div>
+            <label
+              htmlFor="existingAdId"
+              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
+            >
+              Existing Ad ID
+            </label>
+            <input
+              id="existingAdId"
+              placeholder="Paste an existing Meta Ad ID"
+              value={existingAdId}
+              onChange={(e) => {
+                setExistingAdId(e.target.value);
+                setFormError("");
+              }}
+              style={inputStyle}
+            />
+            <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+              Example: 120234142880930745
+            </div>
+          </div>
+        ) : (
           <>
             <div>
               <label
@@ -262,8 +334,8 @@ export default function DashboardPage() {
           </>
         )}
 
-        <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
             <label
               htmlFor="budget"
               style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
@@ -284,7 +356,7 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
             <label
               htmlFor="days"
               style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
@@ -332,11 +404,15 @@ export default function DashboardPage() {
             cursor: loading || !isFormValid ? "not-allowed" : "pointer",
             background: loading || !isFormValid ? "#1e3a8a" : "#2563eb",
             color: "white",
-            fontWeight: 600,
+            fontWeight: 700,
             opacity: loading || !isFormValid ? 0.7 : 1,
           }}
         >
-          {loading ? "Launching..." : "Launch Retargeting"}
+          {loading
+            ? "Launching..."
+            : mode === "existing"
+            ? "Launch Retargeting from Existing Ad"
+            : "Launch New Retargeting Ad"}
         </button>
       </div>
 
@@ -353,17 +429,17 @@ export default function DashboardPage() {
           {result.ok ? (
             <>
               <div>✅ Retargeting launched</div>
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>
+              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
                 Audience ID: {result.audienceId}
               </div>
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
                 Ad Set ID: {result.adsetId}
               </div>
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
                 Ad ID: {result.adId}
               </div>
               {result.reusedCreativeId && (
-                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
                   Reused Creative ID: {result.reusedCreativeId}
                 </div>
               )}
@@ -386,6 +462,19 @@ export default function DashboardPage() {
       )}
     </main>
   );
+}
+
+function modeButtonStyle(active: boolean) {
+  return {
+    padding: "12px 16px",
+    borderRadius: 10,
+    border: active ? "1px solid #2563eb" : "1px solid #333",
+    background: active ? "#1d4ed8" : "#111",
+    color: "#fff",
+    fontWeight: 700,
+    cursor: "pointer",
+    fontSize: 14,
+  } as const;
 }
 
 const inputStyle = {
