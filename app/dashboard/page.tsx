@@ -182,9 +182,7 @@ export default function DashboardPage() {
       <h1 style={{ fontSize: 28, marginBottom: 8 }}>
         🚀 One-Click Meta Retargeting
       </h1>
-      <p style={{ opacity: 0.7 }}>
-        Launch retargeting ads in seconds.
-      </p>
+      <p style={{ opacity: 0.7 }}>Launch retargeting ads in seconds.</p>
 
       <div
         style={{
