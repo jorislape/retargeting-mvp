@@ -1,5 +1,18 @@
 import { NextResponse } from "next/server";
 
+function firstNonEmpty(...values: Array<unknown>) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function imageFromCallToAction(linkData: any) {
+  return linkData?.child_attachments?.[0]?.picture || "";
+}
+
 export async function POST(req: Request) {
   try {
     const { adId } = await req.json();
@@ -13,9 +26,22 @@ export async function POST(req: Request) {
 
     const accessToken = process.env.META_ACCESS_TOKEN;
 
-    // 1. Get ad + creative
+    if (!accessToken) {
+      return NextResponse.json({
+        ok: false,
+        error: "Missing META_ACCESS_TOKEN",
+      });
+    }
+
+    const fields =
+      "name,creative{id,object_story_spec,asset_feed_spec,title,body,image_url,thumbnail_url,effective_object_story_id}";
+
     const adRes = await fetch(
-      `https://graph.facebook.com/v19.0/${adId}?fields=name,creative{id,object_story_spec}&access_token=${accessToken}`
+      `https://graph.facebook.com/v19.0/${adId}?fields=${fields}&access_token=${accessToken}`,
+      {
+        method: "GET",
+        cache: "no-store",
+      }
     );
 
     const adData = await adRes.json();
@@ -27,28 +53,80 @@ export async function POST(req: Request) {
       });
     }
 
-    const creative = adData.creative;
+    const creative = adData.creative || {};
+    const story = creative.object_story_spec || {};
 
-    const story = creative?.object_story_spec || {};
     const linkData = story.link_data || {};
-    const message = story.message || "";
-    const headline = linkData.name || "";
-    const description = linkData.description || "";
-    const imageUrl = linkData.picture || "";
+    const videoData = story.video_data || {};
+    const photoData = story.photo_data || {};
+    const templateData = story.template_data || {};
+    const assetFeedSpec = creative.asset_feed_spec || {};
+
+    const assetBodies = Array.isArray(assetFeedSpec.bodies)
+      ? assetFeedSpec.bodies
+      : [];
+    const assetTitles = Array.isArray(assetFeedSpec.titles)
+      ? assetFeedSpec.titles
+      : [];
+    const assetDescriptions = Array.isArray(assetFeedSpec.descriptions)
+      ? assetFeedSpec.descriptions
+      : [];
+    const assetImages = Array.isArray(assetFeedSpec.images)
+      ? assetFeedSpec.images
+      : [];
+
+    const message = firstNonEmpty(
+      story.message,
+      linkData.message,
+      videoData.message,
+      templateData.message,
+      photoData.message,
+      photoData.caption,
+      creative.body,
+      assetBodies[0]?.text
+    );
+
+    const headline = firstNonEmpty(
+      linkData.name,
+      videoData.title,
+      templateData.name,
+      templateData.title,
+      creative.title,
+      assetTitles[0]?.text
+    );
+
+    const description = firstNonEmpty(
+      linkData.description,
+      templateData.description,
+      assetDescriptions[0]?.text
+    );
+
+    const imageUrl = firstNonEmpty(
+      linkData.picture,
+      imageFromCallToAction(linkData),
+      creative.image_url,
+      creative.thumbnail_url,
+      assetImages[0]?.url
+    );
 
     return NextResponse.json({
       ok: true,
       data: {
         adId,
-        adName: adData.name,
-        creativeId: creative?.id,
-        message,
-        headline,
-        description,
-        imageUrl,
+        adName: adData.name || "",
+        creativeId: creative.id || "",
+        message: message || null,
+        headline: headline || null,
+        description: description || null,
+        imageUrl: imageUrl || null,
+        debug: {
+          hasObjectStorySpec: !!creative.object_story_spec,
+          hasAssetFeedSpec: !!creative.asset_feed_spec,
+          storyKeys: Object.keys(story || {}),
+        },
       },
     });
-  } catch (e) {
+  } catch {
     return NextResponse.json({
       ok: false,
       error: "Failed to fetch preview",

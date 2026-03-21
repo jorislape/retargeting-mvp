@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type LaunchMode = "existing" | "new";
 
@@ -35,6 +35,9 @@ export default function DashboardPage() {
   const [ads, setAds] = useState<MetaAdOption[]>([]);
   const [adsLoading, setAdsLoading] = useState(false);
   const [adsError, setAdsError] = useState("");
+
+  const hasTriedLoadingAds = useRef(false);
+  const previewRequestIdRef = useRef(0);
 
   function isValidUrl(value: string) {
     try {
@@ -76,13 +79,6 @@ export default function DashboardPage() {
 
   const isFormValid = !validationError;
 
-  function resetResultAndError() {
-    setFormError("");
-    setResult(null);
-    setPreviewError("");
-    setPreviewData(null);
-  }
-
   async function loadAds() {
     try {
       setAdsLoading(true);
@@ -102,6 +98,7 @@ export default function DashboardPage() {
       setAds(data.ads || []);
     } catch (err: any) {
       setAdsError(err?.message || "Failed to load ads.");
+      setAds([]);
     } finally {
       setAdsLoading(false);
     }
@@ -110,13 +107,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!unlocked) return;
     if (mode !== "existing") return;
-    if (ads.length > 0 || adsLoading) return;
+    if (hasTriedLoadingAds.current) return;
 
+    hasTriedLoadingAds.current = true;
     loadAds();
-  }, [unlocked, mode, ads.length, adsLoading]);
+  }, [unlocked, mode]);
 
   async function handlePreviewAd(adIdOverride?: string) {
-    const adIdToUse = adIdOverride ?? existingAdId.trim();
+    const adIdToUse = (adIdOverride ?? existingAdId).trim();
 
     if (!adIdToUse) {
       setPreviewError("Existing Ad ID is required.");
@@ -124,9 +122,10 @@ export default function DashboardPage() {
       return;
     }
 
+    const requestId = ++previewRequestIdRef.current;
+
     setPreviewLoading(true);
     setPreviewError("");
-    setPreviewData(null);
 
     try {
       const res = await fetch("/api/meta/preview-ad", {
@@ -141,7 +140,12 @@ export default function DashboardPage() {
 
       const data = await res.json();
 
+      if (requestId !== previewRequestIdRef.current) {
+        return;
+      }
+
       if (!res.ok || !data.ok) {
+        setPreviewData(null);
         setPreviewError(
           typeof data.error === "string"
             ? data.error
@@ -151,12 +155,37 @@ export default function DashboardPage() {
       }
 
       setPreviewData(data.data);
+      setPreviewError("");
     } catch {
+      if (requestId !== previewRequestIdRef.current) {
+        return;
+      }
+
+      setPreviewData(null);
       setPreviewError("Preview request failed.");
     } finally {
-      setPreviewLoading(false);
+      if (requestId === previewRequestIdRef.current) {
+        setPreviewLoading(false);
+      }
     }
   }
+
+  useEffect(() => {
+    if (!unlocked) return;
+    if (mode !== "existing") return;
+
+    const trimmedAdId = existingAdId.trim();
+
+    if (!trimmedAdId) {
+      previewRequestIdRef.current += 1;
+      setPreviewLoading(false);
+      setPreviewError("");
+      setPreviewData(null);
+      return;
+    }
+
+    handlePreviewAd(trimmedAdId);
+  }, [existingAdId, mode, unlocked]);
 
   async function handleLaunchRetargeting() {
     if (!isFormValid) {
@@ -293,7 +322,11 @@ export default function DashboardPage() {
             type="button"
             onClick={() => {
               setMode("existing");
-              resetResultAndError();
+              hasTriedLoadingAds.current = false;
+              setFormError("");
+              setResult(null);
+              setPreviewError("");
+              setPreviewData(null);
             }}
             style={modeButtonStyle(mode === "existing")}
           >
@@ -304,7 +337,11 @@ export default function DashboardPage() {
             type="button"
             onClick={() => {
               setMode("new");
-              resetResultAndError();
+              setFormError("");
+              setResult(null);
+              setPreviewError("");
+              setPreviewData(null);
+              setExistingAdId("");
             }}
             style={modeButtonStyle(mode === "new")}
           >
@@ -336,8 +373,8 @@ export default function DashboardPage() {
                 const selectedId = e.target.value;
                 setExistingAdId(selectedId);
                 setFormError("");
+                setResult(null);
                 setPreviewError("");
-                setPreviewData(null);
               }}
               style={inputStyle}
               disabled={adsLoading}
@@ -372,10 +409,20 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
               <button
                 type="button"
-                onClick={() => loadAds()}
+                onClick={() => {
+                  hasTriedLoadingAds.current = false;
+                  loadAds();
+                }}
                 disabled={adsLoading}
                 style={{
                   padding: "10px 14px",
@@ -415,6 +462,22 @@ export default function DashboardPage() {
                 {previewLoading ? "Loading Preview..." : "Preview Source Ad"}
               </button>
             </div>
+
+            {previewLoading && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 8,
+                  background: "#111827",
+                  color: "#cbd5e1",
+                  fontSize: 14,
+                  border: "1px solid #1f2937",
+                }}
+              >
+                Loading source ad preview...
+              </div>
+            )}
 
             {previewError && (
               <div
