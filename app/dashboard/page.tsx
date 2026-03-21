@@ -1,8 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type LaunchMode = "existing" | "new";
+
+type MetaAdOption = {
+  id: string;
+  name: string;
+  status?: string | null;
+};
 
 export default function DashboardPage() {
   const [accessCode, setAccessCode] = useState("");
@@ -21,6 +27,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [formError, setFormError] = useState("");
+
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [previewData, setPreviewData] = useState<any>(null);
+
+  const [ads, setAds] = useState<MetaAdOption[]>([]);
+  const [adsLoading, setAdsLoading] = useState(false);
+  const [adsError, setAdsError] = useState("");
 
   function isValidUrl(value: string) {
     try {
@@ -42,11 +56,11 @@ export default function DashboardPage() {
 
     if (mode === "existing") {
       if (!existingAdId.trim()) {
-        return "Existing Ad ID is required.";
+        return "Please select an existing ad.";
       }
 
       if (!/^\d+$/.test(existingAdId.trim())) {
-        return "Existing Ad ID should contain only numbers.";
+        return "Selected Ad ID is invalid.";
       }
 
       return "";
@@ -65,60 +79,83 @@ export default function DashboardPage() {
   function resetResultAndError() {
     setFormError("");
     setResult(null);
+    setPreviewError("");
+    setPreviewData(null);
   }
 
-  if (!unlocked) {
-    return (
-      <main style={{ padding: 40, maxWidth: 420, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 28, marginBottom: 8 }}>🔒 Access Required</h1>
-        <p style={{ opacity: 0.7 }}>
-          Enter the dashboard access code to continue.
-        </p>
+  async function loadAds() {
+    try {
+      setAdsLoading(true);
+      setAdsError("");
 
-        <input
-          type="password"
-          placeholder="Enter access code"
-          value={accessCode}
-          onChange={(e) => setAccessCode(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginTop: 16,
-            borderRadius: 8,
-            border: "1px solid #333",
-            background: "#111",
-            color: "#fff",
-            fontSize: 16,
-          }}
-        />
+      const res = await fetch("/api/meta/list-ads", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-        <button
-          onClick={() => {
-            if (
-              accessCode === process.env.NEXT_PUBLIC_DASHBOARD_ACCESS_CODE
-            ) {
-              setUnlocked(true);
-            } else {
-              alert("Wrong code");
-            }
-          }}
-          style={{
-            marginTop: 12,
-            padding: 12,
-            width: "100%",
-            borderRadius: 8,
-            border: "none",
-            background: "#2563eb",
-            color: "white",
-            fontWeight: 600,
-            cursor: "pointer",
-            fontSize: 16,
-          }}
-        >
-          Unlock Dashboard
-        </button>
-      </main>
-    );
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to load ads.");
+      }
+
+      setAds(data.ads || []);
+    } catch (err: any) {
+      setAdsError(err?.message || "Failed to load ads.");
+    } finally {
+      setAdsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!unlocked) return;
+    if (mode !== "existing") return;
+    if (ads.length > 0 || adsLoading) return;
+
+    loadAds();
+  }, [unlocked, mode, ads.length, adsLoading]);
+
+  async function handlePreviewAd(adIdOverride?: string) {
+    const adIdToUse = adIdOverride ?? existingAdId.trim();
+
+    if (!adIdToUse) {
+      setPreviewError("Existing Ad ID is required.");
+      setPreviewData(null);
+      return;
+    }
+
+    setPreviewLoading(true);
+    setPreviewError("");
+    setPreviewData(null);
+
+    try {
+      const res = await fetch("/api/meta/preview-ad", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adId: adIdToUse,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        setPreviewError(
+          typeof data.error === "string"
+            ? data.error
+            : data.error?.message || "Failed to preview ad."
+        );
+        return;
+      }
+
+      setPreviewData(data.data);
+    } catch {
+      setPreviewError("Preview request failed.");
+    } finally {
+      setPreviewLoading(false);
+    }
   }
 
   async function handleLaunchRetargeting() {
@@ -175,6 +212,60 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!unlocked) {
+    return (
+      <main style={{ padding: 40, maxWidth: 420, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 28, marginBottom: 8 }}>🔒 Access Required</h1>
+        <p style={{ opacity: 0.7 }}>
+          Enter the dashboard access code to continue.
+        </p>
+
+        <input
+          type="password"
+          placeholder="Enter access code"
+          value={accessCode}
+          onChange={(e) => setAccessCode(e.target.value)}
+          style={{
+            width: "100%",
+            padding: 12,
+            marginTop: 16,
+            borderRadius: 8,
+            border: "1px solid #333",
+            background: "#111",
+            color: "#fff",
+            fontSize: 16,
+          }}
+        />
+
+        <button
+          onClick={() => {
+            if (
+              accessCode === process.env.NEXT_PUBLIC_DASHBOARD_ACCESS_CODE
+            ) {
+              setUnlocked(true);
+            } else {
+              alert("Wrong code");
+            }
+          }}
+          style={{
+            marginTop: 12,
+            padding: 12,
+            width: "100%",
+            borderRadius: 8,
+            border: "none",
+            background: "#2563eb",
+            color: "white",
+            fontWeight: 600,
+            cursor: "pointer",
+            fontSize: 16,
+          }}
+        >
+          Unlock Dashboard
+        </button>
+      </main>
+    );
   }
 
   return (
@@ -235,21 +326,150 @@ export default function DashboardPage() {
               htmlFor="existingAdId"
               style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
             >
-              Existing Ad ID
+              Choose Existing Ad
             </label>
-            <input
+
+            <select
               id="existingAdId"
-              placeholder="Paste an existing Meta Ad ID"
               value={existingAdId}
               onChange={(e) => {
-                setExistingAdId(e.target.value);
+                const selectedId = e.target.value;
+                setExistingAdId(selectedId);
                 setFormError("");
+                setPreviewError("");
+                setPreviewData(null);
               }}
               style={inputStyle}
-            />
+              disabled={adsLoading}
+            >
+              <option value="">
+                {adsLoading ? "Loading ads..." : "Select an existing Meta ad"}
+              </option>
+
+              {ads.map((ad) => (
+                <option key={ad.id} value={ad.id}>
+                  {ad.name} ({ad.id}){ad.status ? ` — ${ad.status}` : ""}
+                </option>
+              ))}
+            </select>
+
             <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-              Example: 120234142880930745
+              Pick an ad from your account instead of pasting the ID manually.
             </div>
+
+            {adsError && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 8,
+                  background: "#450a0a",
+                  color: "#fecaca",
+                  fontSize: 14,
+                }}
+              >
+                {adsError}
+              </div>
+            )}
+
+            <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => loadAds()}
+                disabled={adsLoading}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #333",
+                  background: adsLoading ? "#111" : "#1f2937",
+                  color: "white",
+                  fontWeight: 600,
+                  cursor: adsLoading ? "not-allowed" : "pointer",
+                  opacity: adsLoading ? 0.7 : 1,
+                }}
+              >
+                {adsLoading ? "Refreshing..." : "Refresh Ads"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePreviewAd()}
+                disabled={previewLoading || !existingAdId.trim()}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #333",
+                  background:
+                    previewLoading || !existingAdId.trim()
+                      ? "#111"
+                      : "#1f2937",
+                  color: "white",
+                  fontWeight: 600,
+                  cursor:
+                    previewLoading || !existingAdId.trim()
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity: previewLoading || !existingAdId.trim() ? 0.7 : 1,
+                }}
+              >
+                {previewLoading ? "Loading Preview..." : "Preview Source Ad"}
+              </button>
+            </div>
+
+            {previewError && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 8,
+                  background: "#450a0a",
+                  color: "#fecaca",
+                  fontSize: 14,
+                }}
+              >
+                {previewError}
+              </div>
+            )}
+
+            {previewData && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 14,
+                  borderRadius: 10,
+                  border: "1px solid #1f2937",
+                  background: "#0f172a",
+                  color: "white",
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 10 }}>
+                  Source Ad Preview
+                </div>
+
+                <div style={{ fontSize: 14, opacity: 0.85 }}>
+                  <div>Ad ID: {previewData.adId}</div>
+                  <div style={{ marginTop: 4 }}>
+                    Ad Name: {previewData.adName || "—"}
+                  </div>
+                  <div style={{ marginTop: 4 }}>
+                    Creative ID: {previewData.creativeId || "—"}
+                  </div>
+                  <div style={{ marginTop: 4 }}>
+                    Message: {previewData.message || "—"}
+                  </div>
+                  <div style={{ marginTop: 4 }}>
+                    Headline: {previewData.headline || "—"}
+                  </div>
+                  <div style={{ marginTop: 4 }}>
+                    Description: {previewData.description || "—"}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 10, fontSize: 13, color: "#86efac" }}>
+                  Ready to reuse this ad creative.
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -409,8 +629,8 @@ export default function DashboardPage() {
           {loading
             ? "Launching..."
             : mode === "existing"
-            ? "Launch Retargeting from Existing Ad"
-            : "Launch New Retargeting Ad"}
+              ? "Launch Retargeting from Existing Ad"
+              : "Launch New Retargeting Ad"}
         </button>
       </div>
 
