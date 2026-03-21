@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
 
   response.cookies.set("meta_access_token", tokenData.access_token, {
     httpOnly: true,
-    secure: true,
+    secure: false,
     sameSite: "lax",
     path: "/",
     maxAge: tokenData.expires_in ?? 60 * 60,
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
   response.cookies.set("meta_oauth_state", "", {
     httpOnly: true,
-    secure: true,
+    secure: false,
     sameSite: "lax",
     path: "/",
     maxAge: 0,
