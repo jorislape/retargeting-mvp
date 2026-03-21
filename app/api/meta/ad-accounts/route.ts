@@ -1,20 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-function requireEnv(name: string, value: string | undefined) {
-  if (!value) {
-    throw new Error(`Missing env: ${name}`);
-  }
-  return value;
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const accessToken = requireEnv(
-      "META_ACCESS_TOKEN",
-      process.env.META_ACCESS_TOKEN
-    );
+    const token = request.cookies.get("meta_access_token")?.value;
 
-    const url = `https://graph.facebook.com/v19.0/me/adaccounts?access_token=${accessToken}`;
+    if (!token) {
+      return NextResponse.json(
+        { ok: false, error: "No token" },
+        { status: 401 }
+      );
+    }
+
+    const url =
+      `https://graph.facebook.com/v19.0/me/adaccounts` +
+      `?fields=id,name,account_status` +
+      `&access_token=${encodeURIComponent(token)}`;
 
     const response = await fetch(url);
     const data = await response.json();
