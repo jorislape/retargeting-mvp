@@ -702,37 +702,109 @@ export default function DashboardPage() {
           style={{
             marginTop: 24,
             padding: 16,
-            borderRadius: 8,
+            borderRadius: 10,
             background: result.ok ? "#052e16" : "#450a0a",
             color: "white",
+            border: result.ok ? "1px solid #166534" : "1px solid #7f1d1d",
           }}
         >
           {result.ok ? (
             <>
-              <div>✅ Retargeting launched</div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
-                Audience ID: {result.audienceId}
+              <div style={{ fontSize: 20, fontWeight: 800 }}>
+                ✅ Retargeting launched
               </div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
-                Ad Set ID: {result.adsetId}
+
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 14,
+                  opacity: 0.9,
+                  lineHeight: 1.5,
+                }}
+              >
+                Your retargeting setup was created successfully and is currently
+                saved in paused status inside Meta.
               </div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
-                Ad ID: {result.adId}
-              </div>
-              {result.reusedCreativeId && (
-                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
-                  Reused Creative ID: {result.reusedCreativeId}
+
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: 12,
+                  borderRadius: 8,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                  What was created
                 </div>
-              )}
+
+                <div style={{ fontSize: 14, lineHeight: 1.7 }}>
+                  <div>• Custom Audience created</div>
+                  <div>• Ad Set created in paused status</div>
+                  <div>• Retargeting Ad created in paused status</div>
+                  {result.reusedCreativeId ? (
+                    <div>• Existing winning creative reused successfully</div>
+                  ) : (
+                    <div>• New creative generated from the form inputs</div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 14,
+                  fontSize: 12,
+                  opacity: 0.8,
+                  lineHeight: 1.7,
+                }}
+              >
+                <div>Audience ID: {result.audienceId}</div>
+                <div>Ad Set ID: {result.adsetId}</div>
+                <div>Ad ID: {result.adId}</div>
+                {result.reusedCreativeId && (
+                  <div>Reused Creative ID: {result.reusedCreativeId}</div>
+                )}
+              </div>
             </>
           ) : (
             <>
-              <div>❌ Launch failed</div>
+              <div style={{ fontSize: 20, fontWeight: 800 }}>
+                ❌ Launch failed
+              </div>
+
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 14,
+                  opacity: 0.9,
+                  lineHeight: 1.5,
+                }}
+              >
+                The retargeting setup could not be completed. Check the error
+                details below.
+              </div>
+
+              {result.step && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 13,
+                    color: "#fecaca",
+                    fontWeight: 700,
+                  }}
+                >
+                  Failed step: {result.step}
+                </div>
+              )}
+
               <pre
                 style={{
                   whiteSpace: "pre-wrap",
                   marginTop: 12,
                   marginBottom: 0,
+                  fontSize: 12,
+                  opacity: 0.95,
                 }}
               >
                 {JSON.stringify(result, null, 2)}
