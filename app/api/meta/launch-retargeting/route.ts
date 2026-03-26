@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     });
 
     // VALIDATION 1:
-    // jei naudojamas existing ad, patikrinam ar jis tikrai priklauso pasirinktam ad account
+    // Jei naudojamas existing ad, patikrinam ar jis priklauso pasirinktam ad account.
     if (existingAdId.trim()) {
       const adCheckUrl = new URL(
         `https://graph.facebook.com/${META_API_VERSION}/${existingAdId}`
@@ -104,7 +104,8 @@ export async function POST(req: NextRequest) {
             ok: false,
             step: "validate_existing_ad",
             adAccountId,
-            error: adCheckData.error?.message || "Failed to validate existing ad",
+            error:
+              adCheckData.error?.message || "Failed to validate existing ad",
             raw: adCheckData,
           },
           { status: 400 }
@@ -126,6 +127,110 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+    }
+
+    // VALIDATION 2:
+    // Patikrinam ar campaign priklauso pasirinktam ad account.
+    const campaignCheckUrl = new URL(
+      `https://graph.facebook.com/${META_API_VERSION}/${campaignId}`
+    );
+    campaignCheckUrl.searchParams.set("fields", "account_id,status,name");
+    campaignCheckUrl.searchParams.set("access_token", accessToken);
+
+    const campaignCheckRes = await fetch(campaignCheckUrl.toString(), {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    const campaignCheckData = await campaignCheckRes.json();
+
+    if (!campaignCheckRes.ok || campaignCheckData.error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "validate_campaign",
+          adAccountId,
+          campaignId,
+          error:
+            campaignCheckData.error?.message || "Failed to validate campaign",
+          raw: campaignCheckData,
+        },
+        { status: 400 }
+      );
+    }
+
+    const campaignAccountId = normalizeAccountId(campaignCheckData.account_id);
+
+    if (campaignAccountId !== adAccountId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "validate_campaign_account_mismatch",
+          adAccountId,
+          campaignId,
+          error:
+            "Selected campaign does not belong to the selected ad account. This launch was blocked.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // VALIDATION 3:
+    // Patikrinam ar pixel apskritai pasiekiamas.
+    const pixelCheckUrl = new URL(
+      `https://graph.facebook.com/${META_API_VERSION}/${pixelId}`
+    );
+    pixelCheckUrl.searchParams.set("fields", "id,name");
+    pixelCheckUrl.searchParams.set("access_token", accessToken);
+
+    const pixelCheckRes = await fetch(pixelCheckUrl.toString(), {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    const pixelCheckData = await pixelCheckRes.json();
+
+    if (!pixelCheckRes.ok || pixelCheckData.error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "validate_pixel",
+          adAccountId,
+          pixelId,
+          error: pixelCheckData.error?.message || "Failed to validate pixel",
+          raw: pixelCheckData,
+        },
+        { status: 400 }
+      );
+    }
+
+    // VALIDATION 4:
+    // Patikrinam ar page apskritai pasiekiamas.
+    const pageCheckUrl = new URL(
+      `https://graph.facebook.com/${META_API_VERSION}/${pageId}`
+    );
+    pageCheckUrl.searchParams.set("fields", "id,name");
+    pageCheckUrl.searchParams.set("access_token", accessToken);
+
+    const pageCheckRes = await fetch(pageCheckUrl.toString(), {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    const pageCheckData = await pageCheckRes.json();
+
+    if (!pageCheckRes.ok || pageCheckData.error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "validate_page",
+          adAccountId,
+          pageId,
+          error: pageCheckData.error?.message || "Failed to validate page",
+          raw: pageCheckData,
+        },
+        { status: 400 }
+      );
     }
 
     const audienceRule = {
