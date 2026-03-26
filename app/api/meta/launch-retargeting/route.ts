@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const META_API_VERSION = "v19.0";
+const META_API_VERSION = "v23.0";
 
 function requireEnv(name: string, value: string | undefined) {
   if (!value) {
@@ -9,35 +9,8 @@ function requireEnv(name: string, value: string | undefined) {
   return value;
 }
 
-async function getUserAdAccountId(accessToken: string) {
-  const url = new URL(
-    `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`
-  );
-  url.searchParams.set("fields", "id,name,account_status");
-  url.searchParams.set("access_token", accessToken);
-
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    cache: "no-store",
-  });
-
-  const data = await res.json();
-
-  if (!res.ok || data.error) {
-    throw new Error(
-      data?.error?.message || "Failed to fetch user ad accounts"
-    );
-  }
-
-  const firstAdAccount = data?.data?.[0];
-
-  if (!firstAdAccount?.id) {
-    throw new Error("No ad accounts found for this user");
-  }
-
-  return firstAdAccount.id.startsWith("act_")
-    ? firstAdAccount.id
-    : `act_${firstAdAccount.id}`;
+function normalizeAccountId(adAccountId: string) {
+  return adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -62,9 +35,22 @@ export async function POST(req: NextRequest) {
     );
     const pageId = requireEnv("META_PAGE_ID", process.env.META_PAGE_ID);
 
-    const adAccountId = await getUserAdAccountId(accessToken);
-
     const body = await req.json().catch(() => ({}));
+
+    const rawAdAccountId = body.adAccountId;
+
+    if (typeof rawAdAccountId !== "string" || !rawAdAccountId.trim()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "validate_ad_account",
+          error: "Missing adAccountId",
+        },
+        { status: 400 }
+      );
+    }
+
+    const adAccountId = normalizeAccountId(rawAdAccountId.trim());
 
     const audienceName = body.audienceName || "Website Visitors 30 Days";
     const audienceDescription =
@@ -95,6 +81,52 @@ export async function POST(req: NextRequest) {
       retentionSeconds,
       eventName,
     });
+
+    // VALIDATION 1:
+    // jei naudojamas existing ad, patikrinam ar jis tikrai priklauso pasirinktam ad account
+    if (existingAdId.trim()) {
+      const adCheckUrl = new URL(
+        `https://graph.facebook.com/${META_API_VERSION}/${existingAdId}`
+      );
+      adCheckUrl.searchParams.set("fields", "account_id");
+      adCheckUrl.searchParams.set("access_token", accessToken);
+
+      const adCheckRes = await fetch(adCheckUrl.toString(), {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const adCheckData = await adCheckRes.json();
+
+      if (!adCheckRes.ok || adCheckData.error) {
+        return NextResponse.json(
+          {
+            ok: false,
+            step: "validate_existing_ad",
+            adAccountId,
+            error: adCheckData.error?.message || "Failed to validate existing ad",
+            raw: adCheckData,
+          },
+          { status: 400 }
+        );
+      }
+
+      const adAccountFromAd = normalizeAccountId(adCheckData.account_id);
+
+      if (adAccountFromAd !== adAccountId) {
+        return NextResponse.json(
+          {
+            ok: false,
+            step: "validate_ad_account_mismatch",
+            adAccountId,
+            existingAdId,
+            error:
+              "Selected ad does not belong to the selected ad account. This launch was blocked.",
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     const audienceRule = {
       inclusions: {
