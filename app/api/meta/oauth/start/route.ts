@@ -19,7 +19,7 @@ export async function GET() {
     `?client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&state=${encodeURIComponent(state)}` +
-    `&scope=${encodeURIComponent("public_profile")}` +
+    `&scope=${encodeURIComponent("public_profile,ads_read")}` +
     `&response_type=code`;
 
   const response = NextResponse.redirect(url);

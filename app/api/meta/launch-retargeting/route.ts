@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+const META_API_VERSION = "v19.0";
 
 function requireEnv(name: string, value: string | undefined) {
   if (!value) {
@@ -7,22 +9,60 @@ function requireEnv(name: string, value: string | undefined) {
   return value;
 }
 
-export async function POST(req: Request) {
+async function getUserAdAccountId(accessToken: string) {
+  const url = new URL(
+    `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`
+  );
+  url.searchParams.set("fields", "id,name,account_status");
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    throw new Error(
+      data?.error?.message || "Failed to fetch user ad accounts"
+    );
+  }
+
+  const firstAdAccount = data?.data?.[0];
+
+  if (!firstAdAccount?.id) {
+    throw new Error("No ad accounts found for this user");
+  }
+
+  return firstAdAccount.id.startsWith("act_")
+    ? firstAdAccount.id
+    : `act_${firstAdAccount.id}`;
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const accessToken = requireEnv(
-      "META_ACCESS_TOKEN",
-      process.env.META_ACCESS_TOKEN
-    );
-    const adAccountId = requireEnv(
-      "META_AD_ACCOUNT_ID",
-      process.env.META_AD_ACCOUNT_ID
-    );
+    const accessToken = req.cookies.get("meta_access_token")?.value;
+
+    if (!accessToken) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "auth",
+          error: "No meta_access_token cookie found",
+        },
+        { status: 401 }
+      );
+    }
+
     const pixelId = requireEnv("META_PIXEL_ID", process.env.META_PIXEL_ID);
     const campaignId = requireEnv(
       "META_CAMPAIGN_ID",
       process.env.META_CAMPAIGN_ID
     );
     const pageId = requireEnv("META_PAGE_ID", process.env.META_PAGE_ID);
+
+    const adAccountId = await getUserAdAccountId(accessToken);
 
     const body = await req.json().catch(() => ({}));
 
@@ -83,13 +123,8 @@ export async function POST(req: Request) {
       },
     };
 
-    console.log("[launch-retargeting] creating audience", {
-      audienceName,
-      audienceDescription,
-    });
-
     const audienceRes = await fetch(
-      `https://graph.facebook.com/v19.0/${adAccountId}/customaudiences`,
+      `https://graph.facebook.com/${META_API_VERSION}/${adAccountId}/customaudiences`,
       {
         method: "POST",
         headers: {
@@ -108,15 +143,11 @@ export async function POST(req: Request) {
     const audienceData = await audienceRes.json();
 
     if (!audienceRes.ok || audienceData.error) {
-      console.error("[launch-retargeting] create_audience failed", {
-        status: audienceRes.status,
-        error: audienceData.error || audienceData,
-      });
-
       return NextResponse.json(
         {
           ok: false,
           step: "create_audience",
+          adAccountId,
           error: audienceData.error || audienceData,
         },
         { status: 500 }
@@ -125,19 +156,8 @@ export async function POST(req: Request) {
 
     const audienceId = audienceData.id;
 
-    console.log("[launch-retargeting] audience created", {
-      audienceId,
-    });
-
-    console.log("[launch-retargeting] creating adset", {
-      adsetName,
-      campaignId,
-      dailyBudget,
-      audienceId,
-    });
-
     const adsetRes = await fetch(
-      `https://graph.facebook.com/v19.0/${adAccountId}/adsets`,
+      `https://graph.facebook.com/${META_API_VERSION}/${adAccountId}/adsets`,
       {
         method: "POST",
         headers: {
@@ -166,16 +186,11 @@ export async function POST(req: Request) {
     const adsetData = await adsetRes.json();
 
     if (!adsetRes.ok || adsetData.error) {
-      console.error("[launch-retargeting] create_adset failed", {
-        status: adsetRes.status,
-        audienceId,
-        error: adsetData.error || adsetData,
-      });
-
       return NextResponse.json(
         {
           ok: false,
           step: "create_adset",
+          adAccountId,
           audienceId,
           error: adsetData.error || adsetData,
         },
@@ -185,38 +200,28 @@ export async function POST(req: Request) {
 
     const adsetId = adsetData.id;
 
-    console.log("[launch-retargeting] adset created", {
-      adsetId,
-      audienceId,
-    });
-
     let adPayload: any;
     let reusedCreativeId: string | null = null;
 
     if (existingAdId.trim()) {
-      console.log("[launch-retargeting] fetching existing ad creative", {
-        existingAdId,
-      });
-
       const existingAdRes = await fetch(
-        `https://graph.facebook.com/v19.0/${existingAdId}?fields=creative&access_token=${accessToken}`
+        `https://graph.facebook.com/${META_API_VERSION}/${existingAdId}?fields=creative&access_token=${encodeURIComponent(
+          accessToken
+        )}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
       );
 
       const existingAdData = await existingAdRes.json();
 
       if (!existingAdRes.ok || existingAdData.error) {
-        console.error("[launch-retargeting] get_existing_ad_creative failed", {
-          status: existingAdRes.status,
-          existingAdId,
-          audienceId,
-          adsetId,
-          error: existingAdData.error || existingAdData,
-        });
-
         return NextResponse.json(
           {
             ok: false,
             step: "get_existing_ad_creative",
+            adAccountId,
             audienceId,
             adsetId,
             error: existingAdData.error || existingAdData,
@@ -228,19 +233,11 @@ export async function POST(req: Request) {
       const creativeId = existingAdData?.creative?.id;
 
       if (!creativeId) {
-        console.error(
-          "[launch-retargeting] get_existing_ad_creative missing creativeId",
-          {
-            existingAdId,
-            audienceId,
-            adsetId,
-          }
-        );
-
         return NextResponse.json(
           {
             ok: false,
             step: "get_existing_ad_creative",
+            adAccountId,
             audienceId,
             adsetId,
             error: "Existing ad does not have a usable creative ID.",
@@ -250,11 +247,6 @@ export async function POST(req: Request) {
       }
 
       reusedCreativeId = creativeId;
-
-      console.log("[launch-retargeting] existing creative resolved", {
-        existingAdId,
-        creativeId,
-      });
 
       adPayload = {
         name: adName,
@@ -266,13 +258,6 @@ export async function POST(req: Request) {
         access_token: accessToken,
       };
     } else {
-      console.log("[launch-retargeting] creating new creative payload", {
-        adName,
-        adsetId,
-        pageId,
-        hasDescription: !!description,
-      });
-
       adPayload = {
         name: adName,
         adset_id: adsetId,
@@ -292,36 +277,25 @@ export async function POST(req: Request) {
       };
     }
 
-    console.log("[launch-retargeting] creating ad", {
-      adName,
-      adsetId,
-      reusedCreativeId,
-      mode,
-    });
-
-    const adRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/ads`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(adPayload),
-    });
+    const adRes = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/${adAccountId}/ads`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(adPayload),
+      }
+    );
 
     const adData = await adRes.json();
 
     if (!adRes.ok || adData.error) {
-      console.error("[launch-retargeting] create_ad failed", {
-        status: adRes.status,
-        audienceId,
-        adsetId,
-        reusedCreativeId,
-        error: adData.error || adData,
-      });
-
       return NextResponse.json(
         {
           ok: false,
           step: "create_ad",
+          adAccountId,
           audienceId,
           adsetId,
           reusedCreativeId,
@@ -331,26 +305,15 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("[launch-retargeting] success", {
-      audienceId,
-      adsetId,
-      adId: adData.id,
-      reusedCreativeId,
-      mode,
-    });
-
     return NextResponse.json({
       ok: true,
+      adAccountId,
       audienceId,
       adsetId,
       adId: adData.id,
       reusedCreativeId,
     });
   } catch (error) {
-    console.error("[launch-retargeting] unexpected error", {
-      error: error instanceof Error ? error.message : error,
-    });
-
     return NextResponse.json(
       {
         ok: false,

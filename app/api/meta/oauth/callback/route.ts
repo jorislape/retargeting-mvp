@@ -55,15 +55,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const response = NextResponse.json({
-    ok: true,
-    message: "TOKEN_RECEIVED",
-    tokenData,
-  });
+  const dashboardUrl = new URL("/dashboard", request.url);
+  const response = NextResponse.redirect(dashboardUrl);
 
   response.cookies.set("meta_access_token", tokenData.access_token, {
     httpOnly: true,
-    secure: false,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: tokenData.expires_in ?? 60 * 60,
@@ -71,7 +68,7 @@ export async function GET(request: NextRequest) {
 
   response.cookies.set("meta_oauth_state", "", {
     httpOnly: true,
-    secure: false,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 0,

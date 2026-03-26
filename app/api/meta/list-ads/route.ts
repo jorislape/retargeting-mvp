@@ -1,56 +1,95 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const META_API_VERSION = "v23.0";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const accessToken = process.env.META_ACCESS_TOKEN;
-    const adAccountId = process.env.META_AD_ACCOUNT_ID;
+    const accessToken = request.cookies.get("meta_access_token")?.value;
 
-    if (!accessToken || !adAccountId) {
+    if (!accessToken) {
       return NextResponse.json(
         {
           ok: false,
-          error: "Missing META_ACCESS_TOKEN or META_AD_ACCOUNT_ID",
+          error: "No meta_access_token cookie found",
         },
-        { status: 500 }
+        { status: 401 }
       );
     }
 
-    // užtikrinam kad būtų act_ prefiksas
-    const normalizedAccountId = adAccountId.startsWith("act_")
-      ? adAccountId
-      : `act_${adAccountId}`;
-
-    const url = new URL(
-      `https://graph.facebook.com/${META_API_VERSION}/${normalizedAccountId}/ads`
+    // 1) Pasiimam user ad accounts
+    const adAccountsUrl = new URL(
+      `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`
     );
+    adAccountsUrl.searchParams.set("fields", "id,name,account_status");
+    adAccountsUrl.searchParams.set("access_token", accessToken);
 
-    url.searchParams.set("fields", "id,name,status");
-    url.searchParams.set("limit", "50");
-    url.searchParams.set("access_token", accessToken);
-
-    const res = await fetch(url.toString(), {
+    const adAccountsRes = await fetch(adAccountsUrl.toString(), {
       method: "GET",
       cache: "no-store",
     });
 
-    const data = await res.json();
+    const adAccountsData = await adAccountsRes.json();
 
-    // error iš Meta
-    if (!res.ok || data.error) {
+    if (!adAccountsRes.ok || adAccountsData.error) {
       return NextResponse.json(
         {
           ok: false,
-          error: data.error?.message || "Failed to fetch ads",
-          raw: data,
+          step: "get_ad_accounts",
+          error: adAccountsData.error?.message || "Failed to fetch ad accounts",
+          raw: adAccountsData,
+        },
+        { status: 400 }
+      );
+    }
+
+    const firstAdAccount = adAccountsData.data?.[0];
+
+    if (!firstAdAccount?.id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "pick_ad_account",
+          error: "No ad accounts found for this user",
+          raw: adAccountsData,
+        },
+        { status: 404 }
+      );
+    }
+
+    const normalizedAccountId = firstAdAccount.id.startsWith("act_")
+      ? firstAdAccount.id
+      : `act_${firstAdAccount.id}`;
+
+    // 2) Su pirmu ad accountu pasiimam ads
+    const adsUrl = new URL(
+      `https://graph.facebook.com/${META_API_VERSION}/${normalizedAccountId}/ads`
+    );
+    adsUrl.searchParams.set("fields", "id,name,status");
+    adsUrl.searchParams.set("limit", "50");
+    adsUrl.searchParams.set("access_token", accessToken);
+
+    const adsRes = await fetch(adsUrl.toString(), {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    const adsData = await adsRes.json();
+
+    if (!adsRes.ok || adsData.error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "get_ads",
+          error: adsData.error?.message || "Failed to fetch ads",
+          raw: adsData,
+          adAccountId: normalizedAccountId,
         },
         { status: 400 }
       );
     }
 
     const ads =
-      data.data?.map((ad: any) => ({
+      adsData.data?.map((ad: any) => ({
         id: ad.id,
         name: ad.name || `Ad ${ad.id}`,
         status: ad.status || null,
@@ -58,6 +97,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
+      adAccountId: normalizedAccountId,
       ads,
     });
   } catch (error: any) {

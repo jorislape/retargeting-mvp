@@ -11,6 +11,7 @@ type MetaAdOption = {
 };
 
 export default function DashboardPage() {
+  const [connected, setConnected] = useState<boolean | null>(null);
   const [accessCode, setAccessCode] = useState("");
   const [unlocked, setUnlocked] = useState(false);
 
@@ -79,6 +80,20 @@ export default function DashboardPage() {
 
   const isFormValid = !validationError;
 
+  async function checkSession() {
+    try {
+      const res = await fetch("/api/meta/session", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+      setConnected(Boolean(data?.connected));
+    } catch {
+      setConnected(false);
+    }
+  }
+
   async function loadAds() {
     try {
       setAdsLoading(true);
@@ -106,12 +121,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!unlocked) return;
+    checkSession();
+  }, [unlocked]);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    if (!connected) return;
     if (mode !== "existing") return;
     if (hasTriedLoadingAds.current) return;
 
     hasTriedLoadingAds.current = true;
     loadAds();
-  }, [unlocked, mode]);
+  }, [unlocked, connected, mode]);
 
   async function handlePreviewAd(adIdOverride?: string) {
     const adIdToUse = (adIdOverride ?? existingAdId).trim();
@@ -172,6 +193,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!unlocked) return;
+    if (!connected) return;
     if (mode !== "existing") return;
 
     const trimmedAdId = existingAdId.trim();
@@ -185,7 +207,7 @@ export default function DashboardPage() {
     }
 
     handlePreviewAd(trimmedAdId);
-  }, [existingAdId, mode, unlocked]);
+  }, [existingAdId, mode, unlocked, connected]);
 
   async function handleLaunchRetargeting() {
     if (!isFormValid) {
@@ -297,12 +319,108 @@ export default function DashboardPage() {
     );
   }
 
+  if (connected === null) {
+    return (
+      <main style={{ padding: 40, maxWidth: 760, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 28, marginBottom: 8 }}>
+          🚀 One-Click Meta Retargeting
+        </h1>
+        <p style={{ opacity: 0.7 }}>Checking Meta connection...</p>
+      </main>
+    );
+  }
+
+  if (!connected) {
+    return (
+      <main style={{ padding: 40, maxWidth: 760, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 28, marginBottom: 8 }}>
+          🚀 One-Click Meta Retargeting
+        </h1>
+        <p style={{ opacity: 0.7, marginBottom: 20 }}>
+          Connect your Meta account to load ads and launch retargeting.
+        </p>
+
+        <div
+          style={{
+            padding: 16,
+            borderRadius: 12,
+            border: "1px solid #222",
+            background: "#0b0b0b",
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+            Meta connection required
+          </div>
+
+          <div style={{ fontSize: 14, opacity: 0.75, lineHeight: 1.6 }}>
+            Your dashboard is unlocked, but there is no active Meta session yet.
+            Connect your account to continue.
+          </div>
+
+          <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/api/meta/oauth/start";
+              }}
+              style={{
+                padding: "12px 16px",
+                borderRadius: 10,
+                border: "none",
+                background: "#2563eb",
+                color: "#fff",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              Connect Meta
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                checkSession();
+              }}
+              style={{
+                padding: "12px 16px",
+                borderRadius: 10,
+                border: "1px solid #333",
+                background: "#111",
+                color: "#fff",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              Refresh Status
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main style={{ padding: 40, maxWidth: 760, margin: "0 auto" }}>
       <h1 style={{ fontSize: 28, marginBottom: 8 }}>
         🚀 One-Click Meta Retargeting
       </h1>
       <p style={{ opacity: 0.7 }}>Launch retargeting ads in seconds.</p>
+
+      <div
+        style={{
+          marginTop: 16,
+          padding: 12,
+          borderRadius: 10,
+          border: "1px solid #1f2937",
+          background: "#0f172a",
+          color: "#cbd5e1",
+          fontSize: 13,
+        }}
+      >
+        Meta account connected.
+      </div>
 
       <div
         style={{

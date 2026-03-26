@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 function firstNonEmpty(...values: Array<unknown>) {
   for (const value of values) {
@@ -13,7 +13,7 @@ function imageFromCallToAction(linkData: any) {
   return linkData?.child_attachments?.[0]?.picture || "";
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const { adId } = await req.json();
 
@@ -24,20 +24,25 @@ export async function POST(req: Request) {
       });
     }
 
-    const accessToken = process.env.META_ACCESS_TOKEN;
+    const accessToken = req.cookies.get("meta_access_token")?.value;
 
     if (!accessToken) {
-      return NextResponse.json({
-        ok: false,
-        error: "Missing META_ACCESS_TOKEN",
-      });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No meta_access_token cookie found",
+        },
+        { status: 401 }
+      );
     }
 
     const fields =
       "name,creative{id,object_story_spec,asset_feed_spec,title,body,image_url,thumbnail_url,effective_object_story_id}";
 
     const adRes = await fetch(
-      `https://graph.facebook.com/v19.0/${adId}?fields=${fields}&access_token=${accessToken}`,
+      `https://graph.facebook.com/v19.0/${adId}?fields=${encodeURIComponent(
+        fields
+      )}&access_token=${encodeURIComponent(accessToken)}`,
       {
         method: "GET",
         cache: "no-store",
@@ -46,11 +51,14 @@ export async function POST(req: Request) {
 
     const adData = await adRes.json();
 
-    if (adData.error) {
-      return NextResponse.json({
-        ok: false,
-        error: adData.error,
-      });
+    if (!adRes.ok || adData.error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: adData.error || "Failed to fetch ad preview",
+        },
+        { status: 400 }
+      );
     }
 
     const creative = adData.creative || {};
@@ -127,9 +135,12 @@ export async function POST(req: Request) {
       },
     });
   } catch {
-    return NextResponse.json({
-      ok: false,
-      error: "Failed to fetch preview",
-    });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Failed to fetch preview",
+      },
+      { status: 500 }
+    );
   }
 }
