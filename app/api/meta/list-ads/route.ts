@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 const META_API_VERSION = "v23.0";
 
-export async function GET(request: NextRequest) {
+type MetaAd = {
+  id: string;
+  name?: string;
+  status?: string | null;
+};
+
+export async function POST(request: NextRequest) {
   try {
     const accessToken = request.cookies.get("meta_access_token")?.value;
 
@@ -16,51 +22,38 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 1) Pasiimam user ad accounts
-    const adAccountsUrl = new URL(
-      `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`
-    );
-    adAccountsUrl.searchParams.set("fields", "id,name,account_status");
-    adAccountsUrl.searchParams.set("access_token", accessToken);
+    let body: any;
 
-    const adAccountsRes = await fetch(adAccountsUrl.toString(), {
-      method: "GET",
-      cache: "no-store",
-    });
-
-    const adAccountsData = await adAccountsRes.json();
-
-    if (!adAccountsRes.ok || adAccountsData.error) {
+    try {
+      body = await request.json();
+    } catch {
       return NextResponse.json(
         {
           ok: false,
-          step: "get_ad_accounts",
-          error: adAccountsData.error?.message || "Failed to fetch ad accounts",
-          raw: adAccountsData,
+          error: "Invalid JSON body",
         },
         { status: 400 }
       );
     }
 
-    const firstAdAccount = adAccountsData.data?.[0];
+    const rawAdAccountId = body?.adAccountId;
 
-    if (!firstAdAccount?.id) {
+    if (typeof rawAdAccountId !== "string" || !rawAdAccountId.trim()) {
       return NextResponse.json(
         {
           ok: false,
-          step: "pick_ad_account",
-          error: "No ad accounts found for this user",
-          raw: adAccountsData,
+          error: "Missing adAccountId",
         },
-        { status: 404 }
+        { status: 400 }
       );
     }
 
-    const normalizedAccountId = firstAdAccount.id.startsWith("act_")
-      ? firstAdAccount.id
-      : `act_${firstAdAccount.id}`;
+    const adAccountId = rawAdAccountId.trim();
 
-    // 2) Su pirmu ad accountu pasiimam ads
+    const normalizedAccountId = adAccountId.startsWith("act_")
+      ? adAccountId
+      : `act_${adAccountId}`;
+
     const adsUrl = new URL(
       `https://graph.facebook.com/${META_API_VERSION}/${normalizedAccountId}/ads`
     );
@@ -88,8 +81,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const ads =
-      adsData.data?.map((ad: any) => ({
+    const ads: MetaAd[] =
+      adsData?.data?.map((ad: MetaAd) => ({
         id: ad.id,
         name: ad.name || `Ad ${ad.id}`,
         status: ad.status || null,

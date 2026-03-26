@@ -10,6 +10,12 @@ type MetaAdOption = {
   status?: string | null;
 };
 
+type MetaAdAccountOption = {
+  id: string;
+  name?: string;
+  account_id?: string;
+};
+
 export default function DashboardPage() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [accessCode, setAccessCode] = useState("");
@@ -37,6 +43,11 @@ export default function DashboardPage() {
   const [adsLoading, setAdsLoading] = useState(false);
   const [adsError, setAdsError] = useState("");
 
+  const [adAccounts, setAdAccounts] = useState<MetaAdAccountOption[]>([]);
+  const [adAccountsLoading, setAdAccountsLoading] = useState(false);
+  const [adAccountsError, setAdAccountsError] = useState("");
+  const [selectedAdAccountId, setSelectedAdAccountId] = useState("");
+
   const hasTriedLoadingAds = useRef(false);
   const previewRequestIdRef = useRef(0);
 
@@ -50,6 +61,10 @@ export default function DashboardPage() {
   }
 
   const validationError = useMemo(() => {
+    if (!selectedAdAccountId.trim()) {
+      return "Please select an ad account.";
+    }
+
     if (!Number.isFinite(budget) || budget < 1) {
       return "Daily Budget must be at least €1.";
     }
@@ -76,7 +91,16 @@ export default function DashboardPage() {
     if (!productName.trim()) return "Product Name is required.";
 
     return "";
-  }, [mode, existingAdId, message, link, productName, budget, days]);
+  }, [
+    selectedAdAccountId,
+    mode,
+    existingAdId,
+    message,
+    link,
+    productName,
+    budget,
+    days,
+  ]);
 
   const isFormValid = !validationError;
 
@@ -94,13 +118,71 @@ export default function DashboardPage() {
     }
   }
 
+  async function loadAdAccounts() {
+    try {
+      setAdAccountsLoading(true);
+      setAdAccountsError("");
+
+      const res = await fetch("/api/meta/ad-accounts", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to load ad accounts.");
+      }
+
+      const nextAccounts: MetaAdAccountOption[] = Array.isArray(data.adAccounts)
+        ? data.adAccounts
+        : [];
+
+      setAdAccounts(nextAccounts);
+
+      if (nextAccounts.length === 0) {
+        setSelectedAdAccountId("");
+        setAds([]);
+        setExistingAdId("");
+        throw new Error("No ad accounts found.");
+      }
+
+      setSelectedAdAccountId((current) => {
+        if (
+          current &&
+          nextAccounts.some((account) => normalizeAccountId(account.id) === normalizeAccountId(current))
+        ) {
+          return current;
+        }
+
+        return nextAccounts[0].id;
+      });
+    } catch (err: any) {
+      setAdAccounts([]);
+      setSelectedAdAccountId("");
+      setAdAccountsError(err?.message || "Failed to load ad accounts.");
+    } finally {
+      setAdAccountsLoading(false);
+    }
+  }
+
   async function loadAds() {
     try {
       setAdsLoading(true);
       setAdsError("");
 
+      if (!selectedAdAccountId.trim()) {
+        throw new Error("No ad account selected");
+      }
+
       const res = await fetch("/api/meta/list-ads", {
-        method: "GET",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adAccountId: selectedAdAccountId,
+        }),
         cache: "no-store",
       });
 
@@ -110,7 +192,7 @@ export default function DashboardPage() {
         throw new Error(data.error || "Failed to load ads.");
       }
 
-      setAds(data.ads || []);
+      setAds(Array.isArray(data.ads) ? data.ads : []);
     } catch (err: any) {
       setAdsError(err?.message || "Failed to load ads.");
       setAds([]);
@@ -127,15 +209,39 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!unlocked) return;
     if (!connected) return;
+    loadAdAccounts();
+  }, [unlocked, connected]);
+
+  useEffect(() => {
+    hasTriedLoadingAds.current = false;
+    setAds([]);
+    setAdsError("");
+    setExistingAdId("");
+    setPreviewError("");
+    setPreviewData(null);
+    setPreviewLoading(false);
+    previewRequestIdRef.current += 1;
+  }, [selectedAdAccountId]);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    if (!connected) return;
     if (mode !== "existing") return;
+    if (!selectedAdAccountId.trim()) return;
     if (hasTriedLoadingAds.current) return;
 
     hasTriedLoadingAds.current = true;
     loadAds();
-  }, [unlocked, connected, mode]);
+  }, [unlocked, connected, mode, selectedAdAccountId]);
 
   async function handlePreviewAd(adIdOverride?: string) {
     const adIdToUse = (adIdOverride ?? existingAdId).trim();
+
+    if (!selectedAdAccountId.trim()) {
+      setPreviewError("Ad account is required.");
+      setPreviewData(null);
+      return;
+    }
 
     if (!adIdToUse) {
       setPreviewError("Existing Ad ID is required.");
@@ -156,6 +262,7 @@ export default function DashboardPage() {
         },
         body: JSON.stringify({
           adId: adIdToUse,
+          adAccountId: selectedAdAccountId,
         }),
       });
 
@@ -195,6 +302,7 @@ export default function DashboardPage() {
     if (!unlocked) return;
     if (!connected) return;
     if (mode !== "existing") return;
+    if (!selectedAdAccountId.trim()) return;
 
     const trimmedAdId = existingAdId.trim();
 
@@ -207,7 +315,7 @@ export default function DashboardPage() {
     }
 
     handlePreviewAd(trimmedAdId);
-  }, [existingAdId, mode, unlocked, connected]);
+  }, [existingAdId, mode, unlocked, connected, selectedAdAccountId]);
 
   async function handleLaunchRetargeting() {
     if (!isFormValid) {
@@ -223,12 +331,14 @@ export default function DashboardPage() {
       const payload =
         mode === "existing"
           ? {
+              adAccountId: selectedAdAccountId,
               audienceName: `Visitors ${days}d`,
               retentionSeconds: days * 86400,
               dailyBudget: budget * 100,
               existingAdId: existingAdId.trim(),
             }
           : {
+              adAccountId: selectedAdAccountId,
               audienceName: `Visitors ${days}d`,
               retentionSeconds: days * 86400,
               dailyBudget: budget * 100,
@@ -248,11 +358,6 @@ export default function DashboardPage() {
       });
 
       const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        setResult(data);
-        return;
-      }
 
       setResult(data);
     } catch {
@@ -432,6 +537,62 @@ export default function DashboardPage() {
         }}
       >
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+          Ad Account
+        </div>
+
+        <select
+          value={selectedAdAccountId}
+          onChange={(e) => {
+            setSelectedAdAccountId(e.target.value);
+            setFormError("");
+            setResult(null);
+          }}
+          style={inputStyle}
+          disabled={adAccountsLoading}
+        >
+          <option value="">
+            {adAccountsLoading
+              ? "Loading ad accounts..."
+              : "Select an ad account"}
+          </option>
+
+          {adAccounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name || account.id} ({normalizeAccountId(account.id)})
+            </option>
+          ))}
+        </select>
+
+        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+          The selected ad account must control every downstream action.
+        </div>
+
+        {adAccountsError && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 8,
+              background: "#450a0a",
+              color: "#fecaca",
+              fontSize: 14,
+            }}
+          >
+            {adAccountsError}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          marginTop: 24,
+          padding: 16,
+          borderRadius: 12,
+          border: "1px solid #222",
+          background: "#0b0b0b",
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
           Launch Mode
         </div>
 
@@ -495,10 +656,14 @@ export default function DashboardPage() {
                 setPreviewError("");
               }}
               style={inputStyle}
-              disabled={adsLoading}
+              disabled={adsLoading || !selectedAdAccountId}
             >
               <option value="">
-                {adsLoading ? "Loading ads..." : "Select an existing Meta ad"}
+                {adsLoading
+                  ? "Loading ads..."
+                  : !selectedAdAccountId
+                    ? "Select an ad account first"
+                    : "Select an existing Meta ad"}
               </option>
 
               {ads.map((ad) => (
@@ -509,7 +674,7 @@ export default function DashboardPage() {
             </select>
 
             <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-              Pick an ad from your account instead of pasting the ID manually.
+              Pick an ad from the selected account instead of pasting the ID manually.
             </div>
 
             {adsError && (
@@ -541,16 +706,20 @@ export default function DashboardPage() {
                   hasTriedLoadingAds.current = false;
                   loadAds();
                 }}
-                disabled={adsLoading}
+                disabled={adsLoading || !selectedAdAccountId}
                 style={{
                   padding: "10px 14px",
                   borderRadius: 8,
                   border: "1px solid #333",
-                  background: adsLoading ? "#111" : "#1f2937",
+                  background:
+                    adsLoading || !selectedAdAccountId ? "#111" : "#1f2937",
                   color: "white",
                   fontWeight: 600,
-                  cursor: adsLoading ? "not-allowed" : "pointer",
-                  opacity: adsLoading ? 0.7 : 1,
+                  cursor:
+                    adsLoading || !selectedAdAccountId
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity: adsLoading || !selectedAdAccountId ? 0.7 : 1,
                 }}
               >
                 {adsLoading ? "Refreshing..." : "Refresh Ads"}
@@ -559,22 +728,35 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => handlePreviewAd()}
-                disabled={previewLoading || !existingAdId.trim()}
+                disabled={
+                  previewLoading ||
+                  !existingAdId.trim() ||
+                  !selectedAdAccountId.trim()
+                }
                 style={{
                   padding: "10px 14px",
                   borderRadius: 8,
                   border: "1px solid #333",
                   background:
-                    previewLoading || !existingAdId.trim()
+                    previewLoading ||
+                    !existingAdId.trim() ||
+                    !selectedAdAccountId.trim()
                       ? "#111"
                       : "#1f2937",
                   color: "white",
                   fontWeight: 600,
                   cursor:
-                    previewLoading || !existingAdId.trim()
+                    previewLoading ||
+                    !existingAdId.trim() ||
+                    !selectedAdAccountId.trim()
                       ? "not-allowed"
                       : "pointer",
-                  opacity: previewLoading || !existingAdId.trim() ? 0.7 : 1,
+                  opacity:
+                    previewLoading ||
+                    !existingAdId.trim() ||
+                    !selectedAdAccountId.trim()
+                      ? 0.7
+                      : 1,
                 }}
               >
                 {previewLoading ? "Loading Preview..." : "Preview Source Ad"}
@@ -860,7 +1042,7 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 14, lineHeight: 1.7 }}>
                   <div>• Custom Audience created</div>
                   <div>• Ad Set created in paused status</div>
-                  <div>• Retargeting Ad created in paused status</div>
+                  <div>• Ad created in paused status</div>
                   {result.reusedCreativeId ? (
                     <div>• Existing winning creative reused successfully</div>
                   ) : (
@@ -877,6 +1059,7 @@ export default function DashboardPage() {
                   lineHeight: 1.7,
                 }}
               >
+                <div>Ad Account: {normalizeAccountId(selectedAdAccountId)}</div>
                 <div>Audience ID: {result.audienceId}</div>
                 <div>Ad Set ID: {result.adsetId}</div>
                 <div>Ad ID: {result.adId}</div>
@@ -933,6 +1116,10 @@ export default function DashboardPage() {
       )}
     </main>
   );
+}
+
+function normalizeAccountId(id: string) {
+  return id.startsWith("act_") ? id : `act_${id}`;
 }
 
 function modeButtonStyle(active: boolean) {
