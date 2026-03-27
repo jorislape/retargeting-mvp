@@ -16,6 +16,8 @@ type MetaAdAccountOption = {
   account_id?: string;
 };
 
+const CONFIGURED_AD_ACCOUNTS = new Set(["act_201748641892516"]);
+
 export default function DashboardPage() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [accessCode, setAccessCode] = useState("");
@@ -50,6 +52,14 @@ export default function DashboardPage() {
 
   const hasTriedLoadingAds = useRef(false);
   const previewRequestIdRef = useRef(0);
+
+  const normalizedSelectedAdAccountId = selectedAdAccountId.trim()
+    ? normalizeAccountId(selectedAdAccountId)
+    : "";
+
+  const isConfiguredAccount = normalizedSelectedAdAccountId
+    ? CONFIGURED_AD_ACCOUNTS.has(normalizedSelectedAdAccountId)
+    : false;
 
   function isValidUrl(value: string) {
     try {
@@ -103,6 +113,7 @@ export default function DashboardPage() {
   ]);
 
   const isFormValid = !validationError;
+  const isLaunchBlocked = loading || !isFormValid || !isConfiguredAccount;
 
   async function checkSession() {
     try {
@@ -150,7 +161,10 @@ export default function DashboardPage() {
       setSelectedAdAccountId((current) => {
         if (
           current &&
-          nextAccounts.some((account) => normalizeAccountId(account.id) === normalizeAccountId(current))
+          nextAccounts.some(
+            (account) =>
+              normalizeAccountId(account.id) === normalizeAccountId(current)
+          )
         ) {
           return current;
         }
@@ -318,6 +332,11 @@ export default function DashboardPage() {
   }, [existingAdId, mode, unlocked, connected, selectedAdAccountId]);
 
   async function handleLaunchRetargeting() {
+    if (!isConfiguredAccount) {
+      setFormError("This ad account is not configured for launch yet.");
+      return;
+    }
+
     if (!isFormValid) {
       setFormError(validationError);
       return;
@@ -462,7 +481,9 @@ export default function DashboardPage() {
             Connect your account to continue.
           </div>
 
-          <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div
+            style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}
+          >
             <button
               type="button"
               onClick={() => {
@@ -566,6 +587,34 @@ export default function DashboardPage() {
         <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
           The selected ad account must control every downstream action.
         </div>
+
+        {selectedAdAccountId && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: 10,
+              borderRadius: 8,
+              border: isConfiguredAccount
+                ? "1px solid #166534"
+                : "1px solid #7f1d1d",
+              background: isConfiguredAccount ? "#052e16" : "#450a0a",
+              color: isConfiguredAccount ? "#bbf7d0" : "#fecaca",
+              fontSize: 13,
+              lineHeight: 1.5,
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>
+              {isConfiguredAccount
+                ? "✅ Ready for launch"
+                : "⚠️ Not configured for launch"}
+            </div>
+            <div style={{ marginTop: 4 }}>
+              {isConfiguredAccount
+                ? "This account has launch configuration and can be used for retargeting."
+                : "This account can load ads, but launch is blocked until its pixel, campaign, and page are configured."}
+            </div>
+          </div>
+        )}
 
         {adAccountsError && (
           <div
@@ -689,6 +738,22 @@ export default function DashboardPage() {
                 }}
               >
                 {adsError}
+              </div>
+            )}
+
+            {!adsLoading && !adsError && selectedAdAccountId && ads.length === 0 && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 8,
+                  background: "#111827",
+                  color: "#cbd5e1",
+                  fontSize: 14,
+                  border: "1px solid #1f2937",
+                }}
+              >
+                No ads found in this account.
               </div>
             )}
 
@@ -915,6 +980,25 @@ export default function DashboardPage() {
           </>
         )}
 
+        <div
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #1f2937",
+            background: "#0f172a",
+            fontSize: 13,
+            color: "#cbd5e1",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Launch Summary</div>
+          <div>Ad Account: {normalizedSelectedAdAccountId || "—"}</div>
+          <div>Configured: {isConfiguredAccount ? "Yes" : "No"}</div>
+          <div>Mode: {mode === "existing" ? "Retarget Winning Ad" : "Create New Ad"}</div>
+          {mode === "existing" && <div>Selected Ad: {existingAdId || "—"}</div>}
+          <div>Budget: €{budget}/day</div>
+          <div>Window: {days} days</div>
+        </div>
+
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <label
@@ -974,19 +1058,33 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {!isConfiguredAccount && selectedAdAccountId && (
+          <div
+            style={{
+              padding: 12,
+              borderRadius: 8,
+              background: "#450a0a",
+              color: "#fecaca",
+              fontSize: 14,
+            }}
+          >
+            This ad account is not configured for launch yet.
+          </div>
+        )}
+
         <button
           onClick={handleLaunchRetargeting}
-          disabled={loading || !isFormValid}
+          disabled={isLaunchBlocked}
           style={{
             padding: "14px",
             fontSize: 16,
             borderRadius: 8,
             border: "none",
-            cursor: loading || !isFormValid ? "not-allowed" : "pointer",
-            background: loading || !isFormValid ? "#1e3a8a" : "#2563eb",
+            cursor: isLaunchBlocked ? "not-allowed" : "pointer",
+            background: isLaunchBlocked ? "#1e3a8a" : "#2563eb",
             color: "white",
             fontWeight: 700,
-            opacity: loading || !isFormValid ? 0.7 : 1,
+            opacity: isLaunchBlocked ? 0.7 : 1,
           }}
         >
           {loading
