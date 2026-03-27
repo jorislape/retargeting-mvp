@@ -2,16 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 const META_API_VERSION = "v23.0";
 
-function requireEnv(name: string, value: string | undefined) {
-  if (!value) {
-    throw new Error(`Missing env: ${name}`);
-  }
-  return value;
-}
-
 function normalizeAccountId(adAccountId: string) {
   return adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
 }
+
+const ACCOUNT_CONFIG: Record<
+  string,
+  { pixelId: string; campaignId: string; pageId: string }
+> = {
+  "act_201748641892516": {
+    pixelId: "799708716173896",
+    campaignId: "120244221374590745",
+    pageId: "548182271709244",
+  },
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,13 +31,6 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
-
-    const pixelId = requireEnv("META_PIXEL_ID", process.env.META_PIXEL_ID);
-    const campaignId = requireEnv(
-      "META_CAMPAIGN_ID",
-      process.env.META_CAMPAIGN_ID
-    );
-    const pageId = requireEnv("META_PAGE_ID", process.env.META_PAGE_ID);
 
     const body = await req.json().catch(() => ({}));
 
@@ -51,6 +48,22 @@ export async function POST(req: NextRequest) {
     }
 
     const adAccountId = normalizeAccountId(rawAdAccountId.trim());
+
+    const accountConfig = ACCOUNT_CONFIG[adAccountId];
+
+    if (!accountConfig) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "validate_account_config",
+          adAccountId,
+          error: "This ad account is not configured for launch yet.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { pixelId, campaignId, pageId } = accountConfig;
 
     const audienceName = body.audienceName || "Website Visitors 30 Days";
     const audienceDescription =
