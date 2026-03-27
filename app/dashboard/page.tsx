@@ -1073,11 +1073,29 @@ export default function DashboardPage() {
         >
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Launch Summary</div>
           <div>Ad Account: {normalizedSelectedAdAccountId || "—"}</div>
-          <div>Configured: {accountStatus ? (accountStatus.configured ? "Yes" : "No") : "—"}</div>
+          <div>
+            Launch Status:{" "}
+            {accountStatusLoading
+              ? "Checking..."
+              : accountStatus
+                ? accountStatus.configured
+                  ? "Ready"
+                  : "Blocked"
+                : "—"}
+          </div>
           <div>Mode: {mode === "existing" ? "Retarget Winning Ad" : "Create New Ad"}</div>
           {mode === "existing" && <div>Selected Ad: {existingAdId || "—"}</div>}
           <div>Budget: €{budget}/day</div>
           <div>Window: {days} days</div>
+
+          {!accountStatusLoading && accountStatus && !accountStatus.configured && (
+            <div style={{ marginTop: 8, lineHeight: 1.6 }}>
+              <div>Missing:</div>
+              <div>{accountStatus.pixelConfigured ? "✅" : "❌"} Pixel</div>
+              <div>{accountStatus.campaignConfigured ? "✅" : "❌"} Campaign</div>
+              <div>{accountStatus.pageConfigured ? "✅" : "❌"} Page</div>
+            </div>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -1139,20 +1157,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!accountStatusLoading && !isConfiguredAccount && selectedAdAccountId && (
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 8,
-              background: "#450a0a",
-              color: "#fecaca",
-              fontSize: 14,
-            }}
-          >
-            This ad account is not configured for launch yet.
-          </div>
-        )}
-
         <button
           onClick={handleLaunchRetargeting}
           disabled={isLaunchBlocked}
@@ -1170,9 +1174,13 @@ export default function DashboardPage() {
         >
           {loading
             ? "Launching..."
-            : mode === "existing"
-              ? "Launch Retargeting from Existing Ad"
-              : "Launch New Retargeting Ad"}
+            : accountStatusLoading
+              ? "Checking Account Setup..."
+              : !isConfiguredAccount
+                ? "Launch Blocked — Account Not Configured"
+                : mode === "existing"
+                  ? "Launch Retargeting from Existing Ad"
+                  : "Launch New Retargeting Ad"}
         </button>
       </div>
 
