@@ -1,24 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-
-function normalizeAccountId(id: string) {
-  return id.startsWith("act_") ? id : `act_${id}`;
-}
-
-// 🔴 LAIKINAS CONFIG (vėliau bus DB)
-const ACCOUNT_CONFIG: Record<
-  string,
-  {
-    pixelId?: string;
-    campaignId?: string;
-    pageId?: string;
-  }
-> = {
-  "act_201748641892516": {
-    pixelId: process.env.META_PIXEL_ID,
-    campaignId: process.env.META_CAMPAIGN_ID,
-    pageId: process.env.META_PAGE_ID,
-  },
-};
+import {
+  getAccountConfig,
+  normalizeAccountId,
+} from "@/lib/meta/account-config";
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,12 +20,11 @@ export async function POST(req: NextRequest) {
     }
 
     const adAccountId = normalizeAccountId(rawAdAccountId);
+    const config = getAccountConfig(adAccountId);
 
-    const config = ACCOUNT_CONFIG[adAccountId] || {};
-
-    const pixelConfigured = Boolean(config.pixelId);
-    const campaignConfigured = Boolean(config.campaignId);
-    const pageConfigured = Boolean(config.pageId);
+    const pixelConfigured = Boolean(config?.pixelId);
+    const campaignConfigured = Boolean(config?.campaignId);
+    const pageConfigured = Boolean(config?.pageId);
 
     const configured =
       pixelConfigured && campaignConfigured && pageConfigured;

@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getAccountConfig,
+  normalizeAccountId,
+} from "@/lib/meta/account-config";
 
 const META_API_VERSION = "v23.0";
-
-function normalizeAccountId(adAccountId: string) {
-  return adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
-}
-
-const ACCOUNT_CONFIG: Record<
-  string,
-  { pixelId: string; campaignId: string; pageId: string }
-> = {
-  "act_201748641892516": {
-    pixelId: "799708716173896",
-    campaignId: "120244221374590745",
-    pageId: "548182271709244",
-  },
-};
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const adAccountId = normalizeAccountId(rawAdAccountId.trim());
 
-    const accountConfig = ACCOUNT_CONFIG[adAccountId];
+    const accountConfig = getAccountConfig(adAccountId);
 
     if (!accountConfig) {
       return NextResponse.json(
@@ -95,8 +84,6 @@ export async function POST(req: NextRequest) {
       eventName,
     });
 
-    // VALIDATION 1:
-    // Jei naudojamas existing ad, patikrinam ar jis priklauso pasirinktam ad account.
     if (existingAdId.trim()) {
       const adCheckUrl = new URL(
         `https://graph.facebook.com/${META_API_VERSION}/${existingAdId}`
@@ -142,8 +129,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // VALIDATION 2:
-    // Patikrinam ar campaign priklauso pasirinktam ad account.
     const campaignCheckUrl = new URL(
       `https://graph.facebook.com/${META_API_VERSION}/${campaignId}`
     );
@@ -188,8 +173,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // VALIDATION 3:
-    // Patikrinam ar pixel apskritai pasiekiamas.
     const pixelCheckUrl = new URL(
       `https://graph.facebook.com/${META_API_VERSION}/${pixelId}`
     );
@@ -217,8 +200,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // VALIDATION 4:
-    // Patikrinam ar page apskritai pasiekiamas.
     const pageCheckUrl = new URL(
       `https://graph.facebook.com/${META_API_VERSION}/${pageId}`
     );
@@ -321,11 +302,7 @@ export async function POST(req: NextRequest) {
           optimization_goal: "LINK_CLICKS",
           bid_strategy: "LOWEST_COST_WITHOUT_CAP",
           targeting: {
-            custom_audiences: [
-              {
-                id: audienceId,
-              },
-            ],
+            custom_audiences: [{ id: audienceId }],
           },
           status: "PAUSED",
           access_token: accessToken,

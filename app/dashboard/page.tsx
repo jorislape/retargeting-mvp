@@ -16,7 +16,14 @@ type MetaAdAccountOption = {
   account_id?: string;
 };
 
-const CONFIGURED_AD_ACCOUNTS = new Set(["act_201748641892516"]);
+type AccountStatus = {
+  ok: boolean;
+  adAccountId: string;
+  configured: boolean;
+  pixelConfigured: boolean;
+  campaignConfigured: boolean;
+  pageConfigured: boolean;
+};
 
 export default function DashboardPage() {
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -50,6 +57,9 @@ export default function DashboardPage() {
   const [adAccountsError, setAdAccountsError] = useState("");
   const [selectedAdAccountId, setSelectedAdAccountId] = useState("");
 
+  const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
+  const [accountStatusLoading, setAccountStatusLoading] = useState(false);
+
   const hasTriedLoadingAds = useRef(false);
   const previewRequestIdRef = useRef(0);
 
@@ -57,9 +67,7 @@ export default function DashboardPage() {
     ? normalizeAccountId(selectedAdAccountId)
     : "";
 
-  const isConfiguredAccount = normalizedSelectedAdAccountId
-    ? CONFIGURED_AD_ACCOUNTS.has(normalizedSelectedAdAccountId)
-    : false;
+  const isConfiguredAccount = Boolean(accountStatus?.configured);
 
   function isValidUrl(value: string) {
     try {
@@ -113,7 +121,8 @@ export default function DashboardPage() {
   ]);
 
   const isFormValid = !validationError;
-  const isLaunchBlocked = loading || !isFormValid || !isConfiguredAccount;
+  const isLaunchBlocked =
+    loading || !isFormValid || !isConfiguredAccount || accountStatusLoading;
 
   async function checkSession() {
     try {
@@ -180,6 +189,41 @@ export default function DashboardPage() {
     }
   }
 
+  async function loadAccountStatus() {
+    if (!selectedAdAccountId.trim()) {
+      setAccountStatus(null);
+      return;
+    }
+
+    try {
+      setAccountStatusLoading(true);
+
+      const res = await fetch("/api/meta/account-config-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adAccountId: selectedAdAccountId,
+        }),
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        setAccountStatus(null);
+        return;
+      }
+
+      setAccountStatus(data);
+    } catch {
+      setAccountStatus(null);
+    } finally {
+      setAccountStatusLoading(false);
+    }
+  }
+
   async function loadAds() {
     try {
       setAdsLoading(true);
@@ -234,8 +278,17 @@ export default function DashboardPage() {
     setPreviewError("");
     setPreviewData(null);
     setPreviewLoading(false);
+    setAccountStatus(null);
     previewRequestIdRef.current += 1;
   }, [selectedAdAccountId]);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    if (!connected) return;
+    if (!selectedAdAccountId.trim()) return;
+
+    loadAccountStatus();
+  }, [unlocked, connected, selectedAdAccountId]);
 
   useEffect(() => {
     if (!unlocked) return;
@@ -588,31 +641,59 @@ export default function DashboardPage() {
           The selected ad account must control every downstream action.
         </div>
 
-        {selectedAdAccountId && (
+        {accountStatusLoading && selectedAdAccountId && (
           <div
             style={{
               marginTop: 10,
               padding: 10,
               borderRadius: 8,
-              border: isConfiguredAccount
-                ? "1px solid #166534"
-                : "1px solid #7f1d1d",
-              background: isConfiguredAccount ? "#052e16" : "#450a0a",
-              color: isConfiguredAccount ? "#bbf7d0" : "#fecaca",
+              border: "1px solid #1f2937",
+              background: "#111827",
+              color: "#cbd5e1",
               fontSize: 13,
-              lineHeight: 1.5,
             }}
           >
-            <div style={{ fontWeight: 700 }}>
-              {isConfiguredAccount
-                ? "✅ Ready for launch"
-                : "⚠️ Not configured for launch"}
-            </div>
-            <div style={{ marginTop: 4 }}>
-              {isConfiguredAccount
-                ? "This account has launch configuration and can be used for retargeting."
-                : "This account can load ads, but launch is blocked until its pixel, campaign, and page are configured."}
-            </div>
+            Checking account setup status...
+          </div>
+        )}
+
+        {accountStatus && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: 14,
+              borderRadius: 10,
+              border: "1px solid #1f2937",
+              background: accountStatus.configured ? "#052e16" : "#450a0a",
+              color: "white",
+            }}
+          >
+            {accountStatus.configured ? (
+              <>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>
+                  ✅ Ready for launch
+                </div>
+                <div style={{ marginTop: 6, fontSize: 13, opacity: 0.9 }}>
+                  This account has full configuration and can be used for retargeting.
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>
+                  ⚠️ Not configured for launch
+                </div>
+
+                <div style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
+                  This account is missing required configuration:
+                </div>
+
+                <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6 }}>
+                  <div>{accountStatus.pixelConfigured ? "✅" : "❌"} Pixel</div>
+                  <div>{accountStatus.campaignConfigured ? "✅" : "❌"} Campaign</div>
+                  <div>{accountStatus.pageConfigured ? "✅" : "❌"} Page</div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -992,7 +1073,7 @@ export default function DashboardPage() {
         >
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Launch Summary</div>
           <div>Ad Account: {normalizedSelectedAdAccountId || "—"}</div>
-          <div>Configured: {isConfiguredAccount ? "Yes" : "No"}</div>
+          <div>Configured: {accountStatus ? (accountStatus.configured ? "Yes" : "No") : "—"}</div>
           <div>Mode: {mode === "existing" ? "Retarget Winning Ad" : "Create New Ad"}</div>
           {mode === "existing" && <div>Selected Ad: {existingAdId || "—"}</div>}
           <div>Budget: €{budget}/day</div>
@@ -1058,7 +1139,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!isConfiguredAccount && selectedAdAccountId && (
+        {!accountStatusLoading && !isConfiguredAccount && selectedAdAccountId && (
           <div
             style={{
               padding: 12,
