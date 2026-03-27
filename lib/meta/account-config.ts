@@ -5,39 +5,28 @@ export type MetaAccountConfig = {
 };
 
 export function normalizeAccountId(adAccountId: string) {
-  return adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
+  return adAccountId.startsWith("act_")
+    ? adAccountId
+    : `act_${adAccountId}`;
 }
 
-function parseAccountConfig(): Record<string, MetaAccountConfig> {
-  const raw = process.env.META_ACCOUNT_CONFIG;
-
-  if (!raw) {
-    console.warn("[account-config] META_ACCOUNT_CONFIG is missing");
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, MetaAccountConfig>;
-
-    if (typeof parsed !== "object" || parsed === null) {
-      console.warn("[account-config] Invalid config format");
-      return {};
-    }
-
-    return parsed;
-  } catch (error) {
-    console.error("[account-config] Failed to parse META_ACCOUNT_CONFIG", error);
-    return {};
-  }
-}
+/**
+ * 🔥 TEMP HARD CODED CONFIG (for MVP testing)
+ * Replace values with YOUR real IDs
+ */
+const ACCOUNT_CONFIG: Record<string, MetaAccountConfig> = {
+  "act_201748641892516": {
+    pixelId: "799708716173896",
+    campaignId: "120244221374590745",
+    pageId: "548182271709244",
+  },
+};
 
 export function getAllAccountConfigs() {
-  return parseAccountConfig();
+  return ACCOUNT_CONFIG;
 }
 
 export function getAccountConfig(adAccountId: string) {
   const normalized = normalizeAccountId(adAccountId);
-  const configs = parseAccountConfig();
-
-  return configs[normalized] || null;
+  return ACCOUNT_CONFIG[normalized] || null;
 }
