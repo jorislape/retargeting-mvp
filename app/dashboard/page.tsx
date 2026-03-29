@@ -79,6 +79,8 @@ export default function DashboardPage() {
   const [pixelsError, setPixelsError] = useState("");
   const [selectedPixelId, setSelectedPixelId] = useState("");
 
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+
   const hasTriedLoadingAds = useRef(false);
   const previewRequestIdRef = useRef(0);
 
@@ -95,21 +97,72 @@ export default function DashboardPage() {
     }
   }
 
+  const setupIssues = useMemo(() => {
+    const issues: string[] = [];
+
+    if (!selectedAdAccountId.trim()) {
+      issues.push("Select an ad account.");
+    }
+
+    if (!selectedPageId.trim()) {
+      if (pagesLoading) {
+        issues.push("Loading your Facebook Pages...");
+      } else if (pagesError) {
+        issues.push("We could not load your Facebook Pages.");
+      } else {
+        issues.push("No Facebook Page available for this account connection.");
+      }
+    }
+
+    if (!selectedCampaignId.trim()) {
+      if (campaignsLoading) {
+        issues.push("Loading campaigns...");
+      } else if (campaignsError) {
+        issues.push("We could not load campaigns for this ad account.");
+      } else {
+        issues.push("No campaign available for the selected ad account.");
+      }
+    }
+
+    if (!selectedPixelId.trim()) {
+      if (pixelsLoading) {
+        issues.push("Loading pixel...");
+      } else if (pixelsError) {
+        issues.push("We could not load pixels for this ad account.");
+      } else {
+        issues.push("No pixel available for the selected ad account.");
+      }
+    }
+
+    return issues;
+  }, [
+    selectedAdAccountId,
+    selectedPageId,
+    selectedCampaignId,
+    selectedPixelId,
+    pagesLoading,
+    pagesError,
+    campaignsLoading,
+    campaignsError,
+    pixelsLoading,
+    pixelsError,
+  ]);
+
   const validationError = useMemo(() => {
     if (!selectedAdAccountId.trim()) {
       return "Please select an ad account.";
     }
 
     if (!selectedPageId.trim()) {
-      return "Please select a page.";
+      return "A Facebook Page is required before you can launch.";
     }
 
     if (!selectedCampaignId.trim()) {
-      return "Please select a campaign.";
+      return "A campaign is required before you can launch.";
     }
 
     if (!selectedPixelId.trim()) {
-      return "Please select a pixel.";
+      return "A pixel is required before you can launch.";
     }
 
     if (!Number.isFinite(budget) || budget < 1) {
@@ -154,6 +207,13 @@ export default function DashboardPage() {
 
   const isFormValid = !validationError;
   const isLaunchBlocked = loading || !isFormValid;
+
+  const selectedPageName =
+    pages.find((page) => page.id === selectedPageId)?.name || "";
+  const selectedCampaignName =
+    campaigns.find((campaign) => campaign.id === selectedCampaignId)?.name || "";
+  const selectedPixelName =
+    pixels.find((pixel) => pixel.id === selectedPixelId)?.name || "";
 
   async function checkSession() {
     try {
@@ -769,155 +829,213 @@ export default function DashboardPage() {
         }}
       >
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-          Asset Selection
+          Ad Account
         </div>
 
-        <div style={{ display: "grid", gap: 16 }}>
-          <div>
-            <label
-              htmlFor="adAccount"
-              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-            >
-              Ad Account
-            </label>
+        <select
+          id="adAccount"
+          value={selectedAdAccountId}
+          onChange={(e) => {
+            setSelectedAdAccountId(e.target.value);
+            setFormError("");
+            setResult(null);
+          }}
+          style={inputStyle}
+          disabled={adAccountsLoading}
+        >
+          <option value="">
+            {adAccountsLoading
+              ? "Loading ad accounts..."
+              : "Select an ad account"}
+          </option>
 
-            <select
-              id="adAccount"
-              value={selectedAdAccountId}
-              onChange={(e) => {
-                setSelectedAdAccountId(e.target.value);
-                setFormError("");
-                setResult(null);
-              }}
-              style={inputStyle}
-              disabled={adAccountsLoading}
-            >
-              <option value="">
-                {adAccountsLoading
-                  ? "Loading ad accounts..."
-                  : "Select an ad account"}
-              </option>
+          {adAccounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name || account.id} ({normalizeAccountId(account.id)})
+            </option>
+          ))}
+        </select>
 
-              {adAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name || account.id} ({normalizeAccountId(account.id)})
-                </option>
-              ))}
-            </select>
+        {adAccountsError && <div style={errorBoxStyle}>{adAccountsError}</div>}
 
-            {adAccountsError && (
-              <div style={errorBoxStyle}>{adAccountsError}</div>
-            )}
+        {setupIssues.length > 0 ? (
+          <div
+            style={{
+              marginTop: 14,
+              padding: 14,
+              borderRadius: 10,
+              border: "1px solid #3f2a00",
+              background: "#2a1800",
+              color: "#fde68a",
+              fontSize: 14,
+              lineHeight: 1.6,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+              Setup needed before launch
+            </div>
+            {setupIssues.map((issue) => (
+              <div key={issue}>• {issue}</div>
+            ))}
           </div>
-
-          <div>
-            <label
-              htmlFor="pageId"
-              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-            >
-              Page
-            </label>
-
-            <select
-              id="pageId"
-              value={selectedPageId}
-              onChange={(e) => {
-                setSelectedPageId(e.target.value);
-                setFormError("");
-                setResult(null);
-              }}
-              style={inputStyle}
-              disabled={pagesLoading}
-            >
-              <option value="">
-                {pagesLoading ? "Loading pages..." : "Select a page"}
-              </option>
-
-              {pages.map((page) => (
-                <option key={page.id} value={page.id}>
-                  {page.name} ({page.id})
-                </option>
-              ))}
-            </select>
-
-            {pagesError && <div style={errorBoxStyle}>{pagesError}</div>}
+        ) : (
+          <div
+            style={{
+              marginTop: 14,
+              padding: 14,
+              borderRadius: 10,
+              border: "1px solid #14532d",
+              background: "#052e16",
+              color: "#bbf7d0",
+              fontSize: 14,
+              lineHeight: 1.6,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+              Ready to launch
+            </div>
+            <div>
+              We found the required assets for this account and selected them automatically.
+            </div>
           </div>
+        )}
 
-          <div>
-            <label
-              htmlFor="campaignId"
-              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-            >
-              Campaign
-            </label>
-
-            <select
-              id="campaignId"
-              value={selectedCampaignId}
-              onChange={(e) => {
-                setSelectedCampaignId(e.target.value);
-                setFormError("");
-                setResult(null);
-              }}
-              style={inputStyle}
-              disabled={campaignsLoading || !selectedAdAccountId}
-            >
-              <option value="">
-                {campaignsLoading
-                  ? "Loading campaigns..."
-                  : !selectedAdAccountId
-                    ? "Select an ad account first"
-                    : "Select a campaign"}
-              </option>
-
-              {campaigns.map((campaign) => (
-                <option key={campaign.id} value={campaign.id}>
-                  {campaign.name} ({campaign.id})
-                  {campaign.status ? ` — ${campaign.status}` : ""}
-                </option>
-              ))}
-            </select>
-
-            {campaignsError && <div style={errorBoxStyle}>{campaignsError}</div>}
-          </div>
-
-          <div>
-            <label
-              htmlFor="pixelId"
-              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-            >
-              Pixel
-            </label>
-
-            <select
-              id="pixelId"
-              value={selectedPixelId}
-              onChange={(e) => {
-                setSelectedPixelId(e.target.value);
-                setFormError("");
-                setResult(null);
-              }}
-              style={inputStyle}
-              disabled={pixelsLoading || !selectedAdAccountId}
-            >
-              <option value="">
-                {pixelsLoading
-                  ? "Loading pixels..."
-                  : !selectedAdAccountId
-                    ? "Select an ad account first"
-                    : "Select a pixel"}
-              </option>
-
-              {pixels.map((pixel) => (
-                <option key={pixel.id} value={pixel.id}>
-                  {pixel.name} ({pixel.id})
-                </option>
-              ))}
-            </select>
-
-            {pixelsError && <div style={errorBoxStyle}>{pixelsError}</div>}
-          </div>
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => setShowTechnicalDetails((current) => !current)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #333",
+              background: "#111",
+              color: "white",
+              fontWeight: 600,
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            {showTechnicalDetails ? "Hide technical details" : "Show technical details"}
+          </button>
         </div>
+
+        {showTechnicalDetails ? (
+          <div
+            style={{
+              marginTop: 14,
+              display: "grid",
+              gap: 14,
+            }}
+          >
+            <div>
+              <label
+                htmlFor="pageId"
+                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
+              >
+                Page
+              </label>
+
+              <select
+                id="pageId"
+                value={selectedPageId}
+                onChange={(e) => {
+                  setSelectedPageId(e.target.value);
+                  setFormError("");
+                  setResult(null);
+                }}
+                style={inputStyle}
+                disabled={pagesLoading}
+              >
+                <option value="">
+                  {pagesLoading ? "Loading pages..." : "Select a page"}
+                </option>
+
+                {pages.map((page) => (
+                  <option key={page.id} value={page.id}>
+                    {page.name} ({page.id})
+                  </option>
+                ))}
+              </select>
+
+              {pagesError && <div style={errorBoxStyle}>{pagesError}</div>}
+            </div>
+
+            <div>
+              <label
+                htmlFor="campaignId"
+                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
+              >
+                Campaign
+              </label>
+
+              <select
+                id="campaignId"
+                value={selectedCampaignId}
+                onChange={(e) => {
+                  setSelectedCampaignId(e.target.value);
+                  setFormError("");
+                  setResult(null);
+                }}
+                style={inputStyle}
+                disabled={campaignsLoading || !selectedAdAccountId}
+              >
+                <option value="">
+                  {campaignsLoading
+                    ? "Loading campaigns..."
+                    : !selectedAdAccountId
+                      ? "Select an ad account first"
+                      : "Select a campaign"}
+                </option>
+
+                {campaigns.map((campaign) => (
+                  <option key={campaign.id} value={campaign.id}>
+                    {campaign.name} ({campaign.id})
+                    {campaign.status ? ` — ${campaign.status}` : ""}
+                  </option>
+                ))}
+              </select>
+
+              {campaignsError && <div style={errorBoxStyle}>{campaignsError}</div>}
+            </div>
+
+            <div>
+              <label
+                htmlFor="pixelId"
+                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
+              >
+                Pixel
+              </label>
+
+              <select
+                id="pixelId"
+                value={selectedPixelId}
+                onChange={(e) => {
+                  setSelectedPixelId(e.target.value);
+                  setFormError("");
+                  setResult(null);
+                }}
+                style={inputStyle}
+                disabled={pixelsLoading || !selectedAdAccountId}
+              >
+                <option value="">
+                  {pixelsLoading
+                    ? "Loading pixels..."
+                    : !selectedAdAccountId
+                      ? "Select an ad account first"
+                      : "Select a pixel"}
+                </option>
+
+                {pixels.map((pixel) => (
+                  <option key={pixel.id} value={pixel.id}>
+                    {pixel.name} ({pixel.id})
+                  </option>
+                ))}
+              </select>
+
+              {pixelsError && <div style={errorBoxStyle}>{pixelsError}</div>}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -967,7 +1085,7 @@ export default function DashboardPage() {
 
         <div style={{ fontSize: 13, opacity: 0.72, marginTop: 10 }}>
           {mode === "existing"
-            ? "Reuse the creative from an existing Meta ad. This is the main workflow."
+            ? "Reuse the creative from an existing Meta ad."
             : "Create a new retargeting ad from scratch."}
         </div>
       </div>
@@ -1011,7 +1129,7 @@ export default function DashboardPage() {
             </select>
 
             <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-              Pick an ad from the selected account instead of pasting the ID manually.
+              Pick an ad from the selected account.
             </div>
 
             {adsError && <div style={errorBoxStyle}>{adsError}</div>}
@@ -1047,20 +1165,9 @@ export default function DashboardPage() {
                   loadAds();
                 }}
                 disabled={adsLoading || !selectedAdAccountId}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: "1px solid #333",
-                  background:
-                    adsLoading || !selectedAdAccountId ? "#111" : "#1f2937",
-                  color: "white",
-                  fontWeight: 600,
-                  cursor:
-                    adsLoading || !selectedAdAccountId
-                      ? "not-allowed"
-                      : "pointer",
-                  opacity: adsLoading || !selectedAdAccountId ? 0.7 : 1,
-                }}
+                style={secondaryButtonStyle(
+                  adsLoading || !selectedAdAccountId
+                )}
               >
                 {adsLoading ? "Refreshing..." : "Refresh Ads"}
               </button>
@@ -1073,31 +1180,11 @@ export default function DashboardPage() {
                   !existingAdId.trim() ||
                   !selectedAdAccountId.trim()
                 }
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: "1px solid #333",
-                  background:
-                    previewLoading ||
+                style={secondaryButtonStyle(
+                  previewLoading ||
                     !existingAdId.trim() ||
                     !selectedAdAccountId.trim()
-                      ? "#111"
-                      : "#1f2937",
-                  color: "white",
-                  fontWeight: 600,
-                  cursor:
-                    previewLoading ||
-                    !existingAdId.trim() ||
-                    !selectedAdAccountId.trim()
-                      ? "not-allowed"
-                      : "pointer",
-                  opacity:
-                    previewLoading ||
-                    !existingAdId.trim() ||
-                    !selectedAdAccountId.trim()
-                      ? 0.7
-                      : 1,
-                }}
+                )}
               >
                 {previewLoading ? "Loading Preview..." : "Preview Source Ad"}
               </button>
@@ -1254,9 +1341,7 @@ export default function DashboardPage() {
         >
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Launch Summary</div>
           <div>Ad Account: {normalizedSelectedAdAccountId || "—"}</div>
-          <div>Page: {selectedPageId || "—"}</div>
-          <div>Campaign: {selectedCampaignId || "—"}</div>
-          <div>Pixel: {selectedPixelId || "—"}</div>
+          <div>Page: {selectedPageName || "—"}</div>
           <div>Mode: {mode === "existing" ? "Retarget Winning Ad" : "Create New Ad"}</div>
           {mode === "existing" && <div>Selected Ad: {existingAdId || "—"}</div>}
           <div>Budget: €{budget}/day</div>
@@ -1408,9 +1493,9 @@ export default function DashboardPage() {
                 }}
               >
                 <div>Ad Account: {normalizeAccountId(selectedAdAccountId)}</div>
-                <div>Page ID: {selectedPageId || "—"}</div>
-                <div>Campaign ID: {selectedCampaignId || "—"}</div>
-                <div>Pixel ID: {selectedPixelId || "—"}</div>
+                <div>Page: {selectedPageName || selectedPageId || "—"}</div>
+                <div>Campaign: {selectedCampaignName || selectedCampaignId || "—"}</div>
+                <div>Pixel: {selectedPixelName || selectedPixelId || "—"}</div>
                 <div>Audience ID: {result.audienceId}</div>
                 <div>Ad Set ID: {result.adsetId}</div>
                 <div>Ad ID: {result.adId}</div>
@@ -1482,6 +1567,20 @@ function modeButtonStyle(active: boolean) {
     color: "#fff",
     fontWeight: 700,
     cursor: "pointer",
+    fontSize: 14,
+  } as const;
+}
+
+function secondaryButtonStyle(disabled: boolean) {
+  return {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid #333",
+    background: disabled ? "#111" : "#1f2937",
+    color: "white",
+    fontWeight: 600,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.7 : 1,
     fontSize: 14,
   } as const;
 }
