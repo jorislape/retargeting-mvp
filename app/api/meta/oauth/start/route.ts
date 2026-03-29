@@ -14,12 +14,19 @@ export async function GET() {
 
   const state = crypto.randomBytes(16).toString("hex");
 
+  const scope = [
+    "public_profile",
+    "ads_read",
+    "ads_management",
+    "pages_show_list",
+  ].join(",");
+
   const url =
     `https://www.facebook.com/v19.0/dialog/oauth` +
     `?client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&state=${encodeURIComponent(state)}` +
-    `&scope=${encodeURIComponent("public_profile,ads_read")}` +
+    `&scope=${encodeURIComponent(scope)}` +
     `&response_type=code`;
 
   const response = NextResponse.redirect(url);
