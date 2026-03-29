@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getAccountConfig,
-  normalizeAccountId,
-} from "@/lib/meta/account-config";
+import { normalizeAccountId } from "@/lib/meta/account-config";
 
 const META_API_VERSION = "v23.0";
 
@@ -24,6 +21,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
 
     const rawAdAccountId = body.adAccountId;
+    const rawPageId = body.pageId;
+    const rawCampaignId = body.campaignId;
+    const rawPixelId = body.pixelId;
 
     if (typeof rawAdAccountId !== "string" || !rawAdAccountId.trim()) {
       return NextResponse.json(
@@ -36,23 +36,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const adAccountId = normalizeAccountId(rawAdAccountId.trim());
-
-    const accountConfig = getAccountConfig(adAccountId);
-
-    if (!accountConfig) {
+    if (typeof rawPageId !== "string" || !rawPageId.trim()) {
       return NextResponse.json(
         {
           ok: false,
-          step: "validate_account_config",
-          adAccountId,
-          error: "This ad account is not configured for launch yet.",
+          step: "validate_page_id",
+          error: "Missing pageId",
         },
         { status: 400 }
       );
     }
 
-    const { pixelId, campaignId, pageId } = accountConfig;
+    if (typeof rawCampaignId !== "string" || !rawCampaignId.trim()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "validate_campaign_id",
+          error: "Missing campaignId",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (typeof rawPixelId !== "string" || !rawPixelId.trim()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          step: "validate_pixel_id",
+          error: "Missing pixelId",
+        },
+        { status: 400 }
+      );
+    }
+
+    const adAccountId = normalizeAccountId(rawAdAccountId.trim());
+    const pageId = rawPageId.trim();
+    const campaignId = rawCampaignId.trim();
+    const pixelId = rawPixelId.trim();
 
     const audienceName = body.audienceName || "Website Visitors 30 Days";
     const audienceDescription =
@@ -390,13 +410,13 @@ export async function POST(req: NextRequest) {
         adset_id: adsetId,
         creative: {
           object_story_spec: {
+            page_id: pageId,
             link_data: {
               message,
               link,
               name,
               description: description || undefined,
             },
-            page_id: pageId,
           },
         },
         status: "PAUSED",
@@ -435,6 +455,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       adAccountId,
+      pageId,
+      campaignId,
+      pixelId,
       audienceId,
       adsetId,
       adId: adData.id,
