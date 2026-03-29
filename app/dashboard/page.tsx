@@ -16,13 +16,20 @@ type MetaAdAccountOption = {
   account_id?: string;
 };
 
-type AccountStatus = {
-  ok: boolean;
-  adAccountId: string;
-  configured: boolean;
-  pixelConfigured: boolean;
-  campaignConfigured: boolean;
-  pageConfigured: boolean;
+type MetaPageOption = {
+  id: string;
+  name: string;
+};
+
+type MetaCampaignOption = {
+  id: string;
+  name: string;
+  status?: string | null;
+};
+
+type MetaPixelOption = {
+  id: string;
+  name: string;
 };
 
 export default function DashboardPage() {
@@ -57,8 +64,20 @@ export default function DashboardPage() {
   const [adAccountsError, setAdAccountsError] = useState("");
   const [selectedAdAccountId, setSelectedAdAccountId] = useState("");
 
-  const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
-  const [accountStatusLoading, setAccountStatusLoading] = useState(false);
+  const [pages, setPages] = useState<MetaPageOption[]>([]);
+  const [pagesLoading, setPagesLoading] = useState(false);
+  const [pagesError, setPagesError] = useState("");
+  const [selectedPageId, setSelectedPageId] = useState("");
+
+  const [campaigns, setCampaigns] = useState<MetaCampaignOption[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignsError, setCampaignsError] = useState("");
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
+
+  const [pixels, setPixels] = useState<MetaPixelOption[]>([]);
+  const [pixelsLoading, setPixelsLoading] = useState(false);
+  const [pixelsError, setPixelsError] = useState("");
+  const [selectedPixelId, setSelectedPixelId] = useState("");
 
   const hasTriedLoadingAds = useRef(false);
   const previewRequestIdRef = useRef(0);
@@ -66,8 +85,6 @@ export default function DashboardPage() {
   const normalizedSelectedAdAccountId = selectedAdAccountId.trim()
     ? normalizeAccountId(selectedAdAccountId)
     : "";
-
-  const isConfiguredAccount = Boolean(accountStatus?.configured);
 
   function isValidUrl(value: string) {
     try {
@@ -81,6 +98,18 @@ export default function DashboardPage() {
   const validationError = useMemo(() => {
     if (!selectedAdAccountId.trim()) {
       return "Please select an ad account.";
+    }
+
+    if (!selectedPageId.trim()) {
+      return "Please select a page.";
+    }
+
+    if (!selectedCampaignId.trim()) {
+      return "Please select a campaign.";
+    }
+
+    if (!selectedPixelId.trim()) {
+      return "Please select a pixel.";
     }
 
     if (!Number.isFinite(budget) || budget < 1) {
@@ -111,6 +140,9 @@ export default function DashboardPage() {
     return "";
   }, [
     selectedAdAccountId,
+    selectedPageId,
+    selectedCampaignId,
+    selectedPixelId,
     mode,
     existingAdId,
     message,
@@ -121,8 +153,7 @@ export default function DashboardPage() {
   ]);
 
   const isFormValid = !validationError;
-  const isLaunchBlocked =
-    loading || !isFormValid || !isConfiguredAccount || accountStatusLoading;
+  const isLaunchBlocked = loading || !isFormValid;
 
   async function checkSession() {
     try {
@@ -189,22 +220,62 @@ export default function DashboardPage() {
     }
   }
 
-  async function loadAccountStatus() {
-    if (!selectedAdAccountId.trim()) {
-      setAccountStatus(null);
-      return;
-    }
-
+  async function loadPages() {
     try {
-      setAccountStatusLoading(true);
+      setPagesLoading(true);
+      setPagesError("");
 
-      const res = await fetch("/api/meta/account-config-status", {
+      const res = await fetch("/api/meta/list-pages", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to load pages.");
+      }
+
+      const nextPages: MetaPageOption[] = Array.isArray(data.pages)
+        ? data.pages
+        : [];
+
+      setPages(nextPages);
+
+      setSelectedPageId((current) => {
+        if (current && nextPages.some((page) => page.id === current)) {
+          return current;
+        }
+
+        return nextPages[0]?.id || "";
+      });
+    } catch (err: any) {
+      setPages([]);
+      setSelectedPageId("");
+      setPagesError(err?.message || "Failed to load pages.");
+    } finally {
+      setPagesLoading(false);
+    }
+  }
+
+  async function loadCampaigns(adAccountId: string) {
+    try {
+      setCampaignsLoading(true);
+      setCampaignsError("");
+
+      if (!adAccountId.trim()) {
+        setCampaigns([]);
+        setSelectedCampaignId("");
+        return;
+      }
+
+      const res = await fetch("/api/meta/list-campaigns", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          adAccountId: selectedAdAccountId,
+          adAccountId,
         }),
         cache: "no-store",
       });
@@ -212,15 +283,81 @@ export default function DashboardPage() {
       const data = await res.json();
 
       if (!res.ok || !data.ok) {
-        setAccountStatus(null);
+        throw new Error(data.error || "Failed to load campaigns.");
+      }
+
+      const nextCampaigns: MetaCampaignOption[] = Array.isArray(data.campaigns)
+        ? data.campaigns
+        : [];
+
+      setCampaigns(nextCampaigns);
+
+      setSelectedCampaignId((current) => {
+        if (
+          current &&
+          nextCampaigns.some((campaign) => campaign.id === current)
+        ) {
+          return current;
+        }
+
+        return nextCampaigns[0]?.id || "";
+      });
+    } catch (err: any) {
+      setCampaigns([]);
+      setSelectedCampaignId("");
+      setCampaignsError(err?.message || "Failed to load campaigns.");
+    } finally {
+      setCampaignsLoading(false);
+    }
+  }
+
+  async function loadPixels(adAccountId: string) {
+    try {
+      setPixelsLoading(true);
+      setPixelsError("");
+
+      if (!adAccountId.trim()) {
+        setPixels([]);
+        setSelectedPixelId("");
         return;
       }
 
-      setAccountStatus(data);
-    } catch {
-      setAccountStatus(null);
+      const res = await fetch("/api/meta/list-pixels", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adAccountId,
+        }),
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to load pixels.");
+      }
+
+      const nextPixels: MetaPixelOption[] = Array.isArray(data.pixels)
+        ? data.pixels
+        : [];
+
+      setPixels(nextPixels);
+
+      setSelectedPixelId((current) => {
+        if (current && nextPixels.some((pixel) => pixel.id === current)) {
+          return current;
+        }
+
+        return nextPixels[0]?.id || "";
+      });
+    } catch (err: any) {
+      setPixels([]);
+      setSelectedPixelId("");
+      setPixelsError(err?.message || "Failed to load pixels.");
     } finally {
-      setAccountStatusLoading(false);
+      setPixelsLoading(false);
     }
   }
 
@@ -250,10 +387,20 @@ export default function DashboardPage() {
         throw new Error(data.error || "Failed to load ads.");
       }
 
-      setAds(Array.isArray(data.ads) ? data.ads : []);
+      const nextAds = Array.isArray(data.ads) ? data.ads : [];
+      setAds(nextAds);
+
+      setExistingAdId((current) => {
+        if (current && nextAds.some((ad: MetaAdOption) => ad.id === current)) {
+          return current;
+        }
+
+        return nextAds[0]?.id || "";
+      });
     } catch (err: any) {
       setAdsError(err?.message || "Failed to load ads.");
       setAds([]);
+      setExistingAdId("");
     } finally {
       setAdsLoading(false);
     }
@@ -267,7 +414,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!unlocked) return;
     if (!connected) return;
+
     loadAdAccounts();
+    loadPages();
   }, [unlocked, connected]);
 
   useEffect(() => {
@@ -278,7 +427,12 @@ export default function DashboardPage() {
     setPreviewError("");
     setPreviewData(null);
     setPreviewLoading(false);
-    setAccountStatus(null);
+    setCampaigns([]);
+    setSelectedCampaignId("");
+    setCampaignsError("");
+    setPixels([]);
+    setSelectedPixelId("");
+    setPixelsError("");
     previewRequestIdRef.current += 1;
   }, [selectedAdAccountId]);
 
@@ -287,7 +441,8 @@ export default function DashboardPage() {
     if (!connected) return;
     if (!selectedAdAccountId.trim()) return;
 
-    loadAccountStatus();
+    loadCampaigns(selectedAdAccountId);
+    loadPixels(selectedAdAccountId);
   }, [unlocked, connected, selectedAdAccountId]);
 
   useEffect(() => {
@@ -385,11 +540,6 @@ export default function DashboardPage() {
   }, [existingAdId, mode, unlocked, connected, selectedAdAccountId]);
 
   async function handleLaunchRetargeting() {
-    if (!isConfiguredAccount) {
-      setFormError("This ad account is not configured for launch yet.");
-      return;
-    }
-
     if (!isFormValid) {
       setFormError(validationError);
       return;
@@ -403,14 +553,22 @@ export default function DashboardPage() {
       const payload =
         mode === "existing"
           ? {
+              mode: "existing",
               adAccountId: selectedAdAccountId,
+              pageId: selectedPageId,
+              campaignId: selectedCampaignId,
+              pixelId: selectedPixelId,
               audienceName: `Visitors ${days}d`,
               retentionSeconds: days * 86400,
               dailyBudget: budget * 100,
               existingAdId: existingAdId.trim(),
             }
           : {
+              mode: "new",
               adAccountId: selectedAdAccountId,
+              pageId: selectedPageId,
+              campaignId: selectedCampaignId,
+              pixelId: selectedPixelId,
               audienceName: `Visitors ${days}d`,
               retentionSeconds: days * 86400,
               dailyBudget: budget * 100,
@@ -611,106 +769,155 @@ export default function DashboardPage() {
         }}
       >
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-          Ad Account
+          Asset Selection
         </div>
 
-        <select
-          value={selectedAdAccountId}
-          onChange={(e) => {
-            setSelectedAdAccountId(e.target.value);
-            setFormError("");
-            setResult(null);
-          }}
-          style={inputStyle}
-          disabled={adAccountsLoading}
-        >
-          <option value="">
-            {adAccountsLoading
-              ? "Loading ad accounts..."
-              : "Select an ad account"}
-          </option>
+        <div style={{ display: "grid", gap: 16 }}>
+          <div>
+            <label
+              htmlFor="adAccount"
+              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
+            >
+              Ad Account
+            </label>
 
-          {adAccounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name || account.id} ({normalizeAccountId(account.id)})
-            </option>
-          ))}
-        </select>
+            <select
+              id="adAccount"
+              value={selectedAdAccountId}
+              onChange={(e) => {
+                setSelectedAdAccountId(e.target.value);
+                setFormError("");
+                setResult(null);
+              }}
+              style={inputStyle}
+              disabled={adAccountsLoading}
+            >
+              <option value="">
+                {adAccountsLoading
+                  ? "Loading ad accounts..."
+                  : "Select an ad account"}
+              </option>
 
-        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-          The selected ad account must control every downstream action.
-        </div>
+              {adAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name || account.id} ({normalizeAccountId(account.id)})
+                </option>
+              ))}
+            </select>
 
-        {accountStatusLoading && selectedAdAccountId && (
-          <div
-            style={{
-              marginTop: 10,
-              padding: 10,
-              borderRadius: 8,
-              border: "1px solid #1f2937",
-              background: "#111827",
-              color: "#cbd5e1",
-              fontSize: 13,
-            }}
-          >
-            Checking account setup status...
-          </div>
-        )}
-
-        {accountStatus && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: 14,
-              borderRadius: 10,
-              border: "1px solid #1f2937",
-              background: accountStatus.configured ? "#052e16" : "#450a0a",
-              color: "white",
-            }}
-          >
-            {accountStatus.configured ? (
-              <>
-                <div style={{ fontWeight: 800, fontSize: 16 }}>
-                  ✅ Ready for launch
-                </div>
-                <div style={{ marginTop: 6, fontSize: 13, opacity: 0.9 }}>
-                  This account has full configuration and can be used for retargeting.
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontWeight: 800, fontSize: 16 }}>
-                  ⚠️ Not configured for launch
-                </div>
-
-                <div style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
-                  This account is missing required configuration:
-                </div>
-
-                <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6 }}>
-                  <div>{accountStatus.pixelConfigured ? "✅" : "❌"} Pixel</div>
-                  <div>{accountStatus.campaignConfigured ? "✅" : "❌"} Campaign</div>
-                  <div>{accountStatus.pageConfigured ? "✅" : "❌"} Page</div>
-                </div>
-              </>
+            {adAccountsError && (
+              <div style={errorBoxStyle}>{adAccountsError}</div>
             )}
           </div>
-        )}
 
-        {adAccountsError && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: 12,
-              borderRadius: 8,
-              background: "#450a0a",
-              color: "#fecaca",
-              fontSize: 14,
-            }}
-          >
-            {adAccountsError}
+          <div>
+            <label
+              htmlFor="pageId"
+              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
+            >
+              Page
+            </label>
+
+            <select
+              id="pageId"
+              value={selectedPageId}
+              onChange={(e) => {
+                setSelectedPageId(e.target.value);
+                setFormError("");
+                setResult(null);
+              }}
+              style={inputStyle}
+              disabled={pagesLoading}
+            >
+              <option value="">
+                {pagesLoading ? "Loading pages..." : "Select a page"}
+              </option>
+
+              {pages.map((page) => (
+                <option key={page.id} value={page.id}>
+                  {page.name} ({page.id})
+                </option>
+              ))}
+            </select>
+
+            {pagesError && <div style={errorBoxStyle}>{pagesError}</div>}
           </div>
-        )}
+
+          <div>
+            <label
+              htmlFor="campaignId"
+              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
+            >
+              Campaign
+            </label>
+
+            <select
+              id="campaignId"
+              value={selectedCampaignId}
+              onChange={(e) => {
+                setSelectedCampaignId(e.target.value);
+                setFormError("");
+                setResult(null);
+              }}
+              style={inputStyle}
+              disabled={campaignsLoading || !selectedAdAccountId}
+            >
+              <option value="">
+                {campaignsLoading
+                  ? "Loading campaigns..."
+                  : !selectedAdAccountId
+                    ? "Select an ad account first"
+                    : "Select a campaign"}
+              </option>
+
+              {campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.name} ({campaign.id})
+                  {campaign.status ? ` — ${campaign.status}` : ""}
+                </option>
+              ))}
+            </select>
+
+            {campaignsError && <div style={errorBoxStyle}>{campaignsError}</div>}
+          </div>
+
+          <div>
+            <label
+              htmlFor="pixelId"
+              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
+            >
+              Pixel
+            </label>
+
+            <select
+              id="pixelId"
+              value={selectedPixelId}
+              onChange={(e) => {
+                setSelectedPixelId(e.target.value);
+                setFormError("");
+                setResult(null);
+              }}
+              style={inputStyle}
+              disabled={pixelsLoading || !selectedAdAccountId}
+            >
+              <option value="">
+                {pixelsLoading
+                  ? "Loading pixels..."
+                  : !selectedAdAccountId
+                    ? "Select an ad account first"
+                    : "Select a pixel"}
+              </option>
+
+              {pixels.map((pixel) => (
+                <option key={pixel.id} value={pixel.id}>
+                  {pixel.name} ({pixel.id})
+                </option>
+              ))}
+            </select>
+
+            {pixelsError && <div style={errorBoxStyle}>{pixelsError}</div>}
+          </div>
+        </div>
       </div>
 
       <div
@@ -807,20 +1014,7 @@ export default function DashboardPage() {
               Pick an ad from the selected account instead of pasting the ID manually.
             </div>
 
-            {adsError && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 8,
-                  background: "#450a0a",
-                  color: "#fecaca",
-                  fontSize: 14,
-                }}
-              >
-                {adsError}
-              </div>
-            )}
+            {adsError && <div style={errorBoxStyle}>{adsError}</div>}
 
             {!adsLoading && !adsError && selectedAdAccountId && ads.length === 0 && (
               <div
@@ -925,20 +1119,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {previewError && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 8,
-                  background: "#450a0a",
-                  color: "#fecaca",
-                  fontSize: 14,
-                }}
-              >
-                {previewError}
-              </div>
-            )}
+            {previewError && <div style={errorBoxStyle}>{previewError}</div>}
 
             {previewData && (
               <div
@@ -1073,29 +1254,13 @@ export default function DashboardPage() {
         >
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Launch Summary</div>
           <div>Ad Account: {normalizedSelectedAdAccountId || "—"}</div>
-          <div>
-            Launch Status:{" "}
-            {accountStatusLoading
-              ? "Checking..."
-              : accountStatus
-                ? accountStatus.configured
-                  ? "Ready"
-                  : "Blocked"
-                : "—"}
-          </div>
+          <div>Page: {selectedPageId || "—"}</div>
+          <div>Campaign: {selectedCampaignId || "—"}</div>
+          <div>Pixel: {selectedPixelId || "—"}</div>
           <div>Mode: {mode === "existing" ? "Retarget Winning Ad" : "Create New Ad"}</div>
           {mode === "existing" && <div>Selected Ad: {existingAdId || "—"}</div>}
           <div>Budget: €{budget}/day</div>
           <div>Window: {days} days</div>
-
-          {!accountStatusLoading && accountStatus && !accountStatus.configured && (
-            <div style={{ marginTop: 8, lineHeight: 1.6 }}>
-              <div>Missing:</div>
-              <div>{accountStatus.pixelConfigured ? "✅" : "❌"} Pixel</div>
-              <div>{accountStatus.campaignConfigured ? "✅" : "❌"} Campaign</div>
-              <div>{accountStatus.pageConfigured ? "✅" : "❌"} Page</div>
-            </div>
-          )}
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -1174,13 +1339,9 @@ export default function DashboardPage() {
         >
           {loading
             ? "Launching..."
-            : accountStatusLoading
-              ? "Checking Account Setup..."
-              : !isConfiguredAccount
-                ? "Launch Blocked — Account Not Configured"
-                : mode === "existing"
-                  ? "Launch Retargeting from Existing Ad"
-                  : "Launch New Retargeting Ad"}
+            : mode === "existing"
+              ? "Launch Retargeting from Existing Ad"
+              : "Launch New Retargeting Ad"}
         </button>
       </div>
 
@@ -1247,6 +1408,9 @@ export default function DashboardPage() {
                 }}
               >
                 <div>Ad Account: {normalizeAccountId(selectedAdAccountId)}</div>
+                <div>Page ID: {selectedPageId || "—"}</div>
+                <div>Campaign ID: {selectedCampaignId || "—"}</div>
+                <div>Pixel ID: {selectedPixelId || "—"}</div>
                 <div>Audience ID: {result.audienceId}</div>
                 <div>Ad Set ID: {result.adsetId}</div>
                 <div>Ad ID: {result.adId}</div>
@@ -1330,4 +1494,13 @@ const inputStyle = {
   border: "1px solid #333",
   background: "#111",
   color: "#fff",
+} as const;
+
+const errorBoxStyle = {
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 8,
+  background: "#450a0a",
+  color: "#fecaca",
+  fontSize: 14,
 } as const;
