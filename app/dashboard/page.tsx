@@ -710,7 +710,9 @@ export default function DashboardPage() {
             Your dashboard is unlocked, but there is no active Meta session yet.
           </div>
 
-          <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div
+            style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}
+          >
             <button
               type="button"
               onClick={() => {
@@ -804,7 +806,9 @@ export default function DashboardPage() {
             onClick={() => setShowTechnicalDetails((current) => !current)}
             style={secondaryButtonStyle(false)}
           >
-            {showTechnicalDetails ? "Hide technical details" : "Show technical details"}
+            {showTechnicalDetails
+              ? "Hide technical details"
+              : "Show technical details"}
           </button>
         </div>
 
@@ -913,7 +917,9 @@ export default function DashboardPage() {
           Reuse an existing ad or create a new one.
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14 }}>
+        <div
+          style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14 }}
+        >
           <button
             type="button"
             onClick={() => {
@@ -997,7 +1003,13 @@ export default function DashboardPage() {
               <div style={neutralBoxStyle}>No ads found in this account.</div>
             )}
 
-            <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>
+              Ad preview loads automatically when you select an ad.
+            </div>
+
+            <div
+              style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -1007,24 +1019,7 @@ export default function DashboardPage() {
                 disabled={adsLoading || !selectedAdAccountId}
                 style={secondaryButtonStyle(adsLoading || !selectedAdAccountId)}
               >
-                {adsLoading ? "Refreshing..." : "Refresh ads"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handlePreviewAd()}
-                disabled={
-                  previewLoading ||
-                  !existingAdId.trim() ||
-                  !selectedAdAccountId.trim()
-                }
-                style={secondaryButtonStyle(
-                  previewLoading ||
-                    !existingAdId.trim() ||
-                    !selectedAdAccountId.trim()
-                )}
-              >
-                {previewLoading ? "Loading preview..." : "Preview ad"}
+                {adsLoading ? "Refreshing..." : "Reload ad list"}
               </button>
             </div>
 
@@ -1130,7 +1125,9 @@ export default function DashboardPage() {
           Review the essentials, then launch the retargeting setup.
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14 }}>
+        <div
+          style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14 }}
+        >
           <div style={{ flex: 1, minWidth: 220 }}>
             <label htmlFor="budget" style={labelStyle}>
               Daily budget (€)
@@ -1212,13 +1209,22 @@ export default function DashboardPage() {
                 ✅ Retargeting launched
               </div>
 
-              <div style={{ marginTop: 10, fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>
-                Your retargeting setup was created successfully and saved in paused
-                status inside Meta.
+              <div
+                style={{
+                  marginTop: 10,
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  opacity: 0.95,
+                }}
+              >
+                Your retargeting setup was created successfully and saved in
+                paused status inside Meta.
               </div>
 
               <div style={resultInnerBoxStyle}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>What was created</div>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                  What was created
+                </div>
                 <div style={{ fontSize: 14, lineHeight: 1.7 }}>
                   <div>• Custom Audience created</div>
                   <div>• Ad Set created in paused status</div>
@@ -1231,10 +1237,19 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div style={{ marginTop: 14, fontSize: 12, opacity: 0.85, lineHeight: 1.7 }}>
+              <div
+                style={{
+                  marginTop: 14,
+                  fontSize: 12,
+                  opacity: 0.85,
+                  lineHeight: 1.7,
+                }}
+              >
                 <div>Ad Account: {normalizeAccountId(selectedAdAccountId)}</div>
                 <div>Page: {selectedPageName || selectedPageId || "—"}</div>
-                <div>Campaign: {selectedCampaignName || selectedCampaignId || "—"}</div>
+                <div>
+                  Campaign: {selectedCampaignName || selectedCampaignId || "—"}
+                </div>
                 <div>Pixel: {selectedPixelName || selectedPixelId || "—"}</div>
                 <div>Audience ID: {result.audienceId}</div>
                 <div>Ad Set ID: {result.adsetId}</div>
@@ -1246,14 +1261,30 @@ export default function DashboardPage() {
             </>
           ) : (
             <>
-              <div style={{ fontSize: 22, fontWeight: 800 }}>❌ Launch failed</div>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>
+                ❌ Launch failed
+              </div>
 
-              <div style={{ marginTop: 10, fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>
+              <div
+                style={{
+                  marginTop: 10,
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  opacity: 0.95,
+                }}
+              >
                 The retargeting setup could not be completed.
               </div>
 
               {result.step && (
-                <div style={{ marginTop: 12, fontSize: 13, color: "#fecaca", fontWeight: 700 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 13,
+                    color: "#fecaca",
+                    fontWeight: 700,
+                  }}
+                >
                   Failed step: {result.step}
                 </div>
               )}
