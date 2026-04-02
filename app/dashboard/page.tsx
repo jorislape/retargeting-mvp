@@ -97,6 +97,15 @@ export default function DashboardPage() {
     }
   }
 
+  const selectedPageName =
+    pages.find((page) => page.id === selectedPageId)?.name || "";
+  const selectedCampaignName =
+    campaigns.find((campaign) => campaign.id === selectedCampaignId)?.name || "";
+  const selectedPixelName =
+    pixels.find((pixel) => pixel.id === selectedPixelId)?.name || "";
+  const selectedAdName =
+    ads.find((ad) => ad.id === existingAdId)?.name || "";
+
   const setupIssues = useMemo(() => {
     const issues: string[] = [];
 
@@ -106,21 +115,21 @@ export default function DashboardPage() {
 
     if (!selectedPageId.trim()) {
       if (pagesLoading) {
-        issues.push("Loading your Facebook Pages...");
+        issues.push("Loading Facebook Page...");
       } else if (pagesError) {
-        issues.push("We could not load your Facebook Pages.");
+        issues.push("Could not load Facebook Page.");
       } else {
-        issues.push("No Facebook Page available for this account connection.");
+        issues.push("No Facebook Page available.");
       }
     }
 
     if (!selectedCampaignId.trim()) {
       if (campaignsLoading) {
-        issues.push("Loading campaigns...");
+        issues.push("Loading campaign...");
       } else if (campaignsError) {
-        issues.push("We could not load campaigns for this ad account.");
+        issues.push("Could not load campaign.");
       } else {
-        issues.push("No campaign available for the selected ad account.");
+        issues.push("No campaign available.");
       }
     }
 
@@ -128,9 +137,9 @@ export default function DashboardPage() {
       if (pixelsLoading) {
         issues.push("Loading pixel...");
       } else if (pixelsError) {
-        issues.push("We could not load pixels for this ad account.");
+        issues.push("Could not load pixel.");
       } else {
-        issues.push("No pixel available for the selected ad account.");
+        issues.push("No pixel available.");
       }
     }
 
@@ -154,23 +163,23 @@ export default function DashboardPage() {
     }
 
     if (!selectedPageId.trim()) {
-      return "A Facebook Page is required before you can launch.";
+      return "A Facebook Page is required before launch.";
     }
 
     if (!selectedCampaignId.trim()) {
-      return "A campaign is required before you can launch.";
+      return "A campaign is required before launch.";
     }
 
     if (!selectedPixelId.trim()) {
-      return "A pixel is required before you can launch.";
+      return "A pixel is required before launch.";
     }
 
     if (!Number.isFinite(budget) || budget < 1) {
-      return "Daily Budget must be at least €1.";
+      return "Daily budget must be at least €1.";
     }
 
     if (![7, 14, 30].includes(days)) {
-      return "Audience Window must be 7, 14, or 30 days.";
+      return "Audience window must be 7, 14, or 30 days.";
     }
 
     if (mode === "existing") {
@@ -179,16 +188,16 @@ export default function DashboardPage() {
       }
 
       if (!/^\d+$/.test(existingAdId.trim())) {
-        return "Selected Ad ID is invalid.";
+        return "Selected ad ID is invalid.";
       }
 
       return "";
     }
 
-    if (!message.trim()) return "Ad Message is required.";
-    if (!link.trim()) return "Destination Link is required.";
+    if (!message.trim()) return "Ad message is required.";
+    if (!link.trim()) return "Destination link is required.";
     if (!isValidUrl(link.trim())) return "Please enter a valid URL.";
-    if (!productName.trim()) return "Product Name is required.";
+    if (!productName.trim()) return "Product name is required.";
 
     return "";
   }, [
@@ -196,24 +205,18 @@ export default function DashboardPage() {
     selectedPageId,
     selectedCampaignId,
     selectedPixelId,
+    budget,
+    days,
     mode,
     existingAdId,
     message,
     link,
     productName,
-    budget,
-    days,
   ]);
 
   const isFormValid = !validationError;
   const isLaunchBlocked = loading || !isFormValid;
-
-  const selectedPageName =
-    pages.find((page) => page.id === selectedPageId)?.name || "";
-  const selectedCampaignName =
-    campaigns.find((campaign) => campaign.id === selectedCampaignId)?.name || "";
-  const selectedPixelName =
-    pixels.find((pixel) => pixel.id === selectedPixelId)?.name || "";
+  const isSetupReady = setupIssues.length === 0;
 
   async function checkSession() {
     try {
@@ -427,7 +430,7 @@ export default function DashboardPage() {
       setAdsError("");
 
       if (!selectedAdAccountId.trim()) {
-        throw new Error("No ad account selected");
+        throw new Error("No ad account selected.");
       }
 
       const res = await fetch("/api/meta/list-ads", {
@@ -472,8 +475,7 @@ export default function DashboardPage() {
   }, [unlocked]);
 
   useEffect(() => {
-    if (!unlocked) return;
-    if (!connected) return;
+    if (!unlocked || !connected) return;
 
     loadAdAccounts();
     loadPages();
@@ -497,17 +499,14 @@ export default function DashboardPage() {
   }, [selectedAdAccountId]);
 
   useEffect(() => {
-    if (!unlocked) return;
-    if (!connected) return;
-    if (!selectedAdAccountId.trim()) return;
+    if (!unlocked || !connected || !selectedAdAccountId.trim()) return;
 
     loadCampaigns(selectedAdAccountId);
     loadPixels(selectedAdAccountId);
   }, [unlocked, connected, selectedAdAccountId]);
 
   useEffect(() => {
-    if (!unlocked) return;
-    if (!connected) return;
+    if (!unlocked || !connected) return;
     if (mode !== "existing") return;
     if (!selectedAdAccountId.trim()) return;
     if (hasTriedLoadingAds.current) return;
@@ -526,7 +525,7 @@ export default function DashboardPage() {
     }
 
     if (!adIdToUse) {
-      setPreviewError("Existing Ad ID is required.");
+      setPreviewError("Existing ad is required.");
       setPreviewData(null);
       return;
     }
@@ -550,9 +549,7 @@ export default function DashboardPage() {
 
       const data = await res.json();
 
-      if (requestId !== previewRequestIdRef.current) {
-        return;
-      }
+      if (requestId !== previewRequestIdRef.current) return;
 
       if (!res.ok || !data.ok) {
         setPreviewData(null);
@@ -567,9 +564,7 @@ export default function DashboardPage() {
       setPreviewData(data.data);
       setPreviewError("");
     } catch {
-      if (requestId !== previewRequestIdRef.current) {
-        return;
-      }
+      if (requestId !== previewRequestIdRef.current) return;
 
       setPreviewData(null);
       setPreviewError("Preview request failed.");
@@ -581,8 +576,7 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    if (!unlocked) return;
-    if (!connected) return;
+    if (!unlocked || !connected) return;
     if (mode !== "existing") return;
     if (!selectedAdAccountId.trim()) return;
 
@@ -648,7 +642,6 @@ export default function DashboardPage() {
       });
 
       const data = await res.json();
-
       setResult(data);
     } catch {
       setResult({
@@ -662,9 +655,9 @@ export default function DashboardPage() {
 
   if (!unlocked) {
     return (
-      <main style={{ padding: 40, maxWidth: 420, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 28, marginBottom: 8 }}>🔒 Access Required</h1>
-        <p style={{ opacity: 0.7 }}>
+      <main style={pageStyleNarrow}>
+        <h1 style={pageTitleStyle}>🔒 Access Required</h1>
+        <p style={mutedTextStyle}>
           Enter the dashboard access code to continue.
         </p>
 
@@ -673,16 +666,7 @@ export default function DashboardPage() {
           placeholder="Enter access code"
           value={accessCode}
           onChange={(e) => setAccessCode(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginTop: 16,
-            borderRadius: 8,
-            border: "1px solid #333",
-            background: "#111",
-            color: "#fff",
-            fontSize: 16,
-          }}
+          style={inputStyle}
         />
 
         <button
@@ -695,18 +679,7 @@ export default function DashboardPage() {
               alert("Wrong code");
             }
           }}
-          style={{
-            marginTop: 12,
-            padding: 12,
-            width: "100%",
-            borderRadius: 8,
-            border: "none",
-            background: "#2563eb",
-            color: "white",
-            fontWeight: 600,
-            cursor: "pointer",
-            fontSize: 16,
-          }}
+          style={primaryButtonStyle(false)}
         >
           Unlock Dashboard
         </button>
@@ -716,60 +689,34 @@ export default function DashboardPage() {
 
   if (connected === null) {
     return (
-      <main style={{ padding: 40, maxWidth: 760, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 28, marginBottom: 8 }}>
-          🚀 One-Click Meta Retargeting
-        </h1>
-        <p style={{ opacity: 0.7 }}>Checking Meta connection...</p>
+      <main style={pageStyle}>
+        <h1 style={pageTitleStyle}>🚀 One-Click Meta Retargeting</h1>
+        <p style={mutedTextStyle}>Checking Meta connection...</p>
       </main>
     );
   }
 
   if (!connected) {
     return (
-      <main style={{ padding: 40, maxWidth: 760, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 28, marginBottom: 8 }}>
-          🚀 One-Click Meta Retargeting
-        </h1>
-        <p style={{ opacity: 0.7, marginBottom: 20 }}>
-          Connect your Meta account to load ads and launch retargeting.
+      <main style={pageStyle}>
+        <h1 style={pageTitleStyle}>🚀 One-Click Meta Retargeting</h1>
+        <p style={{ ...mutedTextStyle, marginBottom: 20 }}>
+          Connect your Meta account to continue.
         </p>
 
-        <div
-          style={{
-            padding: 16,
-            borderRadius: 12,
-            border: "1px solid #222",
-            background: "#0b0b0b",
-          }}
-        >
-          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
-            Meta connection required
-          </div>
-
-          <div style={{ fontSize: 14, opacity: 0.75, lineHeight: 1.6 }}>
+        <section style={cardStyle}>
+          <div style={sectionTitleStyle}>Meta connection required</div>
+          <div style={sectionSubtextStyle}>
             Your dashboard is unlocked, but there is no active Meta session yet.
-            Connect your account to continue.
           </div>
 
-          <div
-            style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}
-          >
+          <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
               type="button"
               onClick={() => {
                 window.location.href = "/api/meta/oauth/start";
               }}
-              style={{
-                padding: "12px 16px",
-                borderRadius: 10,
-                border: "none",
-                background: "#2563eb",
-                color: "#fff",
-                fontWeight: 700,
-                cursor: "pointer",
-                fontSize: 14,
-              }}
+              style={primaryButtonStyle(false)}
             >
               Connect Meta
             </button>
@@ -779,124 +726,75 @@ export default function DashboardPage() {
               onClick={() => {
                 checkSession();
               }}
-              style={{
-                padding: "12px 16px",
-                borderRadius: 10,
-                border: "1px solid #333",
-                background: "#111",
-                color: "#fff",
-                fontWeight: 700,
-                cursor: "pointer",
-                fontSize: 14,
-              }}
+              style={secondaryButtonStyle(false)}
             >
               Refresh Status
             </button>
           </div>
-        </div>
+        </section>
       </main>
     );
   }
 
   return (
-    <main style={{ padding: 40, maxWidth: 760, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 8 }}>
-        🚀 One-Click Meta Retargeting
-      </h1>
-      <p style={{ opacity: 0.7 }}>Launch retargeting ads in seconds.</p>
+    <main style={pageStyle}>
+      <h1 style={pageTitleStyle}>🚀 One-Click Meta Retargeting</h1>
+      <p style={mutedTextStyle}>
+        Launch retargeting fast with the fewest possible decisions.
+      </p>
 
-      <div
-        style={{
-          marginTop: 16,
-          padding: 12,
-          borderRadius: 10,
-          border: "1px solid #1f2937",
-          background: "#0f172a",
-          color: "#cbd5e1",
-          fontSize: 13,
-        }}
-      >
-        Meta account connected.
-      </div>
+      <div style={successBannerStyle}>Meta account connected.</div>
 
-      <div
-        style={{
-          marginTop: 24,
-          padding: 16,
-          borderRadius: 12,
-          border: "1px solid #222",
-          background: "#0b0b0b",
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-          Ad Account
+      <section style={cardStyle}>
+        <div style={stepLabelStyle}>Step 1</div>
+        <div style={sectionTitleStyle}>Choose ad account</div>
+        <div style={sectionSubtextStyle}>
+          We will automatically detect the required assets for this account.
         </div>
 
-        <select
-          id="adAccount"
-          value={selectedAdAccountId}
-          onChange={(e) => {
-            setSelectedAdAccountId(e.target.value);
-            setFormError("");
-            setResult(null);
-          }}
-          style={inputStyle}
-          disabled={adAccountsLoading}
-        >
-          <option value="">
-            {adAccountsLoading
-              ? "Loading ad accounts..."
-              : "Select an ad account"}
-          </option>
-
-          {adAccounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name || account.id} ({normalizeAccountId(account.id)})
-            </option>
-          ))}
-        </select>
-
-        {adAccountsError && <div style={errorBoxStyle}>{adAccountsError}</div>}
-
-        {setupIssues.length > 0 ? (
-          <div
-            style={{
-              marginTop: 14,
-              padding: 14,
-              borderRadius: 10,
-              border: "1px solid #3f2a00",
-              background: "#2a1800",
-              color: "#fde68a",
-              fontSize: 14,
-              lineHeight: 1.6,
+        <div style={{ marginTop: 14 }}>
+          <select
+            id="adAccount"
+            value={selectedAdAccountId}
+            onChange={(e) => {
+              setSelectedAdAccountId(e.target.value);
+              setFormError("");
+              setResult(null);
             }}
+            style={inputStyle}
+            disabled={adAccountsLoading}
           >
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+            <option value="">
+              {adAccountsLoading
+                ? "Loading ad accounts..."
+                : "Select an ad account"}
+            </option>
+
+            {adAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name || account.id} ({normalizeAccountId(account.id)})
+              </option>
+            ))}
+          </select>
+
+          {adAccountsError && <div style={errorBoxStyle}>{adAccountsError}</div>}
+        </div>
+
+        {!selectedAdAccountId ? null : isSetupReady ? (
+          <div style={setupReadyBoxStyle}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Setup detected</div>
+            <div>Page: {selectedPageName || "Detected"}</div>
+            <div>Campaign: {selectedCampaignName || "Detected"}</div>
+            <div>Pixel: {selectedPixelName || "Detected"}</div>
+          </div>
+        ) : (
+          <div style={warningBoxStyle}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>
               Setup needed before launch
             </div>
             {setupIssues.map((issue) => (
               <div key={issue}>• {issue}</div>
             ))}
-          </div>
-        ) : (
-          <div
-            style={{
-              marginTop: 14,
-              padding: 14,
-              borderRadius: 10,
-              border: "1px solid #14532d",
-              background: "#052e16",
-              color: "#bbf7d0",
-              fontSize: 14,
-              lineHeight: 1.6,
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>
-              Ready to launch
-            </div>
-            <div>
-              We found the required assets for this account and selected them automatically.
-            </div>
           </div>
         )}
 
@@ -904,37 +802,18 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => setShowTechnicalDetails((current) => !current)}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #333",
-              background: "#111",
-              color: "white",
-              fontWeight: 600,
-              cursor: "pointer",
-              fontSize: 13,
-            }}
+            style={secondaryButtonStyle(false)}
           >
             {showTechnicalDetails ? "Hide technical details" : "Show technical details"}
           </button>
         </div>
 
         {showTechnicalDetails ? (
-          <div
-            style={{
-              marginTop: 14,
-              display: "grid",
-              gap: 14,
-            }}
-          >
+          <div style={{ marginTop: 16, display: "grid", gap: 14 }}>
             <div>
-              <label
-                htmlFor="pageId"
-                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-              >
+              <label htmlFor="pageId" style={labelStyle}>
                 Page
               </label>
-
               <select
                 id="pageId"
                 value={selectedPageId}
@@ -956,18 +835,13 @@ export default function DashboardPage() {
                   </option>
                 ))}
               </select>
-
               {pagesError && <div style={errorBoxStyle}>{pagesError}</div>}
             </div>
 
             <div>
-              <label
-                htmlFor="campaignId"
-                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-              >
+              <label htmlFor="campaignId" style={labelStyle}>
                 Campaign
               </label>
-
               <select
                 id="campaignId"
                 value={selectedCampaignId}
@@ -994,18 +868,13 @@ export default function DashboardPage() {
                   </option>
                 ))}
               </select>
-
               {campaignsError && <div style={errorBoxStyle}>{campaignsError}</div>}
             </div>
 
             <div>
-              <label
-                htmlFor="pixelId"
-                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-              >
+              <label htmlFor="pixelId" style={labelStyle}>
                 Pixel
               </label>
-
               <select
                 id="pixelId"
                 value={selectedPixelId}
@@ -1031,27 +900,20 @@ export default function DashboardPage() {
                   </option>
                 ))}
               </select>
-
               {pixelsError && <div style={errorBoxStyle}>{pixelsError}</div>}
             </div>
           </div>
         ) : null}
-      </div>
+      </section>
 
-      <div
-        style={{
-          marginTop: 24,
-          padding: 16,
-          borderRadius: 12,
-          border: "1px solid #222",
-          background: "#0b0b0b",
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-          Launch Mode
+      <section style={cardStyle}>
+        <div style={stepLabelStyle}>Step 2</div>
+        <div style={sectionTitleStyle}>Choose how to launch</div>
+        <div style={sectionSubtextStyle}>
+          Reuse an existing ad or create a new one.
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14 }}>
           <button
             type="button"
             onClick={() => {
@@ -1064,7 +926,7 @@ export default function DashboardPage() {
             }}
             style={modeButtonStyle(mode === "existing")}
           >
-            Retarget Winning Ad
+            Retarget existing ad
           </button>
 
           <button
@@ -1079,25 +941,26 @@ export default function DashboardPage() {
             }}
             style={modeButtonStyle(mode === "new")}
           >
-            Create New Ad
+            Create new ad
           </button>
         </div>
+      </section>
 
-        <div style={{ fontSize: 13, opacity: 0.72, marginTop: 10 }}>
-          {mode === "existing"
-            ? "Reuse the creative from an existing Meta ad."
-            : "Create a new retargeting ad from scratch."}
+      <section style={cardStyle}>
+        <div style={stepLabelStyle}>Step 3</div>
+        <div style={sectionTitleStyle}>
+          {mode === "existing" ? "Pick the source ad" : "Enter the new ad details"}
         </div>
-      </div>
+        <div style={sectionSubtextStyle}>
+          {mode === "existing"
+            ? "We will reuse the creative from the selected ad."
+            : "Keep this simple. Only enter what is needed to launch."}
+        </div>
 
-      <div style={{ display: "grid", gap: 16, marginTop: 24 }}>
         {mode === "existing" ? (
-          <div>
-            <label
-              htmlFor="existingAdId"
-              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-            >
-              Choose Existing Ad
+          <div style={{ marginTop: 14 }}>
+            <label htmlFor="existingAdId" style={labelStyle}>
+              Existing ad
             </label>
 
             <select
@@ -1128,36 +991,13 @@ export default function DashboardPage() {
               ))}
             </select>
 
-            <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-              Pick an ad from the selected account.
-            </div>
-
             {adsError && <div style={errorBoxStyle}>{adsError}</div>}
 
             {!adsLoading && !adsError && selectedAdAccountId && ads.length === 0 && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 8,
-                  background: "#111827",
-                  color: "#cbd5e1",
-                  fontSize: 14,
-                  border: "1px solid #1f2937",
-                }}
-              >
-                No ads found in this account.
-              </div>
+              <div style={neutralBoxStyle}>No ads found in this account.</div>
             )}
 
-            <div
-              style={{
-                marginTop: 12,
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
+            <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
                 type="button"
                 onClick={() => {
@@ -1165,11 +1005,9 @@ export default function DashboardPage() {
                   loadAds();
                 }}
                 disabled={adsLoading || !selectedAdAccountId}
-                style={secondaryButtonStyle(
-                  adsLoading || !selectedAdAccountId
-                )}
+                style={secondaryButtonStyle(adsLoading || !selectedAdAccountId)}
               >
-                {adsLoading ? "Refreshing..." : "Refresh Ads"}
+                {adsLoading ? "Refreshing..." : "Refresh ads"}
               </button>
 
               <button
@@ -1186,76 +1024,40 @@ export default function DashboardPage() {
                     !selectedAdAccountId.trim()
                 )}
               >
-                {previewLoading ? "Loading Preview..." : "Preview Source Ad"}
+                {previewLoading ? "Loading preview..." : "Preview ad"}
               </button>
             </div>
 
             {previewLoading && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 8,
-                  background: "#111827",
-                  color: "#cbd5e1",
-                  fontSize: 14,
-                  border: "1px solid #1f2937",
-                }}
-              >
-                Loading source ad preview...
-              </div>
+              <div style={neutralBoxStyle}>Loading source ad preview...</div>
             )}
 
             {previewError && <div style={errorBoxStyle}>{previewError}</div>}
 
             {previewData && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 14,
-                  borderRadius: 10,
-                  border: "1px solid #1f2937",
-                  background: "#0f172a",
-                  color: "white",
-                }}
-              >
+              <div style={previewCardStyle}>
                 <div style={{ fontWeight: 700, marginBottom: 10 }}>
-                  Source Ad Preview
+                  Source ad preview
                 </div>
 
-                <div style={{ fontSize: 14, opacity: 0.85 }}>
-                  <div>Ad ID: {previewData.adId}</div>
-                  <div style={{ marginTop: 4 }}>
-                    Ad Name: {previewData.adName || "—"}
-                  </div>
-                  <div style={{ marginTop: 4 }}>
-                    Creative ID: {previewData.creativeId || "—"}
-                  </div>
-                  <div style={{ marginTop: 4 }}>
-                    Message: {previewData.message || "—"}
-                  </div>
-                  <div style={{ marginTop: 4 }}>
-                    Headline: {previewData.headline || "—"}
-                  </div>
-                  <div style={{ marginTop: 4 }}>
-                    Description: {previewData.description || "—"}
-                  </div>
+                <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.7 }}>
+                  <div>Ad name: {previewData.adName || selectedAdName || "—"}</div>
+                  <div>Message: {previewData.message || "—"}</div>
+                  <div>Headline: {previewData.headline || "—"}</div>
+                  <div>Description: {previewData.description || "—"}</div>
                 </div>
 
                 <div style={{ marginTop: 10, fontSize: 13, color: "#86efac" }}>
-                  Ready to reuse this ad creative.
+                  Ready to reuse this creative.
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <>
+          <div style={{ marginTop: 14, display: "grid", gap: 16 }}>
             <div>
-              <label
-                htmlFor="message"
-                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-              >
-                Ad Message
+              <label htmlFor="message" style={labelStyle}>
+                Ad message
               </label>
               <textarea
                 id="message"
@@ -1271,11 +1073,8 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="link"
-                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-              >
-                Destination Link
+              <label htmlFor="link" style={labelStyle}>
+                Destination link
               </label>
               <input
                 id="link"
@@ -1290,11 +1089,8 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="productName"
-                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-              >
-                Product Name
+              <label htmlFor="productName" style={labelStyle}>
+                Product name
               </label>
               <input
                 id="productName"
@@ -1309,10 +1105,7 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="description"
-                style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-              >
+              <label htmlFor="description" style={labelStyle}>
                 Description
               </label>
               <input
@@ -1326,35 +1119,21 @@ export default function DashboardPage() {
                 style={inputStyle}
               />
             </div>
-          </>
+          </div>
         )}
+      </section>
 
-        <div
-          style={{
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid #1f2937",
-            background: "#0f172a",
-            fontSize: 13,
-            color: "#cbd5e1",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Launch Summary</div>
-          <div>Ad Account: {normalizedSelectedAdAccountId || "—"}</div>
-          <div>Page: {selectedPageName || "—"}</div>
-          <div>Mode: {mode === "existing" ? "Retarget Winning Ad" : "Create New Ad"}</div>
-          {mode === "existing" && <div>Selected Ad: {existingAdId || "—"}</div>}
-          <div>Budget: €{budget}/day</div>
-          <div>Window: {days} days</div>
+      <section style={cardStyle}>
+        <div style={stepLabelStyle}>Step 4</div>
+        <div style={sectionTitleStyle}>Budget and launch</div>
+        <div style={sectionSubtextStyle}>
+          Review the essentials, then launch the retargeting setup.
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14 }}>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <label
-              htmlFor="budget"
-              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-            >
-              Daily Budget (€)
+            <label htmlFor="budget" style={labelStyle}>
+              Daily budget (€)
             </label>
             <input
               id="budget"
@@ -1366,16 +1145,12 @@ export default function DashboardPage() {
                 setFormError("");
               }}
               style={inputStyle}
-              placeholder="e.g. 5"
             />
           </div>
 
           <div style={{ flex: 1, minWidth: 220 }}>
-            <label
-              htmlFor="days"
-              style={{ display: "block", marginBottom: 8, fontWeight: 600 }}
-            >
-              Audience Window
+            <label htmlFor="days" style={labelStyle}>
+              Audience window
             </label>
             <select
               id="days"
@@ -1393,105 +1168,70 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <div style={launchSummaryStyle}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Launch summary</div>
+          <div>Account: {normalizedSelectedAdAccountId || "—"}</div>
+          <div>Mode: {mode === "existing" ? "Retarget existing ad" : "Create new ad"}</div>
+          {mode === "existing" ? (
+            <div>Ad: {selectedAdName || existingAdId || "—"}</div>
+          ) : (
+            <div>Product: {productName.trim() || "—"}</div>
+          )}
+          <div>Budget: €{budget}/day</div>
+          <div>Window: {days} days</div>
+        </div>
+
         {(formError || validationError) && (
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 8,
-              background: "#451a03",
-              color: "#fde68a",
-              fontSize: 14,
-            }}
-          >
-            {formError || validationError}
-          </div>
+          <div style={inlineWarningStyle}>{formError || validationError}</div>
         )}
 
         <button
           onClick={handleLaunchRetargeting}
           disabled={isLaunchBlocked}
-          style={{
-            padding: "14px",
-            fontSize: 16,
-            borderRadius: 8,
-            border: "none",
-            cursor: isLaunchBlocked ? "not-allowed" : "pointer",
-            background: isLaunchBlocked ? "#1e3a8a" : "#2563eb",
-            color: "white",
-            fontWeight: 700,
-            opacity: isLaunchBlocked ? 0.7 : 1,
-          }}
+          style={primaryButtonStyle(isLaunchBlocked)}
         >
           {loading
             ? "Launching..."
             : mode === "existing"
-              ? "Launch Retargeting from Existing Ad"
-              : "Launch New Retargeting Ad"}
+              ? "Launch retargeting"
+              : "Launch new retargeting ad"}
         </button>
-      </div>
+      </section>
 
       {result && (
-        <div
+        <section
           style={{
-            marginTop: 24,
-            padding: 16,
-            borderRadius: 10,
+            ...cardStyle,
             background: result.ok ? "#052e16" : "#450a0a",
-            color: "white",
             border: result.ok ? "1px solid #166534" : "1px solid #7f1d1d",
           }}
         >
           {result.ok ? (
             <>
-              <div style={{ fontSize: 20, fontWeight: 800 }}>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>
                 ✅ Retargeting launched
               </div>
 
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 14,
-                  opacity: 0.9,
-                  lineHeight: 1.5,
-                }}
-              >
-                Your retargeting setup was created successfully and is currently
-                saved in paused status inside Meta.
+              <div style={{ marginTop: 10, fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>
+                Your retargeting setup was created successfully and saved in paused
+                status inside Meta.
               </div>
 
-              <div
-                style={{
-                  marginTop: 14,
-                  padding: 12,
-                  borderRadius: 8,
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                  What was created
-                </div>
-
+              <div style={resultInnerBoxStyle}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>What was created</div>
                 <div style={{ fontSize: 14, lineHeight: 1.7 }}>
                   <div>• Custom Audience created</div>
                   <div>• Ad Set created in paused status</div>
                   <div>• Ad created in paused status</div>
                   {result.reusedCreativeId ? (
-                    <div>• Existing winning creative reused successfully</div>
+                    <div>• Existing creative reused successfully</div>
                   ) : (
-                    <div>• New creative generated from the form inputs</div>
+                    <div>• New creative generated from your inputs</div>
                   )}
                 </div>
               </div>
 
-              <div
-                style={{
-                  marginTop: 14,
-                  fontSize: 12,
-                  opacity: 0.8,
-                  lineHeight: 1.7,
-                }}
-              >
+              <div style={{ marginTop: 14, fontSize: 12, opacity: 0.85, lineHeight: 1.7 }}>
                 <div>Ad Account: {normalizeAccountId(selectedAdAccountId)}</div>
                 <div>Page: {selectedPageName || selectedPageId || "—"}</div>
                 <div>Campaign: {selectedCampaignName || selectedCampaignId || "—"}</div>
@@ -1506,31 +1246,14 @@ export default function DashboardPage() {
             </>
           ) : (
             <>
-              <div style={{ fontSize: 20, fontWeight: 800 }}>
-                ❌ Launch failed
-              </div>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>❌ Launch failed</div>
 
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 14,
-                  opacity: 0.9,
-                  lineHeight: 1.5,
-                }}
-              >
-                The retargeting setup could not be completed. Check the error
-                details below.
+              <div style={{ marginTop: 10, fontSize: 14, lineHeight: 1.6, opacity: 0.95 }}>
+                The retargeting setup could not be completed.
               </div>
 
               {result.step && (
-                <div
-                  style={{
-                    marginTop: 12,
-                    fontSize: 13,
-                    color: "#fecaca",
-                    fontWeight: 700,
-                  }}
-                >
+                <div style={{ marginTop: 12, fontSize: 13, color: "#fecaca", fontWeight: 700 }}>
                   Failed step: {result.step}
                 </div>
               )}
@@ -1548,7 +1271,7 @@ export default function DashboardPage() {
               </pre>
             </>
           )}
-        </div>
+        </section>
       )}
     </main>
   );
@@ -1556,6 +1279,107 @@ export default function DashboardPage() {
 
 function normalizeAccountId(id: string) {
   return id.startsWith("act_") ? id : `act_${id}`;
+}
+
+const pageStyle = {
+  padding: 40,
+  maxWidth: 820,
+  margin: "0 auto",
+} as const;
+
+const pageStyleNarrow = {
+  padding: 40,
+  maxWidth: 420,
+  margin: "0 auto",
+} as const;
+
+const pageTitleStyle = {
+  fontSize: 30,
+  marginBottom: 8,
+  fontWeight: 800,
+} as const;
+
+const mutedTextStyle = {
+  opacity: 0.72,
+  fontSize: 15,
+  lineHeight: 1.6,
+} as const;
+
+const cardStyle = {
+  marginTop: 24,
+  padding: 18,
+  borderRadius: 14,
+  border: "1px solid #222",
+  background: "#0b0b0b",
+} as const;
+
+const stepLabelStyle = {
+  display: "inline-block",
+  fontSize: 12,
+  fontWeight: 800,
+  letterSpacing: 0.4,
+  textTransform: "uppercase" as const,
+  color: "#93c5fd",
+  marginBottom: 8,
+} as const;
+
+const sectionTitleStyle = {
+  fontSize: 18,
+  fontWeight: 800,
+  marginBottom: 6,
+} as const;
+
+const sectionSubtextStyle = {
+  fontSize: 14,
+  lineHeight: 1.6,
+  opacity: 0.72,
+} as const;
+
+const labelStyle = {
+  display: "block",
+  marginBottom: 8,
+  fontWeight: 600,
+  fontSize: 14,
+} as const;
+
+const inputStyle = {
+  width: "100%",
+  padding: 12,
+  fontSize: 16,
+  borderRadius: 10,
+  border: "1px solid #333",
+  background: "#111",
+  color: "#fff",
+} as const;
+
+function primaryButtonStyle(disabled: boolean) {
+  return {
+    marginTop: 16,
+    padding: "14px 16px",
+    width: "100%",
+    borderRadius: 10,
+    border: "none",
+    background: disabled ? "#1e3a8a" : "#2563eb",
+    color: "#fff",
+    fontWeight: 700,
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: 15,
+    opacity: disabled ? 0.7 : 1,
+  } as const;
+}
+
+function secondaryButtonStyle(disabled: boolean) {
+  return {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid #333",
+    background: disabled ? "#111" : "#1f2937",
+    color: "#fff",
+    fontWeight: 600,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.7 : 1,
+    fontSize: 14,
+  } as const;
 }
 
 function modeButtonStyle(active: boolean) {
@@ -1571,28 +1395,46 @@ function modeButtonStyle(active: boolean) {
   } as const;
 }
 
-function secondaryButtonStyle(disabled: boolean) {
-  return {
-    padding: "10px 14px",
-    borderRadius: 8,
-    border: "1px solid #333",
-    background: disabled ? "#111" : "#1f2937",
-    color: "white",
-    fontWeight: 600,
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.7 : 1,
-    fontSize: 14,
-  } as const;
-}
-
-const inputStyle = {
-  width: "100%",
+const successBannerStyle = {
+  marginTop: 16,
   padding: 12,
-  fontSize: 16,
+  borderRadius: 10,
+  border: "1px solid #1f2937",
+  background: "#0f172a",
+  color: "#cbd5e1",
+  fontSize: 13,
+} as const;
+
+const setupReadyBoxStyle = {
+  marginTop: 14,
+  padding: 14,
+  borderRadius: 10,
+  border: "1px solid #14532d",
+  background: "#052e16",
+  color: "#bbf7d0",
+  fontSize: 14,
+  lineHeight: 1.7,
+} as const;
+
+const warningBoxStyle = {
+  marginTop: 14,
+  padding: 14,
+  borderRadius: 10,
+  border: "1px solid #3f2a00",
+  background: "#2a1800",
+  color: "#fde68a",
+  fontSize: 14,
+  lineHeight: 1.6,
+} as const;
+
+const neutralBoxStyle = {
+  marginTop: 12,
+  padding: 12,
   borderRadius: 8,
-  border: "1px solid #333",
-  background: "#111",
-  color: "#fff",
+  background: "#111827",
+  color: "#cbd5e1",
+  fontSize: 14,
+  border: "1px solid #1f2937",
 } as const;
 
 const errorBoxStyle = {
@@ -1602,4 +1444,41 @@ const errorBoxStyle = {
   background: "#450a0a",
   color: "#fecaca",
   fontSize: 14,
+} as const;
+
+const inlineWarningStyle = {
+  marginTop: 14,
+  padding: 12,
+  borderRadius: 8,
+  background: "#451a03",
+  color: "#fde68a",
+  fontSize: 14,
+} as const;
+
+const previewCardStyle = {
+  marginTop: 12,
+  padding: 14,
+  borderRadius: 10,
+  border: "1px solid #1f2937",
+  background: "#0f172a",
+  color: "#fff",
+} as const;
+
+const launchSummaryStyle = {
+  marginTop: 16,
+  padding: 12,
+  borderRadius: 10,
+  border: "1px solid #1f2937",
+  background: "#0f172a",
+  fontSize: 13,
+  color: "#cbd5e1",
+  lineHeight: 1.7,
+} as const;
+
+const resultInnerBoxStyle = {
+  marginTop: 14,
+  padding: 12,
+  borderRadius: 8,
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.08)",
 } as const;
