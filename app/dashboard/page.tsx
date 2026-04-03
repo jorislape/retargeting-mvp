@@ -16,11 +16,6 @@ type MetaAdAccountOption = {
   account_id?: string;
 };
 
-type MetaPageOption = {
-  id: string;
-  name: string;
-};
-
 type MetaCampaignOption = {
   id: string;
   name: string;
@@ -64,11 +59,6 @@ export default function DashboardPage() {
   const [adAccountsError, setAdAccountsError] = useState("");
   const [selectedAdAccountId, setSelectedAdAccountId] = useState("");
 
-  const [pages, setPages] = useState<MetaPageOption[]>([]);
-  const [pagesLoading, setPagesLoading] = useState(false);
-  const [pagesError, setPagesError] = useState("");
-  const [selectedPageId, setSelectedPageId] = useState("");
-
   const [campaigns, setCampaigns] = useState<MetaCampaignOption[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [campaignsError, setCampaignsError] = useState("");
@@ -97,8 +87,6 @@ export default function DashboardPage() {
     }
   }
 
-  const selectedPageName =
-    pages.find((page) => page.id === selectedPageId)?.name || "";
   const selectedCampaignName =
     campaigns.find((campaign) => campaign.id === selectedCampaignId)?.name || "";
   const selectedPixelName =
@@ -149,10 +137,6 @@ export default function DashboardPage() {
       return "Please select an ad account.";
     }
 
-    if (!selectedPageId.trim()) {
-      return "A Facebook Page is required before launch.";
-    }
-
     if (!selectedCampaignId.trim()) {
       return "A campaign is required before launch.";
     }
@@ -189,7 +173,6 @@ export default function DashboardPage() {
     return "";
   }, [
     selectedAdAccountId,
-    selectedPageId,
     selectedCampaignId,
     selectedPixelId,
     budget,
@@ -267,44 +250,6 @@ export default function DashboardPage() {
       setAdAccountsError(err?.message || "Failed to load ad accounts.");
     } finally {
       setAdAccountsLoading(false);
-    }
-  }
-
-  async function loadPages() {
-    try {
-      setPagesLoading(true);
-      setPagesError("");
-
-      const res = await fetch("/api/meta/list-pages", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Failed to load pages.");
-      }
-
-      const nextPages: MetaPageOption[] = Array.isArray(data.pages)
-        ? data.pages
-        : [];
-
-      setPages(nextPages);
-
-      setSelectedPageId((current) => {
-        if (current && nextPages.some((page) => page.id === current)) {
-          return current;
-        }
-
-        return nextPages[0]?.id || "";
-      });
-    } catch (err: any) {
-      setPages([]);
-      setSelectedPageId("");
-      setPagesError(err?.message || "Failed to load pages.");
-    } finally {
-      setPagesLoading(false);
     }
   }
 
@@ -463,9 +408,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!unlocked || !connected) return;
-
     loadAdAccounts();
-    loadPages();
   }, [unlocked, connected]);
 
   useEffect(() => {
@@ -487,7 +430,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!unlocked || !connected || !selectedAdAccountId.trim()) return;
-
     loadCampaigns(selectedAdAccountId);
     loadPixels(selectedAdAccountId);
   }, [unlocked, connected, selectedAdAccountId]);
@@ -596,7 +538,6 @@ export default function DashboardPage() {
           ? {
               mode: "existing",
               adAccountId: selectedAdAccountId,
-              pageId: selectedPageId,
               campaignId: selectedCampaignId,
               pixelId: selectedPixelId,
               audienceName: `Visitors ${days}d`,
@@ -607,7 +548,6 @@ export default function DashboardPage() {
           : {
               mode: "new",
               adAccountId: selectedAdAccountId,
-              pageId: selectedPageId,
               campaignId: selectedCampaignId,
               pixelId: selectedPixelId,
               audienceName: `Visitors ${days}d`,
@@ -800,35 +740,8 @@ export default function DashboardPage() {
 
         {showTechnicalDetails ? (
           <div style={{ marginTop: 16, display: "grid", gap: 14 }}>
-            <div>
-              <label htmlFor="pageId" style={labelStyle}>
-                Facebook Page
-              </label>
-              <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
-                Loaded from your connected Meta pages. Use this if you need to adjust new ad creation manually.
-              </div>
-              <select
-                id="pageId"
-                value={selectedPageId}
-                onChange={(e) => {
-                  setSelectedPageId(e.target.value);
-                  setFormError("");
-                  setResult(null);
-                }}
-                style={inputStyle}
-                disabled={pagesLoading}
-              >
-                <option value="">
-                  {pagesLoading ? "Loading pages..." : "Select a page"}
-                </option>
-
-                {pages.map((page) => (
-                  <option key={page.id} value={page.id}>
-                    {page.name} ({page.id})
-                  </option>
-                ))}
-              </select>
-              {pagesError && <div style={errorBoxStyle}>{pagesError}</div>}
+            <div style={neutralBoxStyle}>
+              Facebook Page is now selected automatically during launch to reduce setup mistakes.
             </div>
 
             <div>
@@ -949,7 +862,7 @@ export default function DashboardPage() {
         <div style={sectionSubtextStyle}>
           {mode === "existing"
             ? "We will reuse the creative from the selected ad."
-            : "This path uses the Facebook Page selected in technical details."}
+            : "Facebook Page is selected automatically during launch."}
         </div>
 
         {mode === "existing" ? (
@@ -1040,7 +953,7 @@ export default function DashboardPage() {
         ) : (
           <div style={{ marginTop: 14, display: "grid", gap: 16 }}>
             <div style={neutralBoxStyle}>
-              New ad creation is more manual right now. Make sure the Facebook Page in technical details is the one you want to use.
+              New ad creation is more manual right now, but Facebook Page is now auto-selected during launch.
             </div>
 
             <div>
@@ -1239,7 +1152,7 @@ export default function DashboardPage() {
                 }}
               >
                 <div>Ad Account: {normalizeAccountId(selectedAdAccountId)}</div>
-                <div>Page: {selectedPageName || selectedPageId || "—"}</div>
+                <div>Page ID used: {result.pageId || "—"}</div>
                 <div>
                   Campaign: {selectedCampaignName || selectedCampaignId || "—"}
                 </div>

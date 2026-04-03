@@ -3,6 +3,36 @@ import { normalizeAccountId } from "@/lib/meta/account-config";
 
 const META_API_VERSION = "v23.0";
 
+async function getAutoSelectedPage(accessToken: string) {
+  const url = new URL(
+    `https://graph.facebook.com/${META_API_VERSION}/me/accounts`
+  );
+  url.searchParams.set("fields", "id,name");
+  url.searchParams.set("access_token", accessToken);
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || data.error) {
+    throw new Error(data.error?.message || "Failed to fetch Facebook pages");
+  }
+
+  const firstPage = data?.data?.[0];
+
+  if (!firstPage?.id) {
+    throw new Error("No Facebook Page found for the connected Meta account");
+  }
+
+  return {
+    id: String(firstPage.id),
+    name: firstPage.name || `Page ${firstPage.id}`,
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const accessToken = req.cookies.get("meta_access_token")?.value;
@@ -21,7 +51,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
 
     const rawAdAccountId = body.adAccountId;
-    const rawPageId = body.pageId;
     const rawCampaignId = body.campaignId;
     const rawPixelId = body.pixelId;
 
@@ -31,17 +60,6 @@ export async function POST(req: NextRequest) {
           ok: false,
           step: "validate_ad_account",
           error: "Missing adAccountId",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (typeof rawPageId !== "string" || !rawPageId.trim()) {
-      return NextResponse.json(
-        {
-          ok: false,
-          step: "validate_page_id",
-          error: "Missing pageId",
         },
         { status: 400 }
       );
@@ -70,7 +88,6 @@ export async function POST(req: NextRequest) {
     }
 
     const adAccountId = normalizeAccountId(rawAdAccountId.trim());
-    const pageId = rawPageId.trim();
     const campaignId = rawCampaignId.trim();
     const pixelId = rawPixelId.trim();
 
@@ -92,12 +109,16 @@ export async function POST(req: NextRequest) {
 
     const mode = existingAdId.trim() ? "existing" : "new";
 
+    const autoSelectedPage = await getAutoSelectedPage(accessToken);
+    const pageId = autoSelectedPage.id;
+
     console.log("[launch-retargeting] start", {
       mode,
       adAccountId,
       campaignId,
       pixelId,
       pageId,
+      pageName: autoSelectedPage.name,
       existingAdId: existingAdId || null,
       dailyBudget,
       retentionSeconds,
@@ -456,6 +477,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       adAccountId,
       pageId,
+      pageName: autoSelectedPage.name,
       campaignId,
       pixelId,
       audienceId,
