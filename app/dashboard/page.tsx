@@ -113,16 +113,6 @@ export default function DashboardPage() {
       issues.push("Select an ad account.");
     }
 
-    if (!selectedPageId.trim()) {
-      if (pagesLoading) {
-        issues.push("Loading Facebook Page...");
-      } else if (pagesError) {
-        issues.push("Could not load Facebook Page.");
-      } else {
-        issues.push("No Facebook Page available.");
-      }
-    }
-
     if (!selectedCampaignId.trim()) {
       if (campaignsLoading) {
         issues.push("Loading campaign...");
@@ -146,11 +136,8 @@ export default function DashboardPage() {
     return issues;
   }, [
     selectedAdAccountId,
-    selectedPageId,
     selectedCampaignId,
     selectedPixelId,
-    pagesLoading,
-    pagesError,
     campaignsLoading,
     campaignsError,
     pixelsLoading,
@@ -785,7 +772,6 @@ export default function DashboardPage() {
         {!selectedAdAccountId ? null : isSetupReady ? (
           <div style={setupReadyBoxStyle}>
             <div style={{ fontWeight: 700, marginBottom: 8 }}>Setup detected</div>
-            <div>Page: {selectedPageName || "Detected"}</div>
             <div>Campaign: {selectedCampaignName || "Detected"}</div>
             <div>Pixel: {selectedPixelName || "Detected"}</div>
           </div>
@@ -816,8 +802,11 @@ export default function DashboardPage() {
           <div style={{ marginTop: 16, display: "grid", gap: 14 }}>
             <div>
               <label htmlFor="pageId" style={labelStyle}>
-                Page
+                Facebook Page
               </label>
+              <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
+                Loaded from your connected Meta pages. Use this if you need to adjust new ad creation manually.
+              </div>
               <select
                 id="pageId"
                 value={selectedPageId}
@@ -914,7 +903,7 @@ export default function DashboardPage() {
         <div style={stepLabelStyle}>Step 2</div>
         <div style={sectionTitleStyle}>Choose how to launch</div>
         <div style={sectionSubtextStyle}>
-          Reuse an existing ad or create a new one.
+          Start with the fastest path. Creating a new ad is more manual.
         </div>
 
         <div
@@ -932,7 +921,7 @@ export default function DashboardPage() {
             }}
             style={modeButtonStyle(mode === "existing")}
           >
-            Retarget existing ad
+            Retarget existing ad • Recommended
           </button>
 
           <button
@@ -960,7 +949,7 @@ export default function DashboardPage() {
         <div style={sectionSubtextStyle}>
           {mode === "existing"
             ? "We will reuse the creative from the selected ad."
-            : "Keep this simple. Only enter what is needed to launch."}
+            : "This path uses the Facebook Page selected in technical details."}
         </div>
 
         {mode === "existing" ? (
@@ -1050,6 +1039,10 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div style={{ marginTop: 14, display: "grid", gap: 16 }}>
+            <div style={neutralBoxStyle}>
+              New ad creation is more manual right now. Make sure the Facebook Page in technical details is the one you want to use.
+            </div>
+
             <div>
               <label htmlFor="message" style={labelStyle}>
                 Ad message
