@@ -327,6 +327,10 @@ export default function DashboardPage() {
   /* Step 1 UX: pre-launch review modal */
   const [showReview, setShowReview] = useState(false);
 
+  /* Step 2 UX: one-click activation after creation */
+  const [activating, setActivating] = useState(false);
+  const [activation, setActivation] = useState<any>(null);
+
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [previewData, setPreviewData] = useState<any>(null);
@@ -373,6 +377,9 @@ export default function DashboardPage() {
 
   const selectedCampaignName =
     campaigns.find((campaign) => campaign.id === selectedCampaignId)?.name ||
+    "";
+  const selectedCampaignStatus =
+    campaigns.find((campaign) => campaign.id === selectedCampaignId)?.status ||
     "";
   const selectedPixelName =
     pixels.find((pixel) => pixel.id === selectedPixelId)?.name || "";
@@ -846,7 +853,41 @@ export default function DashboardPage() {
 
     setFormError("");
     setResult(null);
+    setActivation(null);
     setShowReview(true);
+  }
+
+  /* Step 2 UX: activate the just-created ad set + ad with one click */
+  async function handleActivate() {
+    if (!result?.ok || !result.adsetId || !result.adId) return;
+
+    setActivating(true);
+    setActivation(null);
+
+    try {
+      const res = await fetch("/api/meta/activate-retargeting", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adAccountId: selectedAdAccountId,
+          adsetId: result.adsetId,
+          adId: result.adId,
+          campaignId: result.campaignId || selectedCampaignId,
+        }),
+      });
+
+      const data = await res.json();
+      setActivation(data);
+    } catch {
+      setActivation({
+        ok: false,
+        error: "Request failed. Please try again.",
+      });
+    } finally {
+      setActivating(false);
+    }
   }
 
   async function handleLaunchRetargeting() {
@@ -1742,15 +1783,88 @@ export default function DashboardPage() {
                   </li>
                 </ul>
 
+                {activation?.ok ? (
+                  <div className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-center">
+                    <div className="flex items-center justify-center gap-2 text-[14px] font-semibold text-emerald-300">
+                      <CheckIcon className="h-4 w-4 text-emerald-400" />
+                      Your retargeting ad is now active
+                    </div>
+                    <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-400">
+                      Meta reviews newly activated ads, so delivery usually
+                      starts within minutes to a few hours.
+                    </p>
+                    {activation.campaignStatus === "PAUSED" && (
+                      <p className="mt-2.5 rounded-lg border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-left text-[12px] leading-relaxed text-amber-200">
+                        One more step: your campaign{" "}
+                        <span className="font-medium">
+                          {selectedCampaignName || selectedCampaignId}
+                        </span>{" "}
+                        is itself paused, and we never touch existing
+                        campaigns. Switch it on in Ads Manager and your ad
+                        will start running.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {selectedCampaignStatus === "PAUSED" && (
+                      <div className="mt-5 rounded-lg border border-amber-400/20 bg-amber-500/10 px-3.5 py-2.5 text-[12px] leading-relaxed text-amber-200">
+                        Heads up: your campaign{" "}
+                        <span className="font-medium">
+                          {selectedCampaignName || selectedCampaignId}
+                        </span>{" "}
+                        is currently paused. You can activate the new ad set
+                        and ad now, but they won't start delivering until the
+                        campaign itself is switched on in Ads Manager — we
+                        never modify your existing campaigns automatically.
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleActivate}
+                      disabled={activating}
+                      className={`${primaryButtonClasses} ${
+                        selectedCampaignStatus === "PAUSED" ? "mt-3" : "mt-5"
+                      }`}
+                    >
+                      {activating ? (
+                        <>
+                          <Spinner />
+                          Activating...
+                        </>
+                      ) : (
+                        "Activate now"
+                      )}
+                    </button>
+                    <p className="mt-2 text-center text-[11px] leading-relaxed text-zinc-500">
+                      This switches on the ad set and ad created above — and
+                      only those. Spending starts at €{budget}/day.
+                    </p>
+                    {activation && !activation.ok && (
+                      <ErrorNote>
+                        {typeof activation.error === "string"
+                          ? activation.error
+                          : "Activation didn't complete. You can also activate it manually in Ads Manager below."}
+                      </ErrorNote>
+                    )}
+                  </>
+                )}
+
                 <a
                   href={`https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${stripAccountId(
                     selectedAdAccountId
-                  )}`}
+                  )}${
+                    result.campaignId || selectedCampaignId
+                      ? `&selected_campaign_ids=${
+                          result.campaignId || selectedCampaignId
+                        }`
+                      : ""
+                  }`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`${primaryButtonClasses} mt-5`}
+                  className={`${secondaryButtonClasses} mt-3 w-full`}
                 >
-                  Review &amp; activate in Ads Manager
+                  Open in Ads Manager
                   <svg
                     viewBox="0 0 24 24"
                     className="h-4 w-4"
@@ -1797,6 +1911,7 @@ export default function DashboardPage() {
                   type="button"
                   onClick={() => {
                     setResult(null);
+                    setActivation(null);
                   }}
                   className={`${secondaryButtonClasses} mt-4 w-full`}
                 >
