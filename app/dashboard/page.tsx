@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import LaunchReview from "@/components/LaunchReview";
 
 type LaunchMode = "existing" | "new";
 
@@ -316,6 +317,9 @@ export default function DashboardPage() {
   const [result, setResult] = useState<any>(null);
   const [formError, setFormError] = useState("");
 
+  /* Step 1 UX: pre-launch review modal */
+  const [showReview, setShowReview] = useState(false);
+
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [previewData, setPreviewData] = useState<any>(null);
@@ -460,6 +464,21 @@ export default function DashboardPage() {
   const isFormValid = !validationError;
   const isLaunchBlocked = loading || !isFormValid;
   const isSetupReady = setupIssues.length === 0;
+
+  /* Descriptive names so users recognize these objects in Ads Manager */
+  const generatedNames = useMemo(() => {
+    const monthStamp = new Date().toISOString().slice(0, 7); // e.g. "2026-06"
+    const base = `Visitors ${days}d`;
+
+    return {
+      audience: `Retargeting Audience – ${base} – ${monthStamp}`,
+      adset: `Retargeting Ad Set – ${base} – ${monthStamp}`,
+      ad:
+        mode === "existing"
+          ? `Retargeting Ad – ${selectedAdName || "reused creative"} – ${monthStamp}`
+          : `Retargeting Ad – ${productName.trim() || "new creative"} – ${monthStamp}`,
+    };
+  }, [days, mode, selectedAdName, productName]);
 
   async function checkSession() {
     try {
@@ -811,9 +830,22 @@ export default function DashboardPage() {
     handlePreviewAd(trimmedAdId);
   }, [existingAdId, mode, unlocked, connected, selectedAdAccountId]);
 
+  /* Step 1 UX: validate, then open the review modal instead of launching directly */
+  function handleOpenReview() {
+    if (!isFormValid) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError("");
+    setResult(null);
+    setShowReview(true);
+  }
+
   async function handleLaunchRetargeting() {
     if (!isFormValid) {
       setFormError(validationError);
+      setShowReview(false);
       return;
     }
 
@@ -829,7 +861,9 @@ export default function DashboardPage() {
               adAccountId: selectedAdAccountId,
               campaignId: selectedCampaignId,
               pixelId: selectedPixelId,
-              audienceName: `Visitors ${days}d`,
+              audienceName: generatedNames.audience,
+              adsetName: generatedNames.adset,
+              adName: generatedNames.ad,
               retentionSeconds: days * 86400,
               dailyBudget: budget * 100,
               existingAdId: existingAdId.trim(),
@@ -839,7 +873,9 @@ export default function DashboardPage() {
               adAccountId: selectedAdAccountId,
               campaignId: selectedCampaignId,
               pixelId: selectedPixelId,
-              audienceName: `Visitors ${days}d`,
+              audienceName: generatedNames.audience,
+              adsetName: generatedNames.adset,
+              adName: generatedNames.ad,
               retentionSeconds: days * 86400,
               dailyBudget: budget * 100,
               existingAdId: "",
@@ -866,6 +902,7 @@ export default function DashboardPage() {
       });
     } finally {
       setLoading(false);
+      setShowReview(false);
     }
   }
 
@@ -1578,7 +1615,7 @@ export default function DashboardPage() {
               )}
 
               <button
-                onClick={handleLaunchRetargeting}
+                onClick={handleOpenReview}
                 disabled={isLaunchBlocked}
                 className={`${primaryButtonClasses} mt-4`}
               >
@@ -1588,12 +1625,13 @@ export default function DashboardPage() {
                     {LAUNCH_STAGES[launchStage]}
                   </>
                 ) : (
-                  "Launch retargeting campaign"
+                  "Review & create paused campaign"
                 )}
               </button>
 
               <p className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
-                Created paused via Meta's official Marketing API.
+                You'll see exactly what will be created before anything
+                happens.
                 <br />
                 Nothing spends until you activate it.
               </p>
@@ -1628,6 +1666,23 @@ export default function DashboardPage() {
         </footer>
       </div>
 
+      {/* Pre-launch review modal */}
+      <LaunchReview
+        open={showReview}
+        loading={loading}
+        stageLabel={LAUNCH_STAGES[launchStage]}
+        mode={mode}
+        days={days}
+        budget={budget}
+        campaignName={selectedCampaignName}
+        pixelName={selectedPixelName}
+        accountId={normalizedSelectedAdAccountId}
+        sourceAdName={selectedAdName}
+        names={generatedNames}
+        onConfirm={handleLaunchRetargeting}
+        onCancel={() => setShowReview(false)}
+      />
+
       {/* Result modal */}
       {result && (
         <div
@@ -1654,17 +1709,21 @@ export default function DashboardPage() {
                 <ul className="mt-5 space-y-2.5 rounded-xl border border-white/5 bg-black/20 p-4 text-[13px] text-zinc-300">
                   <li className="flex items-center gap-2.5">
                     <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                    Custom audience — visitors, last {days} days
+                    <span className="truncate">{generatedNames.audience}</span>
                   </li>
                   <li className="flex items-center gap-2.5">
                     <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                    Ad set — €{budget}/day (paused)
+                    <span className="truncate">
+                      {generatedNames.adset} — €{budget}/day (paused)
+                    </span>
                   </li>
                   <li className="flex items-center gap-2.5">
                     <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                    {result.reusedCreativeId
-                      ? "Ad — existing creative reused"
-                      : "Ad — created from your new copy"}
+                    <span className="truncate">
+                      {result.reusedCreativeId
+                        ? `${generatedNames.ad} — existing creative reused`
+                        : `${generatedNames.ad} — created from your new copy`}
+                    </span>
                   </li>
                 </ul>
 
