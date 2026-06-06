@@ -1,66 +1,25 @@
-"use client";
+import Link from "next/link";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+/* ------------------------------------------------------------- */
+/*  Design tokens — identical to /dashboard                       */
+/*  bg: zinc-950 · cards: zinc-900/60 + border-white/10           */
+/*  accent: blue-600 · success: emerald · paused: amber           */
+/* ------------------------------------------------------------- */
 
-type LaunchMode = "existing" | "new";
+const primaryCta =
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50";
 
-type MetaAdOption = {
-  id: string;
-  name: string;
-  status?: string | null;
-};
+const secondaryCta =
+  "inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3.5 text-[15px] font-semibold text-zinc-200 transition hover:border-white/25 hover:bg-white/10";
 
-type MetaAdAccountOption = {
-  id: string;
-  name?: string;
-  account_id?: string;
-};
+const cardClasses =
+  "rounded-2xl border border-white/10 bg-zinc-900/60 shadow-xl shadow-black/20 backdrop-blur";
 
-type MetaCampaignOption = {
-  id: string;
-  name: string;
-  status?: string | null;
-};
-
-type MetaPixelOption = {
-  id: string;
-  name: string;
-};
-
-/* ---------------------------------- */
-/*  Small UI helpers (presentational) */
-/* ---------------------------------- */
-
-function Spinner({ className = "" }: { className?: string }) {
+function LogoMark({ size = "h-9 w-9" }: { size?: string }) {
   return (
-    <svg
-      className={`h-4 w-4 animate-spin ${className}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
+    <div
+      className={`flex ${size} items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20`}
     >
-      <circle
-        className="opacity-20"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-90"
-        d="M22 12a10 10 0 0 1-10 10"
-        stroke="currentColor"
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function LogoMark() {
-  return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20">
       <svg
         viewBox="0 0 24 24"
         className="h-5 w-5 text-white"
@@ -78,1585 +37,11 @@ function LogoMark() {
   );
 }
 
-function StepHeader({
-  step,
-  title,
-  subtitle,
+function CheckIcon({
+  className = "h-4 w-4 text-emerald-400",
 }: {
-  step: number;
-  title: string;
-  subtitle: string;
+  className?: string;
 }) {
-  return (
-    <div className="flex items-start gap-4">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-400/30 bg-blue-500/10 text-sm font-bold text-blue-300">
-        {step}
-      </div>
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight text-white">
-          {title}
-        </h2>
-        <p className="mt-1 text-sm leading-relaxed text-zinc-400">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
-function FieldLabel({
-  htmlFor,
-  children,
-}: {
-  htmlFor: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label
-      htmlFor={htmlFor}
-      className="mb-2 block text-sm font-medium text-zinc-300"
-    >
-      {children}
-    </label>
-  );
-}
-
-function ErrorNote({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-      {children}
-    </div>
-  );
-}
-
-function NeutralNote({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mt-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
-      {children}
-    </div>
-  );
-}
-
-const inputClasses =
-  "w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-3 text-[15px] text-white placeholder-zinc-500 outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50";
-
-const selectClasses = `${inputClasses} appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2371717a%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M4.4%206l3.6%203.6L11.6%206%22%20stroke%3D%22%2371717a%22%20stroke-width%3D%221.6%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[right_1rem_center] bg-no-repeat pr-10`;
-
-const primaryButtonClasses =
-  "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:bg-blue-600";
-
-const secondaryButtonClasses =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50";
-
-const cardClasses =
-  "rounded-2xl border border-white/10 bg-zinc-900/60 p-6 shadow-xl shadow-black/20 backdrop-blur";
-
-/* -------------- */
-/*  Page          */
-/* -------------- */
-
-export default function DashboardPage() {
-  const [connected, setConnected] = useState<boolean | null>(null);
-  const [accessCode, setAccessCode] = useState("");
-  const [unlocked, setUnlocked] = useState(false);
-  const [accessError, setAccessError] = useState("");
-
-  const [mode, setMode] = useState<LaunchMode>("existing");
-
-  const [existingAdId, setExistingAdId] = useState("");
-  const [message, setMessage] = useState("");
-  const [link, setLink] = useState("");
-  const [productName, setProductName] = useState("");
-  const [description, setDescription] = useState("");
-  const [budget, setBudget] = useState(1);
-  const [days, setDays] = useState(30);
-
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [formError, setFormError] = useState("");
-
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState("");
-  const [previewData, setPreviewData] = useState<any>(null);
-
-  const [ads, setAds] = useState<MetaAdOption[]>([]);
-  const [adsLoading, setAdsLoading] = useState(false);
-  const [adsError, setAdsError] = useState("");
-
-  const [adAccounts, setAdAccounts] = useState<MetaAdAccountOption[]>([]);
-  const [adAccountsLoading, setAdAccountsLoading] = useState(false);
-  const [adAccountsError, setAdAccountsError] = useState("");
-  const [selectedAdAccountId, setSelectedAdAccountId] = useState("");
-
-  const [campaigns, setCampaigns] = useState<MetaCampaignOption[]>([]);
-  const [campaignsLoading, setCampaignsLoading] = useState(false);
-  const [campaignsError, setCampaignsError] = useState("");
-  const [selectedCampaignId, setSelectedCampaignId] = useState("");
-
-  const [pixels, setPixels] = useState<MetaPixelOption[]>([]);
-  const [pixelsLoading, setPixelsLoading] = useState(false);
-  const [pixelsError, setPixelsError] = useState("");
-  const [selectedPixelId, setSelectedPixelId] = useState("");
-
-  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
-
-  const hasTriedLoadingAds = useRef(false);
-  const previewRequestIdRef = useRef(0);
-
-  const normalizedSelectedAdAccountId = selectedAdAccountId.trim()
-    ? normalizeAccountId(selectedAdAccountId)
-    : "";
-
-  function isValidUrl(value: string) {
-    try {
-      const url = new URL(value);
-      return url.protocol === "http:" || url.protocol === "https:";
-    } catch {
-      return false;
-    }
-  }
-
-  const selectedCampaignName =
-    campaigns.find((campaign) => campaign.id === selectedCampaignId)?.name ||
-    "";
-  const selectedPixelName =
-    pixels.find((pixel) => pixel.id === selectedPixelId)?.name || "";
-  const selectedAdName = ads.find((ad) => ad.id === existingAdId)?.name || "";
-
-  const setupIssues = useMemo(() => {
-    const issues: string[] = [];
-
-    if (!selectedAdAccountId.trim()) {
-      issues.push("Select an ad account.");
-    }
-
-    if (!selectedCampaignId.trim()) {
-      if (campaignsLoading) {
-        issues.push("Detecting your campaign...");
-      } else if (campaignsError) {
-        issues.push("We couldn't load a campaign for this account.");
-      } else {
-        issues.push("No campaign found in this account.");
-      }
-    }
-
-    if (!selectedPixelId.trim()) {
-      if (pixelsLoading) {
-        issues.push("Detecting your pixel...");
-      } else if (pixelsError) {
-        issues.push("We couldn't load a pixel for this account.");
-      } else {
-        issues.push("No pixel found in this account.");
-      }
-    }
-
-    return issues;
-  }, [
-    selectedAdAccountId,
-    selectedCampaignId,
-    selectedPixelId,
-    campaignsLoading,
-    campaignsError,
-    pixelsLoading,
-    pixelsError,
-  ]);
-
-  const validationError = useMemo(() => {
-    if (!selectedAdAccountId.trim()) {
-      return "Please select an ad account.";
-    }
-
-    if (!selectedCampaignId.trim()) {
-      return "A campaign is required before launch.";
-    }
-
-    if (!selectedPixelId.trim()) {
-      return "A pixel is required before launch.";
-    }
-
-    if (!Number.isFinite(budget) || budget < 1) {
-      return "Daily budget must be at least €1.";
-    }
-
-    if (![7, 14, 30].includes(days)) {
-      return "Audience window must be 7, 14, or 30 days.";
-    }
-
-    if (mode === "existing") {
-      if (!existingAdId.trim()) {
-        return "Please select an existing ad.";
-      }
-
-      if (!/^\d+$/.test(existingAdId.trim())) {
-        return "Selected ad ID is invalid.";
-      }
-
-      return "";
-    }
-
-    if (!message.trim()) return "Ad message is required.";
-    if (!link.trim()) return "Destination link is required.";
-    if (!isValidUrl(link.trim())) return "Please enter a valid URL.";
-    if (!productName.trim()) return "Product name is required.";
-
-    return "";
-  }, [
-    selectedAdAccountId,
-    selectedCampaignId,
-    selectedPixelId,
-    budget,
-    days,
-    mode,
-    existingAdId,
-    message,
-    link,
-    productName,
-  ]);
-
-  const isFormValid = !validationError;
-  const isLaunchBlocked = loading || !isFormValid;
-  const isSetupReady = setupIssues.length === 0;
-
-  async function checkSession() {
-    try {
-      const res = await fetch("/api/meta/session", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      const data = await res.json();
-      setConnected(Boolean(data?.connected));
-    } catch {
-      setConnected(false);
-    }
-  }
-
-  async function loadAdAccounts() {
-    try {
-      setAdAccountsLoading(true);
-      setAdAccountsError("");
-
-      const res = await fetch("/api/meta/ad-accounts", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Failed to load ad accounts.");
-      }
-
-      const nextAccounts: MetaAdAccountOption[] = Array.isArray(data.adAccounts)
-        ? data.adAccounts
-        : [];
-
-      setAdAccounts(nextAccounts);
-
-      if (nextAccounts.length === 0) {
-        setSelectedAdAccountId("");
-        setAds([]);
-        setExistingAdId("");
-        throw new Error("No ad accounts found.");
-      }
-
-      setSelectedAdAccountId((current) => {
-        if (
-          current &&
-          nextAccounts.some(
-            (account) =>
-              normalizeAccountId(account.id) === normalizeAccountId(current)
-          )
-        ) {
-          return current;
-        }
-
-        return nextAccounts[0].id;
-      });
-    } catch (err: any) {
-      setAdAccounts([]);
-      setSelectedAdAccountId("");
-      setAdAccountsError(err?.message || "Failed to load ad accounts.");
-    } finally {
-      setAdAccountsLoading(false);
-    }
-  }
-
-  async function loadCampaigns(adAccountId: string) {
-    try {
-      setCampaignsLoading(true);
-      setCampaignsError("");
-
-      if (!adAccountId.trim()) {
-        setCampaigns([]);
-        setSelectedCampaignId("");
-        return;
-      }
-
-      const res = await fetch("/api/meta/list-campaigns", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adAccountId,
-        }),
-        cache: "no-store",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Failed to load campaigns.");
-      }
-
-      const nextCampaigns: MetaCampaignOption[] = Array.isArray(data.campaigns)
-        ? data.campaigns
-        : [];
-
-      setCampaigns(nextCampaigns);
-
-      setSelectedCampaignId((current) => {
-        if (
-          current &&
-          nextCampaigns.some((campaign) => campaign.id === current)
-        ) {
-          return current;
-        }
-
-        return nextCampaigns[0]?.id || "";
-      });
-    } catch (err: any) {
-      setCampaigns([]);
-      setSelectedCampaignId("");
-      setCampaignsError(err?.message || "Failed to load campaigns.");
-    } finally {
-      setCampaignsLoading(false);
-    }
-  }
-
-  async function loadPixels(adAccountId: string) {
-    try {
-      setPixelsLoading(true);
-      setPixelsError("");
-
-      if (!adAccountId.trim()) {
-        setPixels([]);
-        setSelectedPixelId("");
-        return;
-      }
-
-      const res = await fetch("/api/meta/list-pixels", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adAccountId,
-        }),
-        cache: "no-store",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Failed to load pixels.");
-      }
-
-      const nextPixels: MetaPixelOption[] = Array.isArray(data.pixels)
-        ? data.pixels
-        : [];
-
-      setPixels(nextPixels);
-
-      setSelectedPixelId((current) => {
-        if (current && nextPixels.some((pixel) => pixel.id === current)) {
-          return current;
-        }
-
-        return nextPixels[0]?.id || "";
-      });
-    } catch (err: any) {
-      setPixels([]);
-      setSelectedPixelId("");
-      setPixelsError(err?.message || "Failed to load pixels.");
-    } finally {
-      setPixelsLoading(false);
-    }
-  }
-
-  async function loadAds() {
-    try {
-      setAdsLoading(true);
-      setAdsError("");
-
-      if (!selectedAdAccountId.trim()) {
-        throw new Error("No ad account selected.");
-      }
-
-      const res = await fetch("/api/meta/list-ads", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adAccountId: selectedAdAccountId,
-        }),
-        cache: "no-store",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Failed to load ads.");
-      }
-
-      const nextAds = Array.isArray(data.ads) ? data.ads : [];
-      setAds(nextAds);
-
-      setExistingAdId((current) => {
-        if (current && nextAds.some((ad: MetaAdOption) => ad.id === current)) {
-          return current;
-        }
-
-        return nextAds[0]?.id || "";
-      });
-    } catch (err: any) {
-      setAdsError(err?.message || "Failed to load ads.");
-      setAds([]);
-      setExistingAdId("");
-    } finally {
-      setAdsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!unlocked) return;
-    checkSession();
-  }, [unlocked]);
-
-  useEffect(() => {
-    if (!unlocked || !connected) return;
-    loadAdAccounts();
-  }, [unlocked, connected]);
-
-  useEffect(() => {
-    hasTriedLoadingAds.current = false;
-    setAds([]);
-    setAdsError("");
-    setExistingAdId("");
-    setPreviewError("");
-    setPreviewData(null);
-    setPreviewLoading(false);
-    setCampaigns([]);
-    setSelectedCampaignId("");
-    setCampaignsError("");
-    setPixels([]);
-    setSelectedPixelId("");
-    setPixelsError("");
-    previewRequestIdRef.current += 1;
-  }, [selectedAdAccountId]);
-
-  useEffect(() => {
-    if (!unlocked || !connected || !selectedAdAccountId.trim()) return;
-    loadCampaigns(selectedAdAccountId);
-    loadPixels(selectedAdAccountId);
-  }, [unlocked, connected, selectedAdAccountId]);
-
-  useEffect(() => {
-    if (!unlocked || !connected) return;
-    if (mode !== "existing") return;
-    if (!selectedAdAccountId.trim()) return;
-    if (hasTriedLoadingAds.current) return;
-
-    hasTriedLoadingAds.current = true;
-    loadAds();
-  }, [unlocked, connected, mode, selectedAdAccountId]);
-
-  async function handlePreviewAd(adIdOverride?: string) {
-    const adIdToUse = (adIdOverride ?? existingAdId).trim();
-
-    if (!selectedAdAccountId.trim()) {
-      setPreviewError("Ad account is required.");
-      setPreviewData(null);
-      return;
-    }
-
-    if (!adIdToUse) {
-      setPreviewError("Existing ad is required.");
-      setPreviewData(null);
-      return;
-    }
-
-    const requestId = ++previewRequestIdRef.current;
-
-    setPreviewLoading(true);
-    setPreviewError("");
-
-    try {
-      const res = await fetch("/api/meta/preview-ad", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adId: adIdToUse,
-          adAccountId: selectedAdAccountId,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (requestId !== previewRequestIdRef.current) return;
-
-      if (!res.ok || !data.ok) {
-        setPreviewData(null);
-        setPreviewError(
-          typeof data.error === "string"
-            ? data.error
-            : data.error?.message || "Failed to preview ad."
-        );
-        return;
-      }
-
-      setPreviewData(data.data);
-      setPreviewError("");
-    } catch {
-      if (requestId !== previewRequestIdRef.current) return;
-
-      setPreviewData(null);
-      setPreviewError("Preview request failed.");
-    } finally {
-      if (requestId === previewRequestIdRef.current) {
-        setPreviewLoading(false);
-      }
-    }
-  }
-
-  useEffect(() => {
-    if (!unlocked || !connected) return;
-    if (mode !== "existing") return;
-    if (!selectedAdAccountId.trim()) return;
-
-    const trimmedAdId = existingAdId.trim();
-
-    if (!trimmedAdId) {
-      previewRequestIdRef.current += 1;
-      setPreviewLoading(false);
-      setPreviewError("");
-      setPreviewData(null);
-      return;
-    }
-
-    handlePreviewAd(trimmedAdId);
-  }, [existingAdId, mode, unlocked, connected, selectedAdAccountId]);
-
-  async function handleLaunchRetargeting() {
-    if (!isFormValid) {
-      setFormError(validationError);
-      return;
-    }
-
-    setLoading(true);
-    setResult(null);
-    setFormError("");
-
-    try {
-      const payload =
-        mode === "existing"
-          ? {
-              mode: "existing",
-              adAccountId: selectedAdAccountId,
-              campaignId: selectedCampaignId,
-              pixelId: selectedPixelId,
-              audienceName: `Visitors ${days}d`,
-              retentionSeconds: days * 86400,
-              dailyBudget: budget * 100,
-              existingAdId: existingAdId.trim(),
-            }
-          : {
-              mode: "new",
-              adAccountId: selectedAdAccountId,
-              campaignId: selectedCampaignId,
-              pixelId: selectedPixelId,
-              audienceName: `Visitors ${days}d`,
-              retentionSeconds: days * 86400,
-              dailyBudget: budget * 100,
-              existingAdId: "",
-              message: message.trim(),
-              link: link.trim(),
-              name: productName.trim(),
-              description: description.trim(),
-            };
-
-      const res = await fetch("/api/meta/launch-retargeting", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      setResult(data);
-    } catch {
-      setResult({
-        ok: false,
-        error: "Request failed. Please try again.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  /* ------------------------- */
-  /*  Screen: access gate      */
-  /* ------------------------- */
-
-  if (!unlocked) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-zinc-100 antialiased">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 flex flex-col items-center text-center">
-            <LogoMark />
-            <h1 className="mt-5 text-2xl font-bold tracking-tight text-white">
-              Retargeting Dashboard
-            </h1>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-              This is a private beta. Enter your access code to continue.
-            </p>
-          </div>
-
-          <div className={cardClasses}>
-            <FieldLabel htmlFor="accessCode">Access code</FieldLabel>
-            <input
-              id="accessCode"
-              type="password"
-              placeholder="••••••••"
-              value={accessCode}
-              onChange={(e) => {
-                setAccessCode(e.target.value);
-                setAccessError("");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  if (
-                    accessCode === process.env.NEXT_PUBLIC_DASHBOARD_ACCESS_CODE
-                  ) {
-                    setUnlocked(true);
-                  } else {
-                    setAccessError("That code doesn't match. Please try again.");
-                  }
-                }
-              }}
-              className={inputClasses}
-              autoFocus
-            />
-
-            {accessError && <ErrorNote>{accessError}</ErrorNote>}
-
-            <button
-              onClick={() => {
-                if (
-                  accessCode === process.env.NEXT_PUBLIC_DASHBOARD_ACCESS_CODE
-                ) {
-                  setUnlocked(true);
-                } else {
-                  setAccessError("That code doesn't match. Please try again.");
-                }
-              }}
-              className={`${primaryButtonClasses} mt-5`}
-            >
-              Unlock dashboard
-            </button>
-          </div>
-
-          <p className="mt-6 text-center text-xs text-zinc-600">
-            Don't have a code? Contact us for beta access.
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  /* ------------------------- */
-  /*  Screen: checking session */
-  /* ------------------------- */
-
-  if (connected === null) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-zinc-100 antialiased">
-        <div className="flex flex-col items-center gap-4">
-          <LogoMark />
-          <div className="flex items-center gap-2 text-sm text-zinc-400">
-            <Spinner />
-            Checking your Meta connection...
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  /* ------------------------- */
-  /*  Screen: connect Meta     */
-  /* ------------------------- */
-
-  if (!connected) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-zinc-100 antialiased">
-        <div className="w-full max-w-md">
-          <div className="mb-8 flex flex-col items-center text-center">
-            <LogoMark />
-            <h1 className="mt-5 text-2xl font-bold tracking-tight text-white">
-              Connect your Meta account
-            </h1>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400">
-              We use Meta's official API to read your ad accounts and create
-              retargeting campaigns on your behalf. Everything is created in{" "}
-              <span className="font-medium text-zinc-200">paused</span> status —
-              nothing spends until you approve it.
-            </p>
-          </div>
-
-          <div className={cardClasses}>
-            <ul className="space-y-3 text-sm text-zinc-300">
-              <li className="flex items-start gap-3">
-                <CheckIcon />
-                <span>Secure OAuth login — we never see your password</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckIcon />
-                <span>Campaign and pixel are detected automatically</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckIcon />
-                <span>All ads launch paused, so you stay in control</span>
-              </li>
-            </ul>
-
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = "/api/meta/oauth/start";
-              }}
-              className={`${primaryButtonClasses} mt-6`}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-5 w-5"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.7 4.53-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z" />
-              </svg>
-              Continue with Meta
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                checkSession();
-              }}
-              className={`${secondaryButtonClasses} mt-3 w-full`}
-            >
-              I've already connected — refresh status
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  /* ------------------------- */
-  /*  Screen: main dashboard   */
-  /* ------------------------- */
-
-  return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-      {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-white/5 bg-zinc-950/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <LogoMark />
-            <div>
-              <div className="text-sm font-bold tracking-tight text-white">
-                Meta Retargeting
-              </div>
-              <div className="text-[11px] uppercase tracking-wider text-zinc-500">
-                Private beta
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Meta connected
-          </div>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-3xl px-6 pb-24 pt-12">
-        {/* Hero */}
-        <div className="mb-10">
-          <h1 className="text-3xl font-bold tracking-tight text-white">
-            Launch a retargeting campaign
-          </h1>
-          <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-zinc-400">
-            Re-engage your website visitors in four quick steps. Your campaign
-            is created in paused status, so you review everything before it
-            spends a cent.
-          </p>
-        </div>
-
-        <div className="space-y-6">
-          {/* STEP 1 — Ad account */}
-          <section className={cardClasses}>
-            <StepHeader
-              step={1}
-              title="Select your ad account"
-              subtitle="We'll detect the campaign and pixel for this account automatically."
-            />
-
-            <div className="mt-5">
-              <select
-                id="adAccount"
-                value={selectedAdAccountId}
-                onChange={(e) => {
-                  setSelectedAdAccountId(e.target.value);
-                  setFormError("");
-                  setResult(null);
-                }}
-                className={selectClasses}
-                disabled={adAccountsLoading}
-              >
-                <option value="">
-                  {adAccountsLoading
-                    ? "Loading ad accounts..."
-                    : "Select an ad account"}
-                </option>
-
-                {adAccounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name || account.id} (
-                    {normalizeAccountId(account.id)})
-                  </option>
-                ))}
-              </select>
-
-              {adAccountsError && <ErrorNote>{adAccountsError}</ErrorNote>}
-            </div>
-
-            {!selectedAdAccountId ? null : isSetupReady ? (
-              <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-500/[0.07] p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-300">
-                  <CheckIcon />
-                  Account is ready to launch
-                </div>
-                <dl className="mt-3 space-y-1.5 text-sm">
-                  <div className="flex gap-2">
-                    <dt className="w-24 shrink-0 text-zinc-500">Campaign</dt>
-                    <dd className="text-zinc-200">
-                      {selectedCampaignName || "Detected"}
-                    </dd>
-                  </div>
-                  <div className="flex gap-2">
-                    <dt className="w-24 shrink-0 text-zinc-500">Pixel</dt>
-                    <dd className="text-zinc-200">
-                      {selectedPixelName || "Detected"}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            ) : (
-              <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/[0.07] p-4">
-                <div className="text-sm font-semibold text-amber-300">
-                  Finishing account setup
-                </div>
-                <ul className="mt-2 space-y-1 text-sm text-amber-200/90">
-                  {setupIssues.map((issue) => (
-                    <li key={issue} className="flex items-center gap-2">
-                      {(campaignsLoading || pixelsLoading) && (
-                        <Spinner className="h-3 w-3" />
-                      )}
-                      {issue}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowTechnicalDetails((current) => !current)}
-              className="mt-4 text-xs font-medium text-zinc-500 underline-offset-4 transition hover:text-zinc-300 hover:underline"
-            >
-              {showTechnicalDetails
-                ? "Hide advanced settings"
-                : "Advanced settings"}
-            </button>
-
-            {showTechnicalDetails ? (
-              <div className="mt-4 space-y-4 rounded-xl border border-white/5 bg-black/20 p-4">
-                <p className="text-xs leading-relaxed text-zinc-500">
-                  Your Facebook Page is selected automatically during launch.
-                  Override the detected campaign or pixel below only if you
-                  need to.
-                </p>
-
-                <div>
-                  <FieldLabel htmlFor="campaignId">Campaign</FieldLabel>
-                  <select
-                    id="campaignId"
-                    value={selectedCampaignId}
-                    onChange={(e) => {
-                      setSelectedCampaignId(e.target.value);
-                      setFormError("");
-                      setResult(null);
-                    }}
-                    className={selectClasses}
-                    disabled={campaignsLoading || !selectedAdAccountId}
-                  >
-                    <option value="">
-                      {campaignsLoading
-                        ? "Loading campaigns..."
-                        : !selectedAdAccountId
-                          ? "Select an ad account first"
-                          : "Select a campaign"}
-                    </option>
-
-                    {campaigns.map((campaign) => (
-                      <option key={campaign.id} value={campaign.id}>
-                        {campaign.name} ({campaign.id})
-                        {campaign.status ? ` — ${campaign.status}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {campaignsError && <ErrorNote>{campaignsError}</ErrorNote>}
-                </div>
-
-                <div>
-                  <FieldLabel htmlFor="pixelId">Pixel</FieldLabel>
-                  <select
-                    id="pixelId"
-                    value={selectedPixelId}
-                    onChange={(e) => {
-                      setSelectedPixelId(e.target.value);
-                      setFormError("");
-                      setResult(null);
-                    }}
-                    className={selectClasses}
-                    disabled={pixelsLoading || !selectedAdAccountId}
-                  >
-                    <option value="">
-                      {pixelsLoading
-                        ? "Loading pixels..."
-                        : !selectedAdAccountId
-                          ? "Select an ad account first"
-                          : "Select a pixel"}
-                    </option>
-
-                    {pixels.map((pixel) => (
-                      <option key={pixel.id} value={pixel.id}>
-                        {pixel.name} ({pixel.id})
-                      </option>
-                    ))}
-                  </select>
-                  {pixelsError && <ErrorNote>{pixelsError}</ErrorNote>}
-                </div>
-              </div>
-            ) : null}
-          </section>
-
-          {/* STEP 2 — Launch mode */}
-          <section className={cardClasses}>
-            <StepHeader
-              step={2}
-              title="Choose your creative"
-              subtitle="Reusing a proven ad is the fastest path to launch."
-            />
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("existing");
-                  hasTriedLoadingAds.current = false;
-                  setFormError("");
-                  setResult(null);
-                  setPreviewError("");
-                  setPreviewData(null);
-                }}
-                className={`rounded-xl border p-4 text-left transition ${
-                  mode === "existing"
-                    ? "border-blue-400/60 bg-blue-500/10 ring-2 ring-blue-500/20"
-                    : "border-white/10 bg-white/[0.03] hover:border-white/25"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white">
-                    Reuse an existing ad
-                  </span>
-                  <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-300">
-                    Recommended
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
-                  Keep the creative that already works. Launch in under a
-                  minute.
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("new");
-                  setFormError("");
-                  setResult(null);
-                  setPreviewError("");
-                  setPreviewData(null);
-                  setExistingAdId("");
-                }}
-                className={`rounded-xl border p-4 text-left transition ${
-                  mode === "new"
-                    ? "border-blue-400/60 bg-blue-500/10 ring-2 ring-blue-500/20"
-                    : "border-white/10 bg-white/[0.03] hover:border-white/25"
-                }`}
-              >
-                <span className="text-sm font-semibold text-white">
-                  Create a new ad
-                </span>
-                <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
-                  Write fresh copy and link it to your product page.
-                </p>
-              </button>
-            </div>
-          </section>
-
-          {/* STEP 3 — Creative details */}
-          <section className={cardClasses}>
-            <StepHeader
-              step={3}
-              title={
-                mode === "existing"
-                  ? "Pick the ad to retarget"
-                  : "Write your new ad"
-              }
-              subtitle={
-                mode === "existing"
-                  ? "We'll reuse this ad's creative for your retargeting audience."
-                  : "Your Facebook Page is selected automatically during launch."
-              }
-            />
-
-            {mode === "existing" ? (
-              <div className="mt-5">
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <FieldLabel htmlFor="existingAdId">Source ad</FieldLabel>
-                    <select
-                      id="existingAdId"
-                      value={existingAdId}
-                      onChange={(e) => {
-                        const selectedId = e.target.value;
-                        setExistingAdId(selectedId);
-                        setFormError("");
-                        setResult(null);
-                        setPreviewError("");
-                      }}
-                      className={selectClasses}
-                      disabled={adsLoading || !selectedAdAccountId}
-                    >
-                      <option value="">
-                        {adsLoading
-                          ? "Loading ads..."
-                          : !selectedAdAccountId
-                            ? "Select an ad account first"
-                            : "Select an ad"}
-                      </option>
-
-                      {ads.map((ad) => (
-                        <option key={ad.id} value={ad.id}>
-                          {ad.name} ({ad.id})
-                          {ad.status ? ` — ${ad.status}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    type="button"
-                    title="Reload ad list"
-                    onClick={() => {
-                      hasTriedLoadingAds.current = false;
-                      loadAds();
-                    }}
-                    disabled={adsLoading || !selectedAdAccountId}
-                    className={`${secondaryButtonClasses} h-[50px] px-3.5`}
-                  >
-                    {adsLoading ? (
-                      <Spinner />
-                    ) : (
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                        <path d="M21 3v6h-6" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-
-                {adsError && <ErrorNote>{adsError}</ErrorNote>}
-
-                {!adsLoading &&
-                  !adsError &&
-                  selectedAdAccountId &&
-                  ads.length === 0 && (
-                    <NeutralNote>
-                      No ads found in this account yet. Switch to{" "}
-                      <span className="font-medium text-white">
-                        Create a new ad
-                      </span>{" "}
-                      in Step 2 to write one from scratch.
-                    </NeutralNote>
-                  )}
-
-                {previewLoading && (
-                  <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
-                    <Spinner />
-                    Loading ad preview...
-                  </div>
-                )}
-
-                {previewError && <ErrorNote>{previewError}</ErrorNote>}
-
-                {previewData && !previewLoading && (
-                  <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
-                    <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                        Creative preview
-                      </span>
-                      <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-300">
-                        <CheckIcon />
-                        Ready to reuse
-                      </span>
-                    </div>
-                    <dl className="space-y-2.5 px-4 py-4 text-sm">
-                      <div>
-                        <dt className="text-xs text-zinc-500">Ad name</dt>
-                        <dd className="mt-0.5 text-zinc-100">
-                          {previewData.adName || selectedAdName || "—"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs text-zinc-500">Message</dt>
-                        <dd className="mt-0.5 leading-relaxed text-zinc-100">
-                          {previewData.message || "—"}
-                        </dd>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <dt className="text-xs text-zinc-500">Headline</dt>
-                          <dd className="mt-0.5 text-zinc-100">
-                            {previewData.headline || "—"}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-zinc-500">
-                            Description
-                          </dt>
-                          <dd className="mt-0.5 text-zinc-100">
-                            {previewData.description || "—"}
-                          </dd>
-                        </div>
-                      </div>
-                    </dl>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="mt-5 grid gap-5">
-                <div>
-                  <FieldLabel htmlFor="message">Ad message</FieldLabel>
-                  <textarea
-                    id="message"
-                    placeholder="Still thinking about it? Your favorites are waiting — come back and save 10% today."
-                    value={message}
-                    onChange={(e) => {
-                      setMessage(e.target.value);
-                      setFormError("");
-                    }}
-                    rows={4}
-                    className={`${inputClasses} resize-y`}
-                  />
-                  <p className="mt-1.5 text-xs text-zinc-500">
-                    This is the main text people see above your ad.
-                  </p>
-                </div>
-
-                <div>
-                  <FieldLabel htmlFor="link">Destination link</FieldLabel>
-                  <input
-                    id="link"
-                    placeholder="https://your-site.com/product"
-                    value={link}
-                    onChange={(e) => {
-                      setLink(e.target.value);
-                      setFormError("");
-                    }}
-                    className={inputClasses}
-                  />
-                </div>
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div>
-                    <FieldLabel htmlFor="productName">Product name</FieldLabel>
-                    <input
-                      id="productName"
-                      placeholder="e.g. Aurora Skincare Set"
-                      value={productName}
-                      onChange={(e) => {
-                        setProductName(e.target.value);
-                        setFormError("");
-                      }}
-                      className={inputClasses}
-                    />
-                  </div>
-
-                  <div>
-                    <FieldLabel htmlFor="description">
-                      Description{" "}
-                      <span className="font-normal text-zinc-500">
-                        (optional)
-                      </span>
-                    </FieldLabel>
-                    <input
-                      id="description"
-                      placeholder="Short supporting line"
-                      value={description}
-                      onChange={(e) => {
-                        setDescription(e.target.value);
-                        setFormError("");
-                      }}
-                      className={inputClasses}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* STEP 4 — Budget & launch */}
-          <section className={cardClasses}>
-            <StepHeader
-              step={4}
-              title="Set budget & launch"
-              subtitle="Everything launches paused — review it in Ads Manager before it spends."
-            />
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="budget">Daily budget</FieldLabel>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                    €
-                  </span>
-                  <input
-                    id="budget"
-                    type="number"
-                    min="1"
-                    value={budget}
-                    onChange={(e) => {
-                      setBudget(Number(e.target.value));
-                      setFormError("");
-                    }}
-                    className={`${inputClasses} pl-9`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="days">Audience window</FieldLabel>
-                <select
-                  id="days"
-                  value={days}
-                  onChange={(e) => {
-                    setDays(Number(e.target.value));
-                    setFormError("");
-                  }}
-                  className={selectClasses}
-                >
-                  <option value={7}>Last 7 days of visitors</option>
-                  <option value={14}>Last 14 days of visitors</option>
-                  <option value={30}>Last 30 days of visitors</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Launch summary */}
-            <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                Launch summary
-              </div>
-              <dl className="mt-3 space-y-2 text-sm">
-                <SummaryRow label="Ad account">
-                  <span className="font-mono text-[13px]">
-                    {normalizedSelectedAdAccountId || "—"}
-                  </span>
-                </SummaryRow>
-                <SummaryRow label="Creative">
-                  {mode === "existing"
-                    ? selectedAdName || existingAdId || "—"
-                    : productName.trim()
-                      ? `New ad — ${productName.trim()}`
-                      : "New ad"}
-                </SummaryRow>
-                <SummaryRow label="Audience">
-                  Website visitors, last {days} days
-                </SummaryRow>
-                <SummaryRow label="Budget">€{budget} / day</SummaryRow>
-                <SummaryRow label="Status at launch">
-                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300">
-                    Paused — you activate it
-                  </span>
-                </SummaryRow>
-              </dl>
-            </div>
-
-            {(formError || validationError) && (
-              <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-400/20 bg-amber-500/[0.07] px-4 py-3 text-sm text-amber-200">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="mt-0.5 h-4 w-4 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M12 9v4" />
-                  <path d="M12 17h.01" />
-                  <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-                </svg>
-                {formError || validationError}
-              </div>
-            )}
-
-            <button
-              onClick={handleLaunchRetargeting}
-              disabled={isLaunchBlocked}
-              className={`${primaryButtonClasses} mt-5`}
-            >
-              {loading ? (
-                <>
-                  <Spinner />
-                  Creating your campaign...
-                </>
-              ) : (
-                "Launch retargeting campaign"
-              )}
-            </button>
-
-            <p className="mt-3 text-center text-xs text-zinc-500">
-              No charges until you activate the campaign in Meta Ads Manager.
-            </p>
-          </section>
-
-          {/* Result */}
-          {result && (
-            <section
-              className={`rounded-2xl border p-6 shadow-xl shadow-black/20 ${
-                result.ok
-                  ? "border-emerald-400/25 bg-emerald-950/40"
-                  : "border-red-400/25 bg-red-950/40"
-              }`}
-            >
-              {result.ok ? (
-                <>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15">
-                      <CheckIcon className="h-5 w-5 text-emerald-300" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold tracking-tight text-white">
-                        Your retargeting campaign is ready
-                      </h2>
-                      <p className="text-sm text-emerald-200/80">
-                        Created in paused status — activate it whenever you're
-                        ready.
-                      </p>
-                    </div>
-                  </div>
-
-                  <ul className="mt-5 space-y-2.5 text-sm text-zinc-200">
-                    <li className="flex items-center gap-2.5">
-                      <CheckIcon />
-                      Custom audience created — visitors from the last {days}{" "}
-                      days
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <CheckIcon />
-                      Ad set created with a €{budget}/day budget (paused)
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <CheckIcon />
-                      {result.reusedCreativeId
-                        ? "Ad created — your existing creative was reused"
-                        : "Ad created from your new copy"}
-                    </li>
-                  </ul>
-
-                  <a
-                    href={`https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${stripAccountId(
-                      selectedAdAccountId
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${primaryButtonClasses} mt-6`}
-                  >
-                    Review &amp; activate in Ads Manager
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M7 17 17 7" />
-                      <path d="M7 7h10v10" />
-                    </svg>
-                  </a>
-
-                  <details className="mt-5">
-                    <summary className="cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
-                      Technical details
-                    </summary>
-                    <dl className="mt-3 space-y-1.5 rounded-lg bg-black/30 p-4 font-mono text-xs leading-relaxed text-zinc-400">
-                      <div>
-                        Ad account: {normalizeAccountId(selectedAdAccountId)}
-                      </div>
-                      <div>Page ID: {result.pageId || "—"}</div>
-                      <div>
-                        Campaign:{" "}
-                        {selectedCampaignName || selectedCampaignId || "—"}
-                      </div>
-                      <div>
-                        Pixel: {selectedPixelName || selectedPixelId || "—"}
-                      </div>
-                      <div>Audience ID: {result.audienceId}</div>
-                      <div>Ad set ID: {result.adsetId}</div>
-                      <div>Ad ID: {result.adId}</div>
-                      {result.reusedCreativeId && (
-                        <div>Reused creative ID: {result.reusedCreativeId}</div>
-                      )}
-                    </dl>
-                  </details>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/15">
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-5 w-5 text-red-300"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M18 6 6 18" />
-                        <path d="m6 6 12 12" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold tracking-tight text-white">
-                        Launch didn't complete
-                      </h2>
-                      <p className="text-sm text-red-200/80">
-                        Nothing was charged. Adjust the inputs and try again.
-                      </p>
-                    </div>
-                  </div>
-
-                  {result.step && (
-                    <div className="mt-4 rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                      Failed at step:{" "}
-                      <span className="font-semibold">{result.step}</span>
-                    </div>
-                  )}
-
-                  {typeof result.error === "string" && (
-                    <p className="mt-3 text-sm leading-relaxed text-zinc-200">
-                      {result.error}
-                    </p>
-                  )}
-
-                  <details className="mt-4">
-                    <summary className="cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
-                      Show full error details
-                    </summary>
-                    <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg bg-black/30 p-4 font-mono text-xs leading-relaxed text-zinc-400">
-                      {JSON.stringify(result, null, 2)}
-                    </pre>
-                  </details>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setResult(null);
-                      setFormError("");
-                    }}
-                    className={`${secondaryButtonClasses} mt-5`}
-                  >
-                    Dismiss and try again
-                  </button>
-                </>
-              )}
-            </section>
-          )}
-        </div>
-
-        {/* Footer */}
-        <footer className="mt-14 border-t border-white/5 pt-6 text-center text-xs text-zinc-600">
-          All campaigns are created via Meta's official Marketing API and start
-          in paused status.
-        </footer>
-      </div>
-    </main>
-  );
-}
-
-/* ---------------- */
-/*  Tiny components */
-/* ---------------- */
-
-function SummaryRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-baseline gap-3">
-      <dt className="w-32 shrink-0 text-zinc-500">{label}</dt>
-      <dd className="text-zinc-100">{children}</dd>
-    </div>
-  );
-}
-
-function CheckIcon({ className = "h-4 w-4 text-emerald-400" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -1673,14 +58,505 @@ function CheckIcon({ className = "h-4 w-4 text-emerald-400" }: { className?: str
   );
 }
 
-/* -------- */
-/*  Utils   */
-/* -------- */
-
-function normalizeAccountId(id: string) {
-  return id.startsWith("act_") ? id : `act_${id}`;
+function ArrowIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
+  );
 }
 
-function stripAccountId(id: string) {
-  return id.startsWith("act_") ? id.slice(4) : id;
+/* ------------------------------------------------------------- */
+/*  Page                                                          */
+/* ------------------------------------------------------------- */
+
+export default function HomePage() {
+  return (
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+      {/* ====== NAV — mirrors the dashboard top bar ====== */}
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-950/80 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <LogoMark size="h-8 w-8" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-bold tracking-tight text-white">
+                Meta Retargeting
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                Beta
+              </span>
+            </div>
+          </div>
+
+          <nav className="flex items-center gap-5">
+            <a
+              href="#how-it-works"
+              className="hidden text-sm text-zinc-400 transition hover:text-white sm:inline"
+            >
+              How it works
+            </a>
+            <a
+              href="#safety"
+              className="hidden text-sm text-zinc-400 transition hover:text-white sm:inline"
+            >
+              Account safety
+            </a>
+            <a
+              href="#faq"
+              className="hidden text-sm text-zinc-400 transition hover:text-white md:inline"
+            >
+              FAQ
+            </a>
+            <Link
+              href="/dashboard"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow shadow-blue-600/25 transition hover:bg-blue-500"
+            >
+              Open dashboard
+            </Link>
+          </nav>
+        </div>
+      </header>
+
+      {/* ====== HERO ====== */}
+      <section className="relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[880px] -translate-x-1/2 rounded-full bg-blue-600/15 blur-3xl"
+          aria-hidden="true"
+        />
+        <div
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_55%_at_50%_0%,black,transparent)]"
+          aria-hidden="true"
+        />
+
+        <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-6 pb-24 pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:pt-24">
+          {/* Copy */}
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+              Built on Meta's official Marketing API
+            </div>
+
+            <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[56px]">
+              Launch Meta retargeting in{" "}
+              <span className="bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">
+                under a minute
+              </span>
+              .
+            </h1>
+
+            <p className="mt-5 max-w-xl text-lg leading-relaxed text-zinc-400">
+              Pick an ad account, reuse a proven creative, set a budget — the
+              custom audience, ad set, and ad are created for you. All paused
+              until you approve.
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/dashboard" className={primaryCta}>
+                Launch your first campaign
+                <ArrowIcon />
+              </Link>
+              <a href="#how-it-works" className={secondaryCta}>
+                See how it works
+              </a>
+            </div>
+
+            {/* Risk-reduction bullets, visible without scrolling */}
+            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-400">
+              <li className="flex items-center gap-2">
+                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                Launches paused by default
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                Never touches existing campaigns
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                Free during beta
+              </li>
+            </ul>
+          </div>
+
+          {/* Product proof — exact replica of the dashboard launch panel */}
+          <div className="relative mx-auto w-full max-w-sm">
+            <div
+              className="absolute -inset-8 rounded-3xl bg-blue-600/10 blur-2xl"
+              aria-hidden="true"
+            />
+
+            <div className={`relative ${cardClasses} p-5`}>
+              <div className="flex items-center justify-between">
+                <span className="text-base font-semibold tracking-tight text-white">
+                  Audience &amp; budget
+                </span>
+                <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Meta connected
+                </span>
+              </div>
+
+              <dl className="mt-4 space-y-2.5 border-t border-white/5 pt-4 text-[13px]">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-zinc-500">Account</dt>
+                  <dd className="font-mono text-[12px] text-zinc-200">
+                    act_2017486418
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-zinc-500">Creative</dt>
+                  <dd className="text-zinc-200">Summer Sale — Video</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-zinc-500">Audience</dt>
+                  <dd className="text-zinc-200">Visitors, 30d</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-zinc-500">Budget</dt>
+                  <dd className="text-zinc-200">€10 / day</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-zinc-500">Launch status</dt>
+                  <dd>
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+                      Paused
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-center text-[14px] font-semibold text-white shadow-lg shadow-blue-600/25">
+                Launch retargeting campaign
+              </div>
+
+              <p className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
+                Created paused via Meta's official Marketing API.
+                <br />
+                Nothing spends until you activate it.
+              </p>
+            </div>
+
+            {/* Floating result toast for extra product feel */}
+            <div className="absolute -bottom-6 -left-4 hidden items-center gap-2 rounded-xl border border-emerald-400/25 bg-zinc-900 px-3.5 py-2.5 text-[12px] font-medium text-emerald-300 shadow-2xl shadow-black/50 sm:flex">
+              <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+              Audience + ad set + ad created
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== VALUE / FEATURES ====== */}
+      <section className="border-t border-white/5 bg-zinc-900/30">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <h2 className="text-center text-3xl font-bold tracking-tight text-white">
+            Retargeting setup, minus the busywork
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-center text-zinc-400">
+            For freelancers, media buyers, and small agencies who build the
+            same retargeting structure for every client.
+          </p>
+
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
+            <FeatureCard
+              icon={
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m13 2-2 10h6L11 22l2-10H7L13 2z" />
+                </svg>
+              }
+              title="One click, three assets"
+              text="Custom audience, ad set, and ad — the exact structure you'd build by hand in Ads Manager, created together in seconds."
+            />
+            <FeatureCard
+              icon={
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-9-9" />
+                  <path d="M21 3v6h-6" />
+                </svg>
+              }
+              title="Reuse winning creatives"
+              text="Point at an existing ad and its creative is reused for the retargeting audience — with a live Facebook-feed preview before launch."
+            />
+            <FeatureCard
+              icon={
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+                </svg>
+              }
+              title="Safe by default"
+              text="Everything launches paused and existing campaigns are never modified. You review and activate in Ads Manager."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ====== HOW IT WORKS ====== */}
+      <section id="how-it-works" className="border-t border-white/5">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <h2 className="text-center text-3xl font-bold tracking-tight text-white">
+            From zero to launched in three steps
+          </h2>
+
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
+            <StepCard
+              number={1}
+              title="Connect Meta"
+              text="Secure OAuth login — we never see your password. Your ad account, campaign, and pixel are detected automatically."
+            />
+            <StepCard
+              number={2}
+              title="Pick creative & budget"
+              text="Reuse an existing ad or write a new one, choose the visitor window (7 / 14 / 30 days) and a daily budget."
+            />
+            <StepCard
+              number={3}
+              title="Review & activate"
+              text="The full retargeting structure appears in Ads Manager, paused. Flip it on when you're ready."
+            />
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link href="/dashboard" className={primaryCta}>
+              Try it now
+              <ArrowIcon />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== ACCOUNT SAFETY — mirrors the dashboard safety card ====== */}
+      <section id="safety" className="border-t border-white/5 bg-zinc-900/30">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                Account safety
+              </div>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">
+                Your client accounts stay untouched.
+              </h2>
+              <p className="mt-4 max-w-md leading-relaxed text-zinc-400">
+                We know you're often running someone else's money. That's why
+                the tool is read-and-create only — it can't edit, pause, or
+                delete anything that already exists in the account.
+              </p>
+            </div>
+
+            <div className={`${cardClasses} p-6`}>
+              <ul className="space-y-4 text-[15px] text-zinc-200">
+                <li className="flex items-start gap-3">
+                  <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
+                  <div>
+                    Existing campaigns and ads are never modified
+                    <p className="mt-0.5 text-sm text-zinc-500">
+                      Only new assets are created, inside a campaign you
+                      choose.
+                    </p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
+                  <div>
+                    Everything launches in paused status
+                    <p className="mt-0.5 text-sm text-zinc-500">
+                      Zero spend until you activate it yourself in Ads
+                      Manager.
+                    </p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
+                  <div>
+                    Full control stays in Meta
+                    <p className="mt-0.5 text-sm text-zinc-500">
+                      Every created asset is visible, editable, and deletable
+                      in Ads Manager.
+                    </p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== FAQ ====== */}
+      <section id="faq" className="border-t border-white/5">
+        <div className="mx-auto max-w-3xl px-6 py-20">
+          <h2 className="text-center text-3xl font-bold tracking-tight text-white">
+            Questions, answered
+          </h2>
+
+          <div className="mt-10 space-y-3">
+            <FaqItem
+              q="Can this break my ad account?"
+              a="No. The tool only creates new assets — a custom audience, an ad set, and an ad — inside a campaign you choose. It never edits or deletes anything that already exists, and everything is created in paused status."
+            />
+            <FaqItem
+              q="Will it start spending money?"
+              a="Not until you say so. Every launch is created paused. You review the setup in Meta Ads Manager and activate it manually."
+            />
+            <FaqItem
+              q="What do I need to get started?"
+              a="A Meta ad account with at least one campaign and an active pixel. Connect with OAuth and the dashboard detects the rest automatically."
+            />
+            <FaqItem
+              q="Who is this for?"
+              a="Freelancers, media buyers, SMMA teams, and small agencies that set up the same website-retargeting structure again and again for clients."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ====== FINAL CTA ====== */}
+      <section className="border-t border-white/5">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-blue-950/60 to-zinc-900 px-8 py-14 text-center shadow-2xl shadow-black/40">
+            <div
+              className="pointer-events-none absolute -top-24 left-1/2 h-64 w-[480px] -translate-x-1/2 rounded-full bg-blue-600/20 blur-3xl"
+              aria-hidden="true"
+            />
+            <h2 className="relative text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Your next retargeting campaign, one click away.
+            </h2>
+            <p className="relative mx-auto mt-4 max-w-md text-zinc-400">
+              Free during beta. Launches paused. Nothing spends without your
+              approval.
+            </p>
+            <div className="relative mt-8">
+              <Link href="/dashboard" className={primaryCta}>
+                Open the dashboard
+                <ArrowIcon />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== FOOTER ====== */}
+      <footer className="border-t border-white/5">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-zinc-500">
+          <div className="flex items-center gap-2.5">
+            <LogoMark size="h-8 w-8" />
+            <span className="font-semibold text-zinc-300">
+              Meta Retargeting
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              Beta
+            </span>
+          </div>
+          <p className="text-xs">
+            Built on Meta's official Marketing API. Not affiliated with Meta
+            Platforms, Inc.
+          </p>
+        </div>
+      </footer>
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------- */
+/*  Section cards                                                 */
+/* ------------------------------------------------------------- */
+
+function FeatureCard({
+  icon,
+  title,
+  text,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className={`${cardClasses} p-6 transition hover:border-white/20`}>
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300">
+        {icon}
+      </div>
+      <h3 className="mt-4 text-lg font-semibold tracking-tight text-white">
+        {title}
+      </h3>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{text}</p>
+    </div>
+  );
+}
+
+function StepCard({
+  number,
+  title,
+  text,
+}: {
+  number: number;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className={`${cardClasses} p-6`}>
+      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-400/30 bg-blue-500/10 text-sm font-bold text-blue-300">
+        {number}
+      </div>
+      <h3 className="mt-4 text-lg font-semibold tracking-tight text-white">
+        {title}
+      </h3>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{text}</p>
+    </div>
+  );
+}
+
+function FaqItem({ q, a }: { q: string; a: string }) {
+  return (
+    <details className="group rounded-xl border border-white/10 bg-zinc-900/60 px-5 py-4 transition hover:border-white/20">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[15px] font-semibold text-white">
+        {q}
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4 shrink-0 text-zinc-500 transition group-open:rotate-180"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </summary>
+      <p className="mt-3 text-sm leading-relaxed text-zinc-400">{a}</p>
+    </details>
+  );
 }
