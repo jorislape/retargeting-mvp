@@ -86,14 +86,14 @@ function PausedChip() {
 function ReviewItem({
   index,
   title,
-  name,
-  detail,
+  description,
+  metaName,
   paused = true,
 }: {
   index: number;
   title: string;
-  name: string;
-  detail: string;
+  description: string;
+  metaName: string;
   paused?: boolean;
 }) {
   return (
@@ -103,16 +103,16 @@ function ReviewItem({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+          <span className="text-[13px] font-semibold text-zinc-100">
             {title}
           </span>
           {paused ? <PausedChip /> : null}
         </div>
-        <div className="mt-0.5 truncate text-[13px] font-medium text-zinc-100">
-          {name}
-        </div>
         <div className="mt-0.5 text-[12px] leading-relaxed text-zinc-400">
-          {detail}
+          {description}
+        </div>
+        <div className="mt-1.5 truncate text-[11px] text-zinc-600">
+          In Ads Manager: <span className="font-mono">{metaName}</span>
         </div>
       </div>
     </li>
@@ -148,27 +148,28 @@ export default function LaunchReview({
           id="launch-review-title"
           className="text-xl font-bold tracking-tight text-white"
         >
-          Review before creating
+          Here's what will be created
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-          This is exactly what will be created in your ad account{" "}
-          <span className="font-mono text-[12px] text-zinc-300">
-            {accountId}
-          </span>
-          . Everything starts <span className="text-amber-300">paused</span> —
-          nothing spends.
+          Three things will be added to your ad account. All of them start{" "}
+          <span className="text-amber-300">paused</span>, so{" "}
+          <span className="font-medium text-zinc-200">€0 is spent</span> until
+          you switch them on yourself.
         </p>
 
         {/* Context: existing campaign that will NOT be modified */}
         <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3">
           <CheckIcon className="mt-0.5 h-3.5 w-3.5 text-emerald-400" />
           <div className="text-[13px] leading-relaxed text-zinc-300">
-            New assets are added inside your existing campaign{" "}
+            Your existing ads keep running exactly as they are —{" "}
+            <span className="font-medium text-white">
+              nothing you already have is touched
+            </span>
+            . The new items are added alongside, inside your campaign{" "}
             <span className="font-medium text-white">
               {campaignName || "—"}
             </span>
-            . The campaign itself and your other ads are{" "}
-            <span className="font-medium text-white">never modified</span>.
+            .
           </div>
         </div>
 
@@ -176,36 +177,40 @@ export default function LaunchReview({
         <ul className="mt-4 space-y-2.5">
           <ReviewItem
             index={1}
-            title="Custom audience"
-            name={names.audience}
-            detail={`Website visitors from the last ${days} days, collected by pixel "${
+            title="Who will see the ad"
+            description={`People who visited your website in the last ${days} days. Your site's visitor tracking ("${
               pixelName || "—"
-            }". Audiences have no status — they only define who sees the ad.`}
+            }") already collects this list automatically.`}
+            metaName={names.audience}
             paused={false}
           />
           <ReviewItem
             index={2}
-            title="Ad set"
-            name={names.adset}
-            detail={`Targets the audience above with a daily budget of €${budget}. Spends nothing while paused.`}
+            title="How much it can spend"
+            description={`Up to €${budget} per day — but only after you switch it on. While paused, it spends €0.`}
+            metaName={names.adset}
           />
           <ReviewItem
             index={3}
-            title="Ad"
-            name={names.ad}
-            detail={
+            title="The ad people will see"
+            description={
               mode === "existing"
-                ? `Reuses the creative from "${
-                    sourceAdName || "your selected ad"
-                  }". The original ad stays untouched.`
-                : "Built from the copy you wrote in this dashboard."
+                ? `An exact copy of your ad "${
+                    sourceAdName || "selected ad"
+                  }". The original stays untouched and keeps running as before.`
+                : "Built from the text and link you wrote in this dashboard."
             }
+            metaName={names.ad}
           />
         </ul>
 
         <p className="mt-4 text-center text-[12px] leading-relaxed text-zinc-500">
-          You can review, activate, or delete all of this in Ads Manager at any
-          time.
+          Change your mind later? You can switch everything on, off, or delete
+          it in Ads Manager at any time.
+          <br />
+          <span className="text-[11px] text-zinc-600">
+            Ad account: <span className="font-mono">{accountId || "—"}</span>
+          </span>
         </p>
 
         <div className="mt-5 grid grid-cols-[auto_1fr] gap-3">
@@ -229,7 +234,7 @@ export default function LaunchReview({
                 {stageLabel}
               </>
             ) : (
-              "Create paused campaign"
+              "Create it — stays paused"
             )}
           </button>
         </div>

@@ -293,6 +293,13 @@ const LAUNCH_STAGES = [
   "Finalizing...",
 ];
 
+/* Plain-language explanation for each audience window */
+const AUDIENCE_HELPER: Record<number, string> = {
+  7: "Smallest group, but they visited very recently — most likely to buy. Best if your site gets steady traffic.",
+  14: "A good middle ground between freshness and size. A safe default for most shops.",
+  30: "The biggest group your ad can reach. Best if your site gets fewer visitors.",
+};
+
 /* -------------- */
 /*  Page          */
 /* -------------- */
@@ -1150,7 +1157,7 @@ export default function DashboardPage() {
                 }
               />
               <StatusChip
-                label="Pixel"
+                label="Visitor tracking"
                 value={
                   pixelsLoading
                     ? "Detecting..."
@@ -1257,7 +1264,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold tracking-tight text-white">
-                  Creative
+                  Your ad
                 </h2>
                 <p className="mt-0.5 text-[13px] text-zinc-400">
                   {mode === "existing"
@@ -1315,7 +1322,7 @@ export default function DashboardPage() {
                     <div className="flex items-end gap-2">
                       <div className="min-w-0 flex-1">
                         <FieldLabel htmlFor="existingAdId">
-                          Source ad
+                          Which ad do you want to reuse?
                         </FieldLabel>
                         <select
                           id="existingAdId"
@@ -1521,7 +1528,7 @@ export default function DashboardPage() {
 
               <div className="mt-4 grid gap-4">
                 <div>
-                  <FieldLabel htmlFor="days">Retarget</FieldLabel>
+                  <FieldLabel htmlFor="days">Who should see your ad?</FieldLabel>
                   <select
                     id="days"
                     value={days}
@@ -1531,10 +1538,19 @@ export default function DashboardPage() {
                     }}
                     className={selectClasses}
                   >
-                    <option value={7}>Visitors from the last 7 days</option>
-                    <option value={14}>Visitors from the last 14 days</option>
-                    <option value={30}>Visitors from the last 30 days</option>
+                    <option value={7}>
+                      Hottest audience — visitors from the last 7 days
+                    </option>
+                    <option value={14}>
+                      Balanced — visitors from the last 14 days
+                    </option>
+                    <option value={30}>
+                      Largest reach — visitors from the last 30 days
+                    </option>
                   </select>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
+                    {AUDIENCE_HELPER[days] || AUDIENCE_HELPER[30]}
+                  </p>
                 </div>
 
                 <div>
@@ -1567,7 +1583,7 @@ export default function DashboardPage() {
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-zinc-500">Creative</dt>
+                  <dt className="text-zinc-500">Ad</dt>
                   <dd className="truncate text-right text-zinc-200">
                     {mode === "existing"
                       ? selectedAdName || existingAdId || "—"
@@ -1577,15 +1593,15 @@ export default function DashboardPage() {
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-zinc-500">Audience</dt>
-                  <dd className="text-zinc-200">Visitors, {days}d</dd>
+                  <dt className="text-zinc-500">Who sees it</dt>
+                  <dd className="text-zinc-200">Last {days} days' visitors</dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-zinc-500">Budget</dt>
                   <dd className="text-zinc-200">€{budget} / day</dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-zinc-500">Launch status</dt>
+                  <dt className="text-zinc-500">Status after creation</dt>
                   <dd>
                     <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
                       Paused
@@ -1625,15 +1641,14 @@ export default function DashboardPage() {
                     {LAUNCH_STAGES[launchStage]}
                   </>
                 ) : (
-                  "Review & create paused campaign"
+                  "Review what will be created"
                 )}
               </button>
 
               <p className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
-                You'll see exactly what will be created before anything
-                happens.
+                Nothing is created yet — you'll see the full plan first.
                 <br />
-                Nothing spends until you activate it.
+                Nothing spends money until you activate it yourself.
               </p>
             </section>
 
@@ -1698,11 +1713,11 @@ export default function DashboardPage() {
                     <CheckIcon className="h-7 w-7 text-emerald-300" />
                   </div>
                   <h2 className="mt-4 text-xl font-bold tracking-tight text-white">
-                    Campaign created
+                    Your retargeting ad is ready
                   </h2>
                   <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-                    Everything is in paused status — review it and activate
-                    whenever you're ready.
+                    Everything is paused and spending €0 — review it and
+                    switch it on whenever you're ready.
                   </p>
                 </div>
 
