@@ -1,34 +1,37 @@
 import Link from "next/link";
 
-/* ------------------------------------------------------------- */
-/*  Design tokens — identical to /dashboard                       */
-/*  bg: zinc-950 · cards: zinc-900/60 + border-white/10           */
-/*  accent: blue-600 · success: emerald · paused: amber           */
-/* ------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/*  Design tokens — identical to /dashboard                            */
+/*  bg: zinc-950 · cards: zinc-900/60 + border-white/10                */
+/*  accent: blue-600 · success: emerald · paused: amber                */
+/*                                                                     */
+/*  Mobile-first rules used throughout:                                */
+/*  - one primary CTA per viewport; secondary actions are text links   */
+/*  - section rhythm: py-12 mobile → py-20 desktop                     */
+/*  - no absolute-positioned decoration that can clip on narrow vw     */
+/* ------------------------------------------------------------------ */
 
 const primaryCta =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50";
-
-const secondaryCta =
-  "inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3.5 text-[15px] font-semibold text-zinc-200 transition hover:border-white/25 hover:bg-white/10";
+  "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 sm:w-auto";
 
 const cardClasses =
   "rounded-2xl border border-white/10 bg-zinc-900/60 shadow-xl shadow-black/20 backdrop-blur";
 
-function LogoMark({ size = "h-9 w-9" }: { size?: string }) {
+function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
   return (
     <div
-      className={`flex ${size} items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20`}
     >
       <svg
         viewBox="0 0 24 24"
-        className="h-5 w-5 text-white"
+        className="h-4.5 w-4.5 text-white"
         fill="none"
         stroke="currentColor"
         strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
+        style={{ height: "55%", width: "55%" }}
       >
         <path d="M21 2 13.5 12.5" />
         <path d="M21 2l-4 20-5-9-9-5 18-6z" />
@@ -58,11 +61,11 @@ function CheckIcon({
   );
 }
 
-function ArrowIcon() {
+function ArrowIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-4 w-4"
+      className={className}
       fill="none"
       stroke="currentColor"
       strokeWidth="2.5"
@@ -76,38 +79,36 @@ function ArrowIcon() {
   );
 }
 
-/* ------------------------------------------------------------- */
-/*  Page                                                          */
-/* ------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-      {/* ====== NAV — mirrors the dashboard top bar ====== */}
+    <main className="min-h-screen overflow-x-hidden bg-zinc-950 text-zinc-100 antialiased">
+      {/* ====== NAV ====== */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-950/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <LogoMark size="h-8 w-8" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-bold tracking-tight text-white">
-                Meta Retargeting
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                Beta
-              </span>
-            </div>
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <LogoMark />
+            <span className="truncate text-sm font-bold tracking-tight text-white">
+              Meta Retargeting
+            </span>
+            <span className="hidden rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 sm:inline">
+              Beta
+            </span>
           </div>
 
           <nav className="flex items-center gap-5">
             <a
               href="#how-it-works"
-              className="hidden text-sm text-zinc-400 transition hover:text-white sm:inline"
+              className="hidden text-sm text-zinc-400 transition hover:text-white md:inline"
             >
               How it works
             </a>
             <a
               href="#safety"
-              className="hidden text-sm text-zinc-400 transition hover:text-white sm:inline"
+              className="hidden text-sm text-zinc-400 transition hover:text-white md:inline"
             >
               Account safety
             </a>
@@ -119,7 +120,7 @@ export default function HomePage() {
             </a>
             <Link
               href="/dashboard"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow shadow-blue-600/25 transition hover:bg-blue-500"
+              className="rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow shadow-blue-600/25 transition hover:bg-blue-500 sm:px-4 sm:text-sm"
             >
               Open dashboard
             </Link>
@@ -127,26 +128,27 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ====== HERO ====== */}
-      <section className="relative overflow-hidden">
+      {/* ====== HERO — one story: copy → CTA → connector → product ====== */}
+      <section className="relative">
+        {/* Glow + grid, sized down so they don't inflate mobile height */}
         <div
-          className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[880px] -translate-x-1/2 rounded-full bg-blue-600/15 blur-3xl"
+          className="pointer-events-none absolute -top-32 left-1/2 h-[360px] w-[640px] -translate-x-1/2 rounded-full bg-blue-600/15 blur-3xl sm:h-[520px] sm:w-[880px]"
           aria-hidden="true"
         />
         <div
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_55%_at_50%_0%,black,transparent)]"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,black,transparent)] sm:bg-[size:64px_64px]"
           aria-hidden="true"
         />
 
-        <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-6 pb-24 pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:pt-24">
+        <div className="relative mx-auto grid max-w-6xl gap-0 px-5 pt-10 sm:px-6 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-14 lg:pb-24 lg:pt-24">
           {/* Copy */}
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-300">
+          <div className="mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-[11px] font-medium text-blue-300 sm:py-1.5 sm:text-xs">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-              Built on Meta's official Marketing API
+              Built on Meta&apos;s official Marketing API
             </div>
 
-            <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[56px]">
+            <h1 className="mt-4 text-balance text-[34px] font-bold leading-[1.1] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-[56px] lg:leading-[1.08]">
               Launch Meta retargeting in{" "}
               <span className="bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">
                 under a minute
@@ -154,58 +156,69 @@ export default function HomePage() {
               .
             </h1>
 
-            <p className="mt-5 max-w-xl text-lg leading-relaxed text-zinc-400">
+            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-zinc-400 sm:mt-5 sm:text-lg">
               Pick an ad account, reuse a proven creative, set a budget — the
               custom audience, ad set, and ad are created for you. All paused
               until you approve.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            {/* One primary action; secondary is a quiet text link */}
+            <div className="mt-6 flex flex-col items-start gap-4 sm:mt-8 sm:flex-row sm:items-center">
               <Link href="/dashboard" className={primaryCta}>
                 Launch your first campaign
                 <ArrowIcon />
               </Link>
-              <a href="#how-it-works" className={secondaryCta}>
+              <a
+                href="#how-it-works"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-400 transition hover:text-white"
+              >
                 See how it works
+                <ArrowIcon className="h-3.5 w-3.5" />
               </a>
             </div>
 
-            {/* Risk-reduction bullets, visible without scrolling */}
-            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-400">
-              <li className="flex items-center gap-2">
-                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+            {/* Compact trust strip — visible without scrolling */}
+            <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-zinc-400 sm:mt-8 sm:gap-x-6 sm:gap-y-2 sm:text-sm">
+              <li className="flex items-center gap-1.5">
+                <CheckIcon className="h-3 w-3 text-emerald-400 sm:h-3.5 sm:w-3.5" />
                 Launches paused by default
               </li>
-              <li className="flex items-center gap-2">
-                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+              <li className="flex items-center gap-1.5">
+                <CheckIcon className="h-3 w-3 text-emerald-400 sm:h-3.5 sm:w-3.5" />
                 Never touches existing campaigns
               </li>
-              <li className="flex items-center gap-2">
-                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+              <li className="flex items-center gap-1.5">
+                <CheckIcon className="h-3 w-3 text-emerald-400 sm:h-3.5 sm:w-3.5" />
                 Free during beta
               </li>
             </ul>
           </div>
 
-          {/* Product proof — exact replica of the dashboard launch panel */}
-          <div className="relative mx-auto w-full max-w-sm">
+          {/* Connector — ties the CTA to the product on mobile */}
+          <div
+            className="mx-auto mt-6 h-10 w-px bg-gradient-to-b from-blue-500/60 to-transparent lg:hidden"
+            aria-hidden="true"
+          />
+
+          {/* Product proof — top edge designed to peek into the first viewport */}
+          <div className="relative mx-auto w-full max-w-sm pb-12 sm:pb-16 lg:pb-0">
             <div
-              className="absolute -inset-8 rounded-3xl bg-blue-600/10 blur-2xl"
+              className="absolute -inset-6 rounded-3xl bg-blue-600/10 blur-2xl sm:-inset-8"
               aria-hidden="true"
             />
 
-            <div className={`relative ${cardClasses} p-5`}>
-              <div className="flex items-center justify-between">
-                <span className="text-base font-semibold tracking-tight text-white">
+            <div className={`relative ${cardClasses} p-4 sm:p-5`}>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[15px] font-semibold tracking-tight text-white sm:text-base">
                   Audience &amp; budget
                 </span>
-                <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                   Meta connected
                 </span>
               </div>
 
-              <dl className="mt-4 space-y-2.5 border-t border-white/5 pt-4 text-[13px]">
+              <dl className="mt-3.5 space-y-2.5 border-t border-white/5 pt-3.5 text-[13px] sm:mt-4 sm:pt-4">
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-zinc-500">Account</dt>
                   <dd className="font-mono text-[12px] text-zinc-200">
@@ -234,50 +247,74 @@ export default function HomePage() {
                 </div>
               </dl>
 
-              <div className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-center text-[14px] font-semibold text-white shadow-lg shadow-blue-600/25">
+              <div className="mt-4 rounded-xl bg-blue-600 px-5 py-3 text-center text-[14px] font-semibold text-white shadow-lg shadow-blue-600/25 sm:mt-5">
                 Launch retargeting campaign
               </div>
 
-              <p className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
-                Created paused via Meta's official Marketing API.
-                <br />
-                Nothing spends until you activate it.
-              </p>
-            </div>
-
-            {/* Floating result toast for extra product feel */}
-            <div className="absolute -bottom-6 -left-4 hidden items-center gap-2 rounded-xl border border-emerald-400/25 bg-zinc-900 px-3.5 py-2.5 text-[12px] font-medium text-emerald-300 shadow-2xl shadow-black/50 sm:flex">
-              <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-              Audience + ad set + ad created
+              {/* Result row — in flow on mobile (no absolute clipping) */}
+              <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-500/[0.07] px-3 py-2 text-[12px] font-medium text-emerald-300">
+                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                Audience + ad set + ad created — paused, €0 spent
+              </div>
             </div>
           </div>
         </div>
       </section>
 
+      {/* ====== HOW IT WORKS — moved up: activation before reassurance ====== */}
+      <section id="how-it-works" className="border-t border-white/5 bg-zinc-900/30">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
+          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
+            From zero to launched in three steps
+          </h2>
+
+          {/* Mobile: vertical timeline · Desktop: three columns */}
+          <ol className="relative mt-8 space-y-6 sm:mt-12 sm:grid sm:grid-cols-3 sm:gap-5 sm:space-y-0">
+            <div
+              className="absolute bottom-8 left-[15px] top-2 w-px bg-gradient-to-b from-blue-500/40 via-white/10 to-transparent sm:hidden"
+              aria-hidden="true"
+            />
+            <Step
+              number={1}
+              title="Connect Meta"
+              text="Secure OAuth login — we never see your password. Your ad account, campaign, and pixel are detected automatically."
+            />
+            <Step
+              number={2}
+              title="Pick creative & budget"
+              text="Reuse an existing ad or write a new one, choose the visitor window (7 / 14 / 30 days) and a daily budget."
+            />
+            <Step
+              number={3}
+              title="Review & activate"
+              text="The full retargeting structure appears in Ads Manager, paused. Flip it on when you're ready."
+            />
+          </ol>
+
+          <div className="mt-8 sm:mt-10 sm:text-center">
+            <Link href="/dashboard" className={primaryCta}>
+              Try it now
+              <ArrowIcon />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ====== VALUE / FEATURES ====== */}
-      <section className="border-t border-white/5 bg-zinc-900/30">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <h2 className="text-center text-3xl font-bold tracking-tight text-white">
+      <section className="border-t border-white/5">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
+          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
             Retargeting setup, minus the busywork
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-zinc-400">
+          <p className="mt-2.5 max-w-xl text-[15px] text-zinc-400 sm:mx-auto sm:mt-3 sm:text-center sm:text-base">
             For freelancers, media buyers, and small agencies who build the
             same retargeting structure for every client.
           </p>
 
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
+          <div className="mt-8 grid gap-4 sm:mt-12 sm:gap-5 md:grid-cols-3">
             <FeatureCard
               icon={
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="m13 2-2 10h6L11 22l2-10H7L13 2z" />
                 </svg>
               }
@@ -286,16 +323,7 @@ export default function HomePage() {
             />
             <FeatureCard
               icon={
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M21 12a9 9 0 1 1-9-9" />
                   <path d="M21 3v6h-6" />
                 </svg>
@@ -305,16 +333,7 @@ export default function HomePage() {
             />
             <FeatureCard
               icon={
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
                 </svg>
               }
@@ -325,67 +344,33 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ====== HOW IT WORKS ====== */}
-      <section id="how-it-works" className="border-t border-white/5">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <h2 className="text-center text-3xl font-bold tracking-tight text-white">
-            From zero to launched in three steps
-          </h2>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            <StepCard
-              number={1}
-              title="Connect Meta"
-              text="Secure OAuth login — we never see your password. Your ad account, campaign, and pixel are detected automatically."
-            />
-            <StepCard
-              number={2}
-              title="Pick creative & budget"
-              text="Reuse an existing ad or write a new one, choose the visitor window (7 / 14 / 30 days) and a daily budget."
-            />
-            <StepCard
-              number={3}
-              title="Review & activate"
-              text="The full retargeting structure appears in Ads Manager, paused. Flip it on when you're ready."
-            />
-          </div>
-
-          <div className="mt-10 text-center">
-            <Link href="/dashboard" className={primaryCta}>
-              Try it now
-              <ArrowIcon />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ====== ACCOUNT SAFETY — mirrors the dashboard safety card ====== */}
+      {/* ====== ACCOUNT SAFETY ====== */}
       <section id="safety" className="border-t border-white/5 bg-zinc-900/30">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <div className="grid items-center gap-10 lg:grid-cols-2">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
+          <div className="grid items-center gap-8 sm:gap-10 lg:grid-cols-2">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                 Account safety
               </div>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">
+              <h2 className="mt-2.5 text-2xl font-bold tracking-tight text-white sm:mt-3 sm:text-3xl">
                 Your client accounts stay untouched.
               </h2>
-              <p className="mt-4 max-w-md leading-relaxed text-zinc-400">
-                We know you're often running someone else's money. That's why
-                the tool is read-and-create only — it can't edit, pause, or
-                delete anything that already exists in the account.
+              <p className="mt-3 max-w-md text-[15px] leading-relaxed text-zinc-400 sm:mt-4 sm:text-base">
+                We know you&apos;re often running someone else&apos;s money.
+                That&apos;s why the tool is read-and-create only — it can&apos;t
+                edit, pause, or delete anything that already exists in the
+                account.
               </p>
             </div>
 
-            <div className={`${cardClasses} p-6`}>
-              <ul className="space-y-4 text-[15px] text-zinc-200">
+            <div className={`${cardClasses} p-5 sm:p-6`}>
+              <ul className="space-y-4 text-[14px] text-zinc-200 sm:text-[15px]">
                 <li className="flex items-start gap-3">
                   <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
                   <div>
                     Existing campaigns and ads are never modified
-                    <p className="mt-0.5 text-sm text-zinc-500">
-                      Only new assets are created, inside a campaign you
-                      choose.
+                    <p className="mt-0.5 text-[13px] text-zinc-500 sm:text-sm">
+                      Only new assets are created, inside a campaign you choose.
                     </p>
                   </div>
                 </li>
@@ -393,9 +378,8 @@ export default function HomePage() {
                   <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
                   <div>
                     Everything launches in paused status
-                    <p className="mt-0.5 text-sm text-zinc-500">
-                      Zero spend until you activate it yourself in Ads
-                      Manager.
+                    <p className="mt-0.5 text-[13px] text-zinc-500 sm:text-sm">
+                      Zero spend until you activate it yourself in Ads Manager.
                     </p>
                   </div>
                 </li>
@@ -403,7 +387,7 @@ export default function HomePage() {
                   <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
                   <div>
                     Full control stays in Meta
-                    <p className="mt-0.5 text-sm text-zinc-500">
+                    <p className="mt-0.5 text-[13px] text-zinc-500 sm:text-sm">
                       Every created asset is visible, editable, and deletable
                       in Ads Manager.
                     </p>
@@ -417,12 +401,12 @@ export default function HomePage() {
 
       {/* ====== FAQ ====== */}
       <section id="faq" className="border-t border-white/5">
-        <div className="mx-auto max-w-3xl px-6 py-20">
-          <h2 className="text-center text-3xl font-bold tracking-tight text-white">
+        <div className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-20">
+          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
             Questions, answered
           </h2>
 
-          <div className="mt-10 space-y-3">
+          <div className="mt-7 space-y-3 sm:mt-10">
             <FaqItem
               q="Can this break my ad account?"
               a="No. The tool only creates new assets — a custom audience, an ad set, and an ad — inside a campaign you choose. It never edits or deletes anything that already exists, and everything is created in paused status."
@@ -445,20 +429,20 @@ export default function HomePage() {
 
       {/* ====== FINAL CTA ====== */}
       <section className="border-t border-white/5">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-blue-950/60 to-zinc-900 px-8 py-14 text-center shadow-2xl shadow-black/40">
+        <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-blue-950/60 to-zinc-900 px-6 py-10 text-center shadow-2xl shadow-black/40 sm:rounded-3xl sm:px-8 sm:py-14">
             <div
               className="pointer-events-none absolute -top-24 left-1/2 h-64 w-[480px] -translate-x-1/2 rounded-full bg-blue-600/20 blur-3xl"
               aria-hidden="true"
             />
-            <h2 className="relative text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h2 className="relative text-balance text-2xl font-bold tracking-tight text-white sm:text-3xl lg:text-4xl">
               Your next retargeting campaign, one click away.
             </h2>
-            <p className="relative mx-auto mt-4 max-w-md text-zinc-400">
+            <p className="relative mx-auto mt-3 max-w-md text-[15px] text-zinc-400 sm:mt-4 sm:text-base">
               Free during beta. Launches paused. Nothing spends without your
               approval.
             </p>
-            <div className="relative mt-8">
+            <div className="relative mt-6 sm:mt-8">
               <Link href="/dashboard" className={primaryCta}>
                 Open the dashboard
                 <ArrowIcon />
@@ -470,9 +454,9 @@ export default function HomePage() {
 
       {/* ====== FOOTER ====== */}
       <footer className="border-t border-white/5">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-zinc-500">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-7 text-sm text-zinc-500 sm:px-6 sm:py-8">
           <div className="flex items-center gap-2.5">
-            <LogoMark size="h-8 w-8" />
+            <LogoMark />
             <span className="font-semibold text-zinc-300">
               Meta Retargeting
             </span>
@@ -481,8 +465,8 @@ export default function HomePage() {
             </span>
           </div>
           <p className="text-xs">
-            Built on Meta's official Marketing API. Not affiliated with Meta
-            Platforms, Inc.
+            Built on Meta&apos;s official Marketing API. Not affiliated with
+            Meta Platforms, Inc.
           </p>
         </div>
       </footer>
@@ -490,9 +474,35 @@ export default function HomePage() {
   );
 }
 
-/* ------------------------------------------------------------- */
-/*  Section cards                                                 */
-/* ------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/*  Section pieces                                                     */
+/* ------------------------------------------------------------------ */
+
+function Step({
+  number,
+  title,
+  text,
+}: {
+  number: number;
+  title: string;
+  text: string;
+}) {
+  return (
+    <li className="relative flex gap-4 sm:block sm:rounded-2xl sm:border sm:border-white/10 sm:bg-zinc-900/60 sm:p-6 sm:shadow-xl sm:shadow-black/20">
+      <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-400/30 bg-zinc-950 text-sm font-bold text-blue-300 sm:bg-blue-500/10">
+        {number}
+      </div>
+      <div className="pt-0.5 sm:pt-0">
+        <h3 className="text-[15px] font-semibold tracking-tight text-white sm:mt-4 sm:text-lg">
+          {title}
+        </h3>
+        <p className="mt-1 text-[13px] leading-relaxed text-zinc-400 sm:mt-2 sm:text-sm">
+          {text}
+        </p>
+      </div>
+    </li>
+  );
+}
 
 function FeatureCard({
   icon,
@@ -504,44 +514,28 @@ function FeatureCard({
   text: string;
 }) {
   return (
-    <div className={`${cardClasses} p-6 transition hover:border-white/20`}>
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300">
-        {icon}
+    <div className={`${cardClasses} p-5 transition hover:border-white/20 sm:p-6`}>
+      <div className="flex items-start gap-4 sm:block">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300 sm:h-10 sm:w-10">
+          {icon}
+        </div>
+        <div>
+          <h3 className="text-[15px] font-semibold tracking-tight text-white sm:mt-4 sm:text-lg">
+            {title}
+          </h3>
+          <p className="mt-1 text-[13px] leading-relaxed text-zinc-400 sm:mt-2 sm:text-sm">
+            {text}
+          </p>
+        </div>
       </div>
-      <h3 className="mt-4 text-lg font-semibold tracking-tight text-white">
-        {title}
-      </h3>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{text}</p>
-    </div>
-  );
-}
-
-function StepCard({
-  number,
-  title,
-  text,
-}: {
-  number: number;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className={`${cardClasses} p-6`}>
-      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-400/30 bg-blue-500/10 text-sm font-bold text-blue-300">
-        {number}
-      </div>
-      <h3 className="mt-4 text-lg font-semibold tracking-tight text-white">
-        {title}
-      </h3>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{text}</p>
     </div>
   );
 }
 
 function FaqItem({ q, a }: { q: string; a: string }) {
   return (
-    <details className="group rounded-xl border border-white/10 bg-zinc-900/60 px-5 py-4 transition hover:border-white/20">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[15px] font-semibold text-white">
+    <details className="group rounded-xl border border-white/10 bg-zinc-900/60 px-4 py-3.5 transition hover:border-white/20 sm:px-5 sm:py-4">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[14px] font-semibold text-white sm:text-[15px]">
         {q}
         <svg
           viewBox="0 0 24 24"
@@ -556,7 +550,8 @@ function FaqItem({ q, a }: { q: string; a: string }) {
           <path d="m6 9 6 6 6-6" />
         </svg>
       </summary>
-      <p className="mt-3 text-sm leading-relaxed text-zinc-400">{a}</p>
+      <p className="mt-3 text-[13px] leading-relaxed text-zinc-400 sm:text-sm">{a}</p>
     </details>
   );
 }
+ 

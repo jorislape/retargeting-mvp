@@ -62,7 +62,7 @@ function Spinner({ className = "" }: { className?: string }) {
 function LogoMark({ size = "h-9 w-9" }: { size?: string }) {
   return (
     <div
-      className={`flex ${size} items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20`}
     >
       <svg
         viewBox="0 0 24 24"
@@ -154,7 +154,7 @@ function StatusChip({
 
   return (
     <span
-      className={`inline-flex max-w-[220px] items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-xs font-medium ${styles}`}
+      className={`inline-flex max-w-[220px] shrink-0 items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-xs font-medium ${styles}`}
       title={`${label}: ${value}`}
     >
       {state === "ok" && <CheckIcon className="h-3 w-3 text-emerald-400" />}
@@ -220,7 +220,7 @@ function MetaAdPreview({
       </div>
 
       {/* Primary text */}
-      <p className="whitespace-pre-line px-4 py-3 text-[14px] leading-snug">
+      <p className="whitespace-pre-line break-words px-4 py-3 text-[14px] leading-snug">
         {message || "Your ad message will appear here."}
       </p>
 
@@ -284,7 +284,7 @@ const secondaryButtonClasses =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50";
 
 const cardClasses =
-  "rounded-2xl border border-white/10 bg-zinc-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur";
+  "rounded-2xl border border-white/10 bg-zinc-900/60 p-4 shadow-xl shadow-black/20 backdrop-blur sm:p-5";
 
 const LAUNCH_STAGES = [
   "Creating custom audience...",
@@ -299,6 +299,43 @@ const AUDIENCE_HELPER: Record<number, string> = {
   14: "A good middle ground between freshness and size. A safe default for most shops.",
   30: "The biggest group your ad can reach. Best if your site gets fewer visitors.",
 };
+
+/* Onboarding stepper shown on the access + connect screens */
+function SetupSteps({ current }: { current: 1 | 2 | 3 }) {
+  const steps = ["Connect Meta", "Pick creative", "Review & launch"];
+  return (
+    <ol className="flex items-center justify-center gap-2 text-[11px] font-medium">
+      {steps.map((label, i) => {
+        const n = (i + 1) as 1 | 2 | 3;
+        const active = n === current;
+        const done = n < current;
+        return (
+          <li key={label} className="flex items-center gap-2">
+            <span
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
+                active
+                  ? "border-blue-400/30 bg-blue-500/10 text-blue-300"
+                  : done
+                    ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
+                    : "border-white/10 bg-white/[0.03] text-zinc-500"
+              }`}
+            >
+              {done ? (
+                <CheckIcon className="h-3 w-3 text-emerald-400" />
+              ) : (
+                <span className="text-[10px]">{n}</span>
+              )}
+              {label}
+            </span>
+            {i < steps.length - 1 && (
+              <span className="h-px w-3 bg-white/10" aria-hidden="true" />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 /* -------------- */
 /*  Page          */
@@ -960,15 +997,15 @@ export default function DashboardPage() {
 
   if (!unlocked) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-zinc-100 antialiased">
+      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-5 text-zinc-100 antialiased">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-7 flex flex-col items-center text-center">
             <LogoMark />
-            <h1 className="mt-5 text-2xl font-bold tracking-tight text-white">
+            <h1 className="mt-4 text-xl font-bold tracking-tight text-white sm:text-2xl">
               Retargeting Dashboard
             </h1>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-              This is a private beta. Enter your access code to continue.
+            <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
+              Private beta — enter your access code to continue.
             </p>
           </div>
 
@@ -1019,7 +1056,7 @@ export default function DashboardPage() {
           </div>
 
           <p className="mt-6 text-center text-xs text-zinc-600">
-            Don't have a code? Contact us for beta access.
+            Don&apos;t have a code? Contact us for beta access.
           </p>
         </div>
       </main>
@@ -1032,7 +1069,7 @@ export default function DashboardPage() {
 
   if (connected === null) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-zinc-100 antialiased">
+      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-5 text-zinc-100 antialiased">
         <div className="flex flex-col items-center gap-4">
           <LogoMark />
           <div className="flex items-center gap-2 text-sm text-zinc-400">
@@ -1044,70 +1081,88 @@ export default function DashboardPage() {
     );
   }
 
-  /* ------------------------- */
-  /*  Screen: connect Meta     */
-  /* ------------------------- */
+  /* --------------------------------------------------------- */
+  /*  Screen: connect Meta — a setup step, not a landing page   */
+  /*  Action-first, stepper for orientation, trust as one-liners */
+  /* --------------------------------------------------------- */
 
   if (!connected) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-zinc-100 antialiased">
-        <div className="w-full max-w-md">
-          <div className="mb-8 flex flex-col items-center text-center">
-            <LogoMark />
-            <h1 className="mt-5 text-2xl font-bold tracking-tight text-white">
-              Connect your Meta account
-            </h1>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400">
-              We use Meta's official API to read your ad accounts and create
-              retargeting campaigns on your behalf. Everything is created in{" "}
-              <span className="font-medium text-zinc-200">paused</span> status —
-              nothing spends until you approve it.
-            </p>
+      <main className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100 antialiased">
+        {/* Slim header keeps brand context without restating the pitch */}
+        <header className="border-b border-white/5">
+          <div className="mx-auto flex h-14 max-w-6xl items-center gap-2.5 px-5 sm:px-6">
+            <LogoMark size="h-8 w-8" />
+            <span className="text-sm font-bold tracking-tight text-white">
+              Meta Retargeting
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              Beta
+            </span>
           </div>
+        </header>
 
-          <div className={cardClasses}>
-            <ul className="space-y-3 text-sm text-zinc-300">
-              <li className="flex items-start gap-3">
-                <CheckIcon />
-                <span>Secure OAuth login — we never see your password</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckIcon />
-                <span>Campaign and pixel are detected automatically</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckIcon />
-                <span>All ads launch paused, so you stay in control</span>
-              </li>
-            </ul>
+        <div className="flex flex-1 items-start justify-center px-5 pb-12 pt-8 sm:items-center sm:pt-0">
+          <div className="w-full max-w-sm">
+            <SetupSteps current={1} />
 
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = "/api/meta/oauth/start";
-              }}
-              className={`${primaryButtonClasses} mt-6`}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-5 w-5"
-                fill="currentColor"
-                aria-hidden="true"
+            <div className={`${cardClasses} mt-6`}>
+              <h1 className="text-lg font-bold tracking-tight text-white">
+                Connect your Meta account
+              </h1>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
+                Your ad accounts, campaigns, and pixel are detected
+                automatically once connected.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/api/meta/oauth/start";
+                }}
+                className={`${primaryButtonClasses} mt-5`}
               >
-                <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.7 4.53-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z" />
-              </svg>
-              Continue with Meta
-            </button>
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.7 4.53-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z" />
+                </svg>
+                Continue with Meta
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                checkSession();
-              }}
-              className={`${secondaryButtonClasses} mt-3 w-full`}
-            >
-              I've already connected — refresh status
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  checkSession();
+                }}
+                className="mt-3 w-full text-center text-[13px] font-medium text-zinc-400 underline-offset-4 transition hover:text-white hover:underline"
+              >
+                I&apos;ve already connected — refresh status
+              </button>
+
+              {/* Trust, compressed to scannable one-liners */}
+              <ul className="mt-5 space-y-2 border-t border-white/5 pt-4 text-[12px] text-zinc-400">
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-3 w-3 text-emerald-400" />
+                  Secure OAuth — we never see your password
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-3 w-3 text-emerald-400" />
+                  Everything is created paused — €0 until you approve
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-3 w-3 text-emerald-400" />
+                  Existing campaigns are never modified
+                </li>
+              </ul>
+            </div>
+
+            <p className="mt-5 text-center text-[11px] leading-relaxed text-zinc-600">
+              Built on Meta&apos;s official Marketing API.
+            </p>
           </div>
         </div>
       </main>
@@ -1129,106 +1184,109 @@ export default function DashboardPage() {
   const previewDomain = mode === "existing" ? "" : getDomain(link);
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+    <main className="min-h-screen overflow-x-hidden bg-zinc-950 text-zinc-100 antialiased">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-950/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-5 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
             <LogoMark size="h-8 w-8" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-bold tracking-tight text-white">
-                Meta Retargeting
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                Beta
-              </span>
-            </div>
+            <span className="truncate text-sm font-bold tracking-tight text-white">
+              Meta Retargeting
+            </span>
+            <span className="hidden rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 sm:inline">
+              Beta
+            </span>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
+          <div className="flex shrink-0 items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Meta connected
+            <span className="hidden sm:inline">Meta connected</span>
+            <span className="sm:hidden">Connected</span>
           </div>
         </div>
       </header>
 
-      {/* Workspace bar: account + auto-detected setup */}
+      {/* Workspace bar: stacks on mobile, chips scroll horizontally */}
       <div className="border-b border-white/5 bg-zinc-900/40">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3">
-          <select
-            id="adAccount"
-            value={selectedAdAccountId}
-            onChange={(e) => {
-              setSelectedAdAccountId(e.target.value);
-              setFormError("");
-              setResult(null);
-            }}
-            className={`${selectClasses} w-auto min-w-[240px] max-w-xs`}
-            disabled={adAccountsLoading}
-            aria-label="Ad account"
-          >
-            <option value="">
-              {adAccountsLoading
-                ? "Loading ad accounts..."
-                : "Select an ad account"}
-            </option>
-
-            {adAccounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name || account.id} ({normalizeAccountId(account.id)})
+        <div className="mx-auto max-w-6xl px-5 py-3 sm:px-6">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+            <select
+              id="adAccount"
+              value={selectedAdAccountId}
+              onChange={(e) => {
+                setSelectedAdAccountId(e.target.value);
+                setFormError("");
+                setResult(null);
+              }}
+              className={`${selectClasses} w-full min-w-0 sm:w-auto sm:min-w-[240px] sm:max-w-xs`}
+              disabled={adAccountsLoading}
+              aria-label="Ad account"
+            >
+              <option value="">
+                {adAccountsLoading
+                  ? "Loading ad accounts..."
+                  : "Select an ad account"}
               </option>
-            ))}
-          </select>
 
-          {selectedAdAccountId ? (
-            <>
-              <StatusChip
-                label="Campaign"
-                value={
-                  campaignsLoading
-                    ? "Detecting..."
-                    : selectedCampaignName || "Not found"
-                }
-                state={
-                  campaignsLoading
-                    ? "loading"
-                    : selectedCampaignId
-                      ? "ok"
-                      : "warn"
-                }
-              />
-              <StatusChip
-                label="Visitor tracking"
-                value={
-                  pixelsLoading
-                    ? "Detecting..."
-                    : selectedPixelName || "Not found"
-                }
-                state={
-                  pixelsLoading ? "loading" : selectedPixelId ? "ok" : "warn"
-                }
-              />
-            </>
-          ) : null}
+              {adAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name || account.id} ({normalizeAccountId(account.id)})
+                </option>
+              ))}
+            </select>
 
-          <button
-            type="button"
-            onClick={() => setShowTechnicalDetails((current) => !current)}
-            className="ml-auto text-xs font-medium text-zinc-500 underline-offset-4 transition hover:text-zinc-300 hover:underline"
-          >
-            {showTechnicalDetails ? "Hide advanced" : "Advanced"}
-          </button>
+            <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:contents">
+              {selectedAdAccountId ? (
+                <>
+                  <StatusChip
+                    label="Campaign"
+                    value={
+                      campaignsLoading
+                        ? "Detecting..."
+                        : selectedCampaignName || "Not found"
+                    }
+                    state={
+                      campaignsLoading
+                        ? "loading"
+                        : selectedCampaignId
+                          ? "ok"
+                          : "warn"
+                    }
+                  />
+                  <StatusChip
+                    label="Visitor tracking"
+                    value={
+                      pixelsLoading
+                        ? "Detecting..."
+                        : selectedPixelName || "Not found"
+                    }
+                    state={
+                      pixelsLoading ? "loading" : selectedPixelId ? "ok" : "warn"
+                    }
+                  />
+                </>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setShowTechnicalDetails((current) => !current)}
+                className="ml-auto shrink-0 text-xs font-medium text-zinc-500 underline-offset-4 transition hover:text-zinc-300 hover:underline"
+              >
+                {showTechnicalDetails ? "Hide advanced" : "Advanced"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {adAccountsError && (
-          <div className="mx-auto max-w-6xl px-6 pb-3">
+          <div className="mx-auto max-w-6xl px-5 pb-3 sm:px-6">
             <ErrorNote>{adAccountsError}</ErrorNote>
           </div>
         )}
 
         {showTechnicalDetails ? (
           <div className="border-t border-white/5 bg-black/20">
-            <div className="mx-auto grid max-w-6xl gap-4 px-6 py-4 sm:grid-cols-2">
+            <div className="mx-auto grid max-w-6xl gap-4 px-5 py-4 sm:grid-cols-2 sm:px-6">
               <div>
                 <FieldLabel htmlFor="campaignId">Campaign override</FieldLabel>
                 <select
@@ -1297,9 +1355,9 @@ export default function DashboardPage() {
         ) : null}
       </div>
 
-      {/* Main two-column layout */}
-      <div className="mx-auto max-w-6xl px-6 pb-20 pt-8">
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/* Main layout — extra bottom padding on mobile clears the sticky launch bar */}
+      <div className="mx-auto max-w-6xl px-5 pb-32 pt-6 sm:px-6 sm:pt-8 lg:pb-20">
+        <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* LEFT — creative */}
           <section className={cardClasses}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1314,8 +1372,8 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              {/* Segmented control */}
-              <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-1">
+              {/* Segmented control — full width on mobile for tap targets */}
+              <div className="grid w-full grid-cols-2 rounded-lg border border-white/10 bg-black/30 p-1 sm:inline-flex sm:w-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -1560,7 +1618,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* RIGHT — sticky launch panel */}
+          {/* RIGHT — launch panel (sticky only on desktop) */}
           <aside className="space-y-4 lg:sticky lg:top-[72px]">
             <section className={cardClasses}>
               <h2 className="text-base font-semibold tracking-tight text-white">
@@ -1604,6 +1662,7 @@ export default function DashboardPage() {
                       id="budget"
                       type="number"
                       min="1"
+                      inputMode="numeric"
                       value={budget}
                       onChange={(e) => {
                         setBudget(Number(e.target.value));
@@ -1635,7 +1694,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-zinc-500">Who sees it</dt>
-                  <dd className="text-zinc-200">Last {days} days' visitors</dd>
+                  <dd className="text-zinc-200">Last {days} days&apos; visitors</dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-zinc-500">Budget</dt>
@@ -1687,7 +1746,7 @@ export default function DashboardPage() {
               </button>
 
               <p className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
-                Nothing is created yet — you'll see the full plan first.
+                Nothing is created yet — you&apos;ll see the full plan first.
                 <br />
                 Nothing spends money until you activate it yourself.
               </p>
@@ -1717,9 +1776,35 @@ export default function DashboardPage() {
         </div>
 
         <footer className="mt-12 border-t border-white/5 pt-5 text-center text-xs text-zinc-600">
-          All campaigns are created via Meta's official Marketing API and start
-          in paused status.
+          All campaigns are created via Meta&apos;s official Marketing API and
+          start in paused status.
         </footer>
+      </div>
+
+      {/* Mobile sticky launch bar — primary action always one tap away */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-zinc-950/90 px-5 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 backdrop-blur lg:hidden">
+        <div className="mb-2 flex items-center justify-between text-[12px] text-zinc-400">
+          <span>
+            €{budget}/day · last {days} days&apos; visitors
+          </span>
+          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+            Created paused
+          </span>
+        </div>
+        <button
+          onClick={handleOpenReview}
+          disabled={isLaunchBlocked}
+          className={primaryButtonClasses}
+        >
+          {loading ? (
+            <>
+              <Spinner />
+              {LAUNCH_STAGES[launchStage]}
+            </>
+          ) : (
+            "Review what will be created"
+          )}
+        </button>
       </div>
 
       {/* Pre-launch review modal */}
@@ -1739,14 +1824,14 @@ export default function DashboardPage() {
         onCancel={() => setShowReview(false)}
       />
 
-      {/* Result modal */}
+      {/* Result modal — scrollable on small screens */}
       {result && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-6"
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900 p-6 shadow-2xl shadow-black/50">
+          <div className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-white/10 bg-zinc-900 p-5 shadow-2xl shadow-black/50 sm:rounded-2xl sm:p-6">
             {result.ok ? (
               <>
                 <div className="flex flex-col items-center text-center">
@@ -1758,7 +1843,7 @@ export default function DashboardPage() {
                   </h2>
                   <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
                     Everything is paused and spending €0 — review it and
-                    switch it on whenever you're ready.
+                    switch it on whenever you&apos;re ready.
                   </p>
                 </div>
 
@@ -1814,8 +1899,8 @@ export default function DashboardPage() {
                           {selectedCampaignName || selectedCampaignId}
                         </span>{" "}
                         is currently paused. You can activate the new ad set
-                        and ad now, but they won't start delivering until the
-                        campaign itself is switched on in Ads Manager — we
+                        and ad now, but they won&apos;t start delivering until
+                        the campaign itself is switched on in Ads Manager — we
                         never modify your existing campaigns automatically.
                       </div>
                     )}
@@ -1884,7 +1969,7 @@ export default function DashboardPage() {
                   <summary className="cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
                     Technical details
                   </summary>
-                  <dl className="mt-3 space-y-1.5 rounded-lg bg-black/30 p-4 font-mono text-xs leading-relaxed text-zinc-400">
+                  <dl className="mt-3 space-y-1.5 break-all rounded-lg bg-black/30 p-4 font-mono text-xs leading-relaxed text-zinc-400">
                     <div>
                       Ad account: {normalizeAccountId(selectedAdAccountId)}
                     </div>
@@ -1937,7 +2022,7 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <h2 className="mt-4 text-xl font-bold tracking-tight text-white">
-                    Launch didn't complete
+                    Launch didn&apos;t complete
                   </h2>
                   <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
                     Nothing was charged and no assets were activated. Adjust
@@ -1962,7 +2047,7 @@ export default function DashboardPage() {
                   <summary className="cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
                     Show full error details
                   </summary>
-                  <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-4 font-mono text-xs leading-relaxed text-zinc-400">
+                  <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-black/30 p-4 font-mono text-xs leading-relaxed text-zinc-400">
                     {JSON.stringify(result, null, 2)}
                   </pre>
                 </details>
