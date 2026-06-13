@@ -1184,7 +1184,7 @@ export default function DashboardPage() {
   const previewDomain = mode === "existing" ? "" : getDomain(link);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-zinc-950 text-zinc-100 antialiased">
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-950/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-5 sm:px-6">
