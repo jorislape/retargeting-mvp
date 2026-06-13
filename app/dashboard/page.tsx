@@ -273,7 +273,7 @@ function MetaAdPreview({
 }
 
 const inputClasses =
-  "w-full rounded-lg border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-[14px] text-white placeholder-zinc-500 outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full min-w-0 rounded-lg border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-[14px] text-white placeholder-zinc-500 outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50";
 
 const selectClasses = `${inputClasses} appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2371717a%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M4.4%206l3.6%203.6L11.6%206%22%20stroke%3D%22%2371717a%22%20stroke-width%3D%221.6%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E')] bg-[right_0.85rem_center] bg-no-repeat pr-9`;
 
@@ -1184,7 +1184,7 @@ export default function DashboardPage() {
   const previewDomain = mode === "existing" ? "" : getDomain(link);
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+    <main className="min-h-screen overflow-x-hidden bg-zinc-950 text-zinc-100 antialiased">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-950/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-5 sm:px-6">
@@ -1286,8 +1286,8 @@ export default function DashboardPage() {
 
         {showTechnicalDetails ? (
           <div className="border-t border-white/5 bg-black/20">
-            <div className="mx-auto grid max-w-6xl gap-4 px-5 py-4 sm:grid-cols-2 sm:px-6">
-              <div>
+            <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-5 py-4 sm:grid-cols-2 sm:px-6">
+              <div className="min-w-0">
                 <FieldLabel htmlFor="campaignId">Campaign override</FieldLabel>
                 <select
                   id="campaignId"
@@ -1318,7 +1318,7 @@ export default function DashboardPage() {
                 {campaignsError && <ErrorNote>{campaignsError}</ErrorNote>}
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <FieldLabel htmlFor="pixelId">Pixel override</FieldLabel>
                 <select
                   id="pixelId"
@@ -1357,9 +1357,9 @@ export default function DashboardPage() {
 
       {/* Main layout — extra bottom padding on mobile clears the sticky launch bar */}
       <div className="mx-auto max-w-6xl px-5 pb-32 pt-6 sm:px-6 sm:pt-8 lg:pb-20">
-        <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid grid-cols-1 items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* LEFT — creative */}
-          <section className={cardClasses}>
+          <section className={`${cardClasses} min-w-0`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold tracking-tight text-white">
@@ -1413,9 +1413,9 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* Inputs column */}
-              <div>
+              <div className="min-w-0">
                 {mode === "existing" ? (
                   <>
                     <div className="flex items-end gap-2">
@@ -1585,7 +1585,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Preview column */}
-              <div>
+              <div className="min-w-0">
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-[13px] font-medium text-zinc-300">
                     Ad preview
@@ -1619,7 +1619,7 @@ export default function DashboardPage() {
           </section>
 
           {/* RIGHT — launch panel (sticky only on desktop) */}
-          <aside className="space-y-4 lg:sticky lg:top-[72px]">
+          <aside className="min-w-0 space-y-4 lg:sticky lg:top-[72px]">
             <section className={cardClasses}>
               <h2 className="text-base font-semibold tracking-tight text-white">
                 Audience &amp; budget
