@@ -9,6 +9,10 @@ import Link from "next/link";
 /*  - one primary CTA per viewport; secondary actions are text links   */
 /*  - section rhythm: py-12 mobile → py-20 desktop                     */
 /*  - no absolute-positioned decoration that can clip on narrow vw     */
+/*                                                                     */
+/*  Affordance rule:                                                   */
+/*  - SOLID blue (primaryCta / nav button) = a real, clickable action  */
+/*  - tinted blue inside a framed "preview" = illustration, NOT a btn  */
 /* ------------------------------------------------------------------ */
 
 const primaryCta =
@@ -200,64 +204,102 @@ export default function HomePage() {
             aria-hidden="true"
           />
 
-          {/* Product proof — top edge designed to peek into the first viewport */}
-          <div className="relative mx-auto w-full max-w-sm pb-12 sm:pb-16 lg:pb-0">
+          {/* ----------------------------------------------------------- */
+          /*  Product proof — a LABELLED, NON-INTERACTIVE preview.        */
+          /*  Window chrome + caption make it read as a screenshot, and   */
+          /*  the inner "Launch" element is a tinted illustration (not a  */
+          /*  solid CTA) so nobody mistakes it for a clickable button.    */
+          /* ----------------------------------------------------------- */}
+          <figure className="relative mx-auto w-full max-w-sm pb-12 sm:pb-16 lg:pb-0">
             <div
               className="absolute -inset-6 rounded-3xl bg-blue-600/10 blur-2xl sm:-inset-8"
               aria-hidden="true"
             />
 
-            <div className={`relative ${cardClasses} p-4 sm:p-5`}>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[15px] font-semibold tracking-tight text-white sm:text-base">
-                  Audience &amp; budget
+            {/* Entire mock is decorative: no pointer events, no a11y focus */}
+            <div
+              className={`relative select-none overflow-hidden ${cardClasses}`}
+              aria-hidden="true"
+            >
+              {/* Window chrome → unmistakably a screenshot, not a control */}
+              <div className="flex items-center gap-2 border-b border-white/5 bg-white/[0.02] px-4 py-2.5">
+                <span className="flex gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
                 </span>
-                <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                <span className="ml-1 truncate text-[11px] font-medium text-zinc-500">
+                  Dashboard preview
+                </span>
+                <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                   Meta connected
                 </span>
               </div>
 
-              <dl className="mt-3.5 space-y-2.5 border-t border-white/5 pt-3.5 text-[13px] sm:mt-4 sm:pt-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-zinc-500">Account</dt>
-                  <dd className="font-mono text-[12px] text-zinc-200">
-                    act_2017486418
-                  </dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-zinc-500">Creative</dt>
-                  <dd className="text-zinc-200">Summer Sale — Video</dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-zinc-500">Audience</dt>
-                  <dd className="text-zinc-200">Visitors, 30d</dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-zinc-500">Budget</dt>
-                  <dd className="text-zinc-200">€10 / day</dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-zinc-500">Launch status</dt>
-                  <dd>
-                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
-                      Paused
-                    </span>
-                  </dd>
-                </div>
-              </dl>
+              <div className="p-4 sm:p-5">
+                <span className="text-[15px] font-semibold tracking-tight text-white sm:text-base">
+                  Audience &amp; budget
+                </span>
 
-              <div className="mt-4 rounded-xl bg-blue-600 px-5 py-3 text-center text-[14px] font-semibold text-white shadow-lg shadow-blue-600/25 sm:mt-5">
-                Launch retargeting campaign
-              </div>
+                <dl className="mt-3.5 space-y-2.5 border-t border-white/5 pt-3.5 text-[13px] sm:mt-4 sm:pt-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-zinc-500">Account</dt>
+                    <dd className="font-mono text-[12px] text-zinc-200">
+                      act_2017486418
+                    </dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-zinc-500">Creative</dt>
+                    <dd className="text-zinc-200">Summer Sale — Video</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-zinc-500">Audience</dt>
+                    <dd className="text-zinc-200">Visitors, 30d</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-zinc-500">Budget</dt>
+                    <dd className="text-zinc-200">€10 / day</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-zinc-500">Launch status</dt>
+                    <dd>
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+                        Paused
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
 
-              {/* Result row — in flow on mobile (no absolute clipping) */}
-              <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-500/[0.07] px-3 py-2 text-[12px] font-medium text-emerald-300">
-                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                Audience + ad set + ad created — paused, €0 spent
+                {/* Tinted, NON-interactive — clearly an illustration of the
+                    in-app control, not a real button on this page */}
+                <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/15 px-5 py-3 text-center text-[14px] font-semibold text-blue-200 sm:mt-5">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m13 2-2 10h6L11 22l2-10H7L13 2z" />
+                  </svg>
+                  Launch retargeting campaign
+                </div>
+
+                {/* Result row — stays in flow on mobile (no absolute clipping) */}
+                <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-500/[0.07] px-3 py-2 text-[12px] font-medium text-emerald-300">
+                  <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                  Audience + ad set + ad created — paused, €0 spent
+                </div>
               </div>
             </div>
-          </div>
+
+            <figcaption className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
+              A preview of the dashboard — the real controls open inside.
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -554,4 +596,3 @@ function FaqItem({ q, a }: { q: string; a: string }) {
     </details>
   );
 }
- 
