@@ -354,7 +354,9 @@ export default function DashboardPage() {
   const [link, setLink] = useState("");
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
-  const [budget, setBudget] = useState(1);
+  // Realistic default — €1 was below a deliverable threshold and forced an edit
+  // on virtually every launch. Validation (min €1) is unchanged.
+  const [budget, setBudget] = useState(10);
   const [days, setDays] = useState(30);
 
   const [loading, setLoading] = useState(false);
@@ -402,6 +404,11 @@ export default function DashboardPage() {
   const normalizedSelectedAdAccountId = selectedAdAccountId.trim()
     ? normalizeAccountId(selectedAdAccountId)
     : "";
+
+  /* When exactly one ad account exists, there is nothing to choose — render it
+     as a static label instead of a dropdown. The auto-select effect still sets
+     selectedAdAccountId, so downstream logic is unaffected. */
+  const singleAdAccount = adAccounts.length === 1 ? adAccounts[0] : null;
 
   function isValidUrl(value: string) {
     try {
@@ -1210,30 +1217,50 @@ export default function DashboardPage() {
       <div className="border-b border-white/5 bg-zinc-900/40">
         <div className="mx-auto max-w-6xl px-5 py-3 sm:px-6">
           <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-            <select
-              id="adAccount"
-              value={selectedAdAccountId}
-              onChange={(e) => {
-                setSelectedAdAccountId(e.target.value);
-                setFormError("");
-                setResult(null);
-              }}
-              className={`${selectClasses} w-full min-w-0 sm:w-auto sm:min-w-[240px] sm:max-w-xs`}
-              disabled={adAccountsLoading}
-              aria-label="Ad account"
-            >
-              <option value="">
-                {adAccountsLoading
-                  ? "Loading ad accounts..."
-                  : "Select an ad account"}
-              </option>
-
-              {adAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name || account.id} ({normalizeAccountId(account.id)})
+            {singleAdAccount ? (
+              /* Single account — nothing to choose, so show a static label */
+              <div
+                className="inline-flex max-w-full items-center gap-2 truncate rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-[14px] text-zinc-200 sm:max-w-xs"
+                title={`${
+                  singleAdAccount.name || singleAdAccount.id
+                } (${normalizeAccountId(singleAdAccount.id)})`}
+                aria-label="Ad account"
+              >
+                <span className="shrink-0 text-zinc-500">Account:</span>
+                <span className="truncate">
+                  {singleAdAccount.name || singleAdAccount.id}
+                </span>
+                <span className="shrink-0 font-mono text-[12px] text-zinc-500">
+                  {normalizeAccountId(singleAdAccount.id)}
+                </span>
+              </div>
+            ) : (
+              <select
+                id="adAccount"
+                value={selectedAdAccountId}
+                onChange={(e) => {
+                  setSelectedAdAccountId(e.target.value);
+                  setFormError("");
+                  setResult(null);
+                }}
+                className={`${selectClasses} w-full min-w-0 sm:w-auto sm:min-w-[240px] sm:max-w-xs`}
+                disabled={adAccountsLoading}
+                aria-label="Ad account"
+              >
+                <option value="">
+                  {adAccountsLoading
+                    ? "Loading ad accounts..."
+                    : "Select an ad account"}
                 </option>
-              ))}
-            </select>
+
+                {adAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name || account.id} (
+                    {normalizeAccountId(account.id)})
+                  </option>
+                ))}
+              </select>
+            )}
 
             <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:contents">
               {selectedAdAccountId ? (
@@ -1286,69 +1313,99 @@ export default function DashboardPage() {
 
         {showTechnicalDetails ? (
           <div className="border-t border-white/5 bg-black/20">
-            <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-5 py-4 sm:grid-cols-2 sm:px-6">
+            <div className="mx-auto max-w-6xl px-5 py-4 sm:px-6">
+              {/* Audience window — moved here so the primary flow is just
+                  creative → budget → review. Default is unchanged (30 days). */}
               <div className="min-w-0">
-                <FieldLabel htmlFor="campaignId">Campaign override</FieldLabel>
+                <FieldLabel htmlFor="days">Who should see your ad?</FieldLabel>
                 <select
-                  id="campaignId"
-                  value={selectedCampaignId}
+                  id="days"
+                  value={days}
                   onChange={(e) => {
-                    setSelectedCampaignId(e.target.value);
+                    setDays(Number(e.target.value));
                     setFormError("");
-                    setResult(null);
                   }}
-                  className={selectClasses}
-                  disabled={campaignsLoading || !selectedAdAccountId}
+                  className={`${selectClasses} sm:max-w-md`}
                 >
-                  <option value="">
-                    {campaignsLoading
-                      ? "Loading campaigns..."
-                      : !selectedAdAccountId
-                        ? "Select an ad account first"
-                        : "Select a campaign"}
+                  <option value={7}>
+                    Hottest audience — visitors from the last 7 days
                   </option>
-
-                  {campaigns.map((campaign) => (
-                    <option key={campaign.id} value={campaign.id}>
-                      {campaign.name} ({campaign.id})
-                      {campaign.status ? ` — ${campaign.status}` : ""}
-                    </option>
-                  ))}
+                  <option value={14}>
+                    Balanced — visitors from the last 14 days
+                  </option>
+                  <option value={30}>
+                    Largest reach — visitors from the last 30 days
+                  </option>
                 </select>
-                {campaignsError && <ErrorNote>{campaignsError}</ErrorNote>}
+                <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
+                  {AUDIENCE_HELPER[days] || AUDIENCE_HELPER[30]}
+                </p>
               </div>
 
-              <div className="min-w-0">
-                <FieldLabel htmlFor="pixelId">Pixel override</FieldLabel>
-                <select
-                  id="pixelId"
-                  value={selectedPixelId}
-                  onChange={(e) => {
-                    setSelectedPixelId(e.target.value);
-                    setFormError("");
-                    setResult(null);
-                  }}
-                  className={selectClasses}
-                  disabled={pixelsLoading || !selectedAdAccountId}
-                >
-                  <option value="">
-                    {pixelsLoading
-                      ? "Loading pixels..."
-                      : !selectedAdAccountId
-                        ? "Select an ad account first"
-                        : "Select a pixel"}
-                  </option>
-
-                  {pixels.map((pixel) => (
-                    <option key={pixel.id} value={pixel.id}>
-                      {pixel.name} ({pixel.id})
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <FieldLabel htmlFor="campaignId">Campaign override</FieldLabel>
+                  <select
+                    id="campaignId"
+                    value={selectedCampaignId}
+                    onChange={(e) => {
+                      setSelectedCampaignId(e.target.value);
+                      setFormError("");
+                      setResult(null);
+                    }}
+                    className={selectClasses}
+                    disabled={campaignsLoading || !selectedAdAccountId}
+                  >
+                    <option value="">
+                      {campaignsLoading
+                        ? "Loading campaigns..."
+                        : !selectedAdAccountId
+                          ? "Select an ad account first"
+                          : "Select a campaign"}
                     </option>
-                  ))}
-                </select>
-                {pixelsError && <ErrorNote>{pixelsError}</ErrorNote>}
-                <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                  Your Facebook Page is selected automatically during launch.
-                </p>
+
+                    {campaigns.map((campaign) => (
+                      <option key={campaign.id} value={campaign.id}>
+                        {campaign.name} ({campaign.id})
+                        {campaign.status ? ` — ${campaign.status}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {campaignsError && <ErrorNote>{campaignsError}</ErrorNote>}
+                </div>
+
+                <div className="min-w-0">
+                  <FieldLabel htmlFor="pixelId">Pixel override</FieldLabel>
+                  <select
+                    id="pixelId"
+                    value={selectedPixelId}
+                    onChange={(e) => {
+                      setSelectedPixelId(e.target.value);
+                      setFormError("");
+                      setResult(null);
+                    }}
+                    className={selectClasses}
+                    disabled={pixelsLoading || !selectedAdAccountId}
+                  >
+                    <option value="">
+                      {pixelsLoading
+                        ? "Loading pixels..."
+                        : !selectedAdAccountId
+                          ? "Select an ad account first"
+                          : "Select a pixel"}
+                    </option>
+
+                    {pixels.map((pixel) => (
+                      <option key={pixel.id} value={pixel.id}>
+                        {pixel.name} ({pixel.id})
+                      </option>
+                    ))}
+                  </select>
+                  {pixelsError && <ErrorNote>{pixelsError}</ErrorNote>}
+                  <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                    Your Facebook Page is selected automatically during launch.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -1622,36 +1679,10 @@ export default function DashboardPage() {
           <aside className="min-w-0 space-y-4 lg:sticky lg:top-[72px]">
             <section className={cardClasses}>
               <h2 className="text-base font-semibold tracking-tight text-white">
-                Audience &amp; budget
+                Budget
               </h2>
 
               <div className="mt-4 grid gap-4">
-                <div>
-                  <FieldLabel htmlFor="days">Who should see your ad?</FieldLabel>
-                  <select
-                    id="days"
-                    value={days}
-                    onChange={(e) => {
-                      setDays(Number(e.target.value));
-                      setFormError("");
-                    }}
-                    className={selectClasses}
-                  >
-                    <option value={7}>
-                      Hottest audience — visitors from the last 7 days
-                    </option>
-                    <option value={14}>
-                      Balanced — visitors from the last 14 days
-                    </option>
-                    <option value={30}>
-                      Largest reach — visitors from the last 30 days
-                    </option>
-                  </select>
-                  <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
-                    {AUDIENCE_HELPER[days] || AUDIENCE_HELPER[30]}
-                  </p>
-                </div>
-
                 <div>
                   <FieldLabel htmlFor="budget">Daily budget</FieldLabel>
                   <div className="relative">
@@ -1694,7 +1725,16 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-zinc-500">Who sees it</dt>
-                  <dd className="text-zinc-200">Last {days} days&apos; visitors</dd>
+                  <dd className="text-right text-zinc-200">
+                    Last {days} days&apos; visitors
+                    <button
+                      type="button"
+                      onClick={() => setShowTechnicalDetails(true)}
+                      className="ml-2 align-baseline text-[12px] font-medium text-blue-400 underline-offset-2 transition hover:underline"
+                    >
+                      Change
+                    </button>
+                  </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-zinc-500">Budget</dt>
