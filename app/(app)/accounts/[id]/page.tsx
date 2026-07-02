@@ -57,11 +57,11 @@ function SpendSparkline({
 }: {
   series: { date: string; spend: number }[];
 }) {
-  const path = useMemo(() => {
+  const paths = useMemo(() => {
     if (series.length < 2) return null;
     const max = Math.max(...series.map((p) => p.spend), 1);
     const w = 100 / (series.length - 1);
-    return series
+    const line = series
       .map(
         (p, i) =>
           `${i === 0 ? "M" : "L"}${(i * w).toFixed(2)},${(
@@ -70,9 +70,10 @@ function SpendSparkline({
           ).toFixed(2)}`
       )
       .join(" ");
+    return { line, area: `${line} L100,36 L0,36 Z` };
   }, [series]);
 
-  if (!path) return null;
+  if (!paths) return null;
 
   return (
     <svg
@@ -88,9 +89,14 @@ function SpendSparkline({
           <stop offset="0" stopColor="#38bdf8" />
           <stop offset="1" stopColor="#3b82f6" />
         </linearGradient>
+        <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#38bdf8" stopOpacity="0.15" />
+          <stop offset="1" stopColor="#38bdf8" stopOpacity="0" />
+        </linearGradient>
       </defs>
+      <path d={paths.area} fill="url(#spark-fill)" stroke="none" />
       <path
-        d={path}
+        d={paths.line}
         fill="none"
         stroke="url(#spark)"
         strokeWidth="1.5"
@@ -230,7 +236,12 @@ export default function AccountPage() {
 
               {data.series.length > 1 && (
                 <div className={`mt-4 ${card} p-4`}>
-                  <p className={eyebrow}>Daily spend</p>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className={eyebrow}>Daily spend</p>
+                    <p className="text-[11px] text-zinc-500">
+                      {PERIOD_LABELS[period]}
+                    </p>
+                  </div>
                   <SpendSparkline series={data.series} />
                 </div>
               )}

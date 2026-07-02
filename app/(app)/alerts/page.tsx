@@ -1,4 +1,5 @@
 import { EmptyState, PageHeader } from "@/components/ui/kit";
+import { BellIcon } from "@/components/ui/icons";
 
 export default function AlertsPage() {
   return (
@@ -9,8 +10,9 @@ export default function AlertsPage() {
       />
       <div className="mt-6">
         <EmptyState
+          icon={<BellIcon className="h-5 w-5" />}
           title="All quiet."
-          description="Spend spikes, CPA deviations, rejected ads, and delivery problems will surface here. This module ships in milestone M6 — it requires the persistence layer for rolling baselines."
+          description="Spend spikes, CPA deviations, rejected ads, and delivery problems will surface here. Shipping in milestone M6."
         />
       </div>
     </div>

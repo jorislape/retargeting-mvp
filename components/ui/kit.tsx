@@ -51,16 +51,23 @@ export function PageHeader({
 }
 
 export function EmptyState({
+  icon,
   title,
   description,
   action,
 }: {
+  icon?: ReactNode;
   title: string;
   description?: string;
   action?: ReactNode;
 }) {
   return (
     <div className={`${card} p-10 text-center`}>
+      {icon && (
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400">
+          {icon}
+        </div>
+      )}
       <p className="text-sm font-medium text-zinc-200">{title}</p>
       {description && (
         <p className="mx-auto mt-1 max-w-md text-sm text-zinc-400">

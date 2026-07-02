@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { StateWrapper } from "@/components/ui/data";
 import { EmptyState, PageHeader, StatusChip } from "@/components/ui/kit";
+import { ArrowIcon } from "@/components/ui/icons";
 import {
   btnPrimary,
   cardCompact,
@@ -105,7 +106,8 @@ export default function HomePage() {
                     {account.currency} · {account.timezone}
                   </p>
                   <p className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-zinc-400 transition group-hover:text-white">
-                    View performance →
+                    View performance
+                    <ArrowIcon className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
                   </p>
                 </Link>
               ))}

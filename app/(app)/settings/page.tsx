@@ -25,11 +25,20 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-zinc-100">Meta Ads</p>
-            <p className="mt-0.5 text-xs text-zinc-500">
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  connected === null
+                    ? "animate-pulse bg-zinc-500"
+                    : connected
+                      ? "bg-emerald-400"
+                      : "bg-amber-400"
+                }`}
+              />
               {connected === null
                 ? "Checking connection…"
                 : connected
-                  ? "Connected. Long-lived session (~60 days)."
+                  ? "Connected — long-lived session (~60 days)."
                   : "Not connected."}
             </p>
           </div>

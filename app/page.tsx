@@ -1,5 +1,14 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/ui/brand";
+import {
+  ArrowIcon,
+  BarChartIcon,
+  BellIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  FileTextIcon,
+  SendIcon,
+} from "@/components/ui/icons";
 
 /* ------------------------------------------------------------------ */
 /*  Design tokens — identical to the app shell (components/ui/theme)   */
@@ -17,49 +26,14 @@ import { LogoMark } from "@/components/ui/brand";
 /* ------------------------------------------------------------------ */
 
 const primaryCta =
-  "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 sm:w-auto";
+  "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 sm:w-auto";
 
 const cardClasses =
   "rounded-2xl border border-white/10 bg-zinc-900/60 shadow-xl shadow-black/20 backdrop-blur";
 
-function CheckIcon({
-  className = "h-4 w-4 text-emerald-400",
-}: {
-  className?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={`shrink-0 ${className}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
-function ArrowIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M5 12h14" />
-      <path d="m12 5 7 7-7 7" />
-    </svg>
-  );
-}
+/* Deterministic "daily spend" bars for the hero preview — an upward
+   month with natural variance, last day accented. Illustration only. */
+const SPEND_BARS = [34, 48, 40, 56, 46, 60, 52, 66, 58, 72, 64, 80, 74, 92];
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -102,7 +76,7 @@ export default function HomePage() {
             </a>
             <Link
               href="/home"
-              className="rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow shadow-blue-600/25 transition hover:bg-blue-500 sm:px-4 sm:text-sm"
+              className="rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow shadow-blue-600/25 transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 sm:px-4 sm:text-sm"
             >
               Open dashboard
             </Link>
@@ -140,8 +114,8 @@ export default function HomePage() {
 
             <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-zinc-400 sm:mt-5 sm:text-lg">
               Connect your ad accounts once. Every client gets a live report
-              link and a scheduled summary you&apos;d be proud to send — and
-              you get pinged before the client notices something broke.
+              link and a scheduled summary — and you get pinged before the
+              client notices something broke.
             </p>
 
             {/* One primary action; secondary is a quiet text link */}
@@ -167,7 +141,7 @@ export default function HomePage() {
               </li>
               <li className="flex items-center gap-1.5">
                 <CheckIcon className="h-3 w-3 text-emerald-400 sm:h-3.5 sm:w-3.5" />
-                First report in two minutes
+                No credit card
               </li>
               <li className="flex items-center gap-1.5">
                 <CheckIcon className="h-3 w-3 text-emerald-400 sm:h-3.5 sm:w-3.5" />
@@ -228,10 +202,6 @@ export default function HomePage() {
                     </dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-zinc-500">Spend</dt>
-                    <dd className="text-zinc-200">€12,480</dd>
-                  </div>
-                  <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-zinc-500">ROAS</dt>
                     <dd className="text-zinc-200">
                       4.2x{" "}
@@ -259,21 +229,33 @@ export default function HomePage() {
                   </div>
                 </dl>
 
+                {/* Mini spend chart — makes the preview read as a live report */}
+                <div className="mt-4 border-t border-white/5 pt-3.5">
+                  <div className="flex items-baseline justify-between gap-3 text-[11px]">
+                    <span className="font-semibold uppercase tracking-wider text-zinc-500">
+                      Daily spend · €12,480
+                    </span>
+                    <span className="text-zinc-500">Jun 1–30</span>
+                  </div>
+                  <div className="mt-2 flex h-10 items-end gap-[3px]">
+                    {SPEND_BARS.map((height, i) => (
+                      <span
+                        key={i}
+                        style={{ height: `${height}%` }}
+                        className={`min-w-0 flex-1 rounded-sm ${
+                          i === SPEND_BARS.length - 1
+                            ? "bg-blue-400"
+                            : "bg-blue-500/30"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
                 {/* Tinted, NON-interactive — clearly an illustration of the
                     in-app control, not a real button on this page */}
                 <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/15 px-5 py-3 text-center text-[14px] font-semibold text-blue-200 sm:mt-5">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M22 2 11 13" />
-                    <path d="M22 2 15 22l-4-9-9-4z" />
-                  </svg>
+                  <SendIcon className="h-4 w-4" />
                   Send report to client
                 </div>
 
@@ -293,12 +275,31 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ====== HOW IT WORKS — moved up: activation before reassurance ====== */}
+      {/* ====== TRUST BAND — honest numbers, no fake logos ====== */}
+      <section className="border-t border-white/5">
+        <div className="mx-auto grid max-w-6xl gap-6 px-5 py-8 sm:grid-cols-3 sm:gap-8 sm:px-6 sm:py-10">
+          <TrustStat
+            value="2 minutes"
+            label="from connecting Meta to your first client report"
+          />
+          <TrustStat
+            value="100% read-only"
+            label="the ads_read scope can't modify campaigns or spend"
+          />
+          <TrustStat
+            value="24/7 monitoring"
+            label="every account checked hourly for anomalies"
+          />
+        </div>
+      </section>
+
+      {/* ====== HOW IT WORKS — activation before reassurance ====== */}
       <section id="how-it-works" className="border-t border-white/5 bg-zinc-900/30">
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
-          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
-            From connect to client-ready in three steps
-          </h2>
+          <SectionHeader
+            kicker="How it works"
+            title="From connect to client-ready in three steps"
+          />
 
           {/* Mobile: vertical timeline · Desktop: three columns */}
           <ol className="relative mt-8 space-y-6 sm:mt-12 sm:grid sm:grid-cols-3 sm:gap-5 sm:space-y-0">
@@ -309,17 +310,17 @@ export default function HomePage() {
             <Step
               number={1}
               title="Connect Meta"
-              text="Secure OAuth login with read-only access — we never see your password. Every ad account you manage is detected automatically."
+              text="Read-only OAuth — no password shared. Every ad account you manage appears automatically."
             />
             <Step
               number={2}
               title="Pick accounts & schedule"
-              text="Choose which ad accounts belong to which client and when each report should go out — weekly, monthly, or on demand."
+              text="Map accounts to clients and set a weekly or monthly delivery schedule per report."
             />
             <Step
               number={3}
               title="Reports run themselves"
-              text="Each client gets a live report link and a scheduled summary. Monitoring watches hourly and pings you when something breaks."
+              text="Clients get a live link and a scheduled summary. Monitoring pings you when something breaks."
             />
           </ol>
 
@@ -335,48 +336,27 @@ export default function HomePage() {
       {/* ====== VALUE / FEATURES ====== */}
       <section className="border-t border-white/5">
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
-          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
-            Client reporting, minus the busywork
-          </h2>
-          <p className="mt-2.5 max-w-xl text-[15px] text-zinc-400 sm:mx-auto sm:mt-3 sm:text-center sm:text-base">
-            For freelance media buyers and small agencies who lose half a day
-            per client to Ads Manager exports and spreadsheets.
-          </p>
+          <SectionHeader
+            kicker="Why AdReports"
+            title="Client reporting, minus the busywork"
+            subtitle="For freelance media buyers and small agencies who lose half a day per client to Ads Manager exports and spreadsheets."
+          />
 
           <div className="mt-8 grid gap-4 sm:mt-12 sm:gap-5 md:grid-cols-3">
             <FeatureCard
-              icon={
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <path d="M14 2v6h6" />
-                  <path d="M16 13H8" />
-                  <path d="M16 17H8" />
-                </svg>
-              }
+              icon={<FileTextIcon className="h-5 w-5" />}
               title="Reports that send themselves"
-              text="A live link plus a scheduled email per client — KPIs, deltas, trends, and a written summary good enough to send unedited."
+              text="A live link and a scheduled email per client — KPIs, deltas, trends, and a summary good enough to send unedited."
             />
             <FeatureCard
-              icon={
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-                </svg>
-              }
+              icon={<BellIcon className="h-5 w-5" />}
               title="Always-on monitoring"
-              text="CPA doubles overnight, an ad gets rejected, a campaign stops delivering — you get pinged before the client notices."
+              text="CPA spikes, rejected ads, delivery drops — you know before the client does."
             />
             <FeatureCard
-              icon={
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 3v18h18" />
-                  <path d="M18 17V9" />
-                  <path d="M13 17V5" />
-                  <path d="M8 17v-3" />
-                </svg>
-              }
+              icon={<BarChartIcon className="h-5 w-5" />}
               title="Meta-native depth"
-              text="Built on Meta's Marketing API directly: real breakdowns, campaign tables, and honest period comparisons — not a generic widget grid."
+              text="Real breakdowns, campaign tables, and honest period comparisons — not a generic widget grid."
             />
           </div>
         </div>
@@ -441,26 +421,24 @@ export default function HomePage() {
       {/* ====== FAQ ====== */}
       <section id="faq" className="border-t border-white/5">
         <div className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-20">
-          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
-            Questions, answered
-          </h2>
+          <SectionHeader kicker="FAQ" title="Questions, answered" />
 
           <div className="mt-7 space-y-3 sm:mt-10">
             <FaqItem
               q="Can this touch my ad accounts?"
-              a="No. AdReports connects with Meta's read-only ads_read permission. It can read performance data; it cannot create, edit, pause, or delete anything in any account."
+              a="No. AdReports uses Meta's read-only ads_read permission — it can read performance data, and nothing else."
             />
             <FaqItem
               q="What do my clients see?"
-              a="A clean live report link — no login, no dashboard training — and, if you schedule it, an emailed summary. Each client only ever sees their own accounts."
+              a="A clean live report link — no login needed — plus an optional scheduled email. Each client only ever sees their own accounts."
             />
             <FaqItem
               q="What do I need to get started?"
-              a="A Meta login with access to your clients' ad accounts. Connect with OAuth, pick the accounts, and your first report view is ready in about two minutes."
+              a="A Meta login with access to your clients' ad accounts. Connect, pick accounts, and your first report is ready in about two minutes."
             />
             <FaqItem
               q="Which platforms are supported?"
-              a="Meta Ads today — Facebook and Instagram, at full native depth. Google Ads is next on the roadmap."
+              a="Meta Ads today — Facebook and Instagram at full native depth. Google Ads is next on the roadmap."
             />
             <FaqItem
               q="What does it cost?"
@@ -496,15 +474,33 @@ export default function HomePage() {
 
       {/* ====== FOOTER ====== */}
       <footer className="border-t border-white/5">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-7 text-sm text-zinc-500 sm:px-6 sm:py-8">
-          <div className="flex items-center gap-2.5">
-            <LogoMark />
-            <span className="font-semibold text-zinc-300">AdReports</span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-              Beta
-            </span>
+        <div className="mx-auto max-w-6xl px-5 py-8 sm:px-6 sm:py-10">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <LogoMark />
+              <span className="text-sm font-semibold text-zinc-300">
+                AdReports
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                Beta
+              </span>
+            </div>
+            <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-zinc-400">
+              <a href="#how-it-works" className="transition hover:text-white">
+                How it works
+              </a>
+              <a href="#safety" className="transition hover:text-white">
+                Account safety
+              </a>
+              <a href="#faq" className="transition hover:text-white">
+                FAQ
+              </a>
+              <Link href="/privacy" className="transition hover:text-white">
+                Privacy
+              </Link>
+            </nav>
           </div>
-          <p className="text-xs">
+          <p className="mt-6 border-t border-white/5 pt-5 text-xs text-zinc-500">
             Built on Meta&apos;s official Marketing API. Not affiliated with
             Meta Platforms, Inc.
           </p>
@@ -517,6 +513,45 @@ export default function HomePage() {
 /* ------------------------------------------------------------------ */
 /*  Section pieces                                                     */
 /* ------------------------------------------------------------------ */
+
+function SectionHeader({
+  kicker,
+  title,
+  subtitle,
+}: {
+  kicker: string;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 sm:text-center">
+        {kicker}
+      </p>
+      <h2 className="mt-2.5 text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
+        {title}
+      </h2>
+      {subtitle && (
+        <p className="mt-2.5 max-w-xl text-[15px] text-zinc-400 sm:mx-auto sm:mt-3 sm:text-center sm:text-base">
+          {subtitle}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TrustStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="sm:text-center">
+      <p className="text-lg font-bold tracking-tight text-white sm:text-xl">
+        {value}
+      </p>
+      <p className="mt-1 text-[13px] leading-relaxed text-zinc-500 sm:text-sm">
+        {label}
+      </p>
+    </div>
+  );
+}
 
 function Step({
   number,
@@ -577,18 +612,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
     <details className="group rounded-xl border border-white/10 bg-zinc-900/60 px-4 py-3.5 transition hover:border-white/20 sm:px-5 sm:py-4">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[14px] font-semibold text-white sm:text-[15px]">
         {q}
-        <svg
-          viewBox="0 0 24 24"
-          className="h-4 w-4 shrink-0 text-zinc-500 transition group-open:rotate-180"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+        <ChevronDownIcon className="h-4 w-4 shrink-0 text-zinc-500 transition group-open:rotate-180" />
       </summary>
       <p className="mt-3 text-[13px] leading-relaxed text-zinc-400 sm:text-sm">{a}</p>
     </details>
