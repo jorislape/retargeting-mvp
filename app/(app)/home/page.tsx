@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { StateWrapper } from "@/components/ui/data";
+import { EmptyState, PageHeader, StatusChip } from "@/components/ui/kit";
+import {
+  btnPrimary,
+  cardCompact,
+  cardHover,
+  skeletonTile,
+} from "@/components/ui/theme";
 
 interface Account {
   externalId: string;
@@ -48,22 +55,12 @@ export default function HomePage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Home</h1>
-          <p className="mt-0.5 text-sm text-zinc-500">
-            All connected ad accounts at a glance.
-          </p>
-        </div>
-        {!connected && !loading && (
-          <a
-            href="/api/meta/oauth/start"
-            className="rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-zinc-950 hover:bg-zinc-200"
-          >
-            Connect Meta
-          </a>
-        )}
-      </div>
+      {/* One primary CTA per viewport (landing rule): the disconnected
+          state below carries the Connect button, so no header action. */}
+      <PageHeader
+        title="Home"
+        subtitle="All connected ad accounts at a glance."
+      />
 
       <div className="mt-6">
         <StateWrapper
@@ -75,55 +72,39 @@ export default function HomePage() {
           skeleton={
             <div className="grid gap-3 sm:grid-cols-2">
               {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-20 animate-pulse rounded-xl bg-white/5"
-                />
+                <div key={i} className={skeletonTile} />
               ))}
             </div>
           }
         >
           {!connected ? (
-            <div className="rounded-xl border border-white/5 bg-white/[0.02] p-10 text-center">
-              <p className="text-sm font-medium text-zinc-200">
-                Connect your Meta account to get started.
-              </p>
-              <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500">
-                Read-only access. Two minutes from connect to your first
-                account overview.
-              </p>
-              <a
-                href="/api/meta/oauth/start"
-                className="mt-5 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-zinc-200"
-              >
-                Connect Meta
-              </a>
-            </div>
+            <EmptyState
+              title="Connect your Meta account to get started."
+              description="Read-only access. Two minutes from connect to your first account overview."
+              action={
+                <a href="/api/meta/oauth/start" className={btnPrimary}>
+                  Connect Meta
+                </a>
+              }
+            />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {accounts.map((account) => (
                 <Link
                   key={account.externalId}
                   href={`/accounts/${encodeURIComponent(account.externalId)}`}
-                  className="group rounded-xl border border-white/5 bg-white/[0.02] p-4 transition-colors hover:border-white/10 hover:bg-white/[0.04]"
+                  className={`group ${cardCompact} ${cardHover} p-4`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="truncate text-sm font-semibold text-zinc-100">
                       {account.name}
                     </p>
-                    <span
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                        account.status === "active"
-                          ? "bg-emerald-400"
-                          : "bg-zinc-600"
-                      }`}
-                      title={account.status}
-                    />
+                    <StatusChip status={account.status} />
                   </div>
                   <p className="mt-1 text-xs text-zinc-500">
                     {account.currency} · {account.timezone}
                   </p>
-                  <p className="mt-3 text-xs font-medium text-zinc-400 group-hover:text-zinc-200">
+                  <p className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-zinc-400 transition group-hover:text-white">
                     View performance →
                   </p>
                 </Link>

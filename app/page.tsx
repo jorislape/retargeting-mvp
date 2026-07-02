@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/ui/brand";
 
 /* ------------------------------------------------------------------ */
 /*  Design tokens — identical to /dashboard                            */
@@ -20,29 +21,6 @@ const primaryCta =
 
 const cardClasses =
   "rounded-2xl border border-white/10 bg-zinc-900/60 shadow-xl shadow-black/20 backdrop-blur";
-
-function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
-  return (
-    <div
-      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20`}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        className="h-4.5 w-4.5 text-white"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-        style={{ height: "55%", width: "55%" }}
-      >
-        <path d="M21 2 13.5 12.5" />
-        <path d="M21 2l-4 20-5-9-9-5 18-6z" />
-      </svg>
-    </div>
-  );
-}
 
 function CheckIcon({
   className = "h-4 w-4 text-emerald-400",
