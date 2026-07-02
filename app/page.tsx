@@ -26,7 +26,10 @@ import {
 /* ------------------------------------------------------------------ */
 
 const primaryCta =
-  "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 sm:w-auto";
+  "group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 sm:w-auto";
+
+const primaryCtaArrow =
+  "h-4 w-4 transition-transform group-hover:translate-x-0.5";
 
 const cardClasses =
   "rounded-2xl border border-white/10 bg-zinc-900/60 shadow-xl shadow-black/20 backdrop-blur";
@@ -98,7 +101,7 @@ export default function HomePage() {
 
         <div className="relative mx-auto grid max-w-6xl gap-0 px-5 pt-10 sm:px-6 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-14 lg:pb-24 lg:pt-24">
           {/* Copy */}
-          <div className="mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
+          <div className="animate-rise mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-[11px] font-medium text-blue-300 sm:py-1.5 sm:text-xs">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
               Read-only · Built on Meta&apos;s official Marketing API
@@ -122,7 +125,7 @@ export default function HomePage() {
             <div className="mt-6 flex flex-col items-start gap-4 sm:mt-8 sm:flex-row sm:items-center">
               <Link href="/home" className={primaryCta}>
                 Connect your Meta account
-                <ArrowIcon />
+                <ArrowIcon className={primaryCtaArrow} />
               </Link>
               <a
                 href="#how-it-works"
@@ -162,7 +165,7 @@ export default function HomePage() {
           /*  the inner "Send report" element is a tinted illustration    */
           /*  (not a solid CTA) so nobody mistakes it for a real button.  */
           /* ----------------------------------------------------------- */}
-          <figure className="relative mx-auto w-full max-w-sm pb-12 sm:pb-16 lg:pb-0">
+          <figure className="animate-rise relative mx-auto w-full max-w-sm pb-12 [animation-delay:120ms] sm:pb-16 lg:pb-0">
             <div
               className="absolute -inset-6 rounded-3xl bg-blue-600/10 blur-2xl sm:-inset-8"
               aria-hidden="true"
@@ -294,7 +297,11 @@ export default function HomePage() {
       </section>
 
       {/* ====== HOW IT WORKS — activation before reassurance ====== */}
-      <section id="how-it-works" className="border-t border-white/5 bg-zinc-900/30">
+      {/* scroll-mt offsets the sticky h-14 header on all anchored sections */}
+      <section
+        id="how-it-works"
+        className="scroll-mt-14 border-t border-white/5 bg-zinc-900/30"
+      >
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
           <SectionHeader
             kicker="How it works"
@@ -327,7 +334,7 @@ export default function HomePage() {
           <div className="mt-8 sm:mt-10 sm:text-center">
             <Link href="/home" className={primaryCta}>
               Try it now
-              <ArrowIcon />
+              <ArrowIcon className={primaryCtaArrow} />
             </Link>
           </div>
         </div>
@@ -363,7 +370,10 @@ export default function HomePage() {
       </section>
 
       {/* ====== ACCOUNT SAFETY ====== */}
-      <section id="safety" className="border-t border-white/5 bg-zinc-900/30">
+      <section
+        id="safety"
+        className="scroll-mt-14 border-t border-white/5 bg-zinc-900/30"
+      >
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
           <div className="grid items-center gap-8 sm:gap-10 lg:grid-cols-2">
             <div>
@@ -419,7 +429,7 @@ export default function HomePage() {
       </section>
 
       {/* ====== FAQ ====== */}
-      <section id="faq" className="border-t border-white/5">
+      <section id="faq" className="scroll-mt-14 border-t border-white/5">
         <div className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-20">
           <SectionHeader kicker="FAQ" title="Questions, answered" />
 
@@ -465,7 +475,7 @@ export default function HomePage() {
             <div className="relative mt-6 sm:mt-8">
               <Link href="/home" className={primaryCta}>
                 Open the dashboard
-                <ArrowIcon />
+                <ArrowIcon className={primaryCtaArrow} />
               </Link>
             </div>
           </div>

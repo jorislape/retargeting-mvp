@@ -45,10 +45,16 @@ export function StateWrapper({
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-6">
-        <p className="text-sm font-medium text-red-300">{error}</p>
+      <div
+        role="alert"
+        className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-6"
+      >
+        <p className="text-sm font-semibold text-red-200">
+          Couldn&apos;t load this data
+        </p>
+        <p className="mt-1 text-sm text-red-300/90">{error}</p>
         {onRetry && (
-          <button onClick={onRetry} className={`mt-3 ${btnSecondary}`}>
+          <button onClick={onRetry} className={`mt-4 ${btnSecondary}`}>
             Retry
           </button>
         )}

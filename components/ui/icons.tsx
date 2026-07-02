@@ -125,6 +125,15 @@ export function BarChartIcon({
   );
 }
 
+export function SearchIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </Icon>
+  );
+}
+
 export function SendIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <Icon className={className}>

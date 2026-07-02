@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, PageHeader } from "@/components/ui/kit";
-import { btnSecondary } from "@/components/ui/theme";
+import { btnSecondaryMd } from "@/components/ui/theme";
 
 export default function SettingsPage() {
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -42,7 +42,7 @@ export default function SettingsPage() {
                   : "Not connected."}
             </p>
           </div>
-          <a href="/api/meta/oauth/start" className={`shrink-0 ${btnSecondary}`}>
+          <a href="/api/meta/oauth/start" className={`shrink-0 ${btnSecondaryMd}`}>
             {connected ? "Reconnect" : "Connect"}
           </a>
         </div>

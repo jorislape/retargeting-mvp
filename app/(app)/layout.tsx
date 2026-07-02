@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import { LogoMark } from "@/components/ui/brand";
 import {
   BarChartIcon,
@@ -36,13 +36,12 @@ function navIconClasses(active: boolean) {
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+    <div className="flex min-h-dvh bg-zinc-950 text-zinc-100 antialiased">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-white/5 bg-zinc-950 sm:flex">
         {/* h-14 brand band mirrors the landing nav and mobile top-bar */}
         <Link
@@ -82,83 +81,55 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex-1 sm:pl-56">
-        {/* Mobile top-bar: the sidebar is hidden below sm, so this is the
-            only nav on phones. Same translucent-blur bar as the landing. */}
+      {/* min-w-0 keeps wide page content (tables, pill rows) scrolling
+          inside its own container instead of stretching the whole pane */}
+      <div className="min-w-0 flex-1 sm:pl-56">
+        {/* Mobile top-bar: brand only. Navigation lives in the bottom tab
+            bar — one tap to anywhere, no hamburger round-trip. */}
         <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-950/80 backdrop-blur sm:hidden">
-          <div className="flex h-14 items-center justify-between px-5">
-            <Link
-              href="/home"
-              className="flex items-center gap-2"
-              onClick={() => setMenuOpen(false)}
-            >
+          <div className="flex h-14 items-center px-5">
+            <Link href="/home" className="flex items-center gap-2">
               <LogoMark size="h-7 w-7" />
               <span className="text-sm font-bold tracking-tight text-white">
                 AdReports
               </span>
             </Link>
-            <button
-              type="button"
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={menuOpen}
-              aria-controls="mobile-nav"
-              onClick={() => setMenuOpen((open) => !open)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                {menuOpen ? (
-                  <>
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M4 7h16" />
-                    <path d="M4 12h16" />
-                    <path d="M4 17h16" />
-                  </>
-                )}
-              </svg>
-            </button>
           </div>
-
-          {menuOpen && (
-            <nav
-              id="mobile-nav"
-              className="flex flex-col gap-0.5 border-t border-white/5 px-3 py-2"
-            >
-              {NAV.map((item) => {
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => setMenuOpen(false)}
-                    className={navLinkClasses(active)}
-                  >
-                    <item.icon className={navIconClasses(active)} />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          )}
         </header>
 
-        <main className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
+        {/* pb-24 reserves space for the fixed bottom tab bar on mobile */}
+        <main className="mx-auto max-w-6xl px-5 py-6 pb-24 sm:px-8 sm:py-8">
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom tab bar — top-level destinations, 44pt+ targets,
+          safe-area padding for gesture-nav devices. */}
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-zinc-950/90 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
+      >
+        <div className="grid grid-cols-4">
+          {NAV.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
+                  active ? "text-white" : "text-zinc-500 active:text-zinc-300"
+                }`}
+              >
+                <item.icon
+                  className={`h-5 w-5 ${active ? "text-blue-400" : ""}`}
+                />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
