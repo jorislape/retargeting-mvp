@@ -9,6 +9,16 @@ import {
   fmtMoney,
   fmtNumber,
 } from "@/components/ui/data";
+import {
+  card,
+  eyebrow,
+  skeletonPanel,
+  skeletonTile,
+  tableHead,
+  tableRow,
+  tableWrap,
+  textLink,
+} from "@/components/ui/theme";
 
 type Period = "last_7d" | "last_14d" | "last_30d" | "this_month";
 
@@ -72,10 +82,17 @@ function SpendSparkline({
       role="img"
       aria-label="Daily spend trend"
     >
+      <defs>
+        {/* sky-400 → blue-500, echoing the landing's hero gradient */}
+        <linearGradient id="spark" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#38bdf8" />
+          <stop offset="1" stopColor="#3b82f6" />
+        </linearGradient>
+      </defs>
       <path
         d={path}
         fill="none"
-        stroke="rgb(56 189 248)"
+        stroke="url(#spark)"
         strokeWidth="1.5"
         vectorEffect="non-scaling-stroke"
       />
@@ -129,24 +146,24 @@ export default function AccountPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href="/home" className="text-xs text-zinc-500 hover:text-zinc-300">
+          <Link href="/home" className={`${textLink} text-xs`}>
             ← All accounts
           </Link>
-          <h1 className="mt-1 text-lg font-bold tracking-tight">
+          <h1 className="mt-1 text-xl font-bold tracking-tight text-white">
             Account performance
           </h1>
           <p className="mt-0.5 font-mono text-xs text-zinc-500">{accountId}</p>
         </div>
 
-        <div className="flex gap-1 rounded-lg border border-white/5 bg-white/[0.02] p-1">
+        <div className="flex gap-1 rounded-lg border border-white/10 bg-zinc-900/60 p-1">
           {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
             <Link
               key={p}
               href={`?period=${p}`}
               className={`rounded-md px-2.5 py-1 text-xs font-medium ${
                 p === period
-                  ? "bg-white/10 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
+                  ? "bg-blue-500/10 text-white"
+                  : "text-zinc-400 transition hover:text-white"
               }`}
             >
               {PERIOD_LABELS[p]}
@@ -166,11 +183,11 @@ export default function AccountPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-20 animate-pulse rounded-xl bg-white/5" />
+                  <div key={i} className={skeletonTile} />
                 ))}
               </div>
-              <div className="h-32 animate-pulse rounded-xl bg-white/5" />
-              <div className="h-64 animate-pulse rounded-xl bg-white/5" />
+              <div className={`${skeletonPanel} h-32`} />
+              <div className={`${skeletonPanel} h-64`} />
             </div>
           }
         >
@@ -212,18 +229,16 @@ export default function AccountPage() {
               </div>
 
               {data.series.length > 1 && (
-                <div className="mt-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                    Daily spend
-                  </p>
+                <div className={`mt-4 ${card} p-4`}>
+                  <p className={eyebrow}>Daily spend</p>
                   <SpendSparkline series={data.series} />
                 </div>
               )}
 
-              <div className="mt-4 overflow-hidden rounded-xl border border-white/5">
+              <div className={`mt-4 ${tableWrap}`}>
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-white/5 bg-white/[0.02] text-left text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                    <tr className={tableHead}>
                       <th className="px-4 py-2.5">Campaign</th>
                       <th className="px-4 py-2.5 text-right">Spend</th>
                       <th className="px-4 py-2.5 text-right">Conv.</th>
@@ -234,10 +249,7 @@ export default function AccountPage() {
                   </thead>
                   <tbody>
                     {data.campaigns.map((c) => (
-                      <tr
-                        key={c.id}
-                        className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]"
-                      >
+                      <tr key={c.id} className={tableRow}>
                         <td className="max-w-xs truncate px-4 py-2.5 font-medium text-zinc-200">
                           {c.name || c.id}
                         </td>

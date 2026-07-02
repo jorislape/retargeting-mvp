@@ -1,6 +1,8 @@
 "use client";
 
 import { ReactNode } from "react";
+import { EmptyState } from "./kit";
+import { btnSecondary, cardCompact, eyebrow, skeletonPanel } from "./theme";
 
 /* ------------------------------------------------------------------ */
 /* StateWrapper: every data surface renders loading / error / empty /  */
@@ -33,8 +35,8 @@ export function StateWrapper({
       <div aria-busy="true">
         {skeleton ?? (
           <div className="space-y-3">
-            <div className="h-24 animate-pulse rounded-xl bg-white/5" />
-            <div className="h-24 animate-pulse rounded-xl bg-white/5" />
+            <div className={`${skeletonPanel} h-24`} />
+            <div className={`${skeletonPanel} h-24`} />
           </div>
         )}
       </div>
@@ -43,13 +45,10 @@ export function StateWrapper({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6">
+      <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-6">
         <p className="text-sm font-medium text-red-300">{error}</p>
         {onRetry && (
-          <button
-            onClick={onRetry}
-            className="mt-3 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-white/10"
-          >
+          <button onClick={onRetry} className={`mt-3 ${btnSecondary}`}>
             Retry
           </button>
         )}
@@ -58,12 +57,7 @@ export function StateWrapper({
   }
 
   if (empty) {
-    return (
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-10 text-center">
-        <p className="text-sm text-zinc-400">{emptyTitle}</p>
-        {emptyAction && <div className="mt-4">{emptyAction}</div>}
-      </div>
-    );
+    return <EmptyState title={emptyTitle} action={emptyAction} />;
   }
 
   return <>{children}</>;
@@ -116,10 +110,8 @@ export function MetricCard({
   invertDelta?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-        {label}
-      </p>
+    <div className={`${cardCompact} p-4`}>
+      <p className={eyebrow}>{label}</p>
       <div className="mt-1.5 flex items-baseline justify-between gap-2">
         <p className="truncate text-xl font-bold tabular-nums text-zinc-50">
           {value}

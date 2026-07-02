@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Card, PageHeader } from "@/components/ui/kit";
+import { btnSecondary } from "@/components/ui/theme";
 
 export default function SettingsPage() {
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -14,12 +16,12 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-lg font-bold tracking-tight">Settings</h1>
-      <p className="mt-0.5 text-sm text-zinc-500">
-        Connections, branding, and workspace.
-      </p>
+      <PageHeader
+        title="Settings"
+        subtitle="Connections, branding, and workspace."
+      />
 
-      <div className="mt-6 max-w-xl rounded-xl border border-white/5 bg-white/[0.02] p-5">
+      <Card className="mt-6 max-w-xl p-5 sm:p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-zinc-100">Meta Ads</p>
@@ -31,16 +33,13 @@ export default function SettingsPage() {
                   : "Not connected."}
             </p>
           </div>
-          <a
-            href="/api/meta/oauth/start"
-            className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-white/10"
-          >
+          <a href="/api/meta/oauth/start" className={`shrink-0 ${btnSecondary}`}>
             {connected ? "Reconnect" : "Connect"}
           </a>
         </div>
-      </div>
+      </Card>
 
-      <div className="mt-3 max-w-xl rounded-xl border border-white/5 bg-white/[0.02] p-5">
+      <Card className="mt-3 max-w-xl p-5 sm:p-6">
         <p className="text-sm font-semibold text-zinc-100">
           Branding &amp; delivery
         </p>
@@ -48,7 +47,7 @@ export default function SettingsPage() {
           Logo, accent color, and report sender settings arrive with the
           Reports module (M4/M7).
         </p>
-      </div>
+      </Card>
     </div>
   );
 }

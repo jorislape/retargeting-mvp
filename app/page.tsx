@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/ui/brand";
 
 /* ------------------------------------------------------------------ */
-/*  Design tokens — identical to /dashboard                            */
+/*  Design tokens — identical to the app shell (components/ui/theme)   */
 /*  bg: zinc-950 · cards: zinc-900/60 + border-white/10                */
 /*  accent: blue-600 · success: emerald · paused: amber                */
 /*                                                                     */
@@ -20,29 +21,6 @@ const primaryCta =
 
 const cardClasses =
   "rounded-2xl border border-white/10 bg-zinc-900/60 shadow-xl shadow-black/20 backdrop-blur";
-
-function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
-  return (
-    <div
-      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20`}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        className="h-4.5 w-4.5 text-white"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-        style={{ height: "55%", width: "55%" }}
-      >
-        <path d="M21 2 13.5 12.5" />
-        <path d="M21 2l-4 20-5-9-9-5 18-6z" />
-      </svg>
-    </div>
-  );
-}
 
 function CheckIcon({
   className = "h-4 w-4 text-emerald-400",
@@ -96,7 +74,7 @@ export default function HomePage() {
           <div className="flex min-w-0 items-center gap-2.5">
             <LogoMark />
             <span className="truncate text-sm font-bold tracking-tight text-white">
-              Meta Retargeting
+              AdReports
             </span>
             <span className="hidden rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 sm:inline">
               Beta
@@ -149,27 +127,27 @@ export default function HomePage() {
           <div className="mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-[11px] font-medium text-blue-300 sm:py-1.5 sm:text-xs">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-              Built on Meta&apos;s official Marketing API
+              Read-only · Built on Meta&apos;s official Marketing API
             </div>
 
             <h1 className="mt-4 text-balance text-[34px] font-bold leading-[1.1] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-[56px] lg:leading-[1.08]">
-              Launch Meta retargeting in{" "}
+              Meta Ads client reports,{" "}
               <span className="bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">
-                under a minute
+                on autopilot
               </span>
               .
             </h1>
 
             <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-zinc-400 sm:mt-5 sm:text-lg">
-              Pick an ad account, reuse a proven creative, set a budget — the
-              custom audience, ad set, and ad are created for you. All paused
-              until you approve.
+              Connect your ad accounts once. Every client gets a live report
+              link and a scheduled summary you&apos;d be proud to send — and
+              you get pinged before the client notices something broke.
             </p>
 
             {/* One primary action; secondary is a quiet text link */}
             <div className="mt-6 flex flex-col items-start gap-4 sm:mt-8 sm:flex-row sm:items-center">
               <Link href="/home" className={primaryCta}>
-                Launch your first campaign
+                Connect your Meta account
                 <ArrowIcon />
               </Link>
               <a
@@ -185,11 +163,11 @@ export default function HomePage() {
             <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-zinc-400 sm:mt-8 sm:gap-x-6 sm:gap-y-2 sm:text-sm">
               <li className="flex items-center gap-1.5">
                 <CheckIcon className="h-3 w-3 text-emerald-400 sm:h-3.5 sm:w-3.5" />
-                Launches paused by default
+                Read-only — can&apos;t touch campaigns
               </li>
               <li className="flex items-center gap-1.5">
                 <CheckIcon className="h-3 w-3 text-emerald-400 sm:h-3.5 sm:w-3.5" />
-                Never touches existing campaigns
+                First report in two minutes
               </li>
               <li className="flex items-center gap-1.5">
                 <CheckIcon className="h-3 w-3 text-emerald-400 sm:h-3.5 sm:w-3.5" />
@@ -207,8 +185,8 @@ export default function HomePage() {
           {/* ----------------------------------------------------------- */
           /*  Product proof — a LABELLED, NON-INTERACTIVE preview.        */
           /*  Window chrome + caption make it read as a screenshot, and   */
-          /*  the inner "Launch" element is a tinted illustration (not a  */
-          /*  solid CTA) so nobody mistakes it for a clickable button.    */
+          /*  the inner "Send report" element is a tinted illustration    */
+          /*  (not a solid CTA) so nobody mistakes it for a real button.  */
           /* ----------------------------------------------------------- */}
           <figure className="relative mx-auto w-full max-w-sm pb-12 sm:pb-16 lg:pb-0">
             <div
@@ -229,7 +207,7 @@ export default function HomePage() {
                   <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
                 </span>
                 <span className="ml-1 truncate text-[11px] font-medium text-zinc-500">
-                  Dashboard preview
+                  Client report preview
                 </span>
                 <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -239,7 +217,7 @@ export default function HomePage() {
 
               <div className="p-4 sm:p-5">
                 <span className="text-[15px] font-semibold tracking-tight text-white sm:text-base">
-                  Audience &amp; budget
+                  Aurora Skincare — June
                 </span>
 
                 <dl className="mt-3.5 space-y-2.5 border-t border-white/5 pt-3.5 text-[13px] sm:mt-4 sm:pt-4">
@@ -250,22 +228,32 @@ export default function HomePage() {
                     </dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-zinc-500">Creative</dt>
-                    <dd className="text-zinc-200">Summer Sale — Video</dd>
+                    <dt className="text-zinc-500">Spend</dt>
+                    <dd className="text-zinc-200">€12,480</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-zinc-500">Audience</dt>
-                    <dd className="text-zinc-200">Visitors, 30d</dd>
+                    <dt className="text-zinc-500">ROAS</dt>
+                    <dd className="text-zinc-200">
+                      4.2x{" "}
+                      <span className="text-[11px] font-medium text-emerald-300">
+                        ▲ 18%
+                      </span>
+                    </dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-zinc-500">Budget</dt>
-                    <dd className="text-zinc-200">€10 / day</dd>
+                    <dt className="text-zinc-500">CPA</dt>
+                    <dd className="text-zinc-200">
+                      €11.20{" "}
+                      <span className="text-[11px] font-medium text-emerald-300">
+                        ▼ 9%
+                      </span>
+                    </dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-zinc-500">Launch status</dt>
+                    <dt className="text-zinc-500">Next report</dt>
                     <dd>
                       <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
-                        Paused
+                        Scheduled · Mon 09:00
                       </span>
                     </dd>
                   </div>
@@ -283,21 +271,23 @@ export default function HomePage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <path d="m13 2-2 10h6L11 22l2-10H7L13 2z" />
+                    <path d="M22 2 11 13" />
+                    <path d="M22 2 15 22l-4-9-9-4z" />
                   </svg>
-                  Launch retargeting campaign
+                  Send report to client
                 </div>
 
                 {/* Result row — stays in flow on mobile (no absolute clipping) */}
                 <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-500/[0.07] px-3 py-2 text-[12px] font-medium text-emerald-300">
                   <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                  Audience + ad set + ad created — paused, €0 spent
+                  Report sent — summary went out unedited
                 </div>
               </div>
             </div>
 
             <figcaption className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
-              A preview of the dashboard — the real controls open inside.
+              A preview of a client report — your clients get it as a live
+              link.
             </figcaption>
           </figure>
         </div>
@@ -307,7 +297,7 @@ export default function HomePage() {
       <section id="how-it-works" className="border-t border-white/5 bg-zinc-900/30">
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
           <h2 className="text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
-            From zero to launched in three steps
+            From connect to client-ready in three steps
           </h2>
 
           {/* Mobile: vertical timeline · Desktop: three columns */}
@@ -319,17 +309,17 @@ export default function HomePage() {
             <Step
               number={1}
               title="Connect Meta"
-              text="Secure OAuth login — we never see your password. Your ad account, campaign, and pixel are detected automatically."
+              text="Secure OAuth login with read-only access — we never see your password. Every ad account you manage is detected automatically."
             />
             <Step
               number={2}
-              title="Pick creative & budget"
-              text="Reuse an existing ad or write a new one, choose the visitor window (7 / 14 / 30 days) and a daily budget."
+              title="Pick accounts & schedule"
+              text="Choose which ad accounts belong to which client and when each report should go out — weekly, monthly, or on demand."
             />
             <Step
               number={3}
-              title="Review & activate"
-              text="The full retargeting structure appears in Ads Manager, paused. Flip it on when you're ready."
+              title="Reports run themselves"
+              text="Each client gets a live report link and a scheduled summary. Monitoring watches hourly and pings you when something breaks."
             />
           </ol>
 
@@ -346,41 +336,47 @@ export default function HomePage() {
       <section className="border-t border-white/5">
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
           <h2 className="text-2xl font-bold tracking-tight text-white sm:text-center sm:text-3xl">
-            Retargeting setup, minus the busywork
+            Client reporting, minus the busywork
           </h2>
           <p className="mt-2.5 max-w-xl text-[15px] text-zinc-400 sm:mx-auto sm:mt-3 sm:text-center sm:text-base">
-            For freelancers, media buyers, and small agencies who build the
-            same retargeting structure for every client.
+            For freelance media buyers and small agencies who lose half a day
+            per client to Ads Manager exports and spreadsheets.
           </p>
 
           <div className="mt-8 grid gap-4 sm:mt-12 sm:gap-5 md:grid-cols-3">
             <FeatureCard
               icon={
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="m13 2-2 10h6L11 22l2-10H7L13 2z" />
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6" />
+                  <path d="M16 13H8" />
+                  <path d="M16 17H8" />
                 </svg>
               }
-              title="One click, three assets"
-              text="Custom audience, ad set, and ad — the exact structure you'd build by hand in Ads Manager, created together in seconds."
+              title="Reports that send themselves"
+              text="A live link plus a scheduled email per client — KPIs, deltas, trends, and a written summary good enough to send unedited."
             />
             <FeatureCard
               icon={
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21 12a9 9 0 1 1-9-9" />
-                  <path d="M21 3v6h-6" />
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
                 </svg>
               }
-              title="Reuse winning creatives"
-              text="Point at an existing ad and its creative is reused for the retargeting audience — with a live Facebook-feed preview before launch."
+              title="Always-on monitoring"
+              text="CPA doubles overnight, an ad gets rejected, a campaign stops delivering — you get pinged before the client notices."
             />
             <FeatureCard
               icon={
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+                  <path d="M3 3v18h18" />
+                  <path d="M18 17V9" />
+                  <path d="M13 17V5" />
+                  <path d="M8 17v-3" />
                 </svg>
               }
-              title="Safe by default"
-              text="Everything launches paused and existing campaigns are never modified. You review and activate in Ads Manager."
+              title="Meta-native depth"
+              text="Built on Meta's Marketing API directly: real breakdowns, campaign tables, and honest period comparisons — not a generic widget grid."
             />
           </div>
         </div>
@@ -395,13 +391,12 @@ export default function HomePage() {
                 Account safety
               </div>
               <h2 className="mt-2.5 text-2xl font-bold tracking-tight text-white sm:mt-3 sm:text-3xl">
-                Your client accounts stay untouched.
+                Read-only. Your client accounts stay untouched.
               </h2>
               <p className="mt-3 max-w-md text-[15px] leading-relaxed text-zinc-400 sm:mt-4 sm:text-base">
-                We know you&apos;re often running someone else&apos;s money.
-                That&apos;s why the tool is read-and-create only — it can&apos;t
-                edit, pause, or delete anything that already exists in the
-                account.
+                You&apos;re running someone else&apos;s money. That&apos;s why
+                AdReports asks Meta for read-only access — it can report on
+                anything and change nothing.
               </p>
             </div>
 
@@ -410,28 +405,30 @@ export default function HomePage() {
                 <li className="flex items-start gap-3">
                   <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
                   <div>
-                    Existing campaigns and ads are never modified
+                    Read-only by design
                     <p className="mt-0.5 text-[13px] text-zinc-500 sm:text-sm">
-                      Only new assets are created, inside a campaign you choose.
+                      The permission we request (ads_read) physically cannot
+                      edit, pause, or delete campaigns.
                     </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
                   <div>
-                    Everything launches in paused status
+                    No surprise spend
                     <p className="mt-0.5 text-[13px] text-zinc-500 sm:text-sm">
-                      Zero spend until you activate it yourself in Ads Manager.
+                      Nothing the tool does can start, stop, or change
+                      spending — ever.
                     </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
                   <div>
-                    Full control stays in Meta
+                    Revoke anytime
                     <p className="mt-0.5 text-[13px] text-zinc-500 sm:text-sm">
-                      Every created asset is visible, editable, and deletable
-                      in Ads Manager.
+                      Disconnect in one click from Settings, or from your Meta
+                      Business security page.
                     </p>
                   </div>
                 </li>
@@ -450,20 +447,24 @@ export default function HomePage() {
 
           <div className="mt-7 space-y-3 sm:mt-10">
             <FaqItem
-              q="Can this break my ad account?"
-              a="No. The tool only creates new assets — a custom audience, an ad set, and an ad — inside a campaign you choose. It never edits or deletes anything that already exists, and everything is created in paused status."
+              q="Can this touch my ad accounts?"
+              a="No. AdReports connects with Meta's read-only ads_read permission. It can read performance data; it cannot create, edit, pause, or delete anything in any account."
             />
             <FaqItem
-              q="Will it start spending money?"
-              a="Not until you say so. Every launch is created paused. You review the setup in Meta Ads Manager and activate it manually."
+              q="What do my clients see?"
+              a="A clean live report link — no login, no dashboard training — and, if you schedule it, an emailed summary. Each client only ever sees their own accounts."
             />
             <FaqItem
               q="What do I need to get started?"
-              a="A Meta ad account with at least one campaign and an active pixel. Connect with OAuth and the dashboard detects the rest automatically."
+              a="A Meta login with access to your clients' ad accounts. Connect with OAuth, pick the accounts, and your first report view is ready in about two minutes."
             />
             <FaqItem
-              q="Who is this for?"
-              a="Freelancers, media buyers, SMMA teams, and small agencies that set up the same website-retargeting structure again and again for clients."
+              q="Which platforms are supported?"
+              a="Meta Ads today — Facebook and Instagram, at full native depth. Google Ads is next on the roadmap."
+            />
+            <FaqItem
+              q="What does it cost?"
+              a="Free during beta. After that, simple per-client pricing — no per-seat fees, no per-connector fees, no five-client minimum."
             />
           </div>
         </div>
@@ -478,11 +479,10 @@ export default function HomePage() {
               aria-hidden="true"
             />
             <h2 className="relative text-balance text-2xl font-bold tracking-tight text-white sm:text-3xl lg:text-4xl">
-              Your next retargeting campaign, one click away.
+              Your next client report is two minutes away.
             </h2>
             <p className="relative mx-auto mt-3 max-w-md text-[15px] text-zinc-400 sm:mt-4 sm:text-base">
-              Free during beta. Launches paused. Nothing spends without your
-              approval.
+              Free during beta. Read-only access. Disconnect anytime.
             </p>
             <div className="relative mt-6 sm:mt-8">
               <Link href="/home" className={primaryCta}>
@@ -499,9 +499,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-7 text-sm text-zinc-500 sm:px-6 sm:py-8">
           <div className="flex items-center gap-2.5">
             <LogoMark />
-            <span className="font-semibold text-zinc-300">
-              Meta Retargeting
-            </span>
+            <span className="font-semibold text-zinc-300">AdReports</span>
             <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
               Beta
             </span>
