@@ -1,3 +1,12 @@
+/**
+ * Per-account config for the FROZEN retargeting module.
+ *
+ * Previously this file hardcoded real pixel/campaign/page IDs in source.
+ * Those have been removed. If the retargeting module is re-enabled, supply
+ * config via the META_ACCOUNT_CONFIG env var as JSON, e.g.:
+ *
+ * META_ACCOUNT_CONFIG='{"act_123":{"pixelId":"1","campaignId":"2","pageId":"3"}}'
+ */
 export type MetaAccountConfig = {
   pixelId: string;
   campaignId: string;
@@ -5,28 +14,25 @@ export type MetaAccountConfig = {
 };
 
 export function normalizeAccountId(adAccountId: string) {
-  return adAccountId.startsWith("act_")
-    ? adAccountId
-    : `act_${adAccountId}`;
+  return adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
 }
 
-/**
- * 🔥 TEMP HARD CODED CONFIG (for MVP testing)
- * Replace values with YOUR real IDs
- */
-const ACCOUNT_CONFIG: Record<string, MetaAccountConfig> = {
-  "act_201748641892516": {
-    pixelId: "799708716173896",
-    campaignId: "120244221374590745",
-    pageId: "548182271709244",
-  },
-};
+function loadConfig(): Record<string, MetaAccountConfig> {
+  const raw = process.env.META_ACCOUNT_CONFIG;
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Record<string, MetaAccountConfig>;
+  } catch {
+    console.error("META_ACCOUNT_CONFIG is not valid JSON; ignoring.");
+    return {};
+  }
+}
 
 export function getAllAccountConfigs() {
-  return ACCOUNT_CONFIG;
+  return loadConfig();
 }
 
 export function getAccountConfig(adAccountId: string) {
   const normalized = normalizeAccountId(adAccountId);
-  return ACCOUNT_CONFIG[normalized] || null;
+  return loadConfig()[normalized] || null;
 }

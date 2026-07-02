@@ -34,8 +34,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const GRAPH = "https://graph.facebook.com/v23.0";
+
   const tokenUrl =
-    `https://graph.facebook.com/v19.0/oauth/access_token` +
+    `${GRAPH}/oauth/access_token` +
     `?client_id=${encodeURIComponent(clientId)}` +
     `&client_secret=${encodeURIComponent(clientSecret)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -55,15 +57,35 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const dashboardUrl = new URL("/dashboard", request.url);
-  const response = NextResponse.redirect(dashboardUrl);
+  // Exchange the short-lived token (~1h) for a long-lived one (~60d).
+  // Without this, every session silently died within the hour.
+  let accessToken: string = tokenData.access_token;
+  let expiresIn: number = tokenData.expires_in ?? 60 * 60;
 
-  response.cookies.set("meta_access_token", tokenData.access_token, {
+  const exchangeUrl =
+    `${GRAPH}/oauth/access_token` +
+    `?grant_type=fb_exchange_token` +
+    `&client_id=${encodeURIComponent(clientId)}` +
+    `&client_secret=${encodeURIComponent(clientSecret)}` +
+    `&fb_exchange_token=${encodeURIComponent(accessToken)}`;
+
+  const exchangeResponse = await fetch(exchangeUrl, { method: "GET" });
+  const exchangeData = await exchangeResponse.json().catch(() => null);
+
+  if (exchangeResponse.ok && exchangeData?.access_token) {
+    accessToken = exchangeData.access_token;
+    expiresIn = exchangeData.expires_in ?? 60 * 60 * 24 * 60;
+  }
+
+  const homeUrl = new URL("/home", request.url);
+  const response = NextResponse.redirect(homeUrl);
+
+  response.cookies.set("meta_access_token", accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: tokenData.expires_in ?? 60 * 60,
+    maxAge: expiresIn,
   });
 
   response.cookies.set("meta_oauth_state", "", {

@@ -123,7 +123,7 @@ export default function HomePage() {
               FAQ
             </a>
             <Link
-              href="/dashboard"
+              href="/home"
               className="rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow shadow-blue-600/25 transition hover:bg-blue-500 sm:px-4 sm:text-sm"
             >
               Open dashboard
@@ -168,7 +168,7 @@ export default function HomePage() {
 
             {/* One primary action; secondary is a quiet text link */}
             <div className="mt-6 flex flex-col items-start gap-4 sm:mt-8 sm:flex-row sm:items-center">
-              <Link href="/dashboard" className={primaryCta}>
+              <Link href="/home" className={primaryCta}>
                 Launch your first campaign
                 <ArrowIcon />
               </Link>
@@ -334,7 +334,7 @@ export default function HomePage() {
           </ol>
 
           <div className="mt-8 sm:mt-10 sm:text-center">
-            <Link href="/dashboard" className={primaryCta}>
+            <Link href="/home" className={primaryCta}>
               Try it now
               <ArrowIcon />
             </Link>
@@ -485,7 +485,7 @@ export default function HomePage() {
               approval.
             </p>
             <div className="relative mt-6 sm:mt-8">
-              <Link href="/dashboard" className={primaryCta}>
+              <Link href="/home" className={primaryCta}>
                 Open the dashboard
                 <ArrowIcon />
               </Link>

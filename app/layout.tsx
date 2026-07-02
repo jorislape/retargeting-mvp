@@ -1,21 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+/*
+ * Fonts: next/font/google (Geist) was removed because it fetches from
+ * Google Fonts at build time, which fails in offline/sandboxed CI and
+ * couples every build to an external service. The CSS variables below keep
+ * the same names, so restoring next/font/google (or vendoring Geist via
+ * next/font/local) is a 5-line revert if you want the exact typeface back.
+ */
 
 export const metadata: Metadata = {
-  title: "Meta Retargeting — launch in under a minute",
+  title: "AdReports — Meta Ads client reporting & monitoring",
   description:
-    "Connect Meta, reuse a proven creative, set a budget — the custom audience, ad set, and ad are created for you, paused until you approve.",
+    "Automated client reports and always-on account monitoring for Meta Ads. Connect once, every client gets a scheduled report with a written summary.",
 };
 
 /* This is the fix for the mobile dashboard rendering at desktop width and
@@ -35,11 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
