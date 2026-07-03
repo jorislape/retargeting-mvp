@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Reveal, SpotlightCard } from "@/components/landing/fx";
 import { LogoMark } from "@/components/ui/brand";
 import {
   ArrowIcon,
@@ -37,6 +38,26 @@ const cardClasses =
 /* Deterministic "daily spend" bars for the hero preview — an upward
    month with natural variance, last day accented. Illustration only. */
 const SPEND_BARS = [34, 48, 40, 56, 46, 60, 52, 66, 58, 72, 64, 80, 74, 92];
+
+/* Example alerts for the monitoring ticker — explicitly labelled as
+   examples in the UI; none of this claims to be live data. */
+const TICKER_ITEMS: { tone: "amber" | "red" | "emerald" | "sky"; text: string }[] = [
+  { tone: "amber", text: "CPA spike +38% — Aurora Skincare" },
+  { tone: "red", text: "Ad rejected — policy review needed" },
+  { tone: "sky", text: "Delivery drop −52% — Retargeting · EU" },
+  { tone: "emerald", text: "ROAS 5.1x — best week this quarter" },
+  { tone: "amber", text: "Spend pacing 120% of daily budget" },
+  { tone: "emerald", text: "CPA recovered — back under target" },
+  { tone: "sky", text: "New ad set live — Prospecting · US" },
+  { tone: "red", text: "Payment issue on ad account" },
+];
+
+const TICKER_DOT: Record<(typeof TICKER_ITEMS)[number]["tone"], string> = {
+  amber: "bg-amber-400",
+  red: "bg-red-400",
+  emerald: "bg-emerald-400",
+  sky: "bg-sky-400",
+};
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -89,9 +110,14 @@ export default function HomePage() {
 
       {/* ====== HERO — one story: copy → CTA → connector → product ====== */}
       <section className="relative">
-        {/* Glow + grid, sized down so they don't inflate mobile height */}
+        {/* Glow + grid, sized down so they don't inflate mobile height.
+            Two counter-drifting aurora blobs; static under reduced motion. */}
         <div
-          className="pointer-events-none absolute -top-32 left-1/2 h-[360px] w-[640px] -translate-x-1/2 rounded-full bg-blue-600/15 blur-3xl sm:h-[520px] sm:w-[880px]"
+          className="animate-drift pointer-events-none absolute -top-32 left-1/2 h-[360px] w-[640px] -translate-x-1/2 rounded-full bg-blue-600/15 blur-3xl sm:h-[520px] sm:w-[880px]"
+          aria-hidden="true"
+        />
+        <div
+          className="animate-drift-2 pointer-events-none absolute -right-24 top-44 hidden h-[380px] w-[560px] rounded-full bg-sky-500/10 blur-3xl lg:block"
           aria-hidden="true"
         />
         <div
@@ -103,13 +129,16 @@ export default function HomePage() {
           {/* Copy */}
           <div className="animate-rise mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none">
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-[11px] font-medium text-blue-300 sm:py-1.5 sm:text-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+              <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75 motion-safe:animate-ping" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-400" />
+              </span>
               Read-only · Built on Meta&apos;s official Marketing API
             </div>
 
             <h1 className="mt-4 text-balance text-[34px] font-bold leading-[1.1] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-[56px] lg:leading-[1.08]">
               Meta Ads client reports,{" "}
-              <span className="bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">
+              <span className="animate-shimmer bg-gradient-to-r from-sky-300 via-blue-500 to-sky-300 bg-clip-text text-transparent">
                 on autopilot
               </span>
               .
@@ -173,9 +202,12 @@ export default function HomePage() {
 
             {/* Entire mock is decorative: no pointer events, no a11y focus */}
             <div
-              className={`relative select-none overflow-hidden ${cardClasses}`}
+              className={`animate-float relative select-none overflow-hidden ${cardClasses}`}
               aria-hidden="true"
             >
+              {/* Light pulse traveling along the top edge — "it's running" */}
+              <span className="animate-beam-x absolute left-0 top-0 h-px w-1/3 bg-gradient-to-r from-transparent via-sky-400/80 to-transparent" />
+
               {/* Window chrome → unmistakably a screenshot, not a control */}
               <div className="flex items-center gap-2 border-b border-white/5 bg-white/[0.02] px-4 py-2.5">
                 <span className="flex gap-1.5">
@@ -244,8 +276,11 @@ export default function HomePage() {
                     {SPEND_BARS.map((height, i) => (
                       <span
                         key={i}
-                        style={{ height: `${height}%` }}
-                        className={`min-w-0 flex-1 rounded-sm ${
+                        style={{
+                          height: `${height}%`,
+                          animationDelay: `${0.35 + i * 0.045}s`,
+                        }}
+                        className={`animate-grow-bar min-w-0 flex-1 rounded-sm ${
                           i === SPEND_BARS.length - 1
                             ? "bg-blue-400"
                             : "bg-blue-500/30"
@@ -262,8 +297,9 @@ export default function HomePage() {
                   Send report to client
                 </div>
 
-                {/* Result row — stays in flow on mobile (no absolute clipping) */}
-                <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-500/[0.07] px-3 py-2 text-[12px] font-medium text-emerald-300">
+                {/* Result row — stays in flow on mobile (no absolute clipping);
+                    arrives ~1.6s after load so the preview tells a story */}
+                <div className="animate-toast-in mt-3 flex items-center justify-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-500/[0.07] px-3 py-2 text-[12px] font-medium text-emerald-300">
                   <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
                   Report sent — summary went out unedited
                 </div>
@@ -281,18 +317,47 @@ export default function HomePage() {
       {/* ====== TRUST BAND — honest numbers, no fake logos ====== */}
       <section className="border-t border-white/5">
         <div className="mx-auto grid max-w-6xl gap-6 px-5 py-8 sm:grid-cols-3 sm:gap-8 sm:px-6 sm:py-10">
-          <TrustStat
-            value="2 minutes"
-            label="from connecting Meta to your first client report"
-          />
-          <TrustStat
-            value="100% read-only"
-            label="the ads_read scope can't modify campaigns or spend"
-          />
-          <TrustStat
-            value="24/7 monitoring"
-            label="every account checked hourly for anomalies"
-          />
+          <Reveal>
+            <TrustStat
+              value="2 minutes"
+              label="from connecting Meta to your first client report"
+            />
+          </Reveal>
+          <Reveal delay={120}>
+            <TrustStat
+              value="100% read-only"
+              label="the ads_read scope can't modify campaigns or spend"
+            />
+          </Reveal>
+          <Reveal delay={240}>
+            <TrustStat
+              value="24/7 monitoring"
+              label="every account checked hourly for anomalies"
+            />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ====== MONITORING TICKER — example alerts, stock-ticker style ====== */}
+      <section className="border-t border-white/5 bg-zinc-900/20">
+        <p className="sr-only">
+          Examples of alerts monitoring surfaces: CPA spikes, rejected ads,
+          delivery drops, budget pacing, and payment issues.
+        </p>
+        <div className="mx-auto flex max-w-6xl items-center gap-5 px-5 py-3.5 sm:px-6">
+          <span className="hidden shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 md:flex">
+            <span className="relative flex h-2 w-2" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 motion-safe:animate-ping" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </span>
+            Monitoring · examples
+          </span>
+          <div className="ticker-wrap min-w-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
+            <div className="animate-ticker flex w-max" aria-hidden="true">
+              <TickerRow />
+              <TickerRow className="ticker-dupe" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -303,10 +368,12 @@ export default function HomePage() {
         className="scroll-mt-14 border-t border-white/5 bg-zinc-900/30"
       >
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
-          <SectionHeader
-            kicker="How it works"
-            title="From connect to client-ready in three steps"
-          />
+          <Reveal>
+            <SectionHeader
+              kicker="How it works"
+              title="From connect to client-ready in three steps"
+            />
+          </Reveal>
 
           {/* Mobile: vertical timeline · Desktop: three columns */}
           <ol className="relative mt-8 space-y-6 sm:mt-12 sm:grid sm:grid-cols-3 sm:gap-5 sm:space-y-0">
@@ -331,40 +398,48 @@ export default function HomePage() {
             />
           </ol>
 
-          <div className="mt-8 sm:mt-10 sm:text-center">
+          <Reveal delay={150} className="mt-8 sm:mt-10 sm:text-center">
             <Link href="/home" className={primaryCta}>
               Try it now
               <ArrowIcon className={primaryCtaArrow} />
             </Link>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* ====== VALUE / FEATURES ====== */}
       <section className="border-t border-white/5">
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
-          <SectionHeader
-            kicker="Why AdReports"
-            title="Client reporting, minus the busywork"
-            subtitle="For freelance media buyers and small agencies who lose half a day per client to Ads Manager exports and spreadsheets."
-          />
+          <Reveal>
+            <SectionHeader
+              kicker="Why AdReports"
+              title="Client reporting, minus the busywork"
+              subtitle="For freelance media buyers and small agencies who lose half a day per client to Ads Manager exports and spreadsheets."
+            />
+          </Reveal>
 
           <div className="mt-8 grid gap-4 sm:mt-12 sm:gap-5 md:grid-cols-3">
-            <FeatureCard
-              icon={<FileTextIcon className="h-5 w-5" />}
-              title="Reports that send themselves"
-              text="A live link and a scheduled email per client — KPIs, deltas, trends, and a summary good enough to send unedited."
-            />
-            <FeatureCard
-              icon={<BellIcon className="h-5 w-5" />}
-              title="Always-on monitoring"
-              text="CPA spikes, rejected ads, delivery drops — you know before the client does."
-            />
-            <FeatureCard
-              icon={<BarChartIcon className="h-5 w-5" />}
-              title="Meta-native depth"
-              text="Real breakdowns, campaign tables, and honest period comparisons — not a generic widget grid."
-            />
+            <Reveal className="h-full">
+              <FeatureCard
+                icon={<FileTextIcon className="h-5 w-5" />}
+                title="Reports that send themselves"
+                text="A live link and a scheduled email per client — KPIs, deltas, trends, and a summary good enough to send unedited."
+              />
+            </Reveal>
+            <Reveal delay={120} className="h-full">
+              <FeatureCard
+                icon={<BellIcon className="h-5 w-5" />}
+                title="Always-on monitoring"
+                text="CPA spikes, rejected ads, delivery drops — you know before the client does."
+              />
+            </Reveal>
+            <Reveal delay={240} className="h-full">
+              <FeatureCard
+                icon={<BarChartIcon className="h-5 w-5" />}
+                title="Meta-native depth"
+                text="Real breakdowns, campaign tables, and honest period comparisons — not a generic widget grid."
+              />
+            </Reveal>
           </div>
         </div>
       </section>
@@ -376,7 +451,7 @@ export default function HomePage() {
       >
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
           <div className="grid items-center gap-8 sm:gap-10 lg:grid-cols-2">
-            <div>
+            <Reveal>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                 Account safety
               </div>
@@ -388,9 +463,9 @@ export default function HomePage() {
                 AdReports asks Meta for read-only access — it can report on
                 anything and change nothing.
               </p>
-            </div>
+            </Reveal>
 
-            <div className={`${cardClasses} p-5 sm:p-6`}>
+            <Reveal delay={150} className={`${cardClasses} p-5 sm:p-6`}>
               <ul className="space-y-4 text-[14px] text-zinc-200 sm:text-[15px]">
                 <li className="flex items-start gap-3">
                   <CheckIcon className="mt-1 h-4 w-4 text-emerald-400" />
@@ -423,7 +498,7 @@ export default function HomePage() {
                   </div>
                 </li>
               </ul>
-            </div>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -431,9 +506,11 @@ export default function HomePage() {
       {/* ====== FAQ ====== */}
       <section id="faq" className="scroll-mt-14 border-t border-white/5">
         <div className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-20">
-          <SectionHeader kicker="FAQ" title="Questions, answered" />
+          <Reveal>
+            <SectionHeader kicker="FAQ" title="Questions, answered" />
+          </Reveal>
 
-          <div className="mt-7 space-y-3 sm:mt-10">
+          <Reveal delay={120} className="mt-7 space-y-3 sm:mt-10">
             <FaqItem
               q="Can this touch my ad accounts?"
               a="No. AdReports uses Meta's read-only ads_read permission — it can read performance data, and nothing else."
@@ -454,14 +531,14 @@ export default function HomePage() {
               q="What does it cost?"
               a="Free during beta. After that, simple per-client pricing — no per-seat fees, no per-connector fees, no five-client minimum."
             />
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* ====== FINAL CTA ====== */}
       <section className="border-t border-white/5">
         <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-20">
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-blue-950/60 to-zinc-900 px-6 py-10 text-center shadow-2xl shadow-black/40 sm:rounded-3xl sm:px-8 sm:py-14">
+          <Reveal className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-blue-950/60 to-zinc-900 px-6 py-10 text-center shadow-2xl shadow-black/40 sm:rounded-3xl sm:px-8 sm:py-14">
             <div
               className="pointer-events-none absolute -top-24 left-1/2 h-64 w-[480px] -translate-x-1/2 rounded-full bg-blue-600/20 blur-3xl"
               aria-hidden="true"
@@ -478,7 +555,7 @@ export default function HomePage() {
                 <ArrowIcon className={primaryCtaArrow} />
               </Link>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -550,6 +627,26 @@ function SectionHeader({
   );
 }
 
+/* One pass of ticker chips. Rendered twice (second copy = .ticker-dupe)
+   so the -50% translate loop is seamless; pr matches the inner gap. */
+function TickerRow({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex items-center gap-3 pr-3 ${className}`}>
+      {TICKER_ITEMS.map((item) => (
+        <span
+          key={item.text}
+          className="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-zinc-300"
+        >
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${TICKER_DOT[item.tone]}`}
+          />
+          {item.text}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function TrustStat({ value, label }: { value: string; label: string }) {
   return (
     <div className="sm:text-center">
@@ -599,7 +696,9 @@ function FeatureCard({
   text: string;
 }) {
   return (
-    <div className={`${cardClasses} p-5 transition hover:border-white/20 sm:p-6`}>
+    <SpotlightCard
+      className={`${cardClasses} h-full p-5 transition hover:border-white/20 sm:p-6`}
+    >
       <div className="flex items-start gap-4 sm:block">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300 sm:h-10 sm:w-10">
           {icon}
@@ -613,7 +712,7 @@ function FeatureCard({
           </p>
         </div>
       </div>
-    </div>
+    </SpotlightCard>
   );
 }
 
