@@ -12,8 +12,14 @@ import { runMonitor } from "@/modules/monitoring";
  * manual/local runs:
  *
  *   curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/monitor
+ *
+ * maxDuration: 60 is the ceiling on Hobby without Fluid Compute —
+ * higher values fail DEPLOYMENT validation (local builds don't check
+ * plan limits). Raise to 300 after enabling Fluid or upgrading to Pro.
+ * A timeout mid-run is safe: job_runs' stale-lock window plus per-day
+ * finding dedupe mean the next scheduled run simply picks up cleanly.
  */
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
