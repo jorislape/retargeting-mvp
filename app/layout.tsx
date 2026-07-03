@@ -1,13 +1,31 @@
 import type { Metadata, Viewport } from "next";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
 /*
- * Fonts: next/font/google (Geist) was removed because it fetches from
- * Google Fonts at build time, which fails in offline/sandboxed CI and
- * couples every build to an external service. The CSS variables below keep
- * the same names, so restoring next/font/google (or vendoring Geist via
- * next/font/local) is a 5-line revert if you want the exact typeface back.
+ * Type system — the aesthetic commitment:
+ *   Space Grotesk  → display (headings, verdicts, big numbers)
+ *   IBM Plex Sans  → body
+ *   IBM Plex Mono  → data labels, eyebrows, numerals in tables
+ * Wired into Tailwind via CSS variables in globals.css (@theme inline),
+ * so `font-display` / `font-sans` / `font-mono` utilities map to them.
  */
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-sg",
+});
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
+});
 
 export const metadata: Metadata = {
   title: "Debrief — Meta Ads creative debrief",
@@ -15,11 +33,6 @@ export const metadata: Metadata = {
     "Upload your Meta Ads CSV and get a decision-first debrief: what worked, what failed, and what to test next. No login, nothing stored.",
 };
 
-/* This is the fix for the mobile dashboard rendering at desktop width and
-   getting cut off. width=device-width + initial-scale=1 tells mobile
-   browsers to use the real device width instead of the ~980px default.
-   No maximumScale / userScalable here on purpose — blocking zoom hurts
-   accessibility. */
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -32,7 +45,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${spaceGrotesk.variable} ${plexSans.variable} ${plexMono.variable}`}
+    >
       <body className="antialiased">{children}</body>
     </html>
   );

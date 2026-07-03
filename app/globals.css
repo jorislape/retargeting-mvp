@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /*
- * The product is dark-only by design, so the body defaults match
- * zinc-950 instead of flashing white before a page-level wrapper
- * paints. Pages that forget to set their own bg inherit the right one.
+ * Dark-only performance-terminal identity. Fonts arrive as CSS
+ * variables from next/font in app/layout.tsx; mapping them in @theme
+ * gives us `font-display`, `font-sans`, `font-mono` utilities.
  */
 :root {
   --background: #09090b;
@@ -13,8 +13,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
-  --font-mono: var(--font-geist-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  --font-sans: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sg), var(--font-plex), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 html {
@@ -30,9 +31,62 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI"), Arial, Helvetica, sans-serif;
+  font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
 ::selection {
   background: rgb(37 99 235 / 0.4);
+}
+
+/* Entrance for report sections and view changes — motion-safe only,
+   transform/opacity only, staggered via inline animation-delay. */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-rise {
+    animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/*
+ * Print = "Save as PDF". The report is the only thing that should
+ * print: chrome is hidden via .print-hidden, and the dark theme is
+ * flattened to ink-on-paper. The universal color override is crude by
+ * design — reliable output beats preserved theming — with win/loss
+ * semantics re-asserted afterwards so the two colors that carry
+ * meaning survive.
+ */
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+  }
+  body * {
+    background: transparent !important;
+    color: #18181b !important;
+    border-color: #d4d4d8 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  body .print-win {
+    color: #047857 !important;
+  }
+  body .print-loss {
+    color: #b91c1c !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
 }

@@ -158,3 +158,35 @@ export function ShieldIcon({ className = "h-4 w-4" }: { className?: string }) {
     </Icon>
   );
 }
+
+export function ZapIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M13 2 4.1 12.7a.5.5 0 0 0 .4.8H11l-1 8.5 8.9-10.7a.5.5 0 0 0-.4-.8H13z" />
+    </Icon>
+  );
+}
+
+export function HelpCircleIcon({
+  className = "h-4 w-4",
+}: {
+  className?: string;
+}) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.1 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
+    </Icon>
+  );
+}
+
+export function PrinterIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M6 9V3h12v6" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" rx="1" />
+    </Icon>
+  );
+}
