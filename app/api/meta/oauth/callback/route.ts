@@ -1,4 +1,105 @@
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
+import {
+  createSession,
+  LEGACY_TOKEN_COOKIE,
+  SESSION_COOKIE,
+  SESSION_TTL_SECONDS,
+} from "@/modules/auth";
+import { metaConnector } from "@/modules/connectors/meta";
+import {
+  connections,
+  encryptToken,
+  getDb,
+  isDbConfigured,
+  memberships,
+  upsertAdAccounts,
+  users,
+  workspaces,
+} from "@/modules/db";
+
+/**
+ * Persist the login: user (keyed by Meta user id) → personal workspace
+ * → encrypted connection token → initial ad-account sync → DB session.
+ * Returns the raw session cookie value.
+ */
+async function persistLogin(
+  accessToken: string,
+  expiresIn: number
+): Promise<string> {
+  const db = getDb();
+
+  const meResponse = await fetch(
+    `https://graph.facebook.com/v23.0/me?fields=id,name&access_token=${encodeURIComponent(accessToken)}`
+  );
+  const me = await meResponse.json();
+  if (!meResponse.ok || !me?.id) {
+    throw new Error("Failed to resolve Meta user identity");
+  }
+
+  const [user] = await db
+    .insert(users)
+    .values({ metaUserId: String(me.id), name: me.name ?? null })
+    .onConflictDoUpdate({
+      target: users.metaUserId,
+      set: { name: me.name ?? null },
+    })
+    .returning();
+
+  let membership = (
+    await db
+      .select()
+      .from(memberships)
+      .where(eq(memberships.userId, user.id))
+      .limit(1)
+  )[0];
+
+  if (!membership) {
+    const [workspace] = await db
+      .insert(workspaces)
+      .values({ name: me.name ? `${me.name}'s workspace` : "Workspace" })
+      .returning();
+    [membership] = await db
+      .insert(memberships)
+      .values({ workspaceId: workspace.id, userId: user.id, role: "owner" })
+      .returning();
+  }
+
+  const [connection] = await db
+    .insert(connections)
+    .values({
+      workspaceId: membership.workspaceId,
+      provider: "meta",
+      metaUserId: String(me.id),
+      tokenCiphertext: encryptToken(accessToken),
+      tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
+      status: "active",
+    })
+    .onConflictDoUpdate({
+      target: [
+        connections.workspaceId,
+        connections.provider,
+        connections.metaUserId,
+      ],
+      set: {
+        tokenCiphertext: encryptToken(accessToken),
+        tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
+        status: "active",
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  // Initial account sync — non-fatal: the monitor run repeats it.
+  try {
+    const accounts = await metaConnector.fetchAdAccounts(accessToken);
+    await upsertAdAccounts(membership.workspaceId, connection.id, accounts);
+  } catch (error) {
+    console.error("oauth callback: initial ad-account sync failed", error);
+  }
+
+  return createSession(user.id);
+}
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -80,19 +181,45 @@ export async function GET(request: NextRequest) {
   const homeUrl = new URL("/home", request.url);
   const response = NextResponse.redirect(homeUrl);
 
-  response.cookies.set("meta_access_token", accessToken, {
+  const cookieBase = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
-    maxAge: expiresIn,
-  });
+  };
+
+  /* New logins: session-id cookie + encrypted DB token. The raw token
+     is written to a cookie ONLY as a fallback when persistence isn't
+     available (no DATABASE_URL / ENCRYPTION_KEY, or a DB outage), so
+     local DB-less dev and existing behavior keep working. */
+  let persisted = false;
+  if (isDbConfigured() && process.env.ENCRYPTION_KEY) {
+    try {
+      const sessionToken = await persistLogin(accessToken, expiresIn);
+      response.cookies.set(SESSION_COOKIE, sessionToken, {
+        ...cookieBase,
+        maxAge: SESSION_TTL_SECONDS,
+      });
+      // Retire the legacy raw-token cookie for this browser.
+      response.cookies.set(LEGACY_TOKEN_COOKIE, "", {
+        ...cookieBase,
+        maxAge: 0,
+      });
+      persisted = true;
+    } catch (error) {
+      console.error("oauth callback: persistence failed, falling back", error);
+    }
+  }
+
+  if (!persisted) {
+    response.cookies.set(LEGACY_TOKEN_COOKIE, accessToken, {
+      ...cookieBase,
+      maxAge: expiresIn,
+    });
+  }
 
   response.cookies.set("meta_oauth_state", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
+    ...cookieBase,
     maxAge: 0,
   });
 

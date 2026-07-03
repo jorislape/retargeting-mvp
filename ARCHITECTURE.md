@@ -60,10 +60,36 @@ Order of work: (1) `users`/`workspaces` + real login (Meta OAuth as identity is 
 
 Then M4 reports (share links, PDF, scheduling, delivery), M5 AI summaries (fact-sheet → Claude, validated output, never blocks report render), M6 alerts (rolling 14-day baselines + status detectors).
 
+## 4b. M2 — persistence + scheduled monitoring (SHIPPED)
+
+Implemented from §4's plan, deliberately scoped down (approved): `insights_daily`, historical sync, and `clients` tables are deferred to M3/M4.
+
+**What exists now:**
+
+- `modules/db/` — Drizzle + Neon (HTTP driver, lazy singleton — the app builds and runs without `DATABASE_URL`; persistence features simply stay off). Schema: `users`, `workspaces`, `memberships`, `sessions`, `connections` (AES-256-GCM-encrypted tokens), `ad_accounts`, `monitor_settings`, `findings`, `job_runs`. Migrations in `drizzle/` (`npm run db:generate` / `db:migrate`, `db:push` for dev).
+- **Identity = Meta OAuth.** The callback upserts the user by Meta user id, auto-creates a personal workspace on first login, encrypts + stores the token, syncs ad accounts, and sets a session-id cookie (`adr_session`, hash stored). **The raw token is no longer written to a cookie for new logins**; the legacy `meta_access_token` cookie is still *read* (`modules/auth.resolveAccessToken`) so pre-M2 sessions keep working until they reconnect. Remove the fallback once design partners have migrated.
+- **OAuth scopes trimmed to `public_profile,ads_read`** (read-only product boundary). Reviving the frozen retargeting module now also requires re-adding its scopes in `app/api/meta/oauth/start`.
+- `modules/monitoring/` — deterministic rules (CPA spike, ROAS drop, spend concentration, spend stopped, account disabled, connection expired) with per-account thresholds (`monitor_settings`, defaults merged in code) + a cadence-agnostic runner: 3-day current vs 14-day baseline windows ending yesterday, findings deduped per (account, rule, day), `job_runs` as run log + crash-safe lock.
+- `GET /api/cron/monitor` — protected by `CRON_SECRET`; scheduled in `vercel.json` (daily 06:00 UTC on Hobby; **hourly = change the schedule string, nothing else**).
+- `GET /api/findings`, `GET|PATCH /api/monitoring/settings` — thin routes over the modules. Alerts page renders the findings feed; Settings gains per-account monitoring toggles + thresholds.
+
+**Local testing:**
+
+```
+1. cp .env.example .env.local and fill META_*, DATABASE_URL, ENCRYPTION_KEY, CRON_SECRET
+2. npm run db:migrate                       # apply schema to Neon
+3. npm run dev → connect Meta from /home    # creates user/workspace/connection rows
+4. curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/monitor
+5. /alerts shows findings; /settings shows per-account thresholds
+```
+
 ## 5. Environment
 
 ```
 META_APP_ID / META_APP_SECRET / META_REDIRECT_URI   # existing
+DATABASE_URL                                         # Neon Postgres (M2)
+ENCRYPTION_KEY                                       # 32-byte base64 — openssl rand -base64 32 (M2)
+CRON_SECRET                                          # protects /api/cron/monitor — openssl rand -hex 32 (M2)
 FEATURE_RETARGETING=false                            # freeze gate (default off)
 META_ACCOUNT_CONFIG={}                               # only if retargeting revived
 ```

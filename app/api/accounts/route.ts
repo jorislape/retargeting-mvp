@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveAccessToken } from "@/modules/auth";
 import { metaConnector } from "@/modules/connectors/meta";
 import { ConnectorError } from "@/modules/connectors/types";
 
 /** GET /api/accounts — connected ad accounts for the current session. */
 export async function GET(request: NextRequest) {
-  const accessToken = request.cookies.get("meta_access_token")?.value;
-  if (!accessToken) {
+  const access = await resolveAccessToken(request);
+  if (!access) {
     return NextResponse.json(
       { ok: false, error: "not_connected" },
       { status: 401 }
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const accounts = await metaConnector.fetchAdAccounts(accessToken);
+    const accounts = await metaConnector.fetchAdAccounts(access.accessToken);
     // The account list changes rarely — let the browser reuse it so
     // navigating back to Home is instant.
     return NextResponse.json(

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveAccessToken } from "@/modules/auth";
 import { metaConnector } from "@/modules/connectors/meta";
 import { ConnectorError } from "@/modules/connectors/types";
 import { PeriodPreset } from "@/modules/metrics";
@@ -25,7 +26,8 @@ const PERIODS: PeriodPreset[] = [
 const CACHE_CONTROL = "private, max-age=120, stale-while-revalidate=600";
 
 export async function GET(request: NextRequest) {
-  const accessToken = request.cookies.get("meta_access_token")?.value;
+  const access = await resolveAccessToken(request);
+  const accessToken = access?.accessToken;
   if (!accessToken) {
     return NextResponse.json(
       { ok: false, error: "not_connected" },

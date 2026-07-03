@@ -14,15 +14,15 @@ export async function GET() {
 
   const state = crypto.randomBytes(16).toString("hex");
 
-  const scope = [
-    "public_profile",
-    "ads_read",
-    "ads_management",
-    "pages_show_list",
-  ].join(",");
+  /* Read-only by design: ads_read only. ads_management and
+     pages_show_list were removed with the retargeting freeze — reviving
+     that module means adding its scopes back here (and re-consent). */
+  const scope = ["public_profile", "ads_read"].join(",");
 
+  // v23.0 matches META_API_VERSION in modules/connectors/meta/client.ts
+  // (the dialog lives on www.facebook.com, so the constant isn't imported).
   const url =
-    `https://www.facebook.com/v19.0/dialog/oauth` +
+    `https://www.facebook.com/v23.0/dialog/oauth` +
     `?client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&state=${encodeURIComponent(state)}` +
