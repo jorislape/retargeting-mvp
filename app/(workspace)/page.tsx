@@ -15,19 +15,19 @@ export default function GeneratorPage() {
 
   return (
     <div>
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <header className="animate-rise flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
           <p className={eyebrow}>Debrief generator</p>
-          <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white sm:text-[28px]">
+          <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-white sm:text-3xl">
             Upload your ads.{" "}
             <span className={gradientText}>Get your next tests.</span>
           </h1>
-          <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-zinc-400">
+          <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-400">
             A decision-first debrief from your Meta Ads CSV — what worked,
             what failed, and what to test next.{" "}
             <Link
               href="/sample"
-              className="font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-white"
+              className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-white hover:decoration-zinc-400 active:text-zinc-300"
             >
               See a sample first
             </Link>
@@ -36,7 +36,7 @@ export default function GeneratorPage() {
         </div>
       </header>
 
-      <div className="mt-6">
+      <div className="animate-rise mt-8" style={{ animationDelay: "90ms" }}>
         <GeneratorPanel />
       </div>
     </div>

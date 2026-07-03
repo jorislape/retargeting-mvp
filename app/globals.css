@@ -5,10 +5,12 @@
  * variables from next/font in app/layout.tsx; mapping them in @theme
  * gives us `font-display`, `font-sans`, `font-mono` utilities.
  *
- * Atmosphere: the canvas is a deep blue-black (never #000) with a
- * fixed radial signal-blue glow behind the content and a faint grid
- * masked toward the top — the original landing's depth, inside the
- * workspace layout. Surfaces sit on top as visibly lighter panels.
+ * Atmosphere: the canvas is a deep blue-black (never #000) lit by a
+ * signal-blue aurora — a wide blue field with a hotter sky-toned core
+ * (the .aurora-core layer, which drifts a few px toward the pointer on
+ * desktop) — plus a faint engineering grid masked toward the top.
+ * Three planes, darkest to lightest: canvas → panel → …and input wells
+ * recess BELOW the panel (panel-deep), so depth reads at a glance.
  */
 :root {
   --background: #0a0e1a;
@@ -20,7 +22,7 @@
   --color-foreground: var(--foreground);
   /* ink = canvas; panel-deep = recessed cells/inputs below surfaces */
   --color-ink: #0a0e1a;
-  --color-panel-deep: #0b101e;
+  --color-panel-deep: #070b16;
   --font-sans: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-sg), var(--font-plex), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
@@ -38,12 +40,12 @@ html {
 
 body {
   background-color: var(--background);
-  /* Signal-blue aurora: one strong glow above the content, one faint
-     counterweight bottom-right. Fixed so scrolling feels like moving
-     over a lit surface rather than dragging the light along. */
+  /* Signal-blue aurora base: one strong glow above the content, one
+     faint counterweight bottom-right. Fixed so scrolling feels like
+     moving over a lit surface rather than dragging the light along. */
   background-image:
-    radial-gradient(1100px 560px at 50% -160px, rgba(37, 99, 235, 0.16), transparent 65%),
-    radial-gradient(900px 700px at 100% 115%, rgba(56, 189, 248, 0.05), transparent 60%);
+    radial-gradient(1300px 640px at 50% -180px, rgba(37, 99, 235, 0.28), transparent 68%),
+    radial-gradient(900px 700px at 100% 115%, rgba(56, 189, 248, 0.06), transparent 60%);
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
@@ -58,26 +60,77 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background-image:
-    linear-gradient(to right, rgba(148, 163, 184, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+    linear-gradient(to right, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, black, transparent 78%);
+}
+
+/* The aurora's hot core — rendered by <AuroraGlow/> so it can drift
+   toward the pointer (transform-only). Pure gradient, no filter: cheap
+   to composite and it never causes layout. */
+.aurora-core {
+  background: radial-gradient(
+    closest-side,
+    rgba(56, 189, 248, 0.22),
+    rgba(37, 99, 235, 0.14) 45%,
+    transparent 72%
+  );
 }
 
 ::selection {
   background: rgb(37 99 235 / 0.4);
 }
 
+/*
+ * On-brand keyboard focus. Components that render their own
+ * focus-visible ring also set outline-none, which wins over this
+ * :where() rule (zero specificity by design) — so every focusable
+ * element gets exactly one blue indicator.
+ */
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid rgb(96 165 250 / 0.8);
+  outline-offset: 2px;
+}
+
+/*
+ * Gradient headline phrase. Hand-rolled instead of Tailwind's
+ * bg-clip-text because Safari still needs the -webkit- prefix for
+ * background-clip: text — without it the phrase renders flat white.
+ */
+.gradient-phrase {
+  background-image: linear-gradient(90deg, #7dd3fc, #38bdf8 45%, #3b82f6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
 /* Entrance for report sections and view changes — motion-safe only,
    transform/opacity only, staggered via inline animation-delay. */
 @media (prefers-reduced-motion: no-preference) {
   .animate-rise {
-    animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   @keyframes rise {
     from {
       opacity: 0;
-      transform: translateY(12px);
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* File-accepted pop: a small settle for the dropzone's success view. */
+  .animate-settle {
+    animation: settle 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @keyframes settle {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
     }
     to {
       opacity: 1;
@@ -111,6 +164,9 @@ body::before {
     box-shadow: none !important;
     text-shadow: none !important;
     backdrop-filter: none !important;
+  }
+  body .gradient-phrase {
+    -webkit-text-fill-color: #18181b !important;
   }
   body .print-win {
     color: #047857 !important;

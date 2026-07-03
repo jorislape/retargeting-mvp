@@ -122,10 +122,10 @@ function TestRow({
           aria-checked={checked}
           aria-label={`Mark test ${index + 1} as queued`}
           onClick={onToggle}
-          className={`print-hidden mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+          className={`print-hidden mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border transition motion-safe:duration-200 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-ink ${
             checked
-              ? "border-blue-400/60 bg-blue-600 text-white"
-              : "border-white/20 bg-white/[0.02] text-transparent hover:border-white/40"
+              ? "border-blue-400/60 bg-blue-600 text-white shadow-[0_0_12px_rgba(59,130,246,0.45)]"
+              : "border-white/20 bg-white/[0.02] text-transparent hover:border-blue-400/50 hover:bg-blue-500/[0.06]"
           }`}
         >
           <CheckIcon className="h-3.5 w-3.5 text-current" />
@@ -197,7 +197,9 @@ export function Report({
     }
   };
 
-  const stagger = (i: number) => ({ animationDelay: `${i * 70}ms` });
+  /* Reveal order: header → verdict → tables → patterns → next tests.
+     90ms steps read as one orchestrated cascade, not scattered pops. */
+  const stagger = (i: number) => ({ animationDelay: `${i * 90}ms` });
 
   return (
     <article>
@@ -208,10 +210,10 @@ export function Report({
             <p className={eyebrow}>
               {variant === "sample" ? "Sample creative debrief" : "Creative debrief"}
             </p>
-            <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white sm:text-[28px]">
+            <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-white sm:text-3xl">
               {memo.scope.product}
             </h1>
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className={chipBlue}>KPI · {memo.scope.kpiLabel}</span>
               {memo.scope.dateRangeLabel && (
                 <span className="font-mono text-[11px] tabular-nums text-zinc-500">
@@ -253,8 +255,8 @@ export function Report({
           </div>
         </div>
 
-        {/* Scope strip */}
-        <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 sm:grid-cols-5">
+        {/* Scope strip — recessed data wells below the page surface */}
+        <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 shadow-[inset_0_2px_6px_rgba(0,0,0,0.35)] sm:grid-cols-5">
           {[
             ["Analyzed", String(memo.scope.adsAnalyzed)],
             ["Judged", String(memo.scope.adsJudged)],
@@ -274,9 +276,9 @@ export function Report({
         </div>
       </header>
 
-      {/* ---- Verdict ---- */}
-      <section className="animate-rise mt-6" style={stagger(1)}>
-        <div className="rounded-2xl border border-blue-400/25 bg-gradient-to-b from-blue-500/[0.13] to-blue-500/[0.04] p-5 shadow-[0_0_48px_-16px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(147,197,253,0.12)] sm:p-6">
+      {/* ---- Verdict: the one surface allowed to bloom ---- */}
+      <section className="animate-rise mt-8" style={stagger(1)}>
+        <div className="rounded-2xl border border-blue-400/30 bg-gradient-to-b from-blue-500/[0.16] to-blue-500/[0.05] p-5 shadow-[0_0_64px_-12px_rgba(59,130,246,0.5),0_20px_48px_-16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(147,197,253,0.18)] sm:p-6">
           <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-300">
             <SparklesIcon className="h-3.5 w-3.5" />
             The verdict
@@ -295,13 +297,19 @@ export function Report({
       </section>
 
       {/* ---- Winners ---- */}
-      <section className="animate-rise mt-7" style={stagger(2)}>
+      <section className="animate-rise mt-8" style={stagger(2)}>
         <SectionLabel>Winners</SectionLabel>
         <div className={`mt-2 ${card} px-4 py-1 sm:px-5`}>
           {memo.winners.length === 0 ? (
-            <p className="py-4 text-sm text-zinc-500">
-              No ad cleared the benchmark by enough to call a winner this period.
-            </p>
+            <div className="my-4 rounded-lg border border-dashed border-white/15 bg-panel-deep/40 px-4 py-6 text-center">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
+                No winners this period
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">
+                No ad cleared the benchmark by enough to call a winner — the
+                next tests below are how you find one.
+              </p>
+            </div>
           ) : (
             <AdTable rows={memo.winners} tone="win" />
           )}
@@ -309,7 +317,7 @@ export function Report({
       </section>
 
       {/* ---- Losers ---- */}
-      <section className="animate-rise mt-7" style={stagger(3)}>
+      <section className="animate-rise mt-8" style={stagger(3)}>
         <SectionLabel>Losers / kill list</SectionLabel>
         <div className={`mt-2 ${card} p-4 sm:p-5`}>
           <p className="text-sm leading-relaxed text-zinc-200">
@@ -327,7 +335,7 @@ export function Report({
       </section>
 
       {/* ---- Patterns ---- */}
-      <section className="animate-rise mt-7" style={stagger(4)}>
+      <section className="animate-rise mt-8" style={stagger(4)}>
         <SectionLabel>Patterns</SectionLabel>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {(
@@ -360,7 +368,7 @@ export function Report({
       </section>
 
       {/* ---- Next tests: an actionable run-list ---- */}
-      <section className="animate-rise mt-7" style={stagger(5)}>
+      <section className="animate-rise mt-8" style={stagger(5)}>
         <div className="flex items-baseline justify-between gap-3">
           <SectionLabel>Next tests — run list</SectionLabel>
           <span className="print-hidden font-mono text-[11px] tabular-nums text-zinc-500">
@@ -383,7 +391,7 @@ export function Report({
       </section>
 
       {/* ---- Confidence ---- */}
-      <section className="animate-rise mt-7" style={stagger(6)}>
+      <section className="animate-rise mt-8" style={stagger(6)}>
         <SectionLabel>Confidence &amp; missing data</SectionLabel>
         <div className={`mt-2 ${card} p-4 sm:p-5`}>
           <span className={`${CONFIDENCE_CHIP[memo.confidence.level]} font-mono`}>

@@ -1,5 +1,11 @@
 import { ShieldIcon } from "@/components/ui/icons";
-import { card, eyebrow, gradientText, iconChip } from "@/components/ui/theme";
+import {
+  card,
+  cardLift,
+  eyebrow,
+  gradientText,
+  iconChip,
+} from "@/components/ui/theme";
 
 export const metadata = {
   title: "Privacy — Debrief",
@@ -25,21 +31,25 @@ const SECTIONS = [
 export default function PrivacyPage() {
   return (
     <div>
-      <header>
+      <header className="animate-rise">
         <p className={eyebrow}>Privacy</p>
-        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white sm:text-[28px]">
+        <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-white sm:text-3xl">
           <span className={gradientText}>Nothing stored.</span> By design,
           not by policy.
         </h1>
-        <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-zinc-400">
+        <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-400">
           The strongest privacy guarantee is architecture: this tool has no
           database, no accounts, and no storage to leak from.
         </p>
       </header>
 
-      <div className="mt-7 space-y-3">
-        {SECTIONS.map((section) => (
-          <section key={section.title} className={`${card} p-5 sm:p-6`}>
+      <div className="mt-8 space-y-3">
+        {SECTIONS.map((section, i) => (
+          <section
+            key={section.title}
+            className={`animate-rise ${card} ${cardLift} p-5 sm:p-6`}
+            style={{ animationDelay: `${90 + i * 90}ms` }}
+          >
             <h2 className="flex items-center gap-2.5 font-display text-[15px] font-semibold text-white">
               {/* Blue, not emerald — green is reserved for win/loss */}
               <span className={`h-7 w-7 shrink-0 ${iconChip}`}>
@@ -54,11 +64,11 @@ export default function PrivacyPage() {
         ))}
       </div>
 
-      <p className="mt-7 text-sm leading-relaxed text-zinc-500">
+      <p className="animate-rise mt-8 text-sm leading-relaxed text-zinc-500" style={{ animationDelay: "360ms" }}>
         Questions? Contact{" "}
         <a
           href="mailto:joris.adomas@gmail.com"
-          className="font-medium text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-white/40"
+          className="rounded-sm font-medium text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-white/40 active:text-zinc-200"
         >
           joris.adomas@gmail.com
         </a>

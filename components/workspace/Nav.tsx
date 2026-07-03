@@ -25,10 +25,10 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-white/[0.07] bg-[#0b0f1c]/80 backdrop-blur md:flex">
+    <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-white/[0.08] bg-gradient-to-b from-[#0d1322]/90 to-[#0a0e1a]/90 shadow-[inset_-1px_0_0_rgba(164,196,255,0.04)] backdrop-blur md:flex">
       <Link
         href="/"
-        className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/5 px-4"
+        className="group flex h-14 shrink-0 items-center gap-2.5 border-b border-white/5 px-4 transition-colors hover:bg-white/[0.03]"
       >
         <LogoMark size="h-7 w-7" />
         <span className="font-display text-[15px] font-bold tracking-tight text-white">
@@ -44,16 +44,23 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
+              className={`group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
                 active
-                  ? "bg-blue-500/10 text-white"
-                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                  ? "bg-blue-500/10 text-white shadow-[inset_0_1px_0_rgba(147,197,253,0.10)]"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200 active:bg-white/[0.07]"
               }`}
             >
+              {/* Active rail: a lit notch on the left edge of the item */}
+              <span
+                aria-hidden="true"
+                className={`absolute -left-px top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)] transition-opacity ${
+                  active ? "opacity-100" : "opacity-0"
+                }`}
+              />
               <item.icon
                 className={`h-4 w-4 shrink-0 transition-colors ${
                   active
-                    ? "text-blue-400"
+                    ? "text-blue-400 drop-shadow-[0_0_6px_rgba(96,165,250,0.6)]"
                     : "text-zinc-500 group-hover:text-zinc-300"
                 }`}
               />
@@ -109,11 +116,24 @@ export function MobileTabBar() {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
+              className={`relative flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
                 active ? "text-white" : "text-zinc-500 active:text-zinc-300"
               }`}
             >
-              <item.icon className={`h-5 w-5 ${active ? "text-blue-400" : ""}`} />
+              {/* Active rail: a lit notch on the tab's top edge */}
+              <span
+                aria-hidden="true"
+                className={`absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)] transition-opacity ${
+                  active ? "opacity-100" : "opacity-0"
+                }`}
+              />
+              <item.icon
+                className={`h-5 w-5 ${
+                  active
+                    ? "text-blue-400 drop-shadow-[0_0_6px_rgba(96,165,250,0.6)]"
+                    : ""
+                }`}
+              />
               {item.label === "How it works" ? "Guide" : item.label === "Sample report" ? "Sample" : item.label}
             </Link>
           );

@@ -5,7 +5,7 @@
 export function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
   return (
     <div
-      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/45 ring-1 ring-white/10`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-[0_4px_16px_rgba(37,99,235,0.55),0_0_24px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-white/15`}
     >
       <svg
         viewBox="0 0 24 24"

@@ -70,11 +70,11 @@ function ProcessingPanel() {
             }`}
           >
             <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold ${
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold transition ${
                 i < step
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]"
                   : i === step
-                    ? "border border-blue-400/60 text-blue-300 motion-safe:animate-pulse"
+                    ? "border border-blue-400/60 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.35)] motion-safe:animate-pulse"
                     : "border border-white/15 text-zinc-600"
               }`}
             >
@@ -136,6 +136,10 @@ export function GeneratorPanel() {
             {/* ---- Left pane: data in ---- */}
             <div>
               <p className={fieldLabel}>01 · Data</p>
+              {/* Dropzone states: rest (recessed well) → drag-over (border
+                  + glow light up, subtle lift) → accepted (solid blue
+                  frame, settle-in). Keyboard focus on the hidden input
+                  lights the same ring via focus-within. */}
               <label
                 htmlFor="csv-input"
                 onDragOver={(e) => {
@@ -148,10 +152,12 @@ export function GeneratorPanel() {
                   setDragging(false);
                   handleFiles(e.dataTransfer.files);
                 }}
-                className={`mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-6 text-center transition ${
+                className={`mt-2.5 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl px-4 py-6 text-center transition focus-within:ring-2 focus-within:ring-blue-400/70 focus-within:ring-offset-2 focus-within:ring-offset-ink motion-safe:duration-200 ${
                   dragging
-                    ? "border-blue-400/60 bg-blue-500/[0.06]"
-                    : "border-white/15 hover:border-white/25 hover:bg-white/[0.02]"
+                    ? "border-2 border-blue-400/80 bg-blue-500/[0.10] shadow-[0_0_36px_-4px_rgba(59,130,246,0.45),inset_0_0_24px_rgba(59,130,246,0.12)] motion-safe:-translate-y-0.5"
+                    : file
+                      ? "animate-settle border-2 border-blue-400/40 bg-blue-500/[0.06] shadow-[0_0_24px_-8px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(147,197,253,0.10)]"
+                      : "border-2 border-dashed border-white/15 bg-panel-deep/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.35)] hover:border-white/30 hover:bg-white/[0.03] active:border-blue-400/50"
                 }`}
               >
                 <input
@@ -164,12 +170,14 @@ export function GeneratorPanel() {
                 />
                 {file ? (
                   <>
-                    <FileTextIcon className="h-5 w-5 text-blue-300" />
-                    <p className="max-w-full truncate px-2 font-mono text-[13px] font-semibold text-zinc-100">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-400/30 bg-blue-500/15 shadow-[0_0_16px_rgba(59,130,246,0.3)]">
+                      <FileTextIcon className="h-4.5 w-4.5 text-blue-300" />
+                    </span>
+                    <p className="mt-1 max-w-full truncate px-2 font-mono text-[13px] font-semibold text-zinc-100">
                       {file.name}
                     </p>
-                    <p className="font-mono text-[11px] text-zinc-500">
-                      {fmtBytes(file.size)}
+                    <p className="font-mono text-[11px] text-blue-300/80">
+                      {fmtBytes(file.size)} · ready
                     </p>
                     <button
                       type="button"
@@ -179,7 +187,7 @@ export function GeneratorPanel() {
                         setFile(null);
                         if (inputRef.current) inputRef.current.value = "";
                       }}
-                      className="mt-0.5 inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-zinc-400 transition hover:text-white"
+                      className="mt-0.5 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white active:text-zinc-300"
                     >
                       <XIcon className="h-3 w-3" />
                       Remove
@@ -187,9 +195,21 @@ export function GeneratorPanel() {
                   </>
                 ) : (
                   <>
-                    <UploadIcon className="h-5 w-5 text-zinc-500" />
-                    <p className="text-[13px] font-semibold text-zinc-200">
-                      Drop your Meta Ads CSV
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                        dragging
+                          ? "border-blue-400/50 bg-blue-500/15 shadow-[0_0_16px_rgba(59,130,246,0.4)]"
+                          : "border-white/10 bg-white/[0.03]"
+                      }`}
+                    >
+                      <UploadIcon
+                        className={`h-4.5 w-4.5 transition-colors ${
+                          dragging ? "text-blue-300" : "text-zinc-500"
+                        }`}
+                      />
+                    </span>
+                    <p className="mt-1 text-[13px] font-semibold text-zinc-200">
+                      {dragging ? "Drop to upload" : "Drop your Meta Ads CSV"}
                     </p>
                     <p className="font-mono text-[11px] text-zinc-500">
                       or click to browse · max 5MB
@@ -198,11 +218,11 @@ export function GeneratorPanel() {
                 )}
               </label>
 
-              <fieldset className="mt-5">
+              <fieldset className="mt-6">
                 <legend className={fieldLabel}>02 · Primary KPI</legend>
                 <div
                   role="group"
-                  className="mt-2 grid grid-cols-3 gap-1.5"
+                  className="mt-2.5 grid grid-cols-3 gap-1.5"
                 >
                   {KPI_OPTIONS.map((opt) => {
                     const active = fields.kpi === opt.value;
@@ -212,10 +232,10 @@ export function GeneratorPanel() {
                         type="button"
                         aria-pressed={active}
                         onClick={() => updateFields({ kpi: opt.value })}
-                        className={`cursor-pointer rounded-lg border px-2 py-2 font-mono text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+                        className={`cursor-pointer rounded-lg border px-2 py-2 font-mono text-xs font-semibold transition motion-safe:duration-200 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-ink ${
                           active
-                            ? "border-blue-400/40 bg-blue-500/10 text-white shadow-[0_0_14px_rgba(59,130,246,0.25)]"
-                            : "border-white/10 bg-white/[0.02] text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                            ? "border-blue-400/60 bg-blue-500/15 text-white shadow-[0_0_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(147,197,253,0.2)]"
+                            : "border-white/10 bg-white/[0.02] text-zinc-400 hover:border-white/25 hover:bg-white/[0.04] hover:text-zinc-200"
                         }`}
                       >
                         {opt.label}
@@ -229,7 +249,7 @@ export function GeneratorPanel() {
             {/* ---- Right pane: context ---- */}
             <div>
               <p className={fieldLabel}>03 · Context</p>
-              <div className="mt-2 space-y-3">
+              <div className="mt-2.5 space-y-3">
                 <div>
                   <label htmlFor="product" className="sr-only">
                     Product / industry (required)
@@ -306,15 +326,15 @@ export function GeneratorPanel() {
             </div>
           </div>
 
-          {/* ---- Action row ---- */}
-          <div className="flex flex-col gap-3 border-t border-white/5 bg-white/[0.02] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          {/* ---- Action row: a recessed footer strip below the panel ---- */}
+          <div className="flex flex-col gap-3 border-t border-white/[0.07] bg-panel-deep/50 px-5 py-4 shadow-[inset_0_1px_4px_rgba(0,0,0,0.25)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-600">
               Parsed in memory · never stored · gone on refresh
             </p>
             <button
               type="submit"
               disabled={!canSubmit}
-              className={`cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${btnPrimary}`}
+              className={`cursor-pointer ${btnPrimary}`}
             >
               Generate debrief
               <ArrowIcon className="h-4 w-4" />
