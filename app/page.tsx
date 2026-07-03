@@ -4,11 +4,10 @@ import { LogoMark } from "@/components/ui/brand";
 import {
   ArrowIcon,
   BarChartIcon,
-  BellIcon,
   CheckIcon,
   ChevronDownIcon,
-  FileTextIcon,
   SendIcon,
+  SparklesIcon,
 } from "@/components/ui/icons";
 
 /* ------------------------------------------------------------------ */
@@ -137,17 +136,17 @@ export default function HomePage() {
             </div>
 
             <h1 className="mt-4 text-balance text-[34px] font-bold leading-[1.1] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-[56px] lg:leading-[1.08]">
-              Meta Ads client reports,{" "}
+              Meta Ads reports that{" "}
               <span className="animate-shimmer bg-gradient-to-r from-sky-300 via-blue-500 to-sky-300 bg-clip-text text-transparent">
-                on autopilot
+                explain themselves
               </span>
               .
             </h1>
 
             <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-zinc-400 sm:mt-5 sm:text-lg">
-              Connect your ad accounts once. Every client gets a live report
-              link and a scheduled summary — and you get pinged before the
-              client notices something broke.
+              Numbers are the easy part. Every client report says what
+              changed, why it changed, and what&apos;s worth testing next —
+              and you get pinged before the client notices something broke.
             </p>
 
             {/* One primary action; secondary is a quiet text link */}
@@ -290,9 +289,21 @@ export default function HomePage() {
                   </div>
                 </div>
 
+                {/* The differentiator: the report interprets itself. */}
+                <div className="mt-4 rounded-lg border border-blue-400/15 bg-blue-500/[0.06] p-3">
+                  <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-blue-300">
+                    <SparklesIcon className="h-3 w-3" />
+                    Summary
+                  </p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-zinc-300">
+                    ROAS climbed 18% as retargeting CPA fell. Prospecting is
+                    still under target — room to scale before efficiency dips.
+                  </p>
+                </div>
+
                 {/* Tinted, NON-interactive — clearly an illustration of the
                     in-app control, not a real button on this page */}
-                <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/15 px-5 py-3 text-center text-[14px] font-semibold text-blue-200 sm:mt-5">
+                <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/15 px-5 py-3 text-center text-[14px] font-semibold text-blue-200">
                   <SendIcon className="h-4 w-4" />
                   Send report to client
                 </div>
@@ -394,7 +405,7 @@ export default function HomePage() {
             <Step
               number={3}
               title="Reports run themselves"
-              text="Clients get a live link and a scheduled summary. Monitoring pings you when something breaks."
+              text="Clients get a live link and a summary that explains the numbers. Monitoring pings you when something breaks."
             />
           </ol>
 
@@ -413,31 +424,31 @@ export default function HomePage() {
           <Reveal>
             <SectionHeader
               kicker="Why AdReports"
-              title="Client reporting, minus the busywork"
-              subtitle="For freelance media buyers and small agencies who lose half a day per client to Ads Manager exports and spreadsheets."
+              title="From numbers to decisions"
+              subtitle="Dashboards show what happened. Clients pay you to know why — and what to do next. That interpretation is the product."
             />
           </Reveal>
 
           <div className="mt-8 grid gap-4 sm:mt-12 sm:gap-5 md:grid-cols-3">
             <Reveal className="h-full">
               <FeatureCard
-                icon={<FileTextIcon className="h-5 w-5" />}
-                title="Reports that send themselves"
-                text="A live link and a scheduled email per client — KPIs, deltas, trends, and a summary good enough to send unedited."
+                icon={<BarChartIcon className="h-5 w-5" />}
+                title="What changed"
+                text="KPIs with honest period comparisons — every number carries its delta, so nothing needs a spreadsheet to spot."
               />
             </Reveal>
             <Reveal delay={120} className="h-full">
               <FeatureCard
-                icon={<BellIcon className="h-5 w-5" />}
-                title="Always-on monitoring"
-                text="CPA spikes, rejected ads, delivery drops — you know before the client does."
+                icon={<SparklesIcon className="h-5 w-5" />}
+                title="Why it changed"
+                text="Auto-analysis connects the movement: efficiency vs scale, which campaigns drove it, where the money shifted."
               />
             </Reveal>
             <Reveal delay={240} className="h-full">
               <FeatureCard
-                icon={<BarChartIcon className="h-5 w-5" />}
-                title="Meta-native depth"
-                text="Real breakdowns, campaign tables, and honest period comparisons — not a generic widget grid."
+                icon={<SendIcon className="h-5 w-5" />}
+                title="What to do next"
+                text="Plain-language summaries and the next test worth running — client-ready, without an afternoon in spreadsheets."
               />
             </Reveal>
           </div>

@@ -20,24 +20,30 @@ export default function AlertsPage() {
           Monitoring is coming in milestone M6
         </h2>
         <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-zinc-400">
-          Every connected account will be checked hourly, and anything that
-          needs your attention surfaces here — before the client notices.
+          Hourly checks on every account become your reminder system —
+          nothing lives only in a chat thread, and nothing slips while
+          you&apos;re heads-down on another client.
         </p>
 
         <ul className="mx-auto mt-6 max-w-xs space-y-2.5 text-left text-[13px] text-zinc-300">
           <li className="flex items-start gap-2.5">
             <CheckIcon className="mt-0.5 h-3.5 w-3.5 text-emerald-400" />
-            Spend spikes and CPA deviations
+            Spend spikes, CPA deviations, delivery drops
           </li>
           <li className="flex items-start gap-2.5">
             <CheckIcon className="mt-0.5 h-3.5 w-3.5 text-emerald-400" />
-            Rejected ads and policy flags
+            Rejected ads and policy flags, the hour they happen
           </li>
           <li className="flex items-start gap-2.5">
             <CheckIcon className="mt-0.5 h-3.5 w-3.5 text-emerald-400" />
-            Delivery drops and paused campaigns
+            Every alert links to the affected account — context in one click
           </li>
         </ul>
+
+        <p className="mx-auto mt-5 max-w-sm text-xs leading-relaxed text-zinc-500">
+          Until then, the Overview flags accounts whose spend moved sharply
+          week over week.
+        </p>
 
         <div className="mt-7">
           <Link href="/home" className={btnSecondaryMd}>

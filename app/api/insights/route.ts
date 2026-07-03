@@ -77,35 +77,40 @@ export async function GET(request: NextRequest) {
     const kpis = summarize(currentDaily);
     const prevKpis = summarize(previousTotals);
 
-    return NextResponse.json({
-      ok: true,
-      period: { preset: periodParam, current, previous },
-      kpis,
-      previousKpis: prevKpis,
-      deltas: {
-        spend: pctChange(kpis.spend, prevKpis.spend),
-        conversions: pctChange(kpis.conversions, prevKpis.conversions),
-        revenue: pctChange(kpis.revenue, prevKpis.revenue),
-        ctr: pctChange(kpis.ctr, prevKpis.ctr),
-        cpm: pctChange(kpis.cpm, prevKpis.cpm),
-        cpa: pctChange(kpis.cpa, prevKpis.cpa),
-        roas: pctChange(kpis.roas, prevKpis.roas),
+    return NextResponse.json(
+      {
+        ok: true,
+        period: { preset: periodParam, current, previous },
+        kpis,
+        previousKpis: prevKpis,
+        deltas: {
+          spend: pctChange(kpis.spend, prevKpis.spend),
+          conversions: pctChange(kpis.conversions, prevKpis.conversions),
+          revenue: pctChange(kpis.revenue, prevKpis.revenue),
+          ctr: pctChange(kpis.ctr, prevKpis.ctr),
+          cpm: pctChange(kpis.cpm, prevKpis.cpm),
+          cpa: pctChange(kpis.cpa, prevKpis.cpa),
+          roas: pctChange(kpis.roas, prevKpis.roas),
+        },
+        series: currentDaily
+          .filter((row) => row.date)
+          .map((row) => ({
+            date: row.date,
+            spend: row.metrics.spend,
+            conversions: row.metrics.conversions,
+          })),
+        campaigns: campaigns
+          .map((row) => ({
+            id: row.entityExternalId,
+            name: row.entityName,
+            ...summarize([row]),
+          }))
+          .sort((a, b) => b.spend - a.spend),
       },
-      series: currentDaily
-        .filter((row) => row.date)
-        .map((row) => ({
-          date: row.date,
-          spend: row.metrics.spend,
-          conversions: row.metrics.conversions,
-        })),
-      campaigns: campaigns
-        .map((row) => ({
-          id: row.entityExternalId,
-          name: row.entityName,
-          ...summarize([row]),
-        }))
-        .sort((a, b) => b.spend - a.spend),
-    });
+      // Periods end yesterday, so a short private cache makes back-nav
+      // instant without ever serving misleading data.
+      { headers: { "Cache-Control": "private, max-age=120, stale-while-revalidate=600" } }
+    );
   } catch (error) {
     if (error instanceof ConnectorError) {
       const status =

@@ -14,7 +14,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const accounts = await metaConnector.fetchAdAccounts(accessToken);
-    return NextResponse.json({ ok: true, accounts });
+    // The account list changes rarely — let the browser reuse it so
+    // navigating back to Home is instant.
+    return NextResponse.json(
+      { ok: true, accounts },
+      { headers: { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" } }
+    );
   } catch (error) {
     if (error instanceof ConnectorError) {
       return NextResponse.json(

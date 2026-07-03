@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/icons";
 
 const NAV = [
-  { href: "/home", label: "Home", icon: BarChartIcon },
+  { href: "/home", label: "Overview", icon: BarChartIcon },
   { href: "/reports", label: "Reports", icon: FileTextIcon },
   { href: "/alerts", label: "Alerts", icon: BellIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },

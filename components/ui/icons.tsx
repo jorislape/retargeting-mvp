@@ -125,6 +125,25 @@ export function BarChartIcon({
   );
 }
 
+export function SparklesIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className} strokeWidth={1.8}>
+      <path d="M12 3.5 13.8 9a2 2 0 0 0 1.2 1.2l5.5 1.8-5.5 1.8a2 2 0 0 0-1.2 1.2L12 20.5 10.2 15a2 2 0 0 0-1.2-1.2L3.5 12 9 10.2A2 2 0 0 0 10.2 9z" />
+      <path d="M19 3v3" />
+      <path d="M20.5 4.5h-3" />
+    </Icon>
+  );
+}
+
+export function RefreshIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" />
+      <path d="M21 3v5h-5" />
+    </Icon>
+  );
+}
+
 export function SearchIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <Icon className={className}>

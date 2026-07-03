@@ -16,6 +16,8 @@ interface StateWrapperProps {
   emptyTitle: string;
   emptyAction?: ReactNode;
   onRetry?: () => void;
+  /** Extra recovery action rendered next to Retry (e.g. a Reconnect link). */
+  errorAction?: ReactNode;
   skeleton?: ReactNode;
   children: ReactNode;
 }
@@ -27,6 +29,7 @@ export function StateWrapper({
   emptyTitle,
   emptyAction,
   onRetry,
+  errorAction,
   skeleton,
   children,
 }: StateWrapperProps) {
@@ -53,10 +56,15 @@ export function StateWrapper({
           Couldn&apos;t load this data
         </p>
         <p className="mt-1 text-sm text-red-300/90">{error}</p>
-        {onRetry && (
-          <button onClick={onRetry} className={`mt-4 ${btnSecondary}`}>
-            Retry
-          </button>
+        {(onRetry || errorAction) && (
+          <div className="mt-4 flex flex-wrap items-center gap-2.5">
+            {errorAction}
+            {onRetry && (
+              <button onClick={onRetry} className={btnSecondary}>
+                Retry
+              </button>
+            )}
+          </div>
         )}
       </div>
     );
@@ -141,6 +149,14 @@ export function fmtMoney(value: number | null, currency: string): string {
     currency,
     maximumFractionDigits: value >= 1000 ? 0 : 2,
   }).format(value);
+}
+
+export function fmtAgo(timestamp: number): string {
+  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.round(minutes / 60)}h ago`;
 }
 
 export function fmtNumber(value: number | null): string {
