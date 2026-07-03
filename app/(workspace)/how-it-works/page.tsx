@@ -5,7 +5,14 @@ import {
   FlaskIcon,
   SparklesIcon,
 } from "@/components/ui/icons";
-import { btnPrimary, btnSecondaryMd, card, eyebrow } from "@/components/ui/theme";
+import {
+  btnPrimary,
+  btnSecondaryMd,
+  card,
+  eyebrow,
+  gradientText,
+  iconChip,
+} from "@/components/ui/theme";
 
 export const metadata = {
   title: "How it works — Debrief",
@@ -65,7 +72,7 @@ export default function HowItWorksPage() {
       <header>
         <p className={eyebrow}>How it works</p>
         <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white sm:text-[28px]">
-          Three steps. No black box.
+          Three steps. <span className={gradientText}>No black box.</span>
         </h1>
         <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-zinc-400">
           Every number in a debrief is computed from your CSV with rules you
@@ -78,7 +85,7 @@ export default function HowItWorksPage() {
         {STEPS.map((step, i) => (
           <li key={step.title} className={`${card} p-5`}>
             <div className="flex items-center justify-between">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-400/20 bg-blue-500/10 text-blue-300">
+              <div className={`h-9 w-9 ${iconChip}`}>
                 <step.icon className="h-4 w-4" />
               </div>
               <span className="font-mono text-[11px] font-semibold tracking-widest text-zinc-600">

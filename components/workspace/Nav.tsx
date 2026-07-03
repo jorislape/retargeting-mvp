@@ -25,7 +25,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-white/5 bg-zinc-950 md:flex">
+    <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-white/[0.07] bg-[#0b0f1c]/80 backdrop-blur md:flex">
       <Link
         href="/"
         className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/5 px-4"
@@ -77,7 +77,7 @@ export function Sidebar() {
 
 export function MobileTopBar() {
   return (
-    <header className="print-hidden sticky top-0 z-30 border-b border-white/5 bg-zinc-950/80 backdrop-blur md:hidden">
+    <header className="print-hidden sticky top-0 z-30 border-b border-white/[0.07] bg-ink/75 backdrop-blur md:hidden">
       <div className="flex h-14 items-center justify-between px-5">
         <Link href="/" className="flex items-center gap-2">
           <LogoMark size="h-7 w-7" />
@@ -99,7 +99,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="print-hidden fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-zinc-950/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="print-hidden fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink/85 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
       <div className="grid grid-cols-4">
         {NAV.map((item) => {

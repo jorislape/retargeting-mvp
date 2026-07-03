@@ -1,5 +1,5 @@
 import { ShieldIcon } from "@/components/ui/icons";
-import { card, eyebrow } from "@/components/ui/theme";
+import { card, eyebrow, gradientText, iconChip } from "@/components/ui/theme";
 
 export const metadata = {
   title: "Privacy — Debrief",
@@ -28,7 +28,8 @@ export default function PrivacyPage() {
       <header>
         <p className={eyebrow}>Privacy</p>
         <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white sm:text-[28px]">
-          Nothing stored. By design, not by policy.
+          <span className={gradientText}>Nothing stored.</span> By design,
+          not by policy.
         </h1>
         <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-zinc-400">
           The strongest privacy guarantee is architecture: this tool has no
@@ -40,8 +41,9 @@ export default function PrivacyPage() {
         {SECTIONS.map((section) => (
           <section key={section.title} className={`${card} p-5 sm:p-6`}>
             <h2 className="flex items-center gap-2.5 font-display text-[15px] font-semibold text-white">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-emerald-400/20 bg-emerald-500/10">
-                <ShieldIcon className="h-3.5 w-3.5 text-emerald-300" />
+              {/* Blue, not emerald — green is reserved for win/loss */}
+              <span className={`h-7 w-7 shrink-0 ${iconChip}`}>
+                <ShieldIcon className="h-3.5 w-3.5" />
               </span>
               {section.title}
             </h2>

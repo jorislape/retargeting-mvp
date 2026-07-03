@@ -4,7 +4,7 @@ import Link from "next/link";
 import { GeneratorPanel } from "@/components/debrief/GeneratorPanel";
 import { Report } from "@/components/debrief/Report";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
-import { eyebrow } from "@/components/ui/theme";
+import { eyebrow, gradientText } from "@/components/ui/theme";
 
 export default function GeneratorPage() {
   const { status, memo, generatedAt, reset } = useDebrief();
@@ -19,7 +19,8 @@ export default function GeneratorPage() {
         <div>
           <p className={eyebrow}>Debrief generator</p>
           <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white sm:text-[28px]">
-            Upload your ads. Get your next tests.
+            Upload your ads.{" "}
+            <span className={gradientText}>Get your next tests.</span>
           </h1>
           <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-zinc-400">
             A decision-first debrief from your Meta Ads CSV — what worked,

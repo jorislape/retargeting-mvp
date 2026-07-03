@@ -262,7 +262,7 @@ export function Report({
             ["Total spend", memo.scope.totalSpendLabel],
             [`Median ${memo.scope.kpiLabel}`, memo.scope.medianLabel],
           ].map(([label, value]) => (
-            <div key={label} className="bg-zinc-950 px-3.5 py-3">
+            <div key={label} className="bg-panel-deep px-3.5 py-3">
               <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
                 {label}
               </p>
@@ -276,7 +276,7 @@ export function Report({
 
       {/* ---- Verdict ---- */}
       <section className="animate-rise mt-6" style={stagger(1)}>
-        <div className="rounded-2xl border border-blue-400/20 bg-blue-500/[0.06] p-5 sm:p-6">
+        <div className="rounded-2xl border border-blue-400/25 bg-gradient-to-b from-blue-500/[0.13] to-blue-500/[0.04] p-5 shadow-[0_0_48px_-16px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(147,197,253,0.12)] sm:p-6">
           <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-300">
             <SparklesIcon className="h-3.5 w-3.5" />
             The verdict

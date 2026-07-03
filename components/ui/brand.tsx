@@ -1,13 +1,11 @@
 /* ------------------------------------------------------------------ */
-/* Brand mark shared by the landing page and the app shell.            */
-/* Moved verbatim from app/page.tsx — render output must stay          */
-/* identical there.                                                    */
+/* Brand mark shared across the workspace shell.                       */
 /* ------------------------------------------------------------------ */
 
 export function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
   return (
     <div
-      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/20`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-blue-500/45 ring-1 ring-white/10`}
     >
       <svg
         viewBox="0 0 24 24"

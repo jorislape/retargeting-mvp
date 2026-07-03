@@ -4,15 +4,23 @@
  * Dark-only performance-terminal identity. Fonts arrive as CSS
  * variables from next/font in app/layout.tsx; mapping them in @theme
  * gives us `font-display`, `font-sans`, `font-mono` utilities.
+ *
+ * Atmosphere: the canvas is a deep blue-black (never #000) with a
+ * fixed radial signal-blue glow behind the content and a faint grid
+ * masked toward the top — the original landing's depth, inside the
+ * workspace layout. Surfaces sit on top as visibly lighter panels.
  */
 :root {
-  --background: #09090b;
+  --background: #0a0e1a;
   --foreground: #fafafa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* ink = canvas; panel-deep = recessed cells/inputs below surfaces */
+  --color-ink: #0a0e1a;
+  --color-panel-deep: #0b101e;
   --font-sans: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-sg), var(--font-plex), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
@@ -29,9 +37,31 @@ html {
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  /* Signal-blue aurora: one strong glow above the content, one faint
+     counterweight bottom-right. Fixed so scrolling feels like moving
+     over a lit surface rather than dragging the light along. */
+  background-image:
+    radial-gradient(1100px 560px at 50% -160px, rgba(37, 99, 235, 0.16), transparent 65%),
+    radial-gradient(900px 700px at 100% 115%, rgba(56, 189, 248, 0.05), transparent 60%);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+/* Faint engineering grid, masked so it lives near the glow and fades
+   before it can compete with content further down. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, black, transparent 78%);
 }
 
 ::selection {
@@ -70,6 +100,9 @@ body {
   }
   body {
     background: #ffffff !important;
+  }
+  body::before {
+    display: none !important;
   }
   body * {
     background: transparent !important;

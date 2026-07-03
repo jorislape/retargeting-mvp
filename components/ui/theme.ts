@@ -1,30 +1,34 @@
 /* ------------------------------------------------------------------ */
-/* Shared class-name constants — the landing page design language      */
-/* (app/page.tsx) applied to the app shell.                            */
-/* bg: zinc-950 · cards: zinc-900/60 + border-white/10                 */
-/* accent: blue-600 · success: emerald · paused: amber                 */
+/* Shared class-name constants — the performance-terminal identity.    */
+/* canvas: ink (#0a0e1a, set in globals) with a fixed radial glow      */
+/* surfaces: navy panels a hair lighter than the canvas, with a soft   */
+/*           drop shadow + a 1px inner top highlight (the "lit edge")  */
+/* accent: signal blue (glow reserved for real actions + the verdict)  */
+/* emerald/red: reserved exclusively for win/loss semantics            */
 /*                                                                     */
-/* Affordance rule (same as landing): SOLID blue = a real, clickable   */
-/* action; tinted blue = a state (active nav item, selected pill).     */
+/* Affordance rule: SOLID/gradient blue = a real, clickable action;    */
+/* tinted blue = a state (active nav item, selected pill).             */
 /* ------------------------------------------------------------------ */
 
-/* Panel card: settings cards, empty states, sparkline, table shell. */
+/* Panel card: a visible surface, not a border-only rectangle. Gradient
+   runs a few percent darker toward the bottom so the panel reads as
+   catching the canvas glow from above. */
 export const card =
-  "rounded-2xl border border-white/10 bg-zinc-900/60 shadow-xl shadow-black/20 backdrop-blur";
+  "rounded-2xl border border-white/10 bg-gradient-to-b from-[#151c31]/95 to-[#0e1424]/95 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur";
 
-/* Border lightens on hover — no bg shift, no lift (landing motion rule). */
+/* Border lightens on hover — no bg shift, no lift. */
 export const cardHover = "transition hover:border-white/20";
 
-/* Compact card: KPI tiles and account cards. Same glass material,
-   xl radius and no shadow/blur — six stacked drop-shadows read bulbous
-   at this density. */
-export const cardCompact = "rounded-xl border border-white/10 bg-zinc-900/60";
+/* Compact card: same material at higher density — inner edge light
+   only, no drop shadow (stacked shadows read bulbous in grids). */
+export const cardCompact =
+  "rounded-xl border border-white/10 bg-gradient-to-b from-[#141a2d]/90 to-[#0f1526]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]";
 
 export const btnPrimary =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60";
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-blue-500 to-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/40 transition hover:from-blue-400 hover:to-blue-500 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60";
 
 export const btnPrimarySm =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow shadow-blue-600/25 transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60";
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-blue-500 to-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow shadow-blue-600/40 transition hover:from-blue-400 hover:to-blue-500 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60";
 
 export const btnSecondary =
   "inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-white/20 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60";
@@ -40,11 +44,22 @@ export const textLink =
 export const eyebrow =
   "font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500";
 
+/* Inputs recess below the panel surface: darker than the card, subtle
+   inner shadow, glow only on focus. */
 export const inputBase =
-  "w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-blue-400/40 focus:outline-none focus:ring-2 focus:ring-blue-400/30";
+  "w-full rounded-lg border border-white/10 bg-panel-deep/80 px-3 py-2 text-sm text-zinc-100 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] placeholder:text-zinc-600 focus:border-blue-400/40 focus:outline-none focus:ring-2 focus:ring-blue-400/30";
 
 export const fieldLabel =
   "font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500";
+
+/* Gradient headline treatment — the original hero's sky→blue clip,
+   for the key phrase of a page h1 (one per page, max). */
+export const gradientText =
+  "bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent";
+
+/* Accent icon chip for section tiles: tinted gradient + faint glow. */
+export const iconChip =
+  "flex items-center justify-center rounded-lg border border-blue-400/25 bg-gradient-to-br from-blue-500/25 to-blue-600/5 text-blue-300 shadow-[0_0_16px_rgba(59,130,246,0.15)]";
 
 export const chipBlue =
   "inline-flex items-center gap-1.5 rounded-full border border-blue-400/25 bg-blue-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-blue-300";
@@ -63,7 +78,7 @@ export const chipRed =
 
 /* Skeletons mimic the card material they stand in for. */
 export const skeletonTile =
-  "h-20 animate-pulse rounded-xl border border-white/10 bg-zinc-900/60";
+  "h-20 animate-pulse rounded-xl border border-white/10 bg-[#121829]/70";
 
 export const skeletonPanel =
-  "animate-pulse rounded-2xl border border-white/10 bg-zinc-900/60";
+  "animate-pulse rounded-2xl border border-white/10 bg-[#121829]/70";

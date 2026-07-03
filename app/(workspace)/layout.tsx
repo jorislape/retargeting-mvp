@@ -12,7 +12,8 @@ import { MobileTabBar, MobileTopBar, Sidebar } from "@/components/workspace/Nav"
 export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   return (
     <DebriefProvider>
-      <div className="flex min-h-dvh bg-zinc-950 text-zinc-100 antialiased">
+      {/* No bg here — the body provides the ink canvas + radial glow */}
+      <div className="flex min-h-dvh text-zinc-100 antialiased">
         <Sidebar />
         <div className="min-w-0 flex-1 md:pl-56">
           <MobileTopBar />

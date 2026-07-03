@@ -214,7 +214,7 @@ export function GeneratorPanel() {
                         onClick={() => updateFields({ kpi: opt.value })}
                         className={`cursor-pointer rounded-lg border px-2 py-2 font-mono text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
                           active
-                            ? "border-blue-400/40 bg-blue-500/10 text-white"
+                            ? "border-blue-400/40 bg-blue-500/10 text-white shadow-[0_0_14px_rgba(59,130,246,0.25)]"
                             : "border-white/10 bg-white/[0.02] text-zinc-400 hover:border-white/20 hover:text-zinc-200"
                         }`}
                       >
