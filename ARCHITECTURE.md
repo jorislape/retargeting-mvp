@@ -1,99 +1,130 @@
-# Architecture & Technical Audit
+# Architecture
 
-Pivot: **retargeting automation → Meta Ads client reporting & monitoring platform.**
-Full product rationale, IA, and roadmap live in `product-spec.md` (companion doc).
+Pivot: **Meta Ads reporting/monitoring SaaS → Meta Ads Creative Debrief, a single-flow CSV tool.**
 
-## 1. Audit findings (state of the repo before this restructure)
+## 1. What changed
 
-| Area | Finding | Verdict |
-|---|---|---|
-| Auth/session | Short-lived Meta token stored raw in an httpOnly cookie; **no long-lived exchange**, so every session died within ~1 hour. No user accounts. | Fixed (long-lived exchange added). User accounts required at M-persist. |
-| Persistence | **None.** No database, no state. All 20 routes are stateless Graph API proxies. | Blocker for scheduled reports/alerts — see §4. |
-| Secrets | `lib/meta/account-config.ts` hardcoded real pixel/campaign/page IDs in source. | Purged; env-driven now. |
-| API client | Same fetch/error boilerplate copy-pasted across ~20 routes; API version inconsistent (v19 in OAuth, v23 elsewhere); no retry/rate-limit handling. | Replaced by `modules/connectors/meta/client.ts`. |
-| OAuth scopes | Already includes `ads_read` (all the pivot needs) plus `ads_management` (only retargeting needs). | Consider dropping `ads_management` from the scope request until the module returns — lighter App Review, less scary consent screen. |
-| UI | Landing page: solid dark design language, kept. Dashboard: single 2,132-line client component, ~35 `useState` hooks — retargeting-specific. | Dashboard frozen, not refactored. Design language carried into the new shell. |
-| Quality | 18 lint errors (all in retargeting files), `any` throughout API routes, no tests, no CI. | Frozen files excluded from lint (documented in `eslint.config.mjs`); new code is strict-clean. |
-| Debug | `/api/meta/debug-env` exposed env presence info. | Deleted. |
+The repo previously held a reporting/monitoring product: Meta OAuth,
+Postgres (Drizzle + Neon), encrypted token storage, a scheduled
+monitoring cron, an account dashboard, alerts, settings, and a frozen
+retargeting-automation module underneath all of that.
 
-**Honest reuse tally:** OAuth flow (kept, upgraded), Graph API call patterns (harvested into the connector), landing page + design idioms (kept), retargeting business logic (~2,600 lines: frozen). The prior framing of "existing backend + dashboard" overstated reusability — the backend was stateless glue and the dashboard was single-purpose. That's not a criticism of the MVP (it did its job: proving the API integration); it just sets expectations for what "reuse" means.
+**All of it was removed, not frozen.** The v1 scope fence for this
+product is explicit: no auth, no user accounts, no database or
+persistent storage of any kind, no saved history, no billing, no team
+workspaces, no analytics dashboards. If a future version needs any of
+that, it's a new, explicit milestone — not something to quietly carry
+forward "just in case." Concretely, this pivot deleted:
 
-## 2. What changed in this restructure
+- `app/(app)/*` (the account dashboard: home, accounts/[id], reports, alerts, settings)
+- `app/dashboard/`, `app/launch/`, `components/LaunchReview.tsx`, `lib/meta/account-config.ts` (the frozen retargeting-automation module)
+- `app/api/meta/*` (OAuth, session, and every Graph API proxy route)
+- `app/api/accounts/`, `app/api/insights/`, `app/api/findings/`, `app/api/monitoring/`, `app/api/cron/`
+- `modules/connectors/`, `modules/metrics/`, `modules/portfolio/`, `modules/auth/`, `modules/db/`, `modules/monitoring/`
+- `middleware.ts`, `lib/flags.ts`, `drizzle/`, `drizzle.config.ts`, `scripts/db-migrate.mjs`, `vercel.json`
+- The `drizzle-orm`, `@neondatabase/serverless`, `drizzle-kit`, `pg`, `dotenv` dependencies
 
-**Frozen (not deleted):** all retargeting pages (`/dashboard`, `/launch`) and API routes, gated in one place — `middleware.ts` — behind `FEATURE_RETARGETING=true`. Pages redirect to `/home`; APIs return 404. Unfreezing is a one-line env change.
+**Kept:** the dark, trust-oriented visual language (`components/ui/theme.ts`, `icons.tsx`, `brand.tsx`), the scroll-reveal helper (`components/landing/fx.tsx`), and the Next.js/Tailwind/TypeScript scaffold itself.
 
-**New modules:**
-- `modules/connectors/` — provider-agnostic interface (`types.ts`) + Meta implementation. Unified API version (v23), normalized errors (`ConnectorError` with `auth_expired` / `rate_limited` / …), exponential backoff on retryable failures, cursor pagination. **Everything above this layer must depend on these types, never on Graph shapes** — this is what makes Google Ads connector #2 an addition, not a rewrite.
-- `modules/metrics/` — period presets (ending *yesterday* — today's partial data lies in comparisons), equal-length previous-period math, KPI aggregation with derived metrics recomputed from totals, pct-change.
+## 2. What this is now
 
-**New routes:** `GET /api/accounts`, `GET /api/insights?accountId&period` (KPIs + deltas + daily series + campaign table).
+The entire product is one flow, with nothing reachable outside it:
 
-**New UI:** app shell (`app/(app)/layout.tsx`) with the target IA — Home, Reports, Alerts, Settings; Home (account portfolio, connect flow, all four states via `StateWrapper`); Account performance page (KPI row with inverted-delta cost metrics, spend sparkline, campaign table, period switcher); Settings (live connection status + reconnect); Reports/Alerts (designed empty states, ship at M4/M6).
+**CSV upload → KPI + context form → deterministic analysis → one-page memo, rendered on the same page.**
 
-**Fixes:** long-lived token exchange in OAuth callback (~60d sessions); landing CTAs → `/home`; metadata → new positioning; fonts decoupled from Google Fonts build-time fetch (revert path documented in `app/layout.tsx`).
+No routing beyond `/` and `/privacy` — the upload form, the processing
+state, and the memo result are three states of one client component,
+not three pages. There is no way to navigate to a second CSV's results,
+a history of past debriefs, or an account of any kind, because none of
+that exists.
 
-## 3. Structure
+## 3. Data handling (the actual privacy guarantee, not just a policy)
 
-```
-middleware.ts                 # freeze gate for the retargeting module
-lib/flags.ts                  # feature flags
-modules/
-  connectors/types.ts         # provider-agnostic contract (the key abstraction)
-  connectors/meta/            # client.ts (fetch/retry/errors) + index.ts (connector)
-  metrics/                    # period math, KPI aggregation
-components/ui/data.tsx        # StateWrapper, MetricCard, DeltaChip, formatters
-app/(app)/                    # new product: home, accounts/[id], reports, alerts, settings
-app/api/{accounts,insights}/  # new product APIs
-app/api/meta/                 # OAuth + session (active) + frozen retargeting routes
-app/{dashboard,launch}/       # FROZEN retargeting UI
-```
+The CSV is parsed in memory for the lifetime of one `POST /api/debrief`
+request and never written to a database, a file, a cache, or a log.
+The route logs only structural facts on error (an error code, a row
+count) — never CSV rows or memo content. When the response is sent,
+nothing about that upload exists anywhere. Refreshing the browser tab
+clears the in-memory React state too. Don't add persistence to this
+route as a "small" addition — read the scope fence above first.
 
-Rules going forward: routes stay thin — logic lives in `modules/`; modules expose a public `index.ts` only; no new imports from frozen files.
-
-## 4. The persistence milestone (next, and non-negotiable)
-
-The interim data path reads live from Meta per page view. Fine for one user demoing; wrong for the product: scheduled reports and hourly alert scans must run **without a browser session**, and reports need history + instant loads.
-
-Decision (per single-founder constraints + Vercel guidance in AGENTS.md): **Marketplace Postgres (e.g. Neon) + Drizzle. No queue infra yet** — Vercel Cron + a `jobs` table with row-locking covers hourly sync and scheduled sends at design-partner scale.
-
-Order of work: (1) `users`/`workspaces` + real login (Meta OAuth as identity is fine initially), (2) `connections` with **encrypted long-lived tokens in DB** (cookie becomes session-only), (3) `clients` + `client_ad_accounts` (many-to-many from day one), (4) `insights_daily` + sync engine (90-day backfill, hourly incremental, re-pull trailing 3 days for Meta's attribution restatement), (5) point `/api/insights` at the DB — the response shape was designed so **no UI changes** are needed when this swap happens.
-
-Then M4 reports (share links, PDF, scheduling, delivery), M5 AI summaries (fact-sheet → Claude, validated output, never blocks report render), M6 alerts (rolling 14-day baselines + status detectors).
-
-## 4b. M2 — persistence + scheduled monitoring (SHIPPED)
-
-Implemented from §4's plan, deliberately scoped down (approved): `insights_daily`, historical sync, and `clients` tables are deferred to M3/M4.
-
-**What exists now:**
-
-- `modules/db/` — Drizzle + Neon (HTTP driver, lazy singleton — the app builds and runs without `DATABASE_URL`; persistence features simply stay off). Schema: `users`, `workspaces`, `memberships`, `sessions`, `connections` (AES-256-GCM-encrypted tokens), `ad_accounts`, `monitor_settings`, `findings`, `job_runs`. Migrations in `drizzle/` (`npm run db:generate` / `db:migrate`, `db:push` for dev).
-- **Identity = Meta OAuth.** The callback upserts the user by Meta user id, auto-creates a personal workspace on first login, encrypts + stores the token, syncs ad accounts, and sets a session-id cookie (`adr_session`, hash stored). **The raw token is no longer written to a cookie for new logins**; the legacy `meta_access_token` cookie is still *read* (`modules/auth.resolveAccessToken`) so pre-M2 sessions keep working until they reconnect. Remove the fallback once design partners have migrated.
-- **OAuth scopes trimmed to `public_profile,ads_read`** (read-only product boundary). Reviving the frozen retargeting module now also requires re-adding its scopes in `app/api/meta/oauth/start`.
-- `modules/monitoring/` — deterministic rules (CPA spike, ROAS drop, spend concentration, spend stopped, account disabled, connection expired) with per-account thresholds (`monitor_settings`, defaults merged in code) + a cadence-agnostic runner: 3-day current vs 14-day baseline windows ending yesterday, findings deduped per (account, rule, day), `job_runs` as run log + crash-safe lock.
-- `GET /api/cron/monitor` — protected by `CRON_SECRET`; scheduled in `vercel.json` (daily 06:00 UTC on Hobby; **hourly = change the schedule string, nothing else**).
-- `GET /api/findings`, `GET|PATCH /api/monitoring/settings` — thin routes over the modules. Alerts page renders the findings feed; Settings gains per-account monitoring toggles + thresholds.
-
-**Local testing:**
+## 4. Structure
 
 ```
-1. cp .env.example .env.local and fill META_*, DATABASE_URL, ENCRYPTION_KEY, CRON_SECRET
-2. npm run db:migrate                       # apply schema to Neon
-3. npm run dev → connect Meta from /home    # creates user/workspace/connection rows
-4. curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/monitor
-5. /alerts shows findings; /settings shows per-account thresholds
+modules/debrief/
+  csv.ts          # hand-written RFC4180-ish parser (no dependency —
+                   # Meta's exports are simple; a one-request in-memory
+                   # parse doesn't need a library)
+  columns.ts       # resolves Meta's varying export column names
+                   # ("Purchases" vs "Website purchases", etc.) to
+                   # logical fields via normalized alias matching
+  extract.ts       # turns raw rows into ParsedAd[], deriving a KPI's
+                   # value from whichever columns are actually present
+  analysis.ts      # the deterministic rules: spend gate, median
+                   # benchmark, winners/losers, ad-name pattern hints
+  format.ts        # money/count/KPI value formatting
+  memo.ts          # assembles the 6-section memo from AnalysisResult —
+                   # every sentence is templated from real numbers
+  types.ts         # the shared domain types
+  index.ts         # public exports — routes/UI import only from here
+
+app/api/debrief/route.ts   # the entire backend: validate → parse →
+                             # analyze → generate → return. No writes.
+
+components/debrief/
+  DebriefApp.tsx    # the state machine: form → processing → result
+  Hero.tsx          # landing copy above the upload card
+  UploadForm.tsx    # CSV dropzone, KPI selector, context fields
+  ProcessingState.tsx
+  MemoResult.tsx    # renders the memo; "Copy memo" uses memoToText.ts
+  memoToText.ts     # plain-text serialization for the copy button
 ```
 
-## 5. Environment
+## 5. Calculation rules (the part that must stay honest)
 
-```
-META_APP_ID / META_APP_SECRET / META_REDIRECT_URI   # existing
-DATABASE_URL                                         # Neon Postgres (M2)
-ENCRYPTION_KEY                                       # 32-byte base64 — openssl rand -base64 32 (M2)
-CRON_SECRET                                          # protects /api/cron/monitor — openssl rand -hex 32 (M2)
-FEATURE_RETARGETING=false                            # freeze gate (default off)
-META_ACCOUNT_CONFIG={}                               # only if retargeting revived
-```
+- **Spend gate** — decides which ads have enough data to judge. If a
+  target CPA is given: `gate = 3 × targetCpa`. Otherwise:
+  `gate = max(DEFAULT_SPEND_FLOOR, 0.5 × mean spend per ad)`
+  (`DEFAULT_SPEND_FLOOR` in `analysis.ts`, currently 10 — change the
+  constant if your floor differs). Ads below the gate are **set aside**,
+  never called winners or losers.
+- **Benchmark** = median KPI value across gated ("judged") ads only.
+- **Polarity** — ROAS/CTR/Leads/Purchases: higher is better. CPA/CPC:
+  lower is better. (`HIGHER_IS_BETTER` in `types.ts`.)
+- **Winners/losers** = up to 5 judged ads strictly better/worse than
+  the median, ranked by distance from it. Fewer than 3 qualifying ads
+  is shown honestly as fewer than 3, never padded.
+- **Combined below-benchmark spend** in the kill list is summed across
+  *all* judged ads worse than the median, not just the displayed rows.
+- **Patterns/angle claims** are structural (spend comparisons, ad-name
+  keyword hints) unless the user supplied creative notes. When neither
+  is available, the memo says so explicitly ("metrics only — angle
+  unknown") rather than inventing a creative narrative.
+- **Confidence level** (`high`/`medium`/`low`) and its notes are derived
+  from how much data actually supported the read — see
+  `buildConfidence` in `memo.ts`.
 
-## 6. Verification status
+## 6. The AI seam (not built yet, on purpose)
 
-`next build` ✓ · `tsc --noEmit` ✓ · `eslint` ✓ (0 errors, 0 warnings; frozen module excluded, documented) · live smoke test ✓ (`/home` 200, `/dashboard` → 307 `/home`, frozen API → 404, `/api/accounts` → 401 unauthenticated).
+`generateMemo(analysis, context)` in `modules/debrief/memo.ts` is
+template-based, not an LLM call — deterministic, free to run, and fast.
+It's structured as the seam for a future LLM-backed version: swap the
+function body for a call that takes the same `(AnalysisResult,
+DebriefContext)` fact sheet and returns a `Memo` of the same shape, and
+nothing in the route or UI needs to change. Don't build that yet; it's
+explicitly out of scope for this version.
+
+## 7. Environment
+
+None. `npm install && npm run dev` is the entire setup — see
+`.env.example` for the one-line confirmation of that.
+
+## 8. Verification status
+
+`next build` ✓ · `tsc --noEmit` ✓ · `eslint` ✓ (0 errors, 0 warnings) ·
+deterministic analysis hand-verified against a synthetic CSV for both a
+direct-column KPI (ROAS) and a derived KPI (CPA = spend ÷ purchases),
+including the target-CPA spend-gate path and the missing-required-
+column error path · full browser flow verified (upload → form → memo)
+at desktop and 375px, including the copy-to-clipboard output · server
+log confirmed to contain no CSV or memo content after a request.

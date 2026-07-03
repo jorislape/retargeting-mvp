@@ -1,30 +1,39 @@
-# AdReports — Meta Ads client reporting & monitoring
+# Debrief — Meta Ads creative debrief
 
-Automated client reports and always-on account monitoring for Meta Ads,
-built for freelance media buyers and small agencies.
+Upload your Meta Ads CSV export, add a line of context, and get a
+one-page decision-first debrief: what worked, what failed, and what to
+test next. Built for media buyers and small agencies who don't have
+time to build this analysis by hand every week.
 
-> This repo pivoted from a retargeting-automation MVP. The retargeting
-> module is frozen behind `FEATURE_RETARGETING` — see `ARCHITECTURE.md`
-> for the full technical audit and `product-spec.md` for product strategy.
+> This repo pivoted from an earlier Meta Ads reporting/monitoring
+> product (OAuth, a database, scheduled monitoring). All of that was
+> removed, not frozen — see `ARCHITECTURE.md` for what changed and why.
 
 ## Quickstart
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in Meta app credentials
 npm run dev
 ```
 
-Open http://localhost:3000, hit **Connect Meta**, and you'll land on `/home`
-with your ad accounts. Click any account for KPIs, deltas, trend, and the
-campaign table.
+Open http://localhost:3000, upload a Meta Ads Manager CSV export, pick
+a KPI, add context, and get your debrief. No `.env.local`, no signup,
+no setup.
 
-## Env
+## The whole product, in one flow
 
-| Var | Purpose |
-|---|---|
-| `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI` | Meta OAuth |
-| `FEATURE_RETARGETING` | `true` revives the frozen retargeting module |
+1. Upload a Meta Ads CSV.
+2. Pick the KPI that matters this period (ROAS, CPA, CTR, CPC, Leads,
+   Purchases) and add context (product, offer, goal, optional target
+   CPA, optional creative notes).
+3. The CSV is parsed and scored in memory — a spend gate excludes ads
+   with too little data, a median benchmark separates winners from
+   losers, and a templated memo is generated.
+4. Read (or copy) the one-page debrief. Nothing is saved: refresh the
+   page and it's gone.
+
+There is exactly one path. No login, no dashboard, no history page —
+see `ARCHITECTURE.md` for the scope rules this was built under.
 
 ## Checks
 

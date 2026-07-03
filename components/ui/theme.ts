@@ -48,14 +48,8 @@ export const chipAmber =
 export const chipNeutral =
   "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-zinc-400";
 
-export const tableWrap =
-  "overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/60 shadow-xl shadow-black/20 backdrop-blur";
-
-export const tableHead =
-  "border-b border-white/10 bg-white/[0.03] text-left text-[11px] font-semibold uppercase tracking-wider text-zinc-500";
-
-export const tableRow =
-  "border-b border-white/5 last:border-0 transition-colors hover:bg-white/[0.03]";
+export const chipRed =
+  "inline-flex items-center gap-1.5 rounded-full border border-red-400/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300";
 
 /* Skeletons mimic the card material they stand in for. */
 export const skeletonTile =

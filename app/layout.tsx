@@ -10,9 +10,9 @@ import "./globals.css";
  */
 
 export const metadata: Metadata = {
-  title: "AdReports — Meta Ads client reporting & monitoring",
+  title: "Debrief — Meta Ads creative debrief",
   description:
-    "Automated client reports and always-on account monitoring for Meta Ads. Connect once, every client gets a scheduled report with a written summary.",
+    "Upload your Meta Ads CSV and get a decision-first debrief: what worked, what failed, and what to test next. No login, nothing stored.",
 };
 
 /* This is the fix for the mobile dashboard rendering at desktop width and

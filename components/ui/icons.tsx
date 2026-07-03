@@ -64,15 +64,6 @@ export function ChevronDownIcon({
   );
 }
 
-export function HomeIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <Icon className={className}>
-      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <path d="M9 22V12h6v10" />
-    </Icon>
-  );
-}
-
 export function FileTextIcon({
   className = "h-4 w-4",
 }: {
@@ -84,43 +75,6 @@ export function FileTextIcon({
       <path d="M14 2v6h6" />
       <path d="M16 13H8" />
       <path d="M16 17H8" />
-    </Icon>
-  );
-}
-
-export function BellIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <Icon className={className}>
-      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-    </Icon>
-  );
-}
-
-export function SettingsIcon({
-  className = "h-4 w-4",
-}: {
-  className?: string;
-}) {
-  return (
-    <Icon className={className}>
-      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-      <circle cx="12" cy="12" r="3" />
-    </Icon>
-  );
-}
-
-export function BarChartIcon({
-  className = "h-4 w-4",
-}: {
-  className?: string;
-}) {
-  return (
-    <Icon className={className}>
-      <path d="M3 3v18h18" />
-      <path d="M18 17V9" />
-      <path d="M13 17V5" />
-      <path d="M8 17v-3" />
     </Icon>
   );
 }
@@ -144,20 +98,63 @@ export function RefreshIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
-export function SearchIcon({ className = "h-4 w-4" }: { className?: string }) {
+export function UploadIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <Icon className={className}>
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
+      <path d="M12 16V4" />
+      <path d="m6 10 6-6 6 6" />
+      <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
     </Icon>
   );
 }
 
-export function SendIcon({ className = "h-4 w-4" }: { className?: string }) {
+export function XIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className} strokeWidth={2.5}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </Icon>
+  );
+}
+
+export function CopyIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <Icon className={className}>
-      <path d="M22 2 11 13" />
-      <path d="M22 2 15 22l-4-9-9-4z" />
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </Icon>
+  );
+}
+
+export function AlertTriangleIcon({
+  className = "h-4 w-4",
+}: {
+  className?: string;
+}) {
+  return (
+    <Icon className={className}>
+      <path d="m10.29 3.86-8.18 14.14A1.5 1.5 0 0 0 3.4 20.4h17.2a1.5 1.5 0 0 0 1.3-2.4L13.71 3.86a1.5 1.5 0 0 0-2.42 0Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </Icon>
+  );
+}
+
+export function FlaskIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M9 2v6.34a2 2 0 0 1-.24.96L3.6 18.3A2 2 0 0 0 5.36 21h13.28a2 2 0 0 0 1.76-2.7L15.24 9.3a2 2 0 0 1-.24-.96V2" />
+      <path d="M7 2h10" />
+      <path d="M8 16h8" />
+    </Icon>
+  );
+}
+
+export function ShieldIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M12 2 4 5v6c0 5 3.4 8.4 8 11 4.6-2.6 8-6 8-11V5z" />
+      <path d="m9 12 2 2 4-4" />
     </Icon>
   );
 }
