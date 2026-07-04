@@ -35,6 +35,21 @@ export const HIGHER_IS_BETTER: Record<KpiKey, boolean> = {
   cpc: false,
 };
 
+/** Structured, user-actionable error returned by /api/debrief. Every
+ *  failure reads as a product guide (what happened, how to fix it),
+ *  never a stack trace. `detectedColumns` are the CSV's own headers —
+ *  structural facts only, never row data. */
+export interface DebriefApiError {
+  title: string;
+  message: string;
+  fix: string;
+  /** Headers found in the uploaded CSV, when column resolution ran. */
+  detectedColumns?: string[];
+  /** KPIs whose columns WERE detected — offered as switch suggestions
+   *  when the selected KPI's column is missing. */
+  suggestedKpis?: KpiKey[];
+}
+
 /** Context the user fills in alongside the CSV — never stored. */
 export interface DebriefContext {
   kpi: KpiKey;

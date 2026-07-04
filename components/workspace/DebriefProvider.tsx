@@ -8,7 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import type { KpiKey, Memo } from "@/modules/debrief";
+import type { DebriefApiError, KpiKey, Memo } from "@/modules/debrief";
 
 /* ------------------------------------------------------------------ */
 /* Session state for the generator, lifted to the workspace layout so  */
@@ -46,16 +46,39 @@ const DEFAULT_FIELDS: GeneratorFields = {
    status readable without faking work beyond that. */
 const MIN_PROCESSING_MS = 1200;
 
+/** Anything the API hands back that isn't already a structured error
+ *  (legacy strings, malformed bodies) becomes one, so the UI always
+ *  renders the same guide-shaped block. */
+function normalizeError(raw: unknown): DebriefApiError {
+  if (
+    raw !== null &&
+    typeof raw === "object" &&
+    typeof (raw as DebriefApiError).title === "string" &&
+    typeof (raw as DebriefApiError).message === "string"
+  ) {
+    return raw as DebriefApiError;
+  }
+  return {
+    title: "Something went wrong",
+    message:
+      typeof raw === "string" && raw.trim() !== ""
+        ? raw
+        : "The debrief couldn't be generated.",
+    fix: "Try again — if it keeps happening, re-export the CSV from Meta Ads Manager.",
+  };
+}
+
 interface DebriefContextValue {
   status: GeneratorStatus;
   file: File | null;
   fields: GeneratorFields;
   memo: Memo | null;
-  error: string | null;
+  error: DebriefApiError | null;
   generatedAt: number | null;
   setFile: (file: File | null) => void;
   updateFields: (patch: Partial<GeneratorFields>) => void;
   generate: () => Promise<void>;
+  clearError: () => void;
   reset: () => void;
 }
 
@@ -66,7 +89,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
   const [file, setFile] = useState<File | null>(null);
   const [fields, setFields] = useState<GeneratorFields>(DEFAULT_FIELDS);
   const [memo, setMemo] = useState<Memo | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DebriefApiError | null>(null);
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
 
   const updateFields = useCallback((patch: Partial<GeneratorFields>) => {
@@ -99,7 +122,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       }
 
       if (!data.ok) {
-        setError(data.error || "Something went wrong. Please try again.");
+        setError(normalizeError(data.error));
         setStatus("idle");
         return;
       }
@@ -107,10 +130,16 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       setGeneratedAt(Date.now());
       setStatus("ready");
     } catch {
-      setError("Network error — check your connection and try again.");
+      setError({
+        title: "Network error",
+        message: "The request didn't reach Debrief.",
+        fix: "Check your connection and try again.",
+      });
       setStatus("idle");
     }
   }, [file, fields]);
+
+  const clearError = useCallback(() => setError(null), []);
 
   const reset = useCallback(() => {
     setStatus("idle");
@@ -132,9 +161,10 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       setFile,
       updateFields,
       generate,
+      clearError,
       reset,
     }),
-    [status, file, fields, memo, error, generatedAt, updateFields, generate, reset]
+    [status, file, fields, memo, error, generatedAt, updateFields, generate, clearError, reset]
   );
 
   return (

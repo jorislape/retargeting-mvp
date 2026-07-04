@@ -5,6 +5,10 @@ import type { KpiKey } from "@/modules/debrief";
 import {
   assessMarketNotes,
   HIGHER_IS_BETTER,
+  KPI_LABELS,
+  parseCsv,
+  requiredColumnsFor,
+  resolveColumns,
   SAMPLE_CONTEXT,
   SAMPLE_CSV_FILENAME,
   SAMPLE_CSV_TEXT,
@@ -49,6 +53,17 @@ const KPI_OPTIONS: { value: KpiKey; label: string }[] = [
   { value: "cpc", label: "CPC" },
   { value: "leads", label: "Leads" },
   { value: "purchases", label: "Purchases" },
+];
+
+/** The alias groups documented in the "CSV requirements" helper —
+ *  mirrors what columns.ts actually resolves. */
+const KPI_ALIAS_DOC: [string, string][] = [
+  ["ROAS", "ROAS · Website purchase ROAS · Return on ad spend"],
+  ["CPA", "CPA · Cost per purchase · Cost per lead · Cost per result"],
+  ["CTR", "CTR · Link CTR · Click-through rate"],
+  ["CPC", "CPC · Cost per click · Link CPC"],
+  ["Spend", "Amount spent · Spend · Amount Spent (USD) · Amount Spent (EUR)"],
+  ["Ad name", "Ad name · Ad · Creative name"],
 ];
 
 const PROCESSING_STEPS = [
@@ -158,8 +173,16 @@ function MethodLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function GeneratorPanel() {
-  const { status, file, fields, error, setFile, updateFields, generate } =
-    useDebrief();
+  const {
+    status,
+    file,
+    fields,
+    error,
+    setFile,
+    updateFields,
+    generate,
+    clearError,
+  } = useDebrief();
   const { status: metaStatus } = useMeta();
   const [dragging, setDragging] = useState(false);
   /* "Structure notes" feedback: "done" shows the ✓ state, "empty" swaps
@@ -172,6 +195,63 @@ export function GeneratorPanel() {
 
   /* Non-blocking quality read on the notes — local parsing only. */
   const marketQuality = assessMarketNotes(fields.marketContext);
+
+  /* Lightweight client-side CSV preview: header + row count + which
+     KPIs resolve, using the same parser/alias matcher the API uses —
+     no analysis logic, just structure. Keyed to the File object so a
+     stale read never shows for a newer file. */
+  const [previewState, setPreviewState] = useState<{
+    forFile: File;
+    rows: number;
+    cols: number;
+    kpisFound: KpiKey[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!file || file.size > 5 * 1024 * 1024) return;
+    let cancelled = false;
+    file
+      .text()
+      .then((text) => {
+        if (cancelled) return;
+        const matrix = parseCsv(text);
+        const headers = matrix[0] ?? [];
+        const columns = resolveColumns(headers);
+        const kpisFound = KPI_OPTIONS.map((o) => o.value).filter(
+          (k) => requiredColumnsFor(k, columns).length === 0
+        );
+        setPreviewState({
+          forFile: file,
+          rows: Math.max(0, matrix.length - 1),
+          cols: headers.length,
+          kpisFound,
+        });
+      })
+      .catch(() => {
+        /* Unreadable here just means no preview — the API gives the
+           real, structured error on run. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [file]);
+
+  const preview =
+    file && previewState?.forFile === file ? previewState : null;
+  const previewKpiOk = preview?.kpisFound.includes(fields.kpi) ?? true;
+
+  /* A real file download of the same synthetic dataset "Load the
+     sample dataset" uses — so the expected format can be inspected
+     outside the app. Client-side blob, no network. */
+  const downloadSample = () => {
+    const blob = new Blob([SAMPLE_CSV_TEXT], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "debrief-sample-meta-ads.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   /* Local, deterministic reformat of the pasted notes — no network,
      no external service, just the shared keyword map. */
@@ -239,10 +319,46 @@ export function GeneratorPanel() {
       {error && (
         <div
           role="alert"
-          className="mb-8 flex items-start gap-2.5 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-4 py-3 text-[13px] leading-relaxed text-red-200"
+          className="mb-8 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-4 py-3.5"
         >
-          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-          {error}
+          <p className="flex items-center gap-2.5 text-[13px] font-semibold text-red-200">
+            <AlertTriangleIcon className="h-4 w-4 shrink-0 text-red-400" />
+            {error.title}
+          </p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-red-200/90">
+            {error.message}
+          </p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-300">
+            <span className="font-semibold text-zinc-100">How to fix: </span>
+            {error.fix}
+          </p>
+          {error.suggestedKpis && error.suggestedKpis.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {error.suggestedKpis.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => {
+                    updateFields({ kpi: k });
+                    clearError();
+                  }}
+                  className={`cursor-pointer ${btnSecondary}`}
+                >
+                  Switch to {KPI_LABELS[k]}
+                </button>
+              ))}
+            </div>
+          )}
+          {error.detectedColumns && error.detectedColumns.length > 0 && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs font-medium text-zinc-400 transition hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
+                Columns detected in your CSV
+              </summary>
+              <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-zinc-400">
+                {error.detectedColumns.join(" · ")}
+              </p>
+            </details>
+          )}
         </div>
       )}
 
@@ -374,29 +490,58 @@ export function GeneratorPanel() {
             >
               Load the sample dataset
             </button>
-            — 14 synthetic ads for a full test run.
+            — 14 synthetic ads for a full test run. Want to check the format
+            first?
+            <button
+              type="button"
+              onClick={downloadSample}
+              className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              Download sample CSV
+            </button>
+            .
           </p>
 
           {/* The shared landing strip: whichever method produced the
               data, this is the single source of truth for what's
               loaded. */}
           {file && (
-            <div className="animate-settle mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-accent/25 bg-accent/[0.06] px-4 py-3">
-              <FileTextIcon className="h-4 w-4 shrink-0 text-accent-soft" />
-              <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-zinc-100">
-                {file.name}
-              </p>
-              <span className="font-mono text-[11px] text-zinc-500">
-                {fmtBytes(file.size)} · ready
-              </span>
-              <button
-                type="button"
-                onClick={removeFile}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white"
-              >
-                <XIcon className="h-3 w-3" />
-                Remove
-              </button>
+            <div className="animate-settle mt-3 rounded-lg border border-accent/25 bg-accent/[0.06] px-4 py-3">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <FileTextIcon className="h-4 w-4 shrink-0 text-accent-soft" />
+                <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-zinc-100">
+                  {file.name}
+                </p>
+                <span className="font-mono text-[11px] text-zinc-500">
+                  {fmtBytes(file.size)} · ready
+                </span>
+                <button
+                  type="button"
+                  onClick={removeFile}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white"
+                >
+                  <XIcon className="h-3 w-3" />
+                  Remove
+                </button>
+              </div>
+              {/* Lightweight structural preview — catches a missing-KPI
+                  column BEFORE the run instead of after it. */}
+              {preview && (
+                <p
+                  aria-live="polite"
+                  className={`mt-2 text-xs leading-relaxed ${
+                    previewKpiOk ? "text-zinc-400" : "text-amber-300"
+                  }`}
+                >
+                  {previewKpiOk
+                    ? `Detected ${preview.rows} row${preview.rows === 1 ? "" : "s"}, ${preview.cols} columns. ${KPI_LABELS[fields.kpi]} column found.`
+                    : `${KPI_LABELS[fields.kpi]} was selected, but no ${KPI_LABELS[fields.kpi]}-like column was detected. You can still run, but Debrief may return a missing-column error.${
+                        preview.kpisFound.length > 0
+                          ? ` Columns found for: ${preview.kpisFound.map((k) => KPI_LABELS[k]).join(", ")}.`
+                          : ""
+                      }`}
+                </p>
+              )}
             </div>
           )}
 
@@ -426,21 +571,51 @@ export function GeneratorPanel() {
 
             <details className="group border-l border-white/10 pl-3 open:border-accent/40">
               <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
-                Columns we recognize
+                CSV requirements
               </summary>
-              <div className="pb-2 pt-1.5 text-xs leading-relaxed text-zinc-400">
-                <p>
-                  Only <span className="font-semibold text-zinc-200">Amount spent</span>{" "}
-                  plus the column for your chosen KPI are required. Naming
-                  varies by export — all of these resolve automatically:
+              <div className="space-y-3 pb-2 pt-1.5 text-xs leading-relaxed text-zinc-400">
+                <p className="text-zinc-500">
+                  From Meta Ads Manager, export ads at ad level. Include
+                  delivery/performance columns and the KPI you want Debrief
+                  to judge.
                 </p>
-                <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-zinc-500">
-                  Ad name · Amount spent · Impressions · Link clicks · CTR ·
-                  CPC · Purchases / Results · Purchase conversion value ·
-                  Purchase ROAS · Cost per purchase / result · Leads · Cost
-                  per lead · Reporting starts / ends
-                </p>
-                <p className="mt-1.5 text-zinc-500">
+                <div>
+                  <p className="font-semibold text-zinc-200">Required</p>
+                  <ul className="mt-1 list-inside list-disc space-y-0.5">
+                    <li>Ad name</li>
+                    <li>Amount spent</li>
+                    <li>
+                      The KPI you want to judge by — e.g. ROAS, CPA, CTR,
+                      CPC, Leads, or Purchases
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-200">Recommended</p>
+                  <p className="mt-1 font-mono text-[11px] leading-relaxed text-zinc-500">
+                    Campaign name · Ad set name · Impressions · Clicks ·
+                    Purchases or Leads · Cost per result · Website purchase
+                    ROAS
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-200">
+                    Supported KPI aliases
+                  </p>
+                  <dl className="mt-1 space-y-1">
+                    {KPI_ALIAS_DOC.map(([kpiName, aliases]) => (
+                      <div key={kpiName} className="flex gap-2">
+                        <dt className="w-16 shrink-0 font-semibold text-zinc-300">
+                          {kpiName}
+                        </dt>
+                        <dd className="font-mono text-[11px] leading-relaxed text-zinc-500">
+                          {aliases}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <p className="text-zinc-500">
                   Missing something for your KPI? You&apos;ll get a clear
                   message naming the column, not a wrong answer.
                 </p>

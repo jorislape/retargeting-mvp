@@ -19,7 +19,9 @@ function normalize(header: string): string {
 
 /** Finds the first header whose normalized form matches one of the
  *  aliases exactly, then falls back to substring containment — exact
- *  matches first so e.g. "results" doesn't shadow "cost per result". */
+ *  matches first so e.g. "results" doesn't shadow "cost per result".
+ *  Very short aliases ("ad") are exact-only: as substrings they match
+ *  into unrelated headers ("leads", "return on ad spend"). */
 function findHeader(headers: string[], aliases: readonly string[]): string | null {
   const normalized = headers.map((h) => ({ header: h, norm: normalize(h) }));
   for (const alias of aliases) {
@@ -27,6 +29,7 @@ function findHeader(headers: string[], aliases: readonly string[]): string | nul
     if (exact) return exact.header;
   }
   for (const alias of aliases) {
+    if (alias.length < 3) continue;
     const partial = normalized.find((h) => h.norm.includes(alias));
     if (partial) return partial.header;
   }
@@ -34,12 +37,12 @@ function findHeader(headers: string[], aliases: readonly string[]): string | nul
 }
 
 const ALIASES = {
-  adName: ["ad name", "ad"],
+  adName: ["ad name", "ad", "creative name"],
   spend: ["amount spent usd", "amount spent", "spend"],
   impressions: ["impressions"],
   linkClicks: ["link clicks", "clicks all", "clicks"],
-  ctr: ["ctr link click through rate", "ctr all", "ctr"],
-  cpc: ["cpc cost per link click", "cpc all", "cpc"],
+  ctr: ["ctr link click through rate", "ctr all", "ctr", "click through rate"],
+  cpc: ["cpc cost per link click", "cpc all", "cpc", "cost per click"],
   purchases: [
     "website purchases",
     "on facebook purchases",
@@ -55,12 +58,14 @@ const ALIASES = {
     "website purchase roas return on ad spend",
     "purchase roas return on ad spend",
     "roas",
+    "return on ad spend",
   ],
   costPerPurchase: [
     "cost per website purchase",
     "cost per purchase",
     "cost per result",
     "cost per action",
+    "cpa",
   ],
   leads: ["website leads", "on facebook leads", "leads"],
   costPerLead: ["cost per lead"],
@@ -88,7 +93,13 @@ export interface ColumnMap {
 }
 
 export function resolveColumns(headers: string[]): ColumnMap {
-  const spendHeader = findHeader(headers, ALIASES.spend);
+  /* The generic "spend" alias must never substring-match a ROAS column
+     ("…return on ad spend") — resolve spend only among headers that
+     aren't ROAS-shaped. Real spend headers are unaffected. */
+  const spendCandidates = headers.filter(
+    (h) => !/roas|return on ad spend/i.test(h)
+  );
+  const spendHeader = findHeader(spendCandidates, ALIASES.spend);
   const currencyMatch = spendHeader?.match(/\(([A-Za-z]{3})\)/);
 
   return {
