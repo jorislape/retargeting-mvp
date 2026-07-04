@@ -144,7 +144,7 @@ export default function HowItWorksPage() {
       {/* CTA */}
       <div className="animate-rise mt-12 flex flex-col items-start gap-3 sm:flex-row sm:items-center" style={{ animationDelay: "360ms" }}>
         <Link href="/generator" className={btnPrimary}>
-          Generate a debrief
+          Debrief your ads
           <ArrowIcon className="h-4 w-4" />
         </Link>
         <Link href="/sample" className={btnSecondaryMd}>
