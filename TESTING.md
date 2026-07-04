@@ -60,9 +60,10 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       cards (not tables) with a "N more … full detail in the Buyer
       view" note; confidence reads "This result is based on 14 ads and
       $3,385.50 in ad spend…". Buyer view keeps full tables and notes.
-- [ ] **Visual system**: paper canvas with a faint graph-paper texture
-      fading below the fold, white memo sheet for the report with the
-      ink-ruled verdict; nothing decorative appears in print.
+- [ ] **Visual system**: carbon canvas with warm amber haze + fine
+      masked grid, graphite memo sheet with the amber-ruled verdict, a
+      soft warm spotlight trails the cursor on desktop; nothing
+      decorative appears in print (PDF flattens to ink-on-paper).
 - [ ] "Copy" copies the plain-text version of the ACTIVE view.
 - [ ] Print/PDF exports the active view (`print-hidden` chrome
       disappears); Client view prints as a client-ready report.

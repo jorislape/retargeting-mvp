@@ -17,8 +17,8 @@ export default function SamplePage() {
 
   return (
     <div>
-      <div className="print-hidden animate-rise mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50/70 px-4 py-3">
-        <p className="text-[13px] leading-relaxed text-zinc-700">
+      <div className="print-hidden animate-rise mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-400/25 bg-amber-400/[0.06] px-4 py-3 shadow-[inset_0_1px_0_rgba(253,230,138,0.06)]">
+        <p className="text-[13px] leading-relaxed text-stone-300">
           This is a real report generated from example data by the same
           engine that runs on your CSV.
         </p>

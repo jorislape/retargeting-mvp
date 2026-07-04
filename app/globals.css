@@ -1,29 +1,30 @@
 @import "tailwindcss";
 
 /*
- * Ink-on-paper identity for a professional media-buying tool.
+ * Night-desk identity: the tool media buyers actually use at 1am.
  *
- * The buyer's actual deliverable is a memo, so the product looks like
- * one: a warm-neutral paper canvas, white surfaces with hairline
- * borders, near-black ink for primary actions, and one restrained
- * accent (cobalt) for focus, links, and active markers. Emerald and
- * red are reserved exclusively for win/loss semantics.
+ * Canvas is warm near-black (soot, never #000, never blue-black),
+ * surfaces are graphite panels lit from above, and the single signal
+ * accent is AMBER — terminal heritage, high contrast, unmistakably
+ * not the AI blue/purple default. Emerald and red are reserved
+ * exclusively for win/loss semantics. Neutrals are warm (stone), not
+ * cool (zinc/slate).
  *
  * Fonts arrive as CSS variables from next/font in app/layout.tsx;
  * mapping them in @theme gives us `font-display`, `font-sans`,
  * `font-mono` utilities.
  */
 :root {
-  --background: #f4f4f2;
-  --foreground: #17191d;
+  --background: #121110;
+  --foreground: #fafaf9;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* paper = canvas; ink = text/primary actions */
-  --color-paper: #f4f4f2;
-  --color-ink: #17191d;
+  /* carbon = canvas; well = recessed inputs/cells below the panels */
+  --color-carbon: #121110;
+  --color-well: #0c0b0a;
   --font-sans: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-sg), var(--font-plex), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
@@ -41,53 +42,70 @@ html {
 
 body {
   background-color: var(--background);
-  /* One very soft cool spotlight where work begins — depth without
-     drama. Fixed so scrolling moves content over a still surface. */
-  background-image: radial-gradient(
-    1100px 480px at 50% -180px,
-    rgba(29, 78, 216, 0.045),
-    transparent 72%
-  );
+  /* Atmosphere in two warm layers: a low amber haze above the fold
+     (a desk lamp, not a glow effect) and a faint ember bottom-right.
+     Fixed so scrolling moves content over a lit surface. */
+  background-image:
+    radial-gradient(1200px 560px at 50% -200px, rgba(251, 191, 36, 0.07), transparent 70%),
+    radial-gradient(900px 700px at 100% 115%, rgba(217, 119, 6, 0.04), transparent 60%);
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
-/* A whisper of graph paper near the top — the buyer's medium — that
-   dissolves before content density picks up. */
+/* Fine engineering grid, warm and masked toward the lamp — texture
+   that reads as a working surface, gone before content density. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: radial-gradient(rgba(23, 25, 29, 0.055) 1px, transparent 1.4px);
-  background-size: 24px 24px;
-  mask-image: radial-gradient(ellipse 80% 46% at 50% 0%, black 15%, transparent 68%);
+  background-image:
+    linear-gradient(to right, rgba(250, 250, 249, 0.032) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(250, 250, 249, 0.032) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 85% 52% at 50% 0%, black 12%, transparent 72%);
+}
+
+/* Cursor spotlight — a large, faint pool of warm light that trails
+   the pointer (lerped in <Atmosphere/>). Depth, never a torch: peak
+   alpha stays under 0.06 so contrast is untouched. */
+.cursor-spotlight {
+  background: radial-gradient(
+    closest-side,
+    rgba(251, 191, 36, 0.055),
+    rgba(251, 191, 36, 0.02) 45%,
+    transparent 70%
+  );
 }
 
 ::selection {
-  background: rgb(29 78 216 / 0.18);
+  background: rgb(251 191 36 / 0.3);
 }
 
 /*
  * On-brand keyboard focus. Components that render their own
  * focus-visible ring also set outline-none, which wins over this
  * :where() rule (zero specificity by design) — so every focusable
- * element gets exactly one cobalt indicator.
+ * element gets exactly one amber indicator.
  */
 :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
-  outline: 2px solid rgb(29 78 216 / 0.7);
+  outline: 2px solid rgb(251 191 36 / 0.7);
   outline-offset: 2px;
 }
 
 /*
- * Key phrase in a page h1 (one per page, max). On paper the emphasis
- * is a single confident ink-blue — no gradient. The class name is kept
- * so callers don't change.
+ * Key phrase in a page h1 (one per page, max): the amber signal,
+ * clipped hot-to-deep. Hand-rolled because Safari still needs the
+ * -webkit- prefix for background-clip: text.
  */
 .gradient-phrase {
-  color: #1d4ed8;
+  background-image: linear-gradient(100deg, #fde68a, #fbbf24 45%, #d97706);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 /* Entrance for report sections and view changes — motion-safe only,
@@ -125,10 +143,11 @@ body::before {
 
 /*
  * Print = "Save as PDF". The report is the only thing that should
- * print: chrome is hidden via .print-hidden. The UI is already
- * ink-on-paper, so print mostly means flattening shadows and page
- * furniture; win/loss colors are re-asserted so the two colors that
- * carry meaning survive any driver quirks.
+ * print: chrome is hidden via .print-hidden, and the dark theme is
+ * flattened to ink-on-paper. The universal color override is crude by
+ * design — reliable output beats preserved theming — with win/loss
+ * semantics re-asserted afterwards so the two colors that carry
+ * meaning survive.
  */
 @page {
   margin: 14mm;
@@ -153,6 +172,7 @@ body::before {
     backdrop-filter: none !important;
   }
   body .gradient-phrase {
+    -webkit-text-fill-color: #18181b !important;
     color: #18181b !important;
   }
   body .print-win {

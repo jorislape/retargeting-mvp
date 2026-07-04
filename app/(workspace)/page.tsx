@@ -18,16 +18,16 @@ export default function GeneratorPage() {
       <header className="animate-rise flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
           <p className={eyebrow}>Debrief generator</p>
-          <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-zinc-900 sm:text-3xl">
+          <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-white sm:text-3xl">
             Upload your ads.{" "}
             <span className={gradientText}>Get your next tests.</span>
           </h1>
-          <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-600">
+          <p className="mt-3 max-w-lg text-sm leading-relaxed text-stone-400">
             A decision-first debrief from your Meta Ads CSV — what worked,
             what failed, and what to test next.{" "}
             <Link
               href="/sample"
-              className="rounded-sm font-medium text-zinc-800 underline decoration-zinc-400 underline-offset-2 transition hover:text-blue-700 hover:decoration-blue-400 active:text-blue-800"
+              className="rounded-sm font-medium text-stone-200 underline decoration-stone-600 underline-offset-2 transition hover:text-amber-300 hover:decoration-amber-400/60 active:text-amber-200"
             >
               See a sample first
             </Link>
