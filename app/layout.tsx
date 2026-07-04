@@ -21,9 +21,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Debrief — Meta Ads creative debrief",
+  /* Local/self-hosted fallback; Vercel infers the production URL. */
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
+  ),
+  title: {
+    default: "Debrief — Meta Ads creative debrief",
+    template: "%s · Debrief",
+  },
   description:
     "Upload your Meta Ads CSV and get a decision-first debrief: what worked, what failed, and what to test next. No login, nothing stored.",
+  openGraph: {
+    siteName: "Debrief",
+    type: "website",
+    url: "/",
+    title: "Debrief — Turn Meta Ads data into creative decisions",
+    description:
+      "CSV in → buyer memo + client report out. Deterministic engine: same input, same answer. No login, nothing stored.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Debrief — Turn Meta Ads data into creative decisions",
+    description:
+      "CSV in → buyer memo + client report out. Deterministic engine: same input, same answer. No login, nothing stored.",
+  },
 };
 
 export const viewport: Viewport = {
