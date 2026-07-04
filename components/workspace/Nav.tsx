@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogoMark } from "@/components/ui/brand";
+import { Wordmark } from "@/components/ui/brand";
 import {
   FileTextIcon,
   HelpCircleIcon,
@@ -30,12 +30,9 @@ export function Sidebar() {
     <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-52 flex-col border-r border-white/[0.06] bg-carbon md:flex">
       <Link
         href="/"
-        className="group flex h-16 shrink-0 items-center gap-2.5 px-4 transition-opacity hover:opacity-80"
+        className="flex h-16 shrink-0 items-center px-4 transition-opacity hover:opacity-80"
       >
-        <LogoMark size="h-7 w-7" />
-        <span className="text-[15px] font-semibold tracking-tight text-zinc-100">
-          Debrief
-        </span>
+        <Wordmark />
       </Link>
 
       <nav className="flex flex-col gap-1 px-3 pt-2">
@@ -81,11 +78,8 @@ export function MobileTopBar() {
   return (
     <header className="print-hidden sticky top-0 z-30 border-b border-white/[0.06] bg-carbon/90 backdrop-blur md:hidden">
       <div className="flex h-14 items-center justify-between px-5">
-        <Link href="/" className="flex items-center gap-2">
-          <LogoMark size="h-7 w-7" />
-          <span className="text-[15px] font-semibold tracking-tight text-zinc-100">
-            Debrief
-          </span>
+        <Link href="/" className="flex items-center">
+          <Wordmark />
         </Link>
         <span className="text-[10px] font-medium text-zinc-600">
           Nothing stored

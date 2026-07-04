@@ -1,7 +1,21 @@
 /* ------------------------------------------------------------------ */
-/* Brand mark: white tile, dark glyph — the same language as the       */
-/* primary action. Clean, current, no glow.                            */
+/* Brand.                                                              */
+/* Wordmark: type only — bold Geist, tightened tracking, accent        */
+/* period. This is the brand in every nav.                             */
+/* LogoMark (white tile, dark plane glyph) survives ONLY for icon      */
+/* surfaces: favicon, browser tab, OG/social image. Never in chrome.   */
 /* ------------------------------------------------------------------ */
+
+export function Wordmark({ className = "text-[15px]" }: { className?: string }) {
+  return (
+    <span
+      className={`font-semibold tracking-[-0.01em] text-zinc-100 ${className}`}
+    >
+      Debrief
+      <span className="text-accent">.</span>
+    </span>
+  );
+}
 
 export function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
   return (
