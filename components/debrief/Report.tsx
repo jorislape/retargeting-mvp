@@ -41,7 +41,74 @@ const CONFIDENCE_CHIP: Record<Memo["confidence"]["level"], string> = {
 };
 
 function SectionLabel({ children }: { children: string }) {
-  return <p className={eyebrow}>{children}</p>;
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <p className={`shrink-0 ${eyebrow}`}>{children}</p>
+      <span
+        aria-hidden="true"
+        className="h-px min-w-8 flex-1 bg-gradient-to-r from-white/12 to-transparent"
+      />
+    </div>
+  );
+}
+
+/* Client view renders performers as summary cards, not data tables:
+   top 3 only, name + plain reading + the two numbers that matter. */
+function ClientAdCards({
+  rows,
+  tone,
+}: {
+  rows: MemoWinnerLoserRow[];
+  tone: "win" | "loss";
+}) {
+  const top = rows.slice(0, 3);
+  const more = rows.length - top.length;
+  return (
+    <div className="space-y-2">
+      {top.map((ad, i) => (
+        <div
+          key={ad.name + i}
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-white/10 bg-panel-deep/50 p-3.5 shadow-[inset_0_1px_0_rgba(164,196,255,0.05)] sm:p-4"
+        >
+          <span
+            aria-hidden="true"
+            className={`h-9 w-1 shrink-0 rounded-full ${
+              tone === "win"
+                ? "print-win bg-emerald-400/70"
+                : "print-loss bg-red-400/60"
+            }`}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold leading-snug text-zinc-100">
+              {ad.name}
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">
+              {ad.spendLabel} spent
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">
+              {ad.valueLabel}
+            </p>
+            <span
+              className={`${tone === "win" ? chipEmerald : chipRed} ${
+                tone === "win" ? "print-win" : "print-loss"
+              } whitespace-nowrap font-mono`}
+            >
+              {ad.vsMedianLabel}
+            </span>
+          </div>
+        </div>
+      ))}
+      {more > 0 && (
+        <p className="px-1 pt-0.5 text-xs leading-relaxed text-zinc-500">
+          {more} more ad{more === 1 ? "" : "s"}{" "}
+          {tone === "win" ? "performed above" : "ran below"} the typical result —
+          full detail in the Buyer view.
+        </p>
+      )}
+    </div>
+  );
 }
 
 function AdTable({
@@ -297,7 +364,10 @@ export function Report({
             </div>
             {client && (
               <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-500">
-                {memo.scope.kpiLabel}: {memo.scope.kpiExplainer}.
+                <span className="font-semibold text-zinc-300">
+                  {memo.scope.kpiLabel}
+                </span>{" "}
+                = {memo.scope.kpiExplainer}.
               </p>
             )}
           </div>
@@ -375,7 +445,7 @@ export function Report({
       {/* ---- Winners / What worked ---- */}
       <section className="animate-rise mt-8" style={stagger(2)}>
         <SectionLabel>{client ? "What worked" : "Winners"}</SectionLabel>
-        <div className={`mt-2 ${card} px-4 py-1 sm:px-5`}>
+        <div className={`mt-2 ${card} ${client ? "p-4 sm:p-5" : "px-4 py-1 sm:px-5"}`}>
           {memo.winners.length === 0 ? (
             <div className="my-4 rounded-lg border border-dashed border-white/15 bg-panel-deep/40 px-4 py-6 text-center">
               <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
@@ -387,6 +457,8 @@ export function Report({
                   : "No ad cleared the benchmark by enough to call a winner — the next tests below are how you find one."}
               </p>
             </div>
+          ) : client ? (
+            <ClientAdCards rows={memo.winners} tone="win" />
           ) : (
             <AdTable rows={memo.winners} tone="win" view={view} />
           )}
@@ -403,12 +475,20 @@ export function Report({
             {client ? memo.losers.clientInstruction : memo.losers.killInstruction}
           </p>
           {memo.losers.rows.length > 0 && (
-            <div className="mt-2">
-              <AdTable rows={memo.losers.rows} tone="loss" view={view} />
+            <div className="mt-3">
+              {client ? (
+                <ClientAdCards rows={memo.losers.rows} tone="loss" />
+              ) : (
+                <AdTable rows={memo.losers.rows} tone="loss" view={view} />
+              )}
             </div>
           )}
           <p className="mt-3 border-t border-white/5 pt-3 text-xs leading-relaxed text-zinc-500">
-            {memo.losers.setAsideNote}
+            {client
+              ? memo.scope.adsSetAside > 0
+                ? `${memo.scope.adsSetAside} ad${memo.scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
+                : "Every ad had enough spend to be judged fairly."
+              : memo.losers.setAsideNote}
           </p>
         </div>
       </section>
@@ -456,11 +536,18 @@ export function Report({
             {client ? "What we'll test next" : "Next tests — run list"}
           </SectionLabel>
           {!client && (
-            <span className="print-hidden font-mono text-[11px] tabular-nums text-zinc-500">
+            <span className="print-hidden shrink-0 font-mono text-[11px] tabular-nums text-zinc-500">
               {queuedCount}/{memo.nextTests.length} queued
             </span>
           )}
         </div>
+        {client && (
+          <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">
+            We&apos;ll test new creative based on what performed strongest this
+            period — each test says why it&apos;s worth running, how it&apos;ll
+            be set up, and what success looks like.
+          </p>
+        )}
         <ol className="mt-2 space-y-3">
           {memo.nextTests.map((test, i) => (
             <TestRow
@@ -486,30 +573,39 @@ export function Report({
           <span className={`${CONFIDENCE_CHIP[memo.confidence.level]} font-mono`}>
             {memo.confidence.level.toUpperCase()} CONFIDENCE
           </span>
-          {client && (
-            <p className="mt-3 text-[13px] leading-relaxed text-zinc-400">
-              This report was generated from {memo.scope.adsAnalyzed} ads
-              {memo.scope.dateRangeLabel ? ` (${memo.scope.dateRangeLabel})` : ""} totalling{" "}
-              {memo.scope.totalSpendLabel} in spend. {memo.scope.adsJudged} ads had
-              enough spend to judge fairly; {memo.scope.adsSetAside} were set aside
-              rather than misjudged on thin data. Every number comes directly from
-              the ad account data — nothing is estimated.
+          {client ? (
+            /* Client view: provenance in plain language, no internal
+               caveat list — honest about the data, silent about the
+               machinery. */
+            <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+              This result is based on {memo.scope.adsAnalyzed} ads and{" "}
+              {memo.scope.totalSpendLabel} in ad spend
+              {memo.scope.dateRangeLabel
+                ? ` between ${memo.scope.dateRangeLabel}`
+                : ""}
+              . {memo.scope.adsJudged} ads had enough spend to judge fairly
+              {memo.scope.adsSetAside > 0
+                ? `; ${memo.scope.adsSetAside} did not and were set aside`
+                : ""}
+              . Every number comes directly from the ad account — nothing is
+              estimated.
             </p>
+          ) : (
+            <ul className="mt-3 space-y-1.5">
+              {memo.confidence.notes.map((note, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2.5 text-[13px] leading-relaxed text-zinc-400"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-500"
+                  />
+                  {note}
+                </li>
+              ))}
+            </ul>
           )}
-          <ul className="mt-3 space-y-1.5">
-            {memo.confidence.notes.map((note, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-2.5 text-[13px] leading-relaxed text-zinc-400"
-              >
-                <span
-                  aria-hidden="true"
-                  className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-500"
-                />
-                {note}
-              </li>
-            ))}
-          </ul>
         </div>
       </section>
 

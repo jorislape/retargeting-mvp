@@ -54,8 +54,15 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       (sample data: yes at +100%). A flat account gets 3 creative tests.
 - [ ] **Buyer ⇄ Client toggle**: Client view shows Summary / What
       worked / What underperformed / What we'll test next / Confidence
-      & what data was used — no "kill list" wording, KPI abbreviation
-      explained under the title, "vs typical" table header.
+      & what data was used — no "kill list" or "spend gate" wording,
+      KPI abbreviation explained under the title.
+- [ ] **Client view density**: top 3 performers each way as summary
+      cards (not tables) with a "N more … full detail in the Buyer
+      view" note; confidence reads "This result is based on 14 ads and
+      $3,385.50 in ad spend…". Buyer view keeps full tables and notes.
+- [ ] **Background**: fine dot matrix fades below the fold (no line
+      grid), aurora slowly breathes, a soft spotlight trails the cursor
+      on desktop; none of it appears in print or with reduced motion.
 - [ ] "Copy" copies the plain-text version of the ACTIVE view.
 - [ ] Print/PDF exports the active view (`print-hidden` chrome
       disappears); Client view prints as a client-ready report.

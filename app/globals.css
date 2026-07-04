@@ -40,30 +40,33 @@ html {
 
 body {
   background-color: var(--background);
-  /* Signal-blue aurora base: one strong glow above the content, one
-     faint counterweight bottom-right. Fixed so scrolling feels like
-     moving over a lit surface rather than dragging the light along. */
+  /* Layered aurora: a wide, soft-edged signal-blue field above the
+     fold, a faint indigo mid-page counterweight on the left, and a
+     whisper of cyan bottom-right — three depths, no hard edges.
+     Fixed so scrolling feels like moving over a lit surface rather
+     than dragging the light along. */
   background-image:
-    radial-gradient(1300px 640px at 50% -180px, rgba(37, 99, 235, 0.28), transparent 68%),
-    radial-gradient(900px 700px at 100% 115%, rgba(56, 189, 248, 0.06), transparent 60%);
+    radial-gradient(1400px 720px at 50% -240px, rgba(37, 99, 235, 0.22), transparent 74%),
+    radial-gradient(760px 560px at 6% 42%, rgba(99, 102, 241, 0.05), transparent 66%),
+    radial-gradient(1000px 760px at 96% 112%, rgba(56, 189, 248, 0.05), transparent 62%);
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
-/* Faint engineering grid, masked so it lives near the glow and fades
-   before it can compete with content further down. */
+/* Fine dot matrix in place of the old line grid — points of light
+   near the aurora rather than drawn blocks. Double-masked so it
+   dissolves both downward and at the edges before it can compete
+   with content. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image:
-    linear-gradient(to right, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, black, transparent 78%);
+  background-image: radial-gradient(rgba(164, 196, 255, 0.09) 1px, transparent 1.4px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 82% 52% at 50% 0%, black 18%, transparent 70%);
 }
 
 /* The aurora's hot core — rendered by <AuroraGlow/> so it can drift
@@ -72,8 +75,40 @@ body::before {
 .aurora-core {
   background: radial-gradient(
     closest-side,
-    rgba(56, 189, 248, 0.22),
-    rgba(37, 99, 235, 0.14) 45%,
+    rgba(56, 189, 248, 0.2),
+    rgba(37, 99, 235, 0.13) 45%,
+    transparent 74%
+  );
+}
+
+/* Ambient breathe on the aurora — a 16s tide so the surface reads as
+   lit even with the pointer idle. Sits on a wrapper so it can't fight
+   the pointer-drift transform on the core itself. */
+@media (prefers-reduced-motion: no-preference) {
+  .aurora-breathe {
+    animation: aurora-breathe 16s ease-in-out infinite;
+  }
+  @keyframes aurora-breathe {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: translate3d(0, 14px, 0) scale(1.045);
+      opacity: 0.82;
+    }
+  }
+}
+
+/* Cursor spotlight — a large, very soft pool of light that trails the
+   pointer (lerped in <AuroraGlow/>). Decorative depth, never a torch:
+   peak alpha stays under 0.09 so text contrast is untouched. */
+.cursor-spotlight {
+  background: radial-gradient(
+    closest-side,
+    rgba(96, 165, 250, 0.085),
+    rgba(56, 189, 248, 0.035) 45%,
     transparent 72%
   );
 }
@@ -147,6 +182,10 @@ body::before {
  * semantics re-asserted afterwards so the two colors that carry
  * meaning survive.
  */
+@page {
+  margin: 14mm;
+}
+
 @media print {
   .print-hidden {
     display: none !important;

@@ -24,6 +24,12 @@ export function memoToText(memo: Memo, view: ReportView = "buyer"): string {
   );
   lines.push("");
 
+  // Client view shows the top 3 each way (summary, not a data dump);
+  // buyer view keeps the full detail.
+  const winnerRows = view === "client" ? memo.winners.slice(0, 3) : memo.winners;
+  const loserRows =
+    view === "client" ? memo.losers.rows.slice(0, 3) : memo.losers.rows;
+
   lines.push(view === "client" ? "WHAT WORKED" : "WINNERS");
   if (memo.winners.length === 0) {
     lines.push(
@@ -32,18 +38,34 @@ export function memoToText(memo: Memo, view: ReportView = "buyer"): string {
         : "None cleared the benchmark this period."
     );
   } else {
-    memo.winners.forEach((w) => {
+    winnerRows.forEach((w) => {
       lines.push(`- ${w.name} | ${w.valueLabel} (${w.vsMedianLabel}) | ${w.spendLabel} | ${w.reason}`);
     });
+    if (view === "client" && memo.winners.length > winnerRows.length) {
+      lines.push(
+        `(${memo.winners.length - winnerRows.length} more performed above the typical result.)`
+      );
+    }
   }
   lines.push("");
 
   lines.push(view === "client" ? "WHAT UNDERPERFORMED" : "LOSERS / KILL LIST");
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
-  memo.losers.rows.forEach((l) => {
+  loserRows.forEach((l) => {
     lines.push(`- ${l.name} | ${l.valueLabel} (${l.vsMedianLabel}) | ${l.spendLabel} | ${l.reason}`);
   });
-  lines.push(memo.losers.setAsideNote);
+  if (view === "client" && memo.losers.rows.length > loserRows.length) {
+    lines.push(
+      `(${memo.losers.rows.length - loserRows.length} more ran below the typical result.)`
+    );
+  }
+  lines.push(
+    view === "client"
+      ? scope.adsSetAside > 0
+        ? `${scope.adsSetAside} ad${scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
+        : "Every ad had enough spend to be judged fairly."
+      : memo.losers.setAsideNote
+  );
   lines.push("");
 
   if (view === "buyer") {
@@ -64,12 +86,15 @@ export function memoToText(memo: Memo, view: ReportView = "buyer"): string {
   });
   lines.push("");
 
-  lines.push(
-    view === "client"
-      ? `CONFIDENCE & DATA USED: ${memo.confidence.level.toUpperCase()}`
-      : `CONFIDENCE: ${memo.confidence.level.toUpperCase()}`
-  );
-  memo.confidence.notes.forEach((n) => lines.push(`- ${n}`));
+  if (view === "client") {
+    lines.push(`CONFIDENCE & DATA USED: ${memo.confidence.level.toUpperCase()}`);
+    lines.push(
+      `This result is based on ${scope.adsAnalyzed} ads and ${scope.totalSpendLabel} in ad spend${scope.dateRangeLabel ? ` between ${scope.dateRangeLabel}` : ""}. ${scope.adsJudged} ads had enough spend to judge fairly${scope.adsSetAside > 0 ? `; ${scope.adsSetAside} did not and were set aside` : ""}. Every number comes directly from the ad account — nothing is estimated.`
+    );
+  } else {
+    lines.push(`CONFIDENCE: ${memo.confidence.level.toUpperCase()}`);
+    memo.confidence.notes.forEach((n) => lines.push(`- ${n}`));
+  }
 
   return lines.join("\n");
 }
