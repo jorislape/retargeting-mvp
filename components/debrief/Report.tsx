@@ -417,9 +417,20 @@ export function Report({
             ].map(([label, value], i) => (
               <div
                 key={label}
-                className={i === 0 ? "" : "sm:border-l sm:border-white/10 sm:pl-5"}
+                className={`min-w-0 ${i === 0 ? "" : "sm:border-l sm:border-white/10 sm:pl-5"}`}
               >
-                <p className="font-mono text-[22px] font-semibold leading-none tabular-nums text-zinc-50">
+                {/* Long values (e.g. "434,288.00 EUR") step down in size
+                    and may wrap as a last resort — they must never spill
+                    into the neighboring stat, on screen or in print. */}
+                <p
+                  className={`flex min-h-6 items-end break-words font-mono font-semibold tabular-nums text-zinc-50 ${
+                    value.length > 12
+                      ? "text-[15px] leading-tight"
+                      : value.length > 8
+                        ? "text-[18px] leading-none"
+                        : "text-[22px] leading-none"
+                  }`}
+                >
                   {value}
                 </p>
                 <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
