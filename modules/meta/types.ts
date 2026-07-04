@@ -36,11 +36,16 @@ export interface AdInsightRow {
   dateStop: string;
 }
 
+/** last_7d…last_90d are native Graph API date_preset values; the two
+ *  longer ranges have no preset and are sent as an explicit time_range
+ *  (see fetchAdInsights). */
 export const DATE_PRESETS = [
   "last_7d",
   "last_14d",
   "last_30d",
   "last_90d",
+  "last_180d",
+  "last_365d",
 ] as const;
 
 export type DatePreset = (typeof DATE_PRESETS)[number];
@@ -50,6 +55,8 @@ export const DATE_PRESET_LABELS: Record<DatePreset, string> = {
   last_14d: "Last 14 days",
   last_30d: "Last 30 days",
   last_90d: "Last 90 days",
+  last_180d: "Last 180 days",
+  last_365d: "Last 365 days",
 };
 
 /** postMessage payload the OAuth bridge page sends to the opener. */

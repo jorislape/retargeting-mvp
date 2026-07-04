@@ -56,14 +56,10 @@ export async function POST(request: NextRequest) {
   try {
     const result = await fetchAdInsights(token, accountId, datePreset);
     if (result.rows.length === 0) {
-      return noStore(
-        {
-          ok: false,
-          error:
-            "No ads with delivery in that date range. Try a longer range or another account.",
-        },
-        400
-      );
+      // A valid outcome, not a fault: the account simply had no
+      // delivery in the window. ok:true + empty so the client renders
+      // a guidance state instead of an error.
+      return noStore({ ok: true, empty: true, rowCount: 0 });
     }
     return noStore({
       ok: true,

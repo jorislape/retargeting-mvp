@@ -2,12 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { KpiKey } from "@/modules/debrief";
+import {
+  SAMPLE_CONTEXT,
+  SAMPLE_CSV_FILENAME,
+  SAMPLE_CSV_TEXT,
+} from "@/modules/debrief";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { MetaConnect } from "@/components/debrief/MetaConnect";
 import {
   AlertTriangleIcon,
   ArrowIcon,
   FileTextIcon,
+  FlaskIcon,
   UploadIcon,
   XIcon,
 } from "@/components/ui/icons";
@@ -112,6 +118,25 @@ export function GeneratorPanel() {
     if (picked) setFile(picked);
   };
 
+  /* Loads the synthetic dataset as a virtual CSV — identical pipeline
+     to an upload — and prefills any context field the user hasn't
+     typed in, so "Generate debrief" is one click away. Never
+     overwrites what they already entered. */
+  const loadSample = () => {
+    setFile(
+      new File([SAMPLE_CSV_TEXT], SAMPLE_CSV_FILENAME, { type: "text/csv" })
+    );
+    updateFields({
+      ...(fields.product.trim() === "" && { product: SAMPLE_CONTEXT.product }),
+      ...(fields.offer.trim() === "" && { offer: SAMPLE_CONTEXT.offer }),
+      ...(fields.goal.trim() === "" && { goal: SAMPLE_CONTEXT.goal }),
+      ...(fields.creativeNotes.trim() === "" && {
+        creativeNotes: SAMPLE_CONTEXT.creativeNotes,
+      }),
+    });
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
   return (
     <div className={`${card} overflow-hidden`}>
       {status === "processing" ? (
@@ -136,7 +161,17 @@ export function GeneratorPanel() {
           <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[5fr_6fr] lg:gap-8">
             {/* ---- Left pane: data in ---- */}
             <div>
-              <p className={fieldLabel}>01 · Data source</p>
+              <div className="flex items-baseline justify-between gap-2">
+                <p className={fieldLabel}>01 · Data source</p>
+                <button
+                  type="button"
+                  onClick={loadSample}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white active:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+                >
+                  <FlaskIcon className="h-3.5 w-3.5 text-blue-300" />
+                  Use sample data
+                </button>
+              </div>
               <p className="mt-2.5 font-mono text-[10px] font-semibold tracking-[0.14em] text-zinc-500">
                 A · UPLOAD ADS MANAGER EXPORT
               </p>

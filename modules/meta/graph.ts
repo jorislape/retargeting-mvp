@@ -214,6 +214,17 @@ export interface InsightsResult {
   truncated: boolean;
 }
 
+/** Ranges the Graph API has no date_preset for — sent as an explicit
+ *  trailing time_range instead. */
+const RELATIVE_RANGE_DAYS: Partial<Record<DatePreset, number>> = {
+  last_180d: 180,
+  last_365d: 365,
+};
+
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 export async function fetchAdInsights(
   accessToken: string,
   accountId: string,
@@ -224,7 +235,6 @@ export async function fetchAdInsights(
     // REQUIRED: makes pulled conversions/ROAS follow each ad set's
     // unified attribution setting, so numbers match Ads Manager.
     use_unified_attribution_setting: "true",
-    date_preset: datePreset,
     fields: [
       "ad_name",
       "spend",
@@ -242,6 +252,18 @@ export async function fetchAdInsights(
     ].join(","),
     limit: String(INSIGHTS_PAGE_SIZE),
   });
+
+  const rangeDays = RELATIVE_RANGE_DAYS[datePreset];
+  if (rangeDays) {
+    const until = new Date();
+    const since = new Date(until.getTime() - rangeDays * 24 * 60 * 60 * 1000);
+    params.set(
+      "time_range",
+      JSON.stringify({ since: isoDate(since), until: isoDate(until) })
+    );
+  } else {
+    params.set("date_preset", datePreset);
+  }
 
   const raw: RawInsightRow[] = [];
   let currency = "USD";

@@ -17,7 +17,11 @@ const NAME_TAGS: { tag: string; pattern: RegExp }[] = [
 ];
 
 function extractNameTags(name: string): string[] {
-  return NAME_TAGS.filter((t) => t.pattern.test(name)).map((t) => t.tag);
+  // Ad names routinely use separator conventions like
+  // "UGC_MorningRoutine_V1" — underscores/dots/dashes are \w chars, so
+  // \b-anchored patterns would miss them. Normalize to spaces first.
+  const haystack = name.replace(/[_\-./]+/g, " ");
+  return NAME_TAGS.filter((t) => t.pattern.test(haystack)).map((t) => t.tag);
 }
 
 function kpiValueForRow(

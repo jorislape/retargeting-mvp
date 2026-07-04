@@ -82,6 +82,7 @@ export function MetaConnect() {
   const [pulling, setPulling] = useState(false);
   const [pullError, setPullError] = useState<string | null>(null);
   const [pullNote, setPullNote] = useState<string | null>(null);
+  const [pullEmpty, setPullEmpty] = useState(false);
 
   const selectedAccount =
     accounts.find((a) => a.id === accountId) ?? accounts[0] ?? null;
@@ -91,6 +92,7 @@ export function MetaConnect() {
     setPulling(true);
     setPullError(null);
     setPullNote(null);
+    setPullEmpty(false);
     try {
       const res = await fetch("/api/meta/insights", {
         method: "POST",
@@ -107,6 +109,12 @@ export function MetaConnect() {
         } else {
           setPullError(data.error ?? "Couldn't pull ads from Meta.");
         }
+        return;
+      }
+      if (data.empty) {
+        // Connected fine, account just has no delivery in the window —
+        // guidance, not an error.
+        setPullEmpty(true);
         return;
       }
       // The virtual CSV: same bytes an Ads Manager export would have.
@@ -237,6 +245,15 @@ export function MetaConnect() {
       {pullNote && (
         <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-blue-300/80">
           {pullNote.toUpperCase()}
+        </p>
+      )}
+      {pullEmpty && (
+        <p
+          role="status"
+          className="mt-2 rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2.5 text-xs leading-relaxed text-amber-200"
+        >
+          No ads found for this account/date range. Try a longer date range,
+          upload a CSV, or use sample data.
         </p>
       )}
       {pullError && (
