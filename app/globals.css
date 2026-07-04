@@ -105,6 +105,30 @@ body {
     }
   }
 
+  /* Primary-CTA sheen: one soft dark sweep across the white button on
+     hover. Sweep-in only — it resets instantly, no idle shimmer. */
+  .btn-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 35%,
+      rgba(9, 9, 11, 0.08) 50%,
+      transparent 65%
+    );
+    transform: translateX(-130%);
+    pointer-events: none;
+  }
+  .btn-sheen:hover::after {
+    transform: translateX(130%);
+    transition: transform 0.65s ease;
+  }
+
   /* File-accepted settle for the dropzone's success view. */
   .animate-settle {
     animation: settle 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;

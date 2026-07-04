@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BlurFade } from "@/components/marketing/BlurFade";
 import { HeroProof } from "@/components/marketing/HeroProof";
+import { HeroSpotlight } from "@/components/marketing/HeroSpotlight";
 import {
   ArrowIcon,
   CheckIcon,
@@ -17,6 +18,7 @@ import {
   btnPrimary,
   btnSecondaryMd,
   card,
+  cardHover,
   cardLift,
   gradientText,
 } from "@/components/ui/theme";
@@ -152,7 +154,8 @@ export default function HomePage() {
   return (
     <div>
       {/* ---- Hero ---- */}
-      <section className="animate-rise pt-4 text-center sm:pt-10">
+      <section className="animate-rise relative pt-4 text-center sm:pt-10">
+        <HeroSpotlight />
         <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium text-zinc-400">
           <span
             aria-hidden="true"
@@ -169,7 +172,7 @@ export default function HomePage() {
           performance into a buyer memo and a client-ready report.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/generator" className={btnPrimary}>
+          <Link href="/generator" className={`btn-sheen ${btnPrimary}`}>
             Generate a debrief
             <ArrowIcon className="h-4 w-4" />
           </Link>
@@ -201,7 +204,7 @@ export default function HomePage() {
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
           {/* Data in */}
           <BlurFade className="lg:col-span-5">
-            <div className={`${card} flex h-full flex-col p-5`}>
+            <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
                 Data in
               </p>
@@ -236,7 +239,7 @@ export default function HomePage() {
 
           {/* Engine */}
           <BlurFade className="lg:col-span-7" delay={0.07}>
-            <div className="flex h-full flex-col rounded-xl border border-accent/20 bg-accent/[0.04] p-5">
+            <div className="flex h-full flex-col rounded-xl border border-accent/20 bg-accent/[0.04] p-5 transition-colors hover:border-accent/35">
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
                 Deterministic engine
               </p>
@@ -267,7 +270,7 @@ export default function HomePage() {
 
           {/* Buyer memo */}
           <BlurFade className="lg:col-span-4" delay={0.14}>
-            <div className={`${card} flex h-full flex-col p-5`}>
+            <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
                 Out: buyer memo
               </p>
@@ -282,7 +285,7 @@ export default function HomePage() {
 
           {/* Client report */}
           <BlurFade className="lg:col-span-4" delay={0.21}>
-            <div className={`${card} flex h-full flex-col p-5`}>
+            <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
                 Out: client report
               </p>
@@ -297,7 +300,7 @@ export default function HomePage() {
 
           {/* Trust */}
           <BlurFade className="sm:col-span-2 lg:col-span-4" delay={0.28}>
-            <div className={`${card} flex h-full flex-col p-5`}>
+            <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
               <p className="flex items-center gap-2 text-[14px] font-semibold tracking-tight text-zinc-100">
                 <ShieldIcon className="h-4 w-4 text-accent-soft" />
                 Private by architecture
@@ -381,7 +384,7 @@ export default function HomePage() {
             includes a full sample dataset.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/generator" className={btnPrimary}>
+            <Link href="/generator" className={`btn-sheen ${btnPrimary}`}>
               Generate a debrief
               <ArrowIcon className="h-4 w-4" />
             </Link>

@@ -326,13 +326,22 @@ export function Report({
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2 pb-2">
-          <button onClick={handleCopy} className={`cursor-pointer ${btnSecondary}`}>
-            {copied ? (
-              <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-            ) : (
-              <CopyIcon className="h-3.5 w-3.5" />
-            )}
-            {copied ? "Copied" : "Copy"}
+          <button
+            onClick={handleCopy}
+            className={`min-w-[5.5rem] cursor-pointer ${btnSecondary}`}
+          >
+            {/* Keyed remount plays the settle morph on state change. */}
+            <span
+              key={copied ? "copied" : "copy"}
+              className="flex items-center gap-1.5 motion-safe:animate-settle"
+            >
+              {copied ? (
+                <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+              ) : (
+                <CopyIcon className="h-3.5 w-3.5" />
+              )}
+              {copied ? "Copied" : "Copy"}
+            </span>
           </button>
           <button
             onClick={() => window.print()}
