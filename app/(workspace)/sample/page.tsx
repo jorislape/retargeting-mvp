@@ -22,7 +22,7 @@ export default function SamplePage() {
           This is a real report generated from example data by the same
           engine that runs on your CSV.
         </p>
-        <Link href="/" className={`shrink-0 ${btnPrimarySm}`}>
+        <Link href="/generator" className={`shrink-0 ${btnPrimarySm}`}>
           Run it on your ads
           <ArrowIcon className="h-3.5 w-3.5" />
         </Link>

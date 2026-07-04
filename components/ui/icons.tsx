@@ -190,3 +190,49 @@ export function PrinterIcon({ className = "h-4 w-4" }: { className?: string }) {
     </Icon>
   );
 }
+
+export function HomeIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={`shrink-0 ${className}`}>
+      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M9 22V12h6v10" />
+    </Icon>
+  );
+}
+
+export function TrendingUpIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={`shrink-0 ${className}`}>
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+      <polyline points="16 7 22 7 22 13" />
+    </Icon>
+  );
+}
+
+export function TrendingDownIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={`shrink-0 ${className}`}>
+      <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" />
+      <polyline points="16 17 22 17 22 11" />
+    </Icon>
+  );
+}
+
+export function GaugeIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={`shrink-0 ${className}`}>
+      <path d="m12 14 3.5-3.5" />
+      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+    </Icon>
+  );
+}
+
+export function LayersIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={`shrink-0 ${className}`}>
+      <path d="m12 2 10 5-10 5L2 7z" />
+      <path d="m2 12 10 5 10-5" />
+      <path d="m2 17 10 5 10-5" />
+    </Icon>
+  );
+}

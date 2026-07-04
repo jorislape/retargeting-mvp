@@ -6,12 +6,14 @@ import { LogoMark } from "@/components/ui/brand";
 import {
   FileTextIcon,
   HelpCircleIcon,
+  HomeIcon,
   ShieldIcon,
   ZapIcon,
 } from "@/components/ui/icons";
 
 const NAV = [
-  { href: "/", label: "Generator", icon: ZapIcon },
+  { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/generator", label: "Generator", icon: ZapIcon },
   { href: "/sample", label: "Sample report", icon: FileTextIcon },
   { href: "/how-it-works", label: "How it works", icon: HelpCircleIcon },
   { href: "/privacy", label: "Privacy", icon: ShieldIcon },
@@ -101,7 +103,7 @@ export function MobileTabBar() {
       aria-label="Primary"
       className="print-hidden fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-carbon/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
-      <div className="grid grid-cols-4">
+      <div className="grid grid-cols-5">
         {NAV.map((item) => {
           const active = isActive(pathname, item.href);
           return (

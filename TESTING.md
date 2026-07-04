@@ -80,6 +80,14 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] "How to export from Meta Ads Manager" and "Columns we recognize"
       expanders under the dropzone open/close and read correctly.
 
+## Home
+
+- [ ] `/` renders the landing page: hero CTAs go to `/generator` and
+      `/sample`; the pipeline visual shows inputs → engine → both
+      mini reports (with real sample numbers); mobile stacks with
+      rotated flow arrows.
+- [ ] The generator lives at `/generator` and is unchanged.
+
 ## Layout
 
 - [ ] Mobile (~375px): generator stacks to one column, dropzone and

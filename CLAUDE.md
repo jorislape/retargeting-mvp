@@ -56,7 +56,7 @@ app/api/meta/{login,callback,config,ad-accounts,insights}/route.ts
 
 app/(workspace)/               # shell route group: sidebar/tab-bar around every page
   layout.tsx                   # DebriefProvider + MetaProvider live here (see below)
-  page.tsx (/), sample/, how-it-works/, privacy/
+  page.tsx (/ home), generator/, sample/, how-it-works/, privacy/
 
 components/workspace/
   DebriefProvider.tsx  # generator/session state — React state ONLY; refresh wipes (by design)
@@ -87,7 +87,7 @@ components/debrief/
 
 ## Design constraints to preserve
 
-- No routes beyond `/`, `/sample`, `/how-it-works`, `/privacy`. Don't add a history page, a second CSV's results, or anything account-shaped.
+- No routes beyond `/` (home), `/generator`, `/sample`, `/how-it-works`, `/privacy`. Don't add a history page, a second CSV's results, or anything account-shaped.
 - Meta CSV column names vary by export configuration (`columns.ts` handles this via normalized alias matching) — if a required column can't be found for the selected KPI, the API returns a clear 400 rather than guessing.
 - `/sample` and the generator's "Load sample data" must stay on the same dataset (`sampleCsv.ts`) rendered by the real engine — the sample is a promise about what real data produces, not marketing copy.
 - A Meta pull that returns zero rows is a guidance state ("no ads found — try a longer range, upload a CSV, or use sample data"), never an error state.
