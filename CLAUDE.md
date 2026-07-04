@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Debrief — a single-flow Meta Ads creative debrief tool, built on Next.js (App Router) + React 19 + Tailwind v4 + TypeScript. Load ad-level performance data (CSV upload, built-in sample dataset, or read-only Meta OAuth pull), add context, get a one-page decision-first memo: what worked, what failed, what to test next — rendered in two audiences (buyer memo / client report). Read `ARCHITECTURE.md` for what this pivoted from and why almost everything from the prior version was deleted rather than kept "just in case."
+Debrief — a single-flow Meta Ads creative debrief tool, built on Next.js (App Router) + React 19 + Tailwind v4 + TypeScript (plus `motion` for the marketing page only). Load ad-level performance data (CSV upload, built-in sample dataset, or read-only Meta OAuth pull), add context (KPI, product/offer/goal, optional pasted market/competitor notes), get a one-page decision-first memo: what worked, what failed, what to test next, what NOT to do, why the confidence level is what it is — rendered in two audiences (buyer memo / client report), with selected tests expandable into hand-off creative briefs. Read `ARCHITECTURE.md` for what this pivoted from and why almost everything from the prior version was deleted rather than kept "just in case."
 
 ## Commands
 
@@ -22,27 +22,41 @@ No environment variables are required for the CSV-upload flow. The optional Meta
 
 ## Scope fence — read before adding anything
 
-This product has a hard, deliberate scope: **no auth, no user accounts, no database or persistent storage of any kind, no saved history, no billing, no team workspaces, no analytics dashboards.** The whole flow is data in → KPI + context → deterministic analysis → one-page memo on the same page — nothing else is reachable, and nothing should become reachable as a "small addition." If a future version needs persistence, that is a new, explicit milestone to be requested — not something to add quietly while doing something else.
+This product has a hard, deliberate scope: **no auth, no user accounts, no database or persistent storage of any kind, no saved history, no billing, no team workspaces, no analytics dashboards, no external AI calls, no scraping, no background jobs.** The whole flow is data in → KPI + context → deterministic analysis → one-page memo on the same page — nothing else is reachable, and nothing should become reachable as a "small addition." If a future version needs persistence, that is a new, explicit milestone to be requested — not something to add quietly while doing something else.
 
-The CSV (and the generated memo) must never be written to a database, a file, a cache, or a log. `app/api/debrief/route.ts` only logs structural facts on error (an error code, a row count) — never CSV rows or memo content. Keep it that way.
+The CSV (and the generated memo) must never be written to a database, a file, a cache, or a log. `app/api/debrief/route.ts` only logs structural facts on error (an error code, a row count) — never CSV rows or memo content. Keep it that way. (Structured error *responses* may echo the CSV's own header names back to the user — headers are structural and go only to the person who uploaded them; still never log them.)
 
 **Meta data source (the one approved exception to "no auth"):** the generator can also connect a Meta account via OAuth (`modules/meta/`, `app/api/meta/*`, `MetaProvider`/`MetaConnect`) and pull ad-level insights as a "virtual CSV" that feeds the identical debrief pipeline. Its constraints are part of the fence: scope is read-only `ads_read` (never widen); the access token lives only in browser memory (`MetaProvider`) and is forwarded per-request via the Authorization header — never a cookie, never storage, never a query param, never a log (the only cookie in the flow is the short-lived OAuth CSRF nonce); insights pulls set `use_unified_attribution_setting=true` so numbers match Ads Manager; the OAuth bridge (`modules/meta/bridge.ts`) posts to an exact origin and `MetaProvider` verifies `event.origin` with strict equality — no wildcards; the Graph API version is pinned in `modules/meta/graph.ts` — check deprecation runway when bumping.
+
+**Market / competitor notes (manual input only):** the optional `marketContext` textarea is V1 pasted text, full stop. No Ads Library scraping, no URL fetching, no competitor watchlists, and never a claim about competitor spend or performance. Everything derived from it — the "Structure notes" button, the quality meter, the memo's Market signal section, market-flavored test/brief wording — is local, deterministic keyword matching (`modules/debrief/marketSignals.ts`), always marked "directional," and own account data stays the primary signal. An empty `marketContext` must leave the memo's content exactly as if the feature didn't exist (`marketSignal: null`, no market wording anywhere).
 
 ## Architecture
 
 ```
 modules/debrief/               # the engine — pure, deterministic, no I/O
-  csv.ts        # hand-written CSV parser (no dependency)
-  columns.ts    # resolves Meta's varying export column names via normalized alias matching
-  extract.ts    # raw rows -> ParsedAd[], KPI value derivation, ad-name tag extraction
-  analysis.ts   # spend gate, median benchmark, winners/losers, pattern hints
-  memo.ts       # assembles the memo — templated, not an LLM call (see below)
-  format.ts     # money/count/KPI value formatting
-  sampleCsv.ts  # THE sample dataset (client-safe, no engine imports) — tuned to the
-                # rules engine; its header comment lists invariants to keep when editing
-  sample.ts     # server-side: sample memo via the real engine (renders /sample)
-  types.ts      # domain types incl. Memo (carries BOTH buyer + client-language fields)
-  index.ts      # public surface — import only from here, not the internal files
+  csv.ts          # hand-written CSV parser (no dependency)
+  columns.ts      # resolves Meta's varying export column names via normalized alias
+                  # matching. Hardening rules: aliases < 3 chars ("ad") are exact-match
+                  # only (as substrings they hit "leads"/"return on ad spend"), and the
+                  # generic "spend" alias never resolves into ROAS-shaped headers —
+                  # a spend-less CSV must error, not silently misuse the ROAS column
+  extract.ts      # raw rows -> ParsedAd[], KPI value derivation, ad-name tag extraction
+  analysis.ts     # spend gate, median benchmark, winners/losers, pattern hints
+  memo.ts         # assembles the memo — templated, not an LLM call (see below)
+  marketSignals.ts# ONE keyword map (formats/hooks/offers) shared by memo generation and
+                  # the generator UI: extractMarketSignals, structureMarketNotes (the
+                  # local "Structure notes" reformat, idempotent, never drops a URL),
+                  # assessMarketNotes (quality meter: category count → strong/good/weak)
+  format.ts       # money/count/KPI value formatting
+  sampleCsv.ts    # THE sample dataset (client-safe, no engine imports) — tuned to the
+                  # rules engine; its header comment lists invariants to keep when
+                  # editing. SAMPLE_CONTEXT includes a marketContext so the sample
+                  # demonstrates the market-signal path
+  sample.ts       # server-side: sample memo via the real engine (renders /sample)
+  types.ts        # domain types: Memo (both registers), MemoTest (with signals + brief),
+                  # MemoBrief, MemoMarketSignal, avoid lists, confidence reasons,
+                  # DebriefApiError (the structured error contract)
+  index.ts        # public surface — import only from here, not the internal files
 
 modules/meta/                  # optional OAuth data source ("virtual CSV")
   graph.ts        # server-only Graph client; version pin; token via Authorization header
@@ -51,32 +65,61 @@ modules/meta/                  # optional OAuth data source ("virtual CSV")
   insightsToCsv.ts# serializes insights into Ads-Manager-shaped CSV text
   index.ts        # public surface
 
-app/api/debrief/route.ts       # the entire debrief backend — validate, parse, analyze, return
+app/api/debrief/route.ts       # the entire debrief backend — validate, parse, analyze,
+                               # return. Every failure is a structured DebriefApiError
+                               # (title/message/how-to-fix + detected headers + KPI
+                               # switch suggestions), never a bare string. Route-level
+                               # validation: binary/XLSX sniff, Ad name required
+                               # ("export at ad level" guidance)
 app/api/meta/{login,callback,config,ad-accounts,insights}/route.ts
 
-app/(workspace)/               # shell route group: sidebar/tab-bar around every page
+app/(marketing)/               # home route only: conventional top-nav shell, no providers
+  layout.tsx, page.tsx         # hero (frameless HeroProof demo), bento, KPI demo, CTAs
+app/(workspace)/               # app shell: sidebar (desktop) / tab bar (mobile)
   layout.tsx                   # DebriefProvider + MetaProvider live here (see below)
-  page.tsx (/ home), generator/, sample/, how-it-works/, privacy/
+  generator/, sample/, how-it-works/, privacy/
+app/opengraph-image.tsx        # generated OG card (next/og); app/icon.svg = tab glyph
+
+components/marketing/
+  TopNav.tsx           # marketing navbar (wordmark / links / CTA, mobile menu)
+  HeroProof.tsx        # hero demo: CSV rows FLIP-sort into SCALE/CUT on a slow loop;
+                       # SSR renders the static sorted state; reduced-motion = no loop
+  KpiDemo.tsx          # ROAS/CPA/CTR toggle re-ranking fixed sample data
+  BlurFade.tsx         # scroll entrance — CSS + IntersectionObserver; the hidden state
+                       # exists only under motion-safe (no hydration branch on reduced)
+  motionFeatures.ts    # async domMax chunk for LazyMotion consumers
 
 components/workspace/
-  DebriefProvider.tsx  # generator/session state — React state ONLY; refresh wipes (by design)
+  DebriefProvider.tsx  # generator/session state — React state ONLY; refresh wipes (by
+                       # design). Holds the structured error + clearError
   MetaProvider.tsx     # Meta connection state; token in memory only; strict-origin postMessage
-  Nav.tsx              # sidebar (desktop) / top bar + bottom tabs (mobile)
+  Nav.tsx              # sidebar (desktop) / top bar + bottom tabs (mobile); wordmark-only
+                       # brand (components/ui/brand.tsx — glyph is for icon surfaces only)
 
 components/debrief/
-  GeneratorPanel.tsx   # 3-stage workflow (Source / Framing / Run); step chips fill on completion
+  GeneratorPanel.tsx   # 3-stage workflow (Source / Framing / Run): dropzone, sample
+                       # load + sample CSV download, CSV requirements helper, client-side
+                       # upload preview (rows/columns/KPI check via the same parser +
+                       # alias matcher — structure only, no analysis), market-notes field
+                       # with Structure button + quality meter, structured-error display
+                       # with one-click KPI switch
   MetaConnect.tsx      # connect button / connected controls; checks /api/meta/config first
-  Report.tsx           # the memo document; Buyer/Client view toggle is display-only
-  memoToText.ts        # view-aware plain-text serialization for the Copy button
+  Report.tsx           # the memo document; Buyer/Client view toggle is display-only.
+                       # Section numbering is computed (market + what-not-to-do sections
+                       # exist conditionally). The queue checkboxes double as creative-
+                       # brief selection ("Generate creative briefs", buyer view only)
+  memoToText.ts        # view-aware plain-text serialization for the Copy button; takes
+                       # briefIndices so briefs are included only while shown
 ```
 
 ### Layering rules
 
 - Routes stay thin; domain logic lives in `modules/`. Import from each module's `index.ts` only. The debrief engine never imports from `modules/meta` and never learns where a CSV came from.
 - `modules/debrief/memo.ts`'s `generateMemo(analysis, context)` is deterministic template code, not an LLM call — documented as the seam for a future LLM-backed version (same `(AnalysisResult, DebriefContext)` in, same `Memo` shape out, so the route/UI wouldn't need to change). Do not add an actual AI call here unless explicitly asked; it's out of scope for this version.
-- The Buyer/Client report views are one memo, two renderings: `memo.ts` generates both registers (`tldr` + `clientSummary`, `killInstruction` + `clientInstruction`, `kpiExplainer`), and `Report.tsx`/`memoToText.ts` pick per view. Client copy must stay jargon-free — no "kill", "benchmark", or "spend gate"; client view shows top-3 performers only. Print/PDF and Copy follow the active view.
-- Next-tests rule (`buildNextTests`): tests are creative/angle tests tied to named ads and numbers. A budget action may occupy at most the third slot, and only when the top winner beats the median by ≥30% (`SCALE_TEST_MIN_DELTA_PCT`). Budget movement otherwise lives in the verdict and losers section.
-- `components/ui/theme.ts`, `icons.tsx`, `brand.tsx` are the shared design tokens (modern dark SaaS: carbon `#0b0c0f` canvas, soft translucent surfaces (`bg-white/[0.03]` + hairline borders), WHITE primary actions with dark text, icy-cyan accent (`bg-accent`/`text-accent-soft`) only for markers/selection/focus, emerald/red = win/loss only as plain colored text, amber only for warnings; Geist everywhere with Geist Mono reserved for numerals/data) — reuse them rather than inventing new visual patterns. Print CSS in `globals.css` flattens everything to ink-on-paper; keep `.print-hidden`/`.print-win`/`.print-loss` semantics intact.
+- The Buyer/Client report views are one memo, two renderings: `memo.ts` generates both registers (`tldr` + `clientSummary`, `killInstruction` + `clientInstruction`, `avoid.buyer` + `avoid.client`, `confidence.reasons` + `confidence.clientWhy`, `kpiExplainer`), and `Report.tsx`/`memoToText.ts` pick per view. Client copy must stay jargon-free — no "kill", "benchmark", or "spend gate"; client view shows top-3 performers only and never shows Patterns or creative briefs. Print/PDF and Copy follow the active view (and include briefs only while they're on screen).
+- Everything the memo asserts must trace to data: each next test carries `signals` (own numbers first, market notes suffixed "— directional", guardrails last) and a `brief` built from those same facts; "What not to do" bullets render only when their condition holds; confidence `reasons` derive from the exact conditions that set the level. Creative briefs contain structural direction only — never invented product claims, quotes, discounts, guarantees, or competitor facts.
+- Next-tests rule (`buildNextTests`): tests are creative/angle tests tied to named ads and numbers. A budget action may occupy at most the third slot, and only when the top winner beats the median by ≥30% (`SCALE_TEST_MIN_DELTA_PCT`). Market context may *reframe* a test (founder-led variant, problem-first hook, bundle offer variant in the non-scale T3 slot) but never adds a budget action or a competitor-performance claim. Budget movement otherwise lives in the verdict and losers section.
+- `components/ui/theme.ts`, `icons.tsx`, `brand.tsx` are the shared design tokens (modern dark SaaS: carbon `#0b0c0f` canvas, soft translucent surfaces (`bg-white/[0.03]` + hairline borders), WHITE primary actions with dark text, icy-cyan accent (`bg-accent`/`text-accent-soft`) only for markers/selection/focus, emerald/red = win/loss only as plain colored text, amber only for warnings; Geist everywhere with Geist Mono reserved for numerals/data) — reuse them rather than inventing new visual patterns. Print CSS in `globals.css` flattens everything to ink-on-paper; keep `.print-hidden`/`.print-win`/`.print-loss` semantics intact. Motion is transform/opacity only and gated behind motion-safe / `useReducedMotion`; the marketing page loads motion via LazyMotion + the async `motionFeatures` chunk.
 
 ### Calculation rules (keep these honest — see `ARCHITECTURE.md` §5 for the full spec)
 
@@ -84,10 +127,12 @@ components/debrief/
 - Benchmark = median KPI across gated ads only. Polarity per KPI is in `HIGHER_IS_BETTER` (`types.ts`) — higher wins for ROAS/CTR/Leads/Purchases, lower wins for CPA/CPC.
 - Combined below-benchmark spend in the kill list sums *all* judged ads worse than the median, not just the displayed rows.
 - When there's no creative-notes context and no ad-name keyword signal, the memo must say so plainly ("metrics only — angle unknown") rather than inventing a creative narrative. Name tags are extracted with separators (`_-./`) normalized to spaces (`extract.ts`) — real exports use underscore naming.
+- The stat row in the report masthead steps long values down in size and wraps as a last resort (`min-w-0` + `break-words`) — long non-USD spend values overlapped in A4 PDF export once; don't reintroduce fixed 22px values there.
 
 ## Design constraints to preserve
 
-- No routes beyond `/` (home), `/generator`, `/sample`, `/how-it-works`, `/privacy`. Don't add a history page, a second CSV's results, or anything account-shaped.
-- Meta CSV column names vary by export configuration (`columns.ts` handles this via normalized alias matching) — if a required column can't be found for the selected KPI, the API returns a clear 400 rather than guessing.
-- `/sample` and the generator's "Load sample data" must stay on the same dataset (`sampleCsv.ts`) rendered by the real engine — the sample is a promise about what real data produces, not marketing copy.
+- No routes beyond `/` (home, in the `(marketing)` group), `/generator`, `/sample`, `/how-it-works`, `/privacy`. Don't add a history page, a second CSV's results, or anything account-shaped.
+- Meta CSV column names vary by export configuration (`columns.ts` handles this via normalized alias matching) — if a required column can't be found for the selected KPI, the API returns a clear, structured 400 (with KPI switch suggestions when other KPI columns exist) rather than guessing. The alias groups documented in the generator's "CSV requirements" helper must stay true to what `columns.ts` actually resolves.
+- `/sample` and the generator's "Load sample data" must stay on the same dataset AND context (`sampleCsv.ts`, including its `marketContext`) rendered by the real engine — the sample is a promise about what real data produces, not marketing copy. "Download sample CSV" serves that same `SAMPLE_CSV_TEXT` as a client-side blob.
 - A Meta pull that returns zero rows is a guidance state ("no ads found — try a longer range, upload a CSV, or use sample data"), never an error state.
+- Errors are product guides: title / message / "How to fix", structured as `DebriefApiError` end to end. Never surface a raw string or stack trace to the UI.
