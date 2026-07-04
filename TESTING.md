@@ -60,10 +60,16 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       cards (not tables) with a "N more … full detail in the Buyer
       view" note; confidence reads "This result is based on 14 ads and
       $3,385.50 in ad spend…". Buyer view keeps full tables and notes.
-- [ ] **Visual system**: carbon canvas with warm amber haze + fine
-      masked grid, graphite memo sheet with the amber-ruled verdict, a
-      soft warm spotlight trails the cursor on desktop; nothing
-      decorative appears in print (PDF flattens to ink-on-paper).
+- [ ] **Visual system**: near-black canvas with fuchsia haze + cyan
+      counterweight + fine masked grid; report sheet opens with the
+      hazard-tape strip and a fuchsia-ruled verdict; winners/kill-list
+      labels carry emerald/red tape chips; a faint signal spotlight
+      trails the cursor on desktop. Nothing decorative appears in
+      print (PDF flattens to ink-on-paper).
+- [ ] **Kinetic touches**: generator ticker scrolls slowly (static
+      under reduced-motion), dropzone shows marching-ants frame on
+      drag-over, KPI pills show polarity arrows (↑ ROAS/CTR/Leads/
+      Purchases, ↓ CPA/CPC) and select as the signal gradient.
 - [ ] "Copy" copies the plain-text version of the ACTIVE view.
 - [ ] Print/PDF exports the active view (`print-hidden` chrome
       disappears); Client view prints as a client-ready report.

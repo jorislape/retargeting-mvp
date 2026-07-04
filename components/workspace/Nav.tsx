@@ -25,7 +25,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-white/[0.07] bg-gradient-to-b from-[#171512]/95 to-[#121110]/95 backdrop-blur md:flex">
+    <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-white/[0.07] bg-gradient-to-b from-[#141318]/95 to-[#0a0a0c]/95 backdrop-blur md:flex">
       <Link
         href="/"
         className="group flex h-14 shrink-0 items-center gap-2.5 border-b border-white/[0.06] px-4 transition-colors hover:bg-white/[0.03]"
@@ -46,21 +46,21 @@ export function Sidebar() {
               aria-current={active ? "page" : undefined}
               className={`group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
                 active
-                  ? "bg-amber-400/[0.08] text-white shadow-[inset_0_1px_0_rgba(253,230,138,0.08)]"
+                  ? "bg-fuchsia-400/[0.08] text-white shadow-[inset_0_1px_0_rgba(240,171,252,0.08)]"
                   : "text-stone-400 hover:bg-white/[0.04] hover:text-stone-200 active:bg-white/[0.06]"
               }`}
             >
-              {/* Active rail: a lit amber notch on the item's left edge */}
+              {/* Active rail: a lit signal notch on the item's left edge */}
               <span
                 aria-hidden="true"
-                className={`absolute -left-px top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] transition-opacity ${
+                className={`absolute -left-px top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-fuchsia-400 shadow-[0_0_8px_rgba(232,121,249,0.8)] transition-opacity ${
                   active ? "opacity-100" : "opacity-0"
                 }`}
               />
               <item.icon
                 className={`h-4 w-4 shrink-0 transition-colors ${
                   active
-                    ? "text-amber-300"
+                    ? "text-fuchsia-300"
                     : "text-stone-500 group-hover:text-stone-300"
                 }`}
               />
@@ -120,15 +120,15 @@ export function MobileTabBar() {
                 active ? "text-white" : "text-stone-500 active:text-stone-300"
               }`}
             >
-              {/* Active rail: a lit amber notch on the tab's top edge */}
+              {/* Active rail: a lit signal notch on the tab's top edge */}
               <span
                 aria-hidden="true"
-                className={`absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] transition-opacity ${
+                className={`absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-fuchsia-400 shadow-[0_0_8px_rgba(232,121,249,0.8)] transition-opacity ${
                   active ? "opacity-100" : "opacity-0"
                 }`}
               />
               <item.icon
-                className={`h-5 w-5 ${active ? "text-amber-300" : ""}`}
+                className={`h-5 w-5 ${active ? "text-fuchsia-300" : ""}`}
               />
               {item.label === "How it works" ? "Guide" : item.label === "Sample report" ? "Sample" : item.label}
             </Link>

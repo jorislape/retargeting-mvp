@@ -119,7 +119,7 @@ export default function HowItWorksPage() {
               key={rule.term}
               className="grid gap-1.5 px-5 py-4 sm:grid-cols-[11rem_1fr] sm:gap-6"
             >
-              <dt className="font-mono text-xs font-semibold uppercase tracking-wider text-amber-300">
+              <dt className="font-mono text-xs font-semibold uppercase tracking-wider text-fuchsia-300">
                 {rule.term}
               </dt>
               <dd className="text-[13px] leading-relaxed text-stone-400">
@@ -132,7 +132,7 @@ export default function HowItWorksPage() {
           The same engine renders the{" "}
           <Link
             href="/sample"
-            className="rounded-sm text-stone-300 underline decoration-stone-600 underline-offset-2 transition hover:text-amber-300 hover:decoration-amber-400/60"
+            className="rounded-sm text-stone-300 underline decoration-stone-600 underline-offset-2 transition hover:text-fuchsia-300 hover:decoration-fuchsia-400/60"
           >
             sample report
           </Link>{" "}

@@ -1,30 +1,34 @@
 @import "tailwindcss";
 
 /*
- * Night-desk identity: the tool media buyers actually use at 1am.
+ * "Creative Signal" identity — a creative-intelligence instrument for
+ * media buyers, not a generic dark dashboard.
  *
- * Canvas is warm near-black (soot, never #000, never blue-black),
- * surfaces are graphite panels lit from above, and the single signal
- * accent is AMBER — terminal heritage, high contrast, unmistakably
- * not the AI blue/purple default. Emerald and red are reserved
- * exclusively for win/loss semantics. Neutrals are warm (stone), not
- * cool (zinc/slate).
+ * Canvas is OLED near-black with a cool cast; surfaces are graphite
+ * panels with crisp 1px edges. The SIGNAL is fuchsia→pink (actions,
+ * brand, focus) with cyan as a sparing data accent — the palette of
+ * the creative world this tool judges. Emerald and red remain
+ * reserved exclusively for win/loss semantics.
  *
- * Fonts arrive as CSS variables from next/font in app/layout.tsx;
- * mapping them in @theme gives us `font-display`, `font-sans`,
- * `font-mono` utilities.
+ * Graphic signature: hazard tape — thin 45° striped strips (the film
+ * slate; a debrief is what happens after the takes). Used at the top
+ * of the report sheet and as section markers. Kinetic touches (ticker
+ * marquee, marching-ants dropzone) are motion-safe gated and never
+ * carry meaning alone.
+ *
+ * Fonts arrive as CSS variables from next/font in app/layout.tsx.
  */
 :root {
-  --background: #121110;
-  --foreground: #fafaf9;
+  --background: #0a0a0c;
+  --foreground: #fafafa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   /* carbon = canvas; well = recessed inputs/cells below the panels */
-  --color-carbon: #121110;
-  --color-well: #0c0b0a;
+  --color-carbon: #0a0a0c;
+  --color-well: #070708;
   --font-sans: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-sg), var(--font-plex), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
@@ -42,19 +46,20 @@ html {
 
 body {
   background-color: var(--background);
-  /* Atmosphere in two warm layers: a low amber haze above the fold
-     (a desk lamp, not a glow effect) and a faint ember bottom-right.
-     Fixed so scrolling moves content over a lit surface. */
+  /* Atmosphere: a fuchsia signal-haze above the fold and a faint cyan
+     counterweight below-right — the two creative wavelengths, kept
+     under 7% alpha so they read as depth, not decoration. Fixed so
+     scrolling moves content over a lit surface. */
   background-image:
-    radial-gradient(1200px 560px at 50% -200px, rgba(251, 191, 36, 0.07), transparent 70%),
-    radial-gradient(900px 700px at 100% 115%, rgba(217, 119, 6, 0.04), transparent 60%);
+    radial-gradient(1200px 560px at 50% -200px, rgba(217, 70, 239, 0.075), transparent 70%),
+    radial-gradient(900px 700px at 100% 115%, rgba(34, 211, 238, 0.045), transparent 60%);
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
-/* Fine engineering grid, warm and masked toward the lamp — texture
-   that reads as a working surface, gone before content density. */
+/* Fine engineering grid, masked toward the signal-haze — a working
+   surface, dissolved before content density picks up. */
 body::before {
   content: "";
   position: fixed;
@@ -62,46 +67,71 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background-image:
-    linear-gradient(to right, rgba(250, 250, 249, 0.032) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(250, 250, 249, 0.032) 1px, transparent 1px);
+    linear-gradient(to right, rgba(250, 250, 250, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(250, 250, 250, 0.03) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse 85% 52% at 50% 0%, black 12%, transparent 72%);
 }
 
-/* Cursor spotlight — a large, faint pool of warm light that trails
-   the pointer (lerped in <Atmosphere/>). Depth, never a torch: peak
-   alpha stays under 0.06 so contrast is untouched. */
+/* Cursor spotlight — a faint pool of signal light that trails the
+   pointer (lerped in <Atmosphere/>). Depth, never a torch: peak alpha
+   stays under 0.06 so contrast is untouched. */
 .cursor-spotlight {
   background: radial-gradient(
     closest-side,
-    rgba(251, 191, 36, 0.055),
-    rgba(251, 191, 36, 0.02) 45%,
+    rgba(217, 70, 239, 0.055),
+    rgba(217, 70, 239, 0.02) 45%,
     transparent 70%
   );
 }
 
+/* Hazard tape — the film-slate stripe. Fuchsia for the brand strip,
+   red variant for the kill list marker. Pure gradient: prints as a
+   thin rule, costs nothing. */
+.tape {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(217, 70, 239, 0.85) 0 8px,
+    rgba(217, 70, 239, 0.12) 8px 16px
+  );
+}
+.tape-red {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(248, 113, 113, 0.75) 0 6px,
+    rgba(248, 113, 113, 0.1) 6px 12px
+  );
+}
+.tape-emerald {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(52, 211, 153, 0.75) 0 6px,
+    rgba(52, 211, 153, 0.1) 6px 12px
+  );
+}
+
 ::selection {
-  background: rgb(251 191 36 / 0.3);
+  background: rgb(217 70 239 / 0.35);
 }
 
 /*
  * On-brand keyboard focus. Components that render their own
  * focus-visible ring also set outline-none, which wins over this
  * :where() rule (zero specificity by design) — so every focusable
- * element gets exactly one amber indicator.
+ * element gets exactly one signal indicator.
  */
 :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
-  outline: 2px solid rgb(251 191 36 / 0.7);
+  outline: 2px solid rgb(232 121 249 / 0.75);
   outline-offset: 2px;
 }
 
 /*
- * Key phrase in a page h1 (one per page, max): the amber signal,
- * clipped hot-to-deep. Hand-rolled because Safari still needs the
- * -webkit- prefix for background-clip: text.
+ * Key phrase in a page h1 (one per page, max): the signal gradient,
+ * hot pink into cyan — the two creative wavelengths in one phrase.
+ * Hand-rolled because Safari still needs the -webkit- prefix.
  */
 .gradient-phrase {
-  background-image: linear-gradient(100deg, #fde68a, #fbbf24 45%, #d97706);
+  background-image: linear-gradient(100deg, #f0abfc, #e879f9 40%, #22d3ee);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -138,6 +168,51 @@ body::before {
       opacity: 1;
       transform: none;
     }
+  }
+
+  /* Marching ants — the dropzone's drag-over invitation. Four edge
+     gradients crawl clockwise; pure background-position, no layout. */
+  .drag-ants {
+    background-image:
+      repeating-linear-gradient(90deg, rgba(232, 121, 249, 0.9) 0 10px, transparent 10px 20px),
+      repeating-linear-gradient(90deg, rgba(232, 121, 249, 0.9) 0 10px, transparent 10px 20px),
+      repeating-linear-gradient(0deg, rgba(232, 121, 249, 0.9) 0 10px, transparent 10px 20px),
+      repeating-linear-gradient(0deg, rgba(232, 121, 249, 0.9) 0 10px, transparent 10px 20px);
+    background-position: 0 0, 0 100%, 0 0, 100% 0;
+    background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+    background-repeat: no-repeat;
+    animation: ants 0.7s linear infinite;
+  }
+  @keyframes ants {
+    to {
+      background-position: 20px 0, -20px 100%, 0 -20px, 100% 20px;
+    }
+  }
+
+  /* Ticker marquee — a slow editorial strip. The track holds two
+     copies of the content; translating -50% loops seamlessly. */
+  .marquee-track {
+    animation: marquee 28s linear infinite;
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+}
+
+/* Outside motion-safe, the ants class still draws a static dashed
+   frame so the drag state never loses its affordance. */
+@media (prefers-reduced-motion: reduce) {
+  .drag-ants {
+    background-image:
+      repeating-linear-gradient(90deg, rgba(232, 121, 249, 0.9) 0 10px, transparent 10px 20px),
+      repeating-linear-gradient(90deg, rgba(232, 121, 249, 0.9) 0 10px, transparent 10px 20px),
+      repeating-linear-gradient(0deg, rgba(232, 121, 249, 0.9) 0 10px, transparent 10px 20px),
+      repeating-linear-gradient(0deg, rgba(232, 121, 249, 0.9) 0 10px, transparent 10px 20px);
+    background-position: 0 0, 0 100%, 0 0, 100% 0;
+    background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+    background-repeat: no-repeat;
   }
 }
 

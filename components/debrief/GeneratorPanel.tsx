@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { KpiKey } from "@/modules/debrief";
 import {
+  HIGHER_IS_BETTER,
   SAMPLE_CONTEXT,
   SAMPLE_CSV_FILENAME,
   SAMPLE_CSV_TEXT,
@@ -80,9 +81,9 @@ function ProcessingPanel() {
             <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold transition ${
                 i < step
-                  ? "bg-amber-400 text-stone-950"
+                  ? "bg-fuchsia-600 text-white"
                   : i === step
-                    ? "border border-amber-400/70 text-amber-300 motion-safe:animate-pulse"
+                    ? "border border-fuchsia-400/70 text-fuchsia-300 motion-safe:animate-pulse"
                     : "border border-white/15 text-stone-600"
               }`}
             >
@@ -169,15 +170,15 @@ export function GeneratorPanel() {
                   onClick={loadSample}
                   className={`cursor-pointer ${btnSecondary}`}
                 >
-                  <FlaskIcon className="h-3.5 w-3.5 text-amber-300" />
+                  <FlaskIcon className="h-3.5 w-3.5 text-fuchsia-300" />
                   Use sample data
                 </button>
               </div>
               <p className="mt-3 font-mono text-[10px] font-semibold tracking-[0.14em] text-stone-500">
                 A · UPLOAD ADS MANAGER EXPORT
               </p>
-              {/* Dropzone states: rest (quiet well) → drag-over (amber
-                  invitation) → accepted (settled, filed). Keyboard focus
+              {/* Dropzone states: rest (quiet well) → drag-over (marching
+                  ants frame) → accepted (settled, filed). Keyboard focus
                   on the hidden input lights the same ring via
                   focus-within. */}
               <label
@@ -192,12 +193,12 @@ export function GeneratorPanel() {
                   setDragging(false);
                   handleFiles(e.dataTransfer.files);
                 }}
-                className={`mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg px-4 py-6 text-center transition focus-within:ring-2 focus-within:ring-amber-400/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon motion-safe:duration-200 ${
+                className={`mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg px-4 py-6 text-center transition focus-within:ring-2 focus-within:ring-fuchsia-400/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon motion-safe:duration-200 ${
                   dragging
-                    ? "border-2 border-amber-400/80 bg-amber-400/[0.07] shadow-[0_0_32px_-8px_rgba(251,191,36,0.35)] motion-safe:-translate-y-0.5"
+                    ? "drag-ants border-2 border-transparent bg-fuchsia-400/[0.06] shadow-[0_0_36px_-8px_rgba(217,70,239,0.4)] motion-safe:-translate-y-0.5"
                     : file
-                      ? "animate-settle border-2 border-amber-400/35 bg-amber-400/[0.05]"
-                      : "border-2 border-dashed border-white/15 bg-well/50 hover:border-white/30 hover:bg-white/[0.03] active:border-amber-400/50"
+                      ? "animate-settle border-2 border-fuchsia-400/35 bg-fuchsia-400/[0.05]"
+                      : "border-2 border-dashed border-white/15 bg-well/50 hover:border-white/30 hover:bg-white/[0.03] active:border-fuchsia-400/50"
                 }`}
               >
                 <input
@@ -210,13 +211,13 @@ export function GeneratorPanel() {
                 />
                 {file ? (
                   <>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-amber-400/25 bg-amber-400/10">
-                      <FileTextIcon className="h-4.5 w-4.5 text-amber-300" />
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-fuchsia-400/25 bg-fuchsia-400/10">
+                      <FileTextIcon className="h-4.5 w-4.5 text-fuchsia-300" />
                     </span>
                     <p className="mt-1 max-w-full truncate px-2 font-mono text-[13px] font-semibold text-stone-100">
                       {file.name}
                     </p>
-                    <p className="font-mono text-[11px] text-amber-300/80">
+                    <p className="font-mono text-[11px] text-fuchsia-300/80">
                       {fmtBytes(file.size)} · ready
                     </p>
                     <button
@@ -238,13 +239,13 @@ export function GeneratorPanel() {
                     <span
                       className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
                         dragging
-                          ? "border-amber-400/30 bg-amber-400/10"
+                          ? "border-fuchsia-400/30 bg-fuchsia-400/10"
                           : "border-white/10 bg-white/[0.04]"
                       }`}
                     >
                       <UploadIcon
                         className={`h-4.5 w-4.5 transition-colors ${
-                          dragging ? "text-amber-300" : "text-stone-500"
+                          dragging ? "text-fuchsia-300" : "text-stone-500"
                         }`}
                       />
                     </span>
@@ -262,7 +263,7 @@ export function GeneratorPanel() {
                   <details> keeps both out of the way until needed. */}
               <div className="mt-2 space-y-1">
                 <details className="group rounded-lg border border-transparent open:border-white/10 open:bg-white/[0.03]">
-                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-stone-500 transition hover:text-stone-200 group-open:px-3 group-open:pt-2.5 group-open:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 [&::-webkit-details-marker]:hidden">
+                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-stone-500 transition hover:text-stone-200 group-open:px-3 group-open:pt-2.5 group-open:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 [&::-webkit-details-marker]:hidden">
                     <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
                       ›
                     </span>
@@ -278,7 +279,7 @@ export function GeneratorPanel() {
                       "Drop the file above",
                     ].map((step, i) => (
                       <li key={step} className="flex gap-2">
-                        <span className="font-mono text-[10px] font-semibold text-amber-300">
+                        <span className="font-mono text-[10px] font-semibold text-fuchsia-300">
                           {i + 1}.
                         </span>
                         {step}
@@ -288,7 +289,7 @@ export function GeneratorPanel() {
                 </details>
 
                 <details className="group rounded-lg border border-transparent open:border-white/10 open:bg-white/[0.03]">
-                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-stone-500 transition hover:text-stone-200 group-open:px-3 group-open:pt-2.5 group-open:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 [&::-webkit-details-marker]:hidden">
+                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-stone-500 transition hover:text-stone-200 group-open:px-3 group-open:pt-2.5 group-open:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 [&::-webkit-details-marker]:hidden">
                     <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
                       ›
                     </span>
@@ -340,13 +341,24 @@ export function GeneratorPanel() {
                         type="button"
                         aria-pressed={active}
                         onClick={() => updateFields({ kpi: opt.value })}
-                        className={`cursor-pointer rounded-lg border px-2 py-2 font-mono text-xs font-semibold transition motion-safe:duration-200 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-carbon ${
+                        className={`cursor-pointer rounded-lg border px-2 py-2 font-mono text-xs font-semibold transition motion-safe:duration-200 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-carbon ${
                           active
-                            ? "border-amber-400 bg-amber-400 text-stone-950 shadow-[0_2px_12px_-2px_rgba(251,191,36,0.4)]"
+                            ? "border-fuchsia-400/60 bg-gradient-to-b from-fuchsia-500 to-pink-600 text-white shadow-[0_2px_16px_-2px_rgba(217,70,239,0.5)]"
                             : "border-white/10 bg-white/[0.03] text-stone-400 hover:border-white/25 hover:text-stone-100"
                         }`}
                       >
                         {opt.label}
+                        <span
+                          aria-hidden="true"
+                          title={
+                            HIGHER_IS_BETTER[opt.value]
+                              ? "Higher is better"
+                              : "Lower is better"
+                          }
+                          className={`ml-1 ${active ? "text-white/70" : "text-stone-600"}`}
+                        >
+                          {HIGHER_IS_BETTER[opt.value] ? "\u2191" : "\u2193"}
+                        </span>
                       </button>
                     );
                   })}

@@ -22,7 +22,7 @@ import { memoToText, type ReportView } from "./memoToText";
 /* ------------------------------------------------------------------ */
 /* The report renderer — shared by generated debriefs and the sample.  */
 /* The report is a SHEET: one elevated graphite memo with a            */
-/* letterhead, an amber-ruled verdict, and sections separated by       */
+/* letterhead, a signal-ruled verdict, and sections separated by       */
 /* drawn rules — the                                                   */
 /* on-screen document and the PDF are the same artifact. Product       */
 /* chrome (view toggle, copy, PDF, new debrief) sits in a toolbar      */
@@ -207,10 +207,10 @@ function TestRow({
             aria-checked={checked}
             aria-label={`Mark test ${index + 1} as queued`}
             onClick={onToggle}
-            className={`print-hidden mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border transition motion-safe:duration-200 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-carbon ${
+            className={`print-hidden mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border transition motion-safe:duration-200 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-carbon ${
               checked
-                ? "border-amber-400 bg-amber-400 text-stone-950"
-                : "border-white/20 bg-white/[0.02] text-transparent hover:border-amber-400/50"
+                ? "border-fuchsia-500 bg-fuchsia-600 text-white"
+                : "border-white/20 bg-white/[0.02] text-transparent hover:border-fuchsia-400/50"
             }`}
           >
             <CheckIcon className="h-3.5 w-3.5 text-current" />
@@ -281,9 +281,9 @@ function ViewToggle({
           type="button"
           aria-pressed={view === value}
           onClick={() => onChange(value)}
-          className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
+          className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 ${
             view === value
-              ? "bg-amber-400 text-stone-950 shadow-[0_1px_8px_-1px_rgba(251,191,36,0.5)]"
+              ? "bg-gradient-to-b from-fuchsia-500 to-pink-600 text-white shadow-[0_1px_10px_-1px_rgba(217,70,239,0.55)]"
               : "text-stone-400 hover:text-stone-100"
           }`}
         >
@@ -362,7 +362,10 @@ export function Report({
       </div>
 
       {/* ---- The sheet: one white memo, letterhead to sign-off ---- */}
-      <article className="animate-rise mt-4 rounded-2xl border border-white/10 bg-gradient-to-b from-[#1e1c18] to-[#161411] px-5 py-6 shadow-[0_32px_64px_-24px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(253,230,138,0.08)] sm:px-8 sm:py-8">
+      <article className="animate-rise mt-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#1c1b21] to-[#141318] shadow-[0_32px_64px_-24px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(240,171,252,0.07)]">
+        {/* The slate strip — hazard tape across the sheet's top edge. */}
+        <div aria-hidden="true" className="tape h-1.5" />
+        <div className="px-5 py-6 sm:px-8 sm:py-8">
         {/* Letterhead */}
         <header style={stagger(1)}>
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
@@ -419,7 +422,7 @@ export function Report({
                 memo.scope.medianLabel,
               ],
             ].map(([label, value]) => (
-              <div key={label} className="px-3.5 py-3">
+              <div key={label} className="px-3.5 py-3 transition-colors hover:bg-white/[0.03]">
                 <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-stone-600">
                   {label}
                 </p>
@@ -433,7 +436,7 @@ export function Report({
 
         {/* ---- Verdict / Summary: the ink-ruled callout ---- */}
         <section className="animate-rise mt-8" style={stagger(2)}>
-          <div className="border-y-2 border-amber-400/80 py-5">
+          <div className="border-y-2 border-fuchsia-500/80 py-5">
             <p className={eyebrow}>{client ? "Summary" : "The verdict"}</p>
             <div className="mt-3 space-y-2.5">
               {(client ? memo.clientSummary : memo.tldr).map((line, i) => (
@@ -450,7 +453,10 @@ export function Report({
 
         {/* ---- Winners / What worked ---- */}
         <section className="animate-rise mt-8" style={stagger(3)}>
-          <SectionLabel>{client ? "What worked" : "Winners"}</SectionLabel>
+          <div className="flex items-center gap-2.5">
+            <span aria-hidden="true" className="tape-emerald h-2.5 w-10 shrink-0 rounded-sm" />
+            <SectionLabel>{client ? "What worked" : "Winners"}</SectionLabel>
+          </div>
           <div className="mt-3">
             {memo.winners.length === 0 ? (
               <div className="rounded-lg border border-dashed border-white/15 bg-black/20 px-4 py-6 text-center">
@@ -473,9 +479,12 @@ export function Report({
 
         {/* ---- Losers / What underperformed ---- */}
         <section className="animate-rise mt-8" style={stagger(4)}>
-          <SectionLabel>
-            {client ? "What underperformed" : "Losers / kill list"}
-          </SectionLabel>
+          <div className="flex items-center gap-2.5">
+            <span aria-hidden="true" className="tape-red h-2.5 w-10 shrink-0 rounded-sm" />
+            <SectionLabel>
+              {client ? "What underperformed" : "Losers / kill list"}
+            </SectionLabel>
+          </div>
           <p className="mt-3 text-sm leading-relaxed text-stone-300">
             {client ? memo.losers.clientInstruction : memo.losers.killInstruction}
           </p>
@@ -621,6 +630,7 @@ export function Report({
           Deterministic scoring — every number above comes from your CSV, not a
           model.
         </p>
+        </div>
       </article>
     </div>
   );

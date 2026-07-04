@@ -141,7 +141,7 @@ export function MetaConnect() {
           disabled={disabled}
           className={`w-full cursor-pointer ${btnSecondaryMd}`}
         >
-          <ZapIcon className="h-4 w-4 text-amber-300" />
+          <ZapIcon className="h-4 w-4 text-fuchsia-300" />
           {status === "connecting"
             ? "Waiting for Meta sign-in…"
             : "Connect Meta account"}
@@ -237,13 +237,13 @@ export function MetaConnect() {
         className={`mt-2.5 w-full cursor-pointer ${btnSecondaryMd}`}
       >
         <RefreshIcon
-          className={`h-4 w-4 text-amber-300 ${pulling ? "motion-safe:animate-spin" : ""}`}
+          className={`h-4 w-4 text-fuchsia-300 ${pulling ? "motion-safe:animate-spin" : ""}`}
         />
         {pulling ? "Pulling ads…" : "Pull ads into the generator"}
       </button>
 
       {pullNote && (
-        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-amber-300/80">
+        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-cyan-300/80">
           {pullNote.toUpperCase()}
         </p>
       )}
