@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeroProof } from "@/components/marketing/HeroProof";
 import {
   ArrowIcon,
   CheckIcon,
@@ -189,6 +190,11 @@ export default function HomePage() {
         <p className="mt-4 text-xs text-zinc-600">
           No login · Nothing stored · Optional read-only Meta connection
         </p>
+
+        {/* Live proof: the engine sorting real-shaped rows, on loop. */}
+        <div className="mx-auto mt-12 max-w-2xl text-left">
+          <HeroProof />
+        </div>
       </section>
 
       {/* ---- The pipeline, designed ---- */}
