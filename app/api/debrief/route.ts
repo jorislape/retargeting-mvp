@@ -82,6 +82,10 @@ export async function POST(request: NextRequest) {
     goal: String(form.get("goal") ?? "").trim().slice(0, 200),
     targetCpa,
     creativeNotes: String(form.get("creativeNotes") ?? "").trim().slice(0, 1000),
+    /* Optional pasted market/competitor notes — directional context for
+       the memo only. Read into memory for this request like the rest of
+       the context; never logged, never stored. */
+    marketContext: String(form.get("marketContext") ?? "").trim().slice(0, 2000),
   };
 
   let text: string;

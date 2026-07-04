@@ -284,9 +284,12 @@ export function Report({
     }
   };
 
-  /* Section numbering shifts because the client view drops Patterns. */
+  /* Section numbering shifts because the client view drops Patterns
+     and the market section only exists when context was provided. */
+  const hasMarket = memo.marketSignal !== null;
   const secNum = (buyerN: number, clientN: number) =>
     String(client ? clientN : buyerN).padStart(2, "0");
+  const marketShift = hasMarket ? 1 : 0;
 
   const stagger = (i: number) => ({ animationDelay: `${i * 80}ms` });
 
@@ -501,10 +504,36 @@ export function Report({
           </p>
         </section>
 
-        {/* ---- 04 · Patterns (buyer only) ---- */}
-        {!client && (
+        {/* ---- Market signal / context (only when provided) ---- */}
+        {memo.marketSignal && (
           <section className="animate-rise mt-12" style={stagger(5)}>
-            <SectionHead n="04" title="Patterns" />
+            <SectionHead
+              n="04"
+              title={client ? "Market context" : "Market signal"}
+            />
+            <ul className="mt-4 space-y-2">
+              {memo.marketSignal.bullets.map((bullet, i) => (
+                <li
+                  key={i}
+                  className="border-l border-white/10 pl-3 text-[13px] leading-relaxed text-zinc-400"
+                >
+                  {bullet}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs leading-relaxed text-zinc-500">
+              {memo.marketSignal.caveat}
+            </p>
+          </section>
+        )}
+
+        {/* ---- Patterns (buyer only) ---- */}
+        {!client && (
+          <section
+            className="animate-rise mt-12"
+            style={stagger(5 + marketShift)}
+          >
+            <SectionHead n={secNum(4 + marketShift, 0)} title="Patterns" />
             <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2">
               {(
                 [
@@ -535,9 +564,12 @@ export function Report({
         )}
 
         {/* ---- Next tests: the run-list ledger ---- */}
-        <section className="animate-rise mt-12" style={stagger(client ? 5 : 6)}>
+        <section
+          className="animate-rise mt-12"
+          style={stagger((client ? 5 : 6) + marketShift)}
+        >
           <SectionHead
-            n={secNum(5, 4)}
+            n={secNum(5 + marketShift, 4 + marketShift)}
             title={client ? "What we'll test next" : "Next tests — run list"}
             right={
               !client ? (
@@ -571,9 +603,12 @@ export function Report({
         </section>
 
         {/* ---- Confidence ---- */}
-        <section className="animate-rise mt-10" style={stagger(client ? 6 : 7)}>
+        <section
+          className="animate-rise mt-10"
+          style={stagger((client ? 6 : 7) + marketShift)}
+        >
           <SectionHead
-            n={secNum(6, 5)}
+            n={secNum(6 + marketShift, 5 + marketShift)}
             title={client ? "Confidence & data used" : "Confidence & missing data"}
             right={
               <span

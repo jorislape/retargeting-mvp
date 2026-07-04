@@ -25,6 +25,8 @@ export interface GeneratorFields {
   goal: string;
   targetCpa: string;
   creativeNotes: string;
+  /** Optional pasted market/competitor notes — never required. */
+  marketContext: string;
 }
 
 export type GeneratorStatus = "idle" | "processing" | "ready";
@@ -36,6 +38,7 @@ const DEFAULT_FIELDS: GeneratorFields = {
   goal: "",
   targetCpa: "",
   creativeNotes: "",
+  marketContext: "",
 };
 
 /* The engine is deterministic and fast (~50ms); a sub-100ms flash of
@@ -84,6 +87,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     body.append("goal", fields.goal);
     if (fields.targetCpa.trim() !== "") body.append("targetCpa", fields.targetCpa);
     body.append("creativeNotes", fields.creativeNotes);
+    body.append("marketContext", fields.marketContext);
 
     try {
       const res = await fetch("/api/debrief", { method: "POST", body });

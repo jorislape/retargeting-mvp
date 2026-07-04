@@ -10,6 +10,7 @@ import {
   KPI_EXPLAINERS,
   KPI_LABELS,
   Memo,
+  MemoMarketSignal,
   MemoTest,
   MemoWinnerLoserRow,
   RankedAd,
@@ -158,6 +159,125 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
   return { winners: winnerNotes, losers: loserNotes };
 }
 
+/* ------------------------------------------------------------------ */
+/* Market / competitor context (V1: manually pasted text only).        */
+/*                                                                     */
+/* The text is scanned for known creative-strategy terms — formats,    */
+/* hooks, offers — with the same keyword-matching honesty as ad-name   */
+/* tags: we only restate what the user wrote, grouped. No scraping,    */
+/* no inference about competitor spend or performance, ever. Own       */
+/* account data stays the primary signal; market context can only      */
+/* REFRAME a test, not create a claim.                                 */
+/* ------------------------------------------------------------------ */
+
+const MARKET_CAVEAT =
+  "Market context is directional — it does not confirm competitor spend or performance.";
+
+interface MarketSignals {
+  formats: string[];
+  hooks: string[];
+  offers: string[];
+  has: (key: string) => boolean;
+}
+
+const MARKET_TERMS: {
+  key: string;
+  label: string;
+  group: keyof Pick<MarketSignals, "formats" | "hooks" | "offers">;
+  re: RegExp;
+}[] = [
+  { key: "founder-led", label: "founder-led video", group: "formats", re: /founder[\s-]?led|founder\s+(stor|video)/i },
+  { key: "ugc", label: "UGC / creator content", group: "formats", re: /\bugc\b|creator[\s-]shot|user[\s-]generated/i },
+  { key: "testimonial", label: "testimonials", group: "formats", re: /testimonial|customer\s+review/i },
+  { key: "video", label: "video", group: "formats", re: /\bvideos?\b/i },
+  { key: "static", label: "statics", group: "formats", re: /\bstatics?\b/i },
+  { key: "carousel", label: "carousels", group: "formats", re: /carousel/i },
+  { key: "meme", label: "meme-style creative", group: "formats", re: /\bmeme/i },
+  { key: "problem-first", label: "problem-first hooks", group: "hooks", re: /problem[\s-](first|led)|pain[\s-]?point/i },
+  { key: "before-after", label: "before/after framing", group: "hooks", re: /before[\s/&-]*after/i },
+  { key: "question", label: "question hooks", group: "hooks", re: /question\s+hook/i },
+  { key: "pov", label: "POV-style hooks", group: "hooks", re: /\bpov\b/i },
+  { key: "bundle", label: "bundle offers", group: "offers", re: /bundle/i },
+  { key: "discount", label: "discounts", group: "offers", re: /discount|%\s?off|\bsale\b/i },
+  { key: "first-order", label: "first-order offers", group: "offers", re: /first[\s-]order|new[\s-]customer\s+offer/i },
+  { key: "free-shipping", label: "free shipping", group: "offers", re: /free\s+shipping/i },
+  { key: "subscription", label: "subscription / trial offers", group: "offers", re: /subscri|free\s+trial/i },
+];
+
+function extractMarketSignals(text: string): MarketSignals {
+  const matched = MARKET_TERMS.filter((t) => t.re.test(text));
+  const keys = new Set(matched.map((t) => t.key));
+  const labels = (group: string) =>
+    matched
+      .filter((t) => t.group === group)
+      // "video" adds nothing when a specific video format also matched
+      .filter((t) => t.key !== "video" || !(keys.has("founder-led") || keys.has("ugc")))
+      .map((t) => t.label);
+  return {
+    formats: labels("formats"),
+    hooks: labels("hooks"),
+    offers: labels("offers"),
+    has: (key) => keys.has(key),
+  };
+}
+
+/** 2–4 bullets restating the user's own market notes, plus the fixed
+ *  directional caveat. Null when no context was pasted — the memo is
+ *  then identical to a run without this feature. */
+function buildMarketSignal(
+  analysis: AnalysisResult,
+  context: DebriefContext
+): MemoMarketSignal | null {
+  const text = context.marketContext.trim();
+  if (text === "") return null;
+
+  const signals = extractMarketSignals(text);
+  const top = analysis.winners[0] ?? null;
+  const bullets: string[] = [];
+
+  if (signals.formats.length > 0) {
+    bullets.push(
+      `Formats observed in the market: ${signals.formats.join(", ")}.`
+    );
+  }
+  if (signals.hooks.length > 0) {
+    bullets.push(
+      `Hooks repeating across the notes: ${signals.hooks.join(", ")} — an observed pattern, not verified performance.`
+    );
+  }
+  if (signals.offers.length > 0) {
+    bullets.push(`Offers in circulation: ${signals.offers.join(", ")}.`);
+  }
+
+  if (bullets.length === 0) {
+    const snippet = text.length > 120 ? `${text.slice(0, 117)}…` : text;
+    bullets.push(
+      `Notes captured: "${snippet}" — carried into the next tests as directional context.`
+    );
+  }
+
+  /* What seems worth adapting — always tied back to own data. */
+  if (top && signals.has("founder-led") && !top.nameTags.includes("founder")) {
+    bullets.push(
+      `Worth testing: a founder-led take on "${top.name}"'s proven angle — adapt, don't copy.`
+    );
+  } else if (top && signals.has("bundle")) {
+    bullets.push(
+      `Worth testing: "${top.name}"'s winning angle with a bundle offer variant.`
+    );
+  } else if (top && signals.formats.length > 0) {
+    bullets.push(
+      `Worth testing: the ${signals.formats[0]} pattern applied to "${top.name}"'s angle — your own numbers stay the primary signal.`
+    );
+  } else {
+    bullets.push(
+      `These notes shape the angle tests below — your own account data stays the primary signal.`
+    );
+  }
+
+  return { bullets: bullets.slice(0, 4), caveat: MARKET_CAVEAT };
+}
+
 /** The most common name tag in a group, or null. */
 function dominantTag(group: RankedAd[]): { tag: string; count: number } | null {
   const counts = new Map<string, number>();
@@ -205,19 +325,41 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
   const worst = losers[0] ?? null; // losers arrive sorted worst-first
   const winnerTag = dominantTag(winners);
 
+  /* Market context (when pasted) may REFRAME a test — own performance
+     data stays the primary signal, and every market-informed line says
+     so. Null when the field was left empty, in which case every branch
+     below is byte-identical to the pre-market-context engine. */
+  const market =
+    context.marketContext.trim() === ""
+      ? null
+      : extractMarketSignals(context.marketContext);
+
   /* T1 — iterate the proven winner (creative). */
   if (top) {
     const format = winnerTag && top.nameTags.includes(winnerTag.tag) ? `${winnerTag.tag} ` : "";
+    const founderLed =
+      market?.has("founder-led") && !top.nameTags.includes("founder");
     tests.push({
-      test: `Brief 2 new ${format}variants of "${top.name}" — keep the angle, change the hook.`,
-      why: `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend. The angle has proven demand — new hooks find its ceiling before fatigue does.`,
+      test: founderLed
+        ? `Brief 2 new ${format}variants of "${top.name}" — keep the angle; make one a founder-led version (market signal), change only the hook on the other.`
+        : `Brief 2 new ${format}variants of "${top.name}" — keep the angle, change the hook.`,
+      why: `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend. The angle has proven demand — new hooks find its ceiling before fatigue does.${
+        founderLed
+          ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of the proven angle. Adapt, don't copy."
+          : ""
+      }`,
       setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each clears the spend gate. Change only the opening 3 seconds / first frame between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
     });
   } else {
+    const marketAngles = market && market.hooks.length > 0;
     tests.push({
       test: `Brief 3 deliberately distinct angles${context.product ? ` for ${context.product}` : ""}: problem-led, social-proof-led, and offer-led.`,
-      why: `No ad beat the ${medianLabel} median this period — flat results mean the account needs new angles, not more budget behind existing ones.`,
+      why: `No ad beat the ${medianLabel} median this period — flat results mean the account needs new angles, not more budget behind existing ones.${
+        marketAngles
+          ? ` Your market notes point the same way (${market.hooks.join(", ")}) — directional support for the problem-led slot.`
+          : ""
+      }`,
       setup: `Matched budget (~${gateLabel} per ad), same audience and placement across all three, so the angle is the only variable.`,
       winningLooksLike: `At least one angle clears ${gateLabel} spend and beats ${medianLabel}.`,
     });
@@ -227,24 +369,39 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
      angle outright. */
   if (worst) {
     const worstStats = `${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}) on ${fmtMoney(worst.spend, currency)} spend`;
+    const problemFirst = market?.has("problem-first") ?? false;
     if (worst.nameTags.includes("discount/promo")) {
       tests.push({
         test: `Rebuild "${worst.name}" so the hook leads with the problem and the discount becomes the closer.`,
-        why: `An offer-led ad running ${worstStats} means the discount alone isn't earning attention — the opening has to sell the problem before the price can close.`,
+        why: `An offer-led ad running ${worstStats} means the discount alone isn't earning attention — the opening has to sell the problem before the price can close.${
+          problemFirst
+            ? " Problem-first hooks also repeat in your market notes — an observed pattern worth adapting to your own claim, not copying."
+            : ""
+        }`,
         setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateLabel} with the same audience, placement, and offer — creative is the only change.`,
         winningLooksLike: `The rebuild beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} and closes to within 20% of ${medianLabel}.`,
       });
     } else if (winnerTag && !worst.nameTags.includes(winnerTag.tag)) {
       tests.push({
         test: `Reshoot "${worst.name}"'s message in the ${winnerTag.tag} format carrying your winners.`,
-        why: `The message got ${fmtMoney(worst.spend, currency)} of spend but ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}, while ${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots — test whether the format, not the message, is what's failing.`,
+        why: `The message got ${fmtMoney(worst.spend, currency)} of spend but ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}, while ${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots — test whether the format, not the message, is what's failing.${
+          problemFirst
+            ? " Give the reshoot a problem-first opening — a repeating pattern in your market notes (directional)."
+            : ""
+        }`,
         setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateLabel}, same audience and offer.`,
         winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
       });
     } else {
       tests.push({
-        test: `Rebuild "${worst.name}" with a new opening hook before writing the angle off.`,
-        why: `At ${worstStats} it's the account's weakest judged ad — one rebuild is cheaper than losing an angle that might only have a hook problem.`,
+        test: problemFirst
+          ? `Rebuild "${worst.name}" with a problem-first opening hook (observed market pattern) before writing the angle off.`
+          : `Rebuild "${worst.name}" with a new opening hook before writing the angle off.`,
+        why: `At ${worstStats} it's the account's weakest judged ad — one rebuild is cheaper than losing an angle that might only have a hook problem.${
+          problemFirst
+            ? " Your market notes flag problem-first hooks as a repeating pattern — directional, and the cheapest place to test it."
+            : ""
+        }`,
         setup: `Reduce the original's spend. One rebuild at ~${gateLabel}, changing only the hook — same body, audience, and offer.`,
         winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
       });
@@ -271,6 +428,15 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} vs median on ${fmtMoney(top.spend, currency)} already spent. Everything else this period is a creative problem, not a budget one.`,
       setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
       winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
+    });
+  } else if (top && market?.has("bundle")) {
+    /* Market-informed offer variant on the proven angle — still a
+       creative/offer test, never a budget action. */
+    tests.push({
+      test: `Test "${top.name}"'s winning angle with a bundle offer variant (market signal).`,
+      why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already proven at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
+      setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it clears the spend gate.`,
+      winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
     });
   } else {
     const challenger = winnerTag
@@ -410,6 +576,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
           : "No ads were set aside for low spend.",
     },
     patterns: buildPatterns(analysis),
+    marketSignal: buildMarketSignal(analysis, context),
     nextTests: buildNextTests(analysis, context),
     confidence: buildConfidence(analysis),
   };

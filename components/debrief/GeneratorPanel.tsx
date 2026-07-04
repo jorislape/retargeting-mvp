@@ -187,6 +187,9 @@ export function GeneratorPanel() {
       ...(fields.creativeNotes.trim() === "" && {
         creativeNotes: SAMPLE_CONTEXT.creativeNotes,
       }),
+      ...(fields.marketContext.trim() === "" && {
+        marketContext: SAMPLE_CONTEXT.marketContext,
+      }),
     });
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -532,6 +535,25 @@ export function GeneratorPanel() {
                 placeholder="e.g. Ads 3 & 5 are UGC; rest are statics"
                 className={`mt-1.5 resize-none ${inputBase}`}
               />
+            </div>
+            <div className="sm:col-span-3">
+              <label htmlFor="marketContext" className={fieldLabel}>
+                Market / competitor context
+              </label>
+              <textarea
+                id="marketContext"
+                rows={2}
+                value={fields.marketContext}
+                onChange={(e) =>
+                  updateFields({ marketContext: e.target.value })
+                }
+                placeholder="Competitors are running founder-led videos, problem-first hooks, UGC testimonials, and bundle offers around first-order discounts."
+                className={`mt-1.5 resize-none ${inputBase}`}
+              />
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-600">
+                Optional — paste competitor ad examples, Ads Library links,
+                hooks, offers, angles, or market notes.
+              </p>
             </div>
           </div>
           <p className="mt-3 text-xs text-zinc-600">

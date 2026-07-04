@@ -68,6 +68,13 @@ export function memoToText(memo: Memo, view: ReportView = "buyer"): string {
   );
   lines.push("");
 
+  if (memo.marketSignal) {
+    lines.push(view === "client" ? "MARKET CONTEXT" : "MARKET SIGNAL");
+    memo.marketSignal.bullets.forEach((b) => lines.push(`- ${b}`));
+    lines.push(memo.marketSignal.caveat);
+    lines.push("");
+  }
+
   if (view === "buyer") {
     lines.push("PATTERNS");
     lines.push("What winners share:");

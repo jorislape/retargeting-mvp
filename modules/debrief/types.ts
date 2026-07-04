@@ -43,6 +43,9 @@ export interface DebriefContext {
   goal: string;
   targetCpa: number | null;
   creativeNotes: string;
+  /** Optional pasted market/competitor notes (V1: manual input only).
+   *  Directional context for the memo — never a performance claim. */
+  marketContext: string;
 }
 
 /** One ad row after column resolution and metric derivation. */
@@ -117,6 +120,16 @@ export interface MemoTest {
   winningLooksLike: string;
 }
 
+/** Summary of user-pasted market/competitor context. Directional by
+ *  definition: bullets restate what the USER observed, they never
+ *  assert competitor spend or performance. Null when no context was
+ *  provided — the memo is then byte-identical to a run without the
+ *  feature. */
+export interface MemoMarketSignal {
+  bullets: string[];
+  caveat: string;
+}
+
 export interface Memo {
   scope: MemoScope;
   tldr: string[];
@@ -137,6 +150,8 @@ export interface Memo {
     winners: string[];
     losers: string[];
   };
+  /** Present only when the user pasted market/competitor context. */
+  marketSignal: MemoMarketSignal | null;
   nextTests: MemoTest[];
   confidence: {
     level: "high" | "medium" | "low";
