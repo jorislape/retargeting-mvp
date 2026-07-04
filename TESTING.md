@@ -60,16 +60,17 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       cards (not tables) with a "N more … full detail in the Buyer
       view" note; confidence reads "This result is based on 14 ads and
       $3,385.50 in ad spend…". Buyer view keeps full tables and notes.
-- [ ] **Visual system**: near-black canvas with fuchsia haze + cyan
-      counterweight + fine masked grid; report sheet opens with the
-      hazard-tape strip and a fuchsia-ruled verdict; winners/kill-list
-      labels carry emerald/red tape chips; a faint signal spotlight
-      trails the cursor on desktop. Nothing decorative appears in
-      print (PDF flattens to ink-on-paper).
-- [ ] **Kinetic touches**: generator ticker scrolls slowly (static
-      under reduced-motion), dropzone shows marching-ants frame on
-      drag-over, KPI pills show polarity arrows (↑ ROAS/CTR/Leads/
-      Purchases, ↓ CPA/CPC) and select as the signal gradient.
+- [ ] **Visual system ("the dossier")**: graphite canvas, flat panels
+      with hairline borders, brass as the only accent, serif display
+      type. The generator is a 3-stage workflow (Source / Framing /
+      Run) down a progress rail that fills as stages complete; the
+      three input methods are equal tiles and loaded data lands in one
+      brass-ruled strip. The report is a ruled document: brass double
+      rule under the masthead, editorial stat row (no boxes), numbered
+      sections, run-list as a ledger. No glows, no tickers, no neon.
+      PDF flattens to ink-on-paper with win/loss preserved.
+- [ ] **KPI selector**: underline-selected tabs with polarity arrows
+      (↑ ROAS/CTR/Leads/Purchases, ↓ CPA/CPC).
 - [ ] "Copy" copies the plain-text version of the ACTIVE view.
 - [ ] Print/PDF exports the active view (`print-hidden` chrome
       disappears); Client view prints as a client-ready report.

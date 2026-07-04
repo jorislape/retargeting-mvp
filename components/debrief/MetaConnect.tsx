@@ -6,7 +6,7 @@ import { DATE_PRESET_LABELS, DATE_PRESETS } from "@/modules/meta/types";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
 import { RefreshIcon, ZapIcon } from "@/components/ui/icons";
-import { btnSecondaryMd, cardCompact, inputBase } from "@/components/ui/theme";
+import { btnSecondary, inputBase } from "@/components/ui/theme";
 
 /* ------------------------------------------------------------------ */
 /* The second way into the pipeline: connect Meta read-only, pull      */
@@ -134,25 +134,29 @@ export function MetaConnect() {
     const disabled =
       status === "connecting" || (config.checked && !config.configured);
     return (
-      <div>
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
+        <p className="text-sm leading-snug text-stone-400">
+          Pull ad-level insights read-only over OAuth — attribution matches
+          Ads Manager.
+        </p>
         <button
           type="button"
           onClick={connect}
           disabled={disabled}
-          className={`w-full cursor-pointer ${btnSecondaryMd}`}
+          className={`cursor-pointer self-start ${btnSecondary}`}
         >
-          <ZapIcon className="h-4 w-4 text-fuchsia-300" />
+          <ZapIcon className="h-3.5 w-3.5 text-stone-400" />
           {status === "connecting"
             ? "Waiting for Meta sign-in…"
             : "Connect Meta account"}
         </button>
-        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-stone-600">
-          READ-ONLY (ADS_READ) · TOKEN HELD IN MEMORY, GONE ON REFRESH
+        <p className="font-mono text-[10px] leading-relaxed tracking-[0.14em] text-stone-600">
+          READ-ONLY (ADS_READ) · TOKEN IN MEMORY ONLY
         </p>
         {config.checked && !config.configured && (
           <div
             role="alert"
-            className="mt-2 rounded-lg border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2.5"
+            className="border-l-2 border-amber-400/70 bg-amber-400/[0.05] px-3 py-2.5"
           >
             <p className="text-xs leading-relaxed text-amber-200">
               {config.message}
@@ -165,7 +169,7 @@ export function MetaConnect() {
           </div>
         )}
         {error && (
-          <p role="alert" className="mt-2 text-xs leading-relaxed text-red-300">
+          <p role="alert" className="text-xs leading-relaxed text-red-300">
             {error}
           </p>
         )}
@@ -174,14 +178,14 @@ export function MetaConnect() {
   }
 
   return (
-    <div className={`${cardCompact} p-3.5`}>
+    <div>
       {/* Connected header: live status dot + identity + disconnect. */}
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
-          <span className="relative flex h-2 w-2" aria-hidden="true">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500/50 motion-safe:animate-ping" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
-          </span>
+        <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400">
+          <span
+            aria-hidden="true"
+            className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400"
+          />
           Meta connected · read-only
         </p>
         <button
@@ -234,23 +238,23 @@ export function MetaConnect() {
         type="button"
         onClick={() => void pull()}
         disabled={pulling || !selectedAccount}
-        className={`mt-2.5 w-full cursor-pointer ${btnSecondaryMd}`}
+        className={`mt-2.5 w-full cursor-pointer ${btnSecondary}`}
       >
         <RefreshIcon
-          className={`h-4 w-4 text-fuchsia-300 ${pulling ? "motion-safe:animate-spin" : ""}`}
+          className={`h-3.5 w-3.5 text-stone-400 ${pulling ? "motion-safe:animate-spin" : ""}`}
         />
         {pulling ? "Pulling ads…" : "Pull ads into the generator"}
       </button>
 
       {pullNote && (
-        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-cyan-300/80">
+        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-brass-soft/90">
           {pullNote.toUpperCase()}
         </p>
       )}
       {pullEmpty && (
         <p
           role="status"
-          className="mt-2 rounded-lg border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2.5 text-xs leading-relaxed text-amber-200"
+          className="mt-2 border-l-2 border-amber-400/70 bg-amber-400/[0.05] px-3 py-2.5 text-xs leading-relaxed text-amber-200"
         >
           No ads found for this account/date range. Try a longer date range,
           upload a CSV, or use sample data.

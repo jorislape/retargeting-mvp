@@ -68,7 +68,7 @@ export default function PrivacyPage() {
         Questions? Contact{" "}
         <a
           href="mailto:joris.adomas@gmail.com"
-          className="rounded-sm font-medium text-stone-200 underline decoration-stone-600 underline-offset-4 transition hover:text-fuchsia-300 hover:decoration-fuchsia-400/60 active:text-fuchsia-200"
+          className="rounded-sm font-medium text-stone-200 underline decoration-stone-600 underline-offset-4 transition hover:text-brass-soft hover:decoration-brass/60 active:text-brass-soft"
         >
           joris.adomas@gmail.com
         </a>

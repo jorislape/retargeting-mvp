@@ -1,19 +1,19 @@
 /* ------------------------------------------------------------------ */
-/* Brand mark shared across the workspace shell: the signal stamp —   */
-/* white glyph on the fuchsia→pink gradient. Hot, graphic, singular.   */
+/* Brand mark: a brass-ruled square, glyph set in brass. A seal, not   */
+/* a glow — restrained, like everything else in the dossier.           */
 /* ------------------------------------------------------------------ */
 
 export function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
   return (
     <div
-      className={`flex ${size} shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 to-pink-600 shadow-[0_2px_14px_-2px_rgba(217,70,239,0.55),inset_0_1px_0_rgba(255,255,255,0.3)] ring-1 ring-fuchsia-300/20`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-md border border-brass/50 bg-brass/[0.06]`}
     >
       <svg
         viewBox="0 0 24 24"
-        className="text-white"
+        className="text-brass-soft"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.2"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"

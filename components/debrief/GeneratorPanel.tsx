@@ -18,17 +18,18 @@ import {
   UploadIcon,
   XIcon,
 } from "@/components/ui/icons";
-import {
-  btnPrimary,
-  btnSecondary,
-  card,
-  fieldLabel,
-  inputBase,
-} from "@/components/ui/theme";
+import { btnPrimary, btnSecondary, fieldLabel, inputBase } from "@/components/ui/theme";
 
 /* ------------------------------------------------------------------ */
-/* The working tool: a two-pane workbench, not a landing form.         */
-/* Left: data in (dropzone + KPI). Right: context. One action row.     */
+/* The generator as a WORKFLOW, not a form-in-a-card: three stages     */
+/* down a progress rail —                                              */
+/*   01 SOURCE   three intentional input methods (CSV export, sample  */
+/*               dataset, Meta API) as equal tiles; whatever method    */
+/*               fills the pipeline lands in one shared "loaded" bar   */
+/*   02 FRAMING  the KPI (underline-selected, polarity shown) and the */
+/*               context the memo is written against                   */
+/*   03 RUN      one status line, one brass action                     */
+/* The rail fills as stages complete — live state, not decoration.     */
 /* ------------------------------------------------------------------ */
 
 const KPI_OPTIONS: { value: KpiKey; label: string }[] = [
@@ -66,7 +67,7 @@ function ProcessingPanel() {
 
   return (
     <div
-      className="flex min-h-[380px] flex-col items-center justify-center px-6 text-center"
+      className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-white/[0.08] bg-panel px-6 text-center"
       role="status"
       aria-live="polite"
     >
@@ -81,9 +82,9 @@ function ProcessingPanel() {
             <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold transition ${
                 i < step
-                  ? "bg-fuchsia-600 text-white"
+                  ? "bg-brass text-[#141414]"
                   : i === step
-                    ? "border border-fuchsia-400/70 text-fuchsia-300 motion-safe:animate-pulse"
+                    ? "border border-brass/60 text-brass-soft motion-safe:animate-pulse"
                     : "border border-white/15 text-stone-600"
               }`}
             >
@@ -103,21 +104,84 @@ function ProcessingPanel() {
   );
 }
 
+/* One node of the progress rail. State is real: done = the stage's
+   requirement is met, active = it's the next thing to do. */
+function StageNode({
+  n,
+  state,
+  last = false,
+}: {
+  n: string;
+  state: "done" | "active" | "idle";
+  last?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center self-stretch">
+      <span
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-mono text-[10px] font-semibold transition-colors ${
+          state === "done"
+            ? "border-brass bg-brass text-[#141414]"
+            : state === "active"
+              ? "border-brass/60 text-brass-soft"
+              : "border-white/15 text-stone-600"
+        }`}
+      >
+        {state === "done" ? "✓" : n}
+      </span>
+      {!last && (
+        <span
+          aria-hidden="true"
+          className={`mt-2 w-px flex-1 ${
+            state === "done" ? "bg-brass/40" : "bg-white/10"
+          }`}
+        />
+      )}
+    </div>
+  );
+}
+
+function StageHeading({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pt-0.5">
+      <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-300">
+        {title}
+      </h2>
+      {hint && <p className="text-xs text-stone-600">{hint}</p>}
+    </div>
+  );
+}
+
+const methodTile =
+  "flex min-h-36 flex-col rounded-lg border border-white/[0.08] bg-panel p-4 transition-colors";
+
+function MethodLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+      {children}
+    </p>
+  );
+}
+
 export function GeneratorPanel() {
   const { status, file, fields, error, setFile, updateFields, generate } =
     useDebrief();
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const canSubmit =
-    !!file &&
+  const contextDone =
     fields.product.trim() !== "" &&
     fields.offer.trim() !== "" &&
     fields.goal.trim() !== "";
+  const canSubmit = !!file && contextDone;
 
   const handleFiles = (files: FileList | null) => {
     const picked = files?.[0];
     if (picked) setFile(picked);
+  };
+
+  const removeFile = () => {
+    setFile(null);
+    if (inputRef.current) inputRef.current.value = "";
   };
 
   /* Loads the synthetic dataset as a virtual CSV — identical pipeline
@@ -139,317 +203,326 @@ export function GeneratorPanel() {
     if (inputRef.current) inputRef.current.value = "";
   };
 
+  if (status === "processing") {
+    return <ProcessingPanel />;
+  }
+
   return (
-    <div className={`${card} overflow-hidden`}>
-      {status === "processing" ? (
-        <ProcessingPanel />
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (canSubmit) void generate();
-          }}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (canSubmit) void generate();
+      }}
+    >
+      {error && (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-2.5 border-l-2 border-red-400 bg-red-400/[0.06] px-4 py-3 text-[13px] leading-relaxed text-red-200"
         >
-          {error && (
-            <div
-              role="alert"
-              className="flex items-start gap-2.5 border-b border-red-400/20 bg-red-400/[0.07] px-5 py-3.5 text-[13px] leading-relaxed text-red-200"
+          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+          {error}
+        </div>
+      )}
+
+      {/* ---- Stage 01 · Source ---- */}
+      <section className="grid grid-cols-[2.25rem_1fr] gap-x-4 sm:gap-x-5">
+        <StageNode n="01" state={file ? "done" : "active"} />
+        <div className="pb-10">
+          <StageHeading
+            title="Source"
+            hint="Three ways in — all land in the same pipeline."
+          />
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            {/* Method A: CSV export (the dropzone itself) */}
+            <label
+              htmlFor="csv-input"
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                handleFiles(e.dataTransfer.files);
+              }}
+              className={`${methodTile} cursor-pointer items-start justify-between gap-3 focus-within:ring-2 focus-within:ring-brass/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
+                dragging
+                  ? "border-brass/70 bg-brass/[0.04]"
+                  : "hover:border-white/20"
+              }`}
             >
-              <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-              {error}
-            </div>
-          )}
-
-          <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[5fr_6fr] lg:gap-8">
-            {/* ---- Left pane: data in ---- */}
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <p className={fieldLabel}>01 · Data source</p>
-                <button
-                  type="button"
-                  onClick={loadSample}
-                  className={`cursor-pointer ${btnSecondary}`}
-                >
-                  <FlaskIcon className="h-3.5 w-3.5 text-fuchsia-300" />
-                  Use sample data
-                </button>
-              </div>
-              <p className="mt-3 font-mono text-[10px] font-semibold tracking-[0.14em] text-stone-500">
-                A · UPLOAD ADS MANAGER EXPORT
-              </p>
-              {/* Dropzone states: rest (quiet well) → drag-over (marching
-                  ants frame) → accepted (settled, filed). Keyboard focus
-                  on the hidden input lights the same ring via
-                  focus-within. */}
-              <label
-                htmlFor="csv-input"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragging(false);
-                  handleFiles(e.dataTransfer.files);
-                }}
-                className={`mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg px-4 py-6 text-center transition focus-within:ring-2 focus-within:ring-fuchsia-400/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon motion-safe:duration-200 ${
-                  dragging
-                    ? "drag-ants border-2 border-transparent bg-fuchsia-400/[0.06] shadow-[0_0_36px_-8px_rgba(217,70,239,0.4)] motion-safe:-translate-y-0.5"
-                    : file
-                      ? "animate-settle border-2 border-fuchsia-400/35 bg-fuchsia-400/[0.05]"
-                      : "border-2 border-dashed border-white/15 bg-well/50 hover:border-white/30 hover:bg-white/[0.03] active:border-fuchsia-400/50"
-                }`}
-              >
-                <input
-                  ref={inputRef}
-                  id="csv-input"
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="sr-only"
-                  onChange={(e) => handleFiles(e.target.files)}
+              <input
+                ref={inputRef}
+                id="csv-input"
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                onChange={(e) => handleFiles(e.target.files)}
+              />
+              <MethodLabel>
+                <UploadIcon
+                  className={`h-3.5 w-3.5 ${dragging ? "text-brass-soft" : "text-stone-500"}`}
                 />
-                {file ? (
-                  <>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-fuchsia-400/25 bg-fuchsia-400/10">
-                      <FileTextIcon className="h-4.5 w-4.5 text-fuchsia-300" />
-                    </span>
-                    <p className="mt-1 max-w-full truncate px-2 font-mono text-[13px] font-semibold text-stone-100">
-                      {file.name}
-                    </p>
-                    <p className="font-mono text-[11px] text-fuchsia-300/80">
-                      {fmtBytes(file.size)} · ready
-                    </p>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setFile(null);
-                        if (inputRef.current) inputRef.current.value = "";
-                      }}
-                      className="mt-0.5 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-stone-500 transition hover:text-white active:text-stone-300"
-                    >
-                      <XIcon className="h-3 w-3" />
-                      Remove
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span
-                      className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                        dragging
-                          ? "border-fuchsia-400/30 bg-fuchsia-400/10"
-                          : "border-white/10 bg-white/[0.04]"
-                      }`}
-                    >
-                      <UploadIcon
-                        className={`h-4.5 w-4.5 transition-colors ${
-                          dragging ? "text-fuchsia-300" : "text-stone-500"
-                        }`}
-                      />
-                    </span>
-                    <p className="mt-1 text-[13px] font-semibold text-stone-200">
-                      {dragging ? "Drop to upload" : "Drop your Meta Ads CSV"}
-                    </p>
-                    <p className="font-mono text-[11px] text-stone-600">
-                      or click to browse · max 5MB
-                    </p>
-                  </>
-                )}
-              </label>
-
-              {/* Onboarding: how to get the CSV + what we can read.
-                  <details> keeps both out of the way until needed. */}
-              <div className="mt-2 space-y-1">
-                <details className="group rounded-lg border border-transparent open:border-white/10 open:bg-white/[0.03]">
-                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-stone-500 transition hover:text-stone-200 group-open:px-3 group-open:pt-2.5 group-open:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 [&::-webkit-details-marker]:hidden">
-                    <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
-                      ›
-                    </span>
-                    How to export from Meta Ads Manager
-                  </summary>
-                  <ol className="space-y-1 px-3 pb-3 pt-1 text-xs leading-relaxed text-stone-400">
-                    {[
-                      "Open Meta Ads Manager",
-                      "Switch to the Ads level (not Campaigns or Ad sets)",
-                      "Select your date range (30–90 days reads best)",
-                      "Choose your performance columns — spend plus your KPI",
-                      "Export → Export table data → .csv",
-                      "Drop the file above",
-                    ].map((step, i) => (
-                      <li key={step} className="flex gap-2">
-                        <span className="font-mono text-[10px] font-semibold text-fuchsia-300">
-                          {i + 1}.
-                        </span>
-                        {step}
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-
-                <details className="group rounded-lg border border-transparent open:border-white/10 open:bg-white/[0.03]">
-                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-stone-500 transition hover:text-stone-200 group-open:px-3 group-open:pt-2.5 group-open:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 [&::-webkit-details-marker]:hidden">
-                    <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
-                      ›
-                    </span>
-                    Columns we recognize
-                  </summary>
-                  <div className="px-3 pb-3 pt-1 text-xs leading-relaxed text-stone-400">
-                    <p>
-                      Only <span className="font-semibold text-stone-200">Amount spent</span>{" "}
-                      plus the column for your chosen KPI are required. Naming
-                      varies by export — all of these resolve automatically:
-                    </p>
-                    <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-stone-500">
-                      Ad name · Amount spent · Impressions · Link clicks · CTR ·
-                      CPC · Purchases / Results · Purchase conversion value ·
-                      Purchase ROAS · Cost per purchase / result · Leads · Cost
-                      per lead · Reporting starts / ends
-                    </p>
-                    <p className="mt-1.5 text-stone-500">
-                      Missing something for your KPI? You&apos;ll get a clear
-                      message naming the column, not a wrong answer.
-                    </p>
-                  </div>
-                </details>
-              </div>
-
-              {/* Second data source: OAuth pull rendered as the same
-                  virtual-CSV File the dropzone produces. */}
-              <div
-                className="my-4 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600"
-                aria-hidden="true"
-              >
-                <span className="h-px flex-1 bg-white/10" />
-                or
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
-              <p className="mb-2 font-mono text-[10px] font-semibold tracking-[0.14em] text-stone-500">
-                B · CONNECT META ACCOUNT
-              </p>
-              <MetaConnect />
-
-              <fieldset className="mt-6">
-                <legend className={fieldLabel}>02 · Primary KPI</legend>
-                <div role="group" className="mt-2.5 grid grid-cols-3 gap-1.5">
-                  {KPI_OPTIONS.map((opt) => {
-                    const active = fields.kpi === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => updateFields({ kpi: opt.value })}
-                        className={`cursor-pointer rounded-lg border px-2 py-2 font-mono text-xs font-semibold transition motion-safe:duration-200 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-carbon ${
-                          active
-                            ? "border-fuchsia-400/60 bg-gradient-to-b from-fuchsia-500 to-pink-600 text-white shadow-[0_2px_16px_-2px_rgba(217,70,239,0.5)]"
-                            : "border-white/10 bg-white/[0.03] text-stone-400 hover:border-white/25 hover:text-stone-100"
-                        }`}
-                      >
-                        {opt.label}
-                        <span
-                          aria-hidden="true"
-                          title={
-                            HIGHER_IS_BETTER[opt.value]
-                              ? "Higher is better"
-                              : "Lower is better"
-                          }
-                          className={`ml-1 ${active ? "text-white/70" : "text-stone-600"}`}
-                        >
-                          {HIGHER_IS_BETTER[opt.value] ? "\u2191" : "\u2193"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            </div>
-
-            {/* ---- Right pane: context ---- */}
-            <div>
-              <p className={fieldLabel}>03 · Context</p>
-              <div className="mt-2.5 space-y-3">
-                <div>
-                  <label htmlFor="product" className="sr-only">
-                    Product / industry (required)
-                  </label>
-                  <input
-                    id="product"
-                    value={fields.product}
-                    onChange={(e) => updateFields({ product: e.target.value })}
-                    placeholder="Product / industry — e.g. Skincare, vitamin C serum *"
-                    className={inputBase}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="offer" className="sr-only">
-                    Offer (required)
-                  </label>
-                  <input
-                    id="offer"
-                    value={fields.offer}
-                    onChange={(e) => updateFields({ offer: e.target.value })}
-                    placeholder="Offer — e.g. 25% off first order *"
-                    className={inputBase}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="goal" className="sr-only">
-                    Campaign goal (required)
-                  </label>
-                  <input
-                    id="goal"
-                    value={fields.goal}
-                    onChange={(e) => updateFields({ goal: e.target.value })}
-                    placeholder="Campaign goal — e.g. Scale past $500/day *"
-                    className={inputBase}
-                  />
-                </div>
-
-                <div className="grid grid-cols-[7rem_1fr] gap-3 border-t border-white/[0.07] pt-3">
-                  <div>
-                    <label htmlFor="targetCpa" className={fieldLabel}>
-                      Target CPA
-                    </label>
-                    <input
-                      id="targetCpa"
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      value={fields.targetCpa}
-                      onChange={(e) => updateFields({ targetCpa: e.target.value })}
-                      placeholder="25"
-                      className={`mt-1.5 ${inputBase}`}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="creativeNotes" className={fieldLabel}>
-                      Creative notes
-                    </label>
-                    <textarea
-                      id="creativeNotes"
-                      rows={2}
-                      value={fields.creativeNotes}
-                      onChange={(e) =>
-                        updateFields({ creativeNotes: e.target.value })
-                      }
-                      placeholder="e.g. Ads 3 & 5 are UGC; rest are statics"
-                      className={`mt-1.5 resize-none ${inputBase}`}
-                    />
-                  </div>
-                </div>
-                <p className="font-mono text-[10px] leading-relaxed tracking-wide text-stone-600">
-                  * REQUIRED · TARGET CPA SHARPENS THE SPEND GATE
+                A · CSV export
+              </MethodLabel>
+              <div>
+                <p className="text-sm font-medium text-stone-200">
+                  {dragging ? "Drop to load" : "Drop your Ads Manager export"}
+                </p>
+                <p className="mt-1 font-mono text-[11px] text-stone-600">
+                  or click to browse · max 5MB
                 </p>
               </div>
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-stone-600">
+                Ad-level · any column set
+              </span>
+            </label>
+
+            {/* Method B: sample dataset */}
+            <div className={`${methodTile} items-start justify-between gap-3`}>
+              <MethodLabel>
+                <FlaskIcon className="h-3.5 w-3.5 text-stone-500" />
+                B · Sample dataset
+              </MethodLabel>
+              <p className="text-sm leading-snug text-stone-400">
+                14 synthetic ads with clear winners, losers, and thin-spend
+                traps — built to exercise every rule.
+              </p>
+              <button
+                type="button"
+                onClick={loadSample}
+                className={`cursor-pointer ${btnSecondary}`}
+              >
+                Load sample data
+              </button>
+            </div>
+
+            {/* Method C: Meta API */}
+            <div className={`${methodTile} justify-between gap-3`}>
+              <MethodLabel>
+                <span className="h-1.5 w-1.5 rounded-full bg-stone-500" />
+                C · Meta API
+              </MethodLabel>
+              <MetaConnect />
             </div>
           </div>
 
-          {/* ---- Action row: a quiet footer strip below the panel ---- */}
-          <div className="flex flex-col gap-3 border-t border-white/[0.07] bg-black/25 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-stone-600">
-              Parsed in memory · never stored · gone on refresh
+          {/* The shared landing strip: whichever method produced the
+              data, this is the single source of truth for what's
+              loaded. */}
+          {file && (
+            <div className="animate-settle mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-l-2 border-brass bg-brass/[0.05] px-4 py-3">
+              <FileTextIcon className="h-4 w-4 shrink-0 text-brass-soft" />
+              <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-stone-100">
+                {file.name}
+              </p>
+              <span className="font-mono text-[11px] text-stone-500">
+                {fmtBytes(file.size)} · ready
+              </span>
+              <button
+                type="button"
+                onClick={removeFile}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-stone-500 transition hover:text-white"
+              >
+                <XIcon className="h-3 w-3" />
+                Remove
+              </button>
+            </div>
+          )}
+
+          <div className="mt-3 space-y-1">
+            <details className="group border-l border-white/10 pl-3 open:border-brass/40">
+              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-stone-500 transition hover:text-stone-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/60 [&::-webkit-details-marker]:hidden">
+                How to export from Meta Ads Manager
+              </summary>
+              <ol className="space-y-1 pb-2 pt-1.5 text-xs leading-relaxed text-stone-400">
+                {[
+                  "Open Meta Ads Manager",
+                  "Switch to the Ads level (not Campaigns or Ad sets)",
+                  "Select your date range (30–90 days reads best)",
+                  "Choose your performance columns — spend plus your KPI",
+                  "Export → Export table data → .csv",
+                  "Drop the file above",
+                ].map((step, i) => (
+                  <li key={step} className="flex gap-2">
+                    <span className="font-mono text-[10px] font-semibold text-brass-soft">
+                      {i + 1}.
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </details>
+
+            <details className="group border-l border-white/10 pl-3 open:border-brass/40">
+              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-stone-500 transition hover:text-stone-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/60 [&::-webkit-details-marker]:hidden">
+                Columns we recognize
+              </summary>
+              <div className="pb-2 pt-1.5 text-xs leading-relaxed text-stone-400">
+                <p>
+                  Only <span className="font-semibold text-stone-200">Amount spent</span>{" "}
+                  plus the column for your chosen KPI are required. Naming
+                  varies by export — all of these resolve automatically:
+                </p>
+                <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-stone-500">
+                  Ad name · Amount spent · Impressions · Link clicks · CTR ·
+                  CPC · Purchases / Results · Purchase conversion value ·
+                  Purchase ROAS · Cost per purchase / result · Leads · Cost
+                  per lead · Reporting starts / ends
+                </p>
+                <p className="mt-1.5 text-stone-500">
+                  Missing something for your KPI? You&apos;ll get a clear
+                  message naming the column, not a wrong answer.
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        {/* ---- Stage 02 · Framing ---- */}
+        <StageNode
+          n="02"
+          state={contextDone ? "done" : file ? "active" : "idle"}
+        />
+        <div className="pb-10">
+          <StageHeading
+            title="Framing"
+            hint="The KPI the memo judges by, and the context it's written against."
+          />
+
+          <fieldset className="mt-4">
+            <legend className="sr-only">Primary KPI</legend>
+            <div
+              role="group"
+              className="grid grid-cols-3 border-b border-white/10 sm:grid-cols-6"
+            >
+              {KPI_OPTIONS.map((opt) => {
+                const active = fields.kpi === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => updateFields({ kpi: opt.value })}
+                    className={`relative cursor-pointer px-2 pb-2.5 pt-1.5 font-mono text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/60 ${
+                      active
+                        ? "text-stone-100"
+                        : "text-stone-500 hover:text-stone-300"
+                    }`}
+                  >
+                    {opt.label}
+                    <span
+                      aria-hidden="true"
+                      title={
+                        HIGHER_IS_BETTER[opt.value]
+                          ? "Higher is better"
+                          : "Lower is better"
+                      }
+                      className={`ml-1 ${active ? "text-brass-soft" : "text-stone-600"}`}
+                    >
+                      {HIGHER_IS_BETTER[opt.value] ? "↑" : "↓"}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-x-2 -bottom-px h-0.5 transition-opacity ${
+                        active ? "bg-brass opacity-100" : "opacity-0"
+                      }`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="product" className={fieldLabel}>
+                Product / industry *
+              </label>
+              <input
+                id="product"
+                value={fields.product}
+                onChange={(e) => updateFields({ product: e.target.value })}
+                placeholder="Skincare, vitamin C serum"
+                className={`mt-1.5 ${inputBase}`}
+              />
+            </div>
+            <div>
+              <label htmlFor="offer" className={fieldLabel}>
+                Offer *
+              </label>
+              <input
+                id="offer"
+                value={fields.offer}
+                onChange={(e) => updateFields({ offer: e.target.value })}
+                placeholder="25% off first order"
+                className={`mt-1.5 ${inputBase}`}
+              />
+            </div>
+            <div>
+              <label htmlFor="goal" className={fieldLabel}>
+                Campaign goal *
+              </label>
+              <input
+                id="goal"
+                value={fields.goal}
+                onChange={(e) => updateFields({ goal: e.target.value })}
+                placeholder="Scale past $500/day"
+                className={`mt-1.5 ${inputBase}`}
+              />
+            </div>
+            <div>
+              <label htmlFor="targetCpa" className={fieldLabel}>
+                Target CPA
+              </label>
+              <input
+                id="targetCpa"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={fields.targetCpa}
+                onChange={(e) => updateFields({ targetCpa: e.target.value })}
+                placeholder="25"
+                className={`mt-1.5 ${inputBase}`}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="creativeNotes" className={fieldLabel}>
+                Creative notes
+              </label>
+              <textarea
+                id="creativeNotes"
+                rows={2}
+                value={fields.creativeNotes}
+                onChange={(e) => updateFields({ creativeNotes: e.target.value })}
+                placeholder="e.g. Ads 3 & 5 are UGC; rest are statics"
+                className={`mt-1.5 resize-none ${inputBase}`}
+              />
+            </div>
+          </div>
+          <p className="mt-3 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-stone-600">
+            * REQUIRED · TARGET CPA SHARPENS THE SPEND GATE
+          </p>
+        </div>
+
+        {/* ---- Stage 03 · Run ---- */}
+        <StageNode n="03" state={canSubmit ? "active" : "idle"} last />
+        <div>
+          <StageHeading title="Run" />
+          <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-mono text-[11px] leading-relaxed text-stone-500">
+              {file ? (
+                <>
+                  <span className="text-stone-300">{file.name}</span>
+                  {" · "}
+                  {KPI_OPTIONS.find((o) => o.value === fields.kpi)?.label}
+                  {contextDone ? " · ready" : " · context incomplete"}
+                </>
+              ) : (
+                "Load data in stage 01 to run."
+              )}
             </p>
             <button
               type="submit"
@@ -460,8 +533,11 @@ export function GeneratorPanel() {
               <ArrowIcon className="h-4 w-4" />
             </button>
           </div>
-        </form>
-      )}
-    </div>
+          <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone-600">
+            Parsed in memory · never stored · gone on refresh
+          </p>
+        </div>
+      </section>
+    </form>
   );
 }

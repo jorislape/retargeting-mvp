@@ -1,16 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
 /*
- * Type system — the aesthetic commitment:
- *   Space Grotesk  → display (headings, verdicts, big numbers)
+ * Type system — the editorial commitment:
+ *   Source Serif 4 → display (report titles, verdicts, section leads)
  *   IBM Plex Sans  → body
  *   IBM Plex Mono  → data labels, eyebrows, numerals in tables
  * Wired into Tailwind via CSS variables in globals.css (@theme inline),
  * so `font-display` / `font-sans` / `font-mono` utilities map to them.
  */
-const spaceGrotesk = Space_Grotesk({
+const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
   variable: "--font-sg",
 });
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#121110",
+  themeColor: "#0e0e10",
 };
 
 export default function RootLayout({
@@ -47,7 +47,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${sourceSerif.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
       <body className="antialiased">{children}</body>
     </html>
