@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BlurFade } from "@/components/marketing/BlurFade";
 import { HeroProof } from "@/components/marketing/HeroProof";
 import { HeroSpotlight } from "@/components/marketing/HeroSpotlight";
+import { KpiDemo } from "@/components/marketing/KpiDemo";
 import {
   ArrowIcon,
   CheckIcon,
@@ -343,6 +344,21 @@ export default function HomePage() {
           questions that actually end a reporting call: what worked, what
           failed, what to test next.
         </p>
+      </section>
+
+      {/* ---- Interactive proof: the KPI drives the ranking ---- */}
+      <section className="mt-16" aria-label="Interactive KPI demo">
+        <BlurFade>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+            Try the judgement
+          </p>
+          <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
+            Pick the KPI — the ranking follows
+          </h2>
+        </BlurFade>
+        <BlurFade className="mt-5" delay={0.07}>
+          <KpiDemo />
+        </BlurFade>
       </section>
 
       {/* ---- What you get ---- */}
