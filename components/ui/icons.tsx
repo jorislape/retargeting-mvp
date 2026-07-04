@@ -52,6 +52,16 @@ export function ArrowIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+export function MenuIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </Icon>
+  );
+}
+
 export function ChevronDownIcon({
   className = "h-4 w-4",
 }: {
