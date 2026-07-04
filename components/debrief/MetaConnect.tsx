@@ -141,31 +141,31 @@ export function MetaConnect() {
           disabled={disabled}
           className={`w-full cursor-pointer ${btnSecondaryMd}`}
         >
-          <ZapIcon className="h-4 w-4 text-blue-300" />
+          <ZapIcon className="h-4 w-4 text-blue-700" />
           {status === "connecting"
             ? "Waiting for Meta sign-in…"
             : "Connect Meta account"}
         </button>
-        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-600">
+        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-400">
           READ-ONLY (ADS_READ) · TOKEN HELD IN MEMORY, GONE ON REFRESH
         </p>
         {config.checked && !config.configured && (
           <div
             role="alert"
-            className="mt-2 rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2.5"
+            className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5"
           >
-            <p className="text-xs leading-relaxed text-amber-200">
+            <p className="text-xs leading-relaxed text-amber-800">
               {config.message}
             </p>
             {config.redirectUri && (
-              <p className="mt-1.5 break-all font-mono text-[10px] leading-relaxed text-zinc-500">
+              <p className="mt-1.5 break-all font-mono text-[10px] leading-relaxed text-amber-700/70">
                 OAUTH REDIRECT · {config.redirectUri}
               </p>
             )}
           </div>
         )}
         {error && (
-          <p role="alert" className="mt-2 text-xs leading-relaxed text-red-300">
+          <p role="alert" className="mt-2 text-xs leading-relaxed text-red-700">
             {error}
           </p>
         )}
@@ -177,17 +177,17 @@ export function MetaConnect() {
     <div className={`${cardCompact} p-3.5`}>
       {/* Connected header: live status dot + identity + disconnect. */}
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
+        <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
           <span className="relative flex h-2 w-2" aria-hidden="true">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400/60 motion-safe:animate-ping" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500/50 motion-safe:animate-ping" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
           Meta connected · read-only
         </p>
         <button
           type="button"
           onClick={disconnect}
-          className="cursor-pointer rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white active:text-zinc-300"
+          className="cursor-pointer rounded-sm text-xs font-medium text-zinc-500 transition hover:text-zinc-900 active:text-zinc-700"
         >
           Disconnect
         </button>
@@ -237,32 +237,32 @@ export function MetaConnect() {
         className={`mt-2.5 w-full cursor-pointer ${btnSecondaryMd}`}
       >
         <RefreshIcon
-          className={`h-4 w-4 text-blue-300 ${pulling ? "motion-safe:animate-spin" : ""}`}
+          className={`h-4 w-4 text-blue-700 ${pulling ? "motion-safe:animate-spin" : ""}`}
         />
         {pulling ? "Pulling ads…" : "Pull ads into the generator"}
       </button>
 
       {pullNote && (
-        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-blue-300/80">
+        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-blue-800/80">
           {pullNote.toUpperCase()}
         </p>
       )}
       {pullEmpty && (
         <p
           role="status"
-          className="mt-2 rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2.5 text-xs leading-relaxed text-amber-200"
+          className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-800"
         >
           No ads found for this account/date range. Try a longer date range,
           upload a CSV, or use sample data.
         </p>
       )}
       {pullError && (
-        <p role="alert" className="mt-2 text-xs leading-relaxed text-red-300">
+        <p role="alert" className="mt-2 text-xs leading-relaxed text-red-700">
           {pullError}
         </p>
       )}
 
-      <p className="mt-2.5 border-t border-white/5 pt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-600">
+      <p className="mt-2.5 border-t border-zinc-200/70 pt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-400">
         TOKEN IN MEMORY ONLY · GONE ON REFRESH
       </p>
     </div>

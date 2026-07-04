@@ -51,7 +51,7 @@ components/debrief/
 
 - Routes stay thin; the domain logic lives in `modules/debrief/`. Import from its `index.ts` only.
 - `modules/debrief/memo.ts`'s `generateMemo(analysis, context)` is deterministic template code, not an LLM call — documented as the seam for a future LLM-backed version (same `(AnalysisResult, DebriefContext)` in, same `Memo` shape out, so the route/UI wouldn't need to change). Do not add an actual AI call here unless explicitly asked; it's out of scope for this version.
-- `components/ui/theme.ts`, `icons.tsx`, `brand.tsx` are the shared design tokens (dark, zinc-950/blue-600, card/chip/button classnames) — reuse them rather than inventing new visual patterns.
+- `components/ui/theme.ts`, `icons.tsx`, `brand.tsx` are the shared design tokens (light ink-on-paper: paper `#f4f4f2` canvas, white cards with zinc hairlines, solid zinc-900 ink primary actions, blue-700 reserved for focus/links/active markers, emerald/red only for win/loss) — reuse them rather than inventing new visual patterns.
 
 ### Calculation rules (keep these honest — see `ARCHITECTURE.md` §5 for the full spec)
 

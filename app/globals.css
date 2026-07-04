@@ -1,28 +1,29 @@
 @import "tailwindcss";
 
 /*
- * Dark-only performance-terminal identity. Fonts arrive as CSS
- * variables from next/font in app/layout.tsx; mapping them in @theme
- * gives us `font-display`, `font-sans`, `font-mono` utilities.
+ * Ink-on-paper identity for a professional media-buying tool.
  *
- * Atmosphere: the canvas is a deep blue-black (never #000) lit by a
- * signal-blue aurora — a wide blue field with a hotter sky-toned core
- * (the .aurora-core layer, which drifts a few px toward the pointer on
- * desktop) — plus a faint engineering grid masked toward the top.
- * Three planes, darkest to lightest: canvas → panel → …and input wells
- * recess BELOW the panel (panel-deep), so depth reads at a glance.
+ * The buyer's actual deliverable is a memo, so the product looks like
+ * one: a warm-neutral paper canvas, white surfaces with hairline
+ * borders, near-black ink for primary actions, and one restrained
+ * accent (cobalt) for focus, links, and active markers. Emerald and
+ * red are reserved exclusively for win/loss semantics.
+ *
+ * Fonts arrive as CSS variables from next/font in app/layout.tsx;
+ * mapping them in @theme gives us `font-display`, `font-sans`,
+ * `font-mono` utilities.
  */
 :root {
-  --background: #0a0e1a;
-  --foreground: #fafafa;
+  --background: #f4f4f2;
+  --foreground: #17191d;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* ink = canvas; panel-deep = recessed cells/inputs below surfaces */
-  --color-ink: #0a0e1a;
-  --color-panel-deep: #070b16;
+  /* paper = canvas; ink = text/primary actions */
+  --color-paper: #f4f4f2;
+  --color-ink: #17191d;
   --font-sans: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-sg), var(--font-plex), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
@@ -40,105 +41,53 @@ html {
 
 body {
   background-color: var(--background);
-  /* Layered aurora: a wide, soft-edged signal-blue field above the
-     fold, a faint indigo mid-page counterweight on the left, and a
-     whisper of cyan bottom-right — three depths, no hard edges.
-     Fixed so scrolling feels like moving over a lit surface rather
-     than dragging the light along. */
-  background-image:
-    radial-gradient(1400px 720px at 50% -240px, rgba(37, 99, 235, 0.22), transparent 74%),
-    radial-gradient(760px 560px at 6% 42%, rgba(99, 102, 241, 0.05), transparent 66%),
-    radial-gradient(1000px 760px at 96% 112%, rgba(56, 189, 248, 0.05), transparent 62%);
+  /* One very soft cool spotlight where work begins — depth without
+     drama. Fixed so scrolling moves content over a still surface. */
+  background-image: radial-gradient(
+    1100px 480px at 50% -180px,
+    rgba(29, 78, 216, 0.045),
+    transparent 72%
+  );
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
-/* Fine dot matrix in place of the old line grid — points of light
-   near the aurora rather than drawn blocks. Double-masked so it
-   dissolves both downward and at the edges before it can compete
-   with content. */
+/* A whisper of graph paper near the top — the buyer's medium — that
+   dissolves before content density picks up. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: radial-gradient(rgba(164, 196, 255, 0.09) 1px, transparent 1.4px);
-  background-size: 26px 26px;
-  mask-image: radial-gradient(ellipse 82% 52% at 50% 0%, black 18%, transparent 70%);
-}
-
-/* The aurora's hot core — rendered by <AuroraGlow/> so it can drift
-   toward the pointer (transform-only). Pure gradient, no filter: cheap
-   to composite and it never causes layout. */
-.aurora-core {
-  background: radial-gradient(
-    closest-side,
-    rgba(56, 189, 248, 0.2),
-    rgba(37, 99, 235, 0.13) 45%,
-    transparent 74%
-  );
-}
-
-/* Ambient breathe on the aurora — a 16s tide so the surface reads as
-   lit even with the pointer idle. Sits on a wrapper so it can't fight
-   the pointer-drift transform on the core itself. */
-@media (prefers-reduced-motion: no-preference) {
-  .aurora-breathe {
-    animation: aurora-breathe 16s ease-in-out infinite;
-  }
-  @keyframes aurora-breathe {
-    0%,
-    100% {
-      transform: translate3d(0, 0, 0) scale(1);
-      opacity: 1;
-    }
-    50% {
-      transform: translate3d(0, 14px, 0) scale(1.045);
-      opacity: 0.82;
-    }
-  }
-}
-
-/* Cursor spotlight — a large, very soft pool of light that trails the
-   pointer (lerped in <AuroraGlow/>). Decorative depth, never a torch:
-   peak alpha stays under 0.09 so text contrast is untouched. */
-.cursor-spotlight {
-  background: radial-gradient(
-    closest-side,
-    rgba(96, 165, 250, 0.085),
-    rgba(56, 189, 248, 0.035) 45%,
-    transparent 72%
-  );
+  background-image: radial-gradient(rgba(23, 25, 29, 0.055) 1px, transparent 1.4px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse 80% 46% at 50% 0%, black 15%, transparent 68%);
 }
 
 ::selection {
-  background: rgb(37 99 235 / 0.4);
+  background: rgb(29 78 216 / 0.18);
 }
 
 /*
  * On-brand keyboard focus. Components that render their own
  * focus-visible ring also set outline-none, which wins over this
  * :where() rule (zero specificity by design) — so every focusable
- * element gets exactly one blue indicator.
+ * element gets exactly one cobalt indicator.
  */
 :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
-  outline: 2px solid rgb(96 165 250 / 0.8);
+  outline: 2px solid rgb(29 78 216 / 0.7);
   outline-offset: 2px;
 }
 
 /*
- * Gradient headline phrase. Hand-rolled instead of Tailwind's
- * bg-clip-text because Safari still needs the -webkit- prefix for
- * background-clip: text — without it the phrase renders flat white.
+ * Key phrase in a page h1 (one per page, max). On paper the emphasis
+ * is a single confident ink-blue — no gradient. The class name is kept
+ * so callers don't change.
  */
 .gradient-phrase {
-  background-image: linear-gradient(90deg, #7dd3fc, #38bdf8 45%, #3b82f6);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: #1d4ed8;
 }
 
 /* Entrance for report sections and view changes — motion-safe only,
@@ -176,11 +125,10 @@ body::before {
 
 /*
  * Print = "Save as PDF". The report is the only thing that should
- * print: chrome is hidden via .print-hidden, and the dark theme is
- * flattened to ink-on-paper. The universal color override is crude by
- * design — reliable output beats preserved theming — with win/loss
- * semantics re-asserted afterwards so the two colors that carry
- * meaning survive.
+ * print: chrome is hidden via .print-hidden. The UI is already
+ * ink-on-paper, so print mostly means flattening shadows and page
+ * furniture; win/loss colors are re-asserted so the two colors that
+ * carry meaning survive any driver quirks.
  */
 @page {
   margin: 14mm;
@@ -205,7 +153,7 @@ body::before {
     backdrop-filter: none !important;
   }
   body .gradient-phrase {
-    -webkit-text-fill-color: #18181b !important;
+    color: #18181b !important;
   }
   body .print-win {
     color: #047857 !important;

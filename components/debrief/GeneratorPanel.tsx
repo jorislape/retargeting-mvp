@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/icons";
 import {
   btnPrimary,
+  btnSecondary,
   card,
   fieldLabel,
   inputBase,
@@ -79,17 +80,17 @@ function ProcessingPanel() {
             <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold transition ${
                 i < step
-                  ? "bg-blue-600 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                  ? "bg-zinc-900 text-white"
                   : i === step
-                    ? "border border-blue-400/60 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.35)] motion-safe:animate-pulse"
-                    : "border border-white/15 text-zinc-600"
+                    ? "border border-blue-700 text-blue-700 motion-safe:animate-pulse"
+                    : "border border-zinc-300 text-zinc-400"
               }`}
             >
               {i < step ? "✓" : i + 1}
             </span>
             <span
               className={`font-mono text-xs tracking-wide ${
-                i === step ? "text-zinc-100" : "text-zinc-500"
+                i === step ? "text-zinc-900" : "text-zinc-500"
               }`}
             >
               {label}…
@@ -151,9 +152,9 @@ export function GeneratorPanel() {
           {error && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 border-b border-red-500/20 bg-red-500/[0.06] px-5 py-3.5 text-[13px] leading-relaxed text-red-200"
+              className="flex items-start gap-2.5 border-b border-red-200 bg-red-50 px-5 py-3.5 text-[13px] leading-relaxed text-red-800"
             >
-              <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+              <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
               {error}
             </div>
           )}
@@ -161,24 +162,24 @@ export function GeneratorPanel() {
           <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[5fr_6fr] lg:gap-8">
             {/* ---- Left pane: data in ---- */}
             <div>
-              <div className="flex items-baseline justify-between gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <p className={fieldLabel}>01 · Data source</p>
                 <button
                   type="button"
                   onClick={loadSample}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white active:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70"
+                  className={`cursor-pointer ${btnSecondary}`}
                 >
-                  <FlaskIcon className="h-3.5 w-3.5 text-blue-300" />
+                  <FlaskIcon className="h-3.5 w-3.5 text-blue-700" />
                   Use sample data
                 </button>
               </div>
-              <p className="mt-2.5 font-mono text-[10px] font-semibold tracking-[0.14em] text-zinc-500">
+              <p className="mt-3 font-mono text-[10px] font-semibold tracking-[0.14em] text-zinc-400">
                 A · UPLOAD ADS MANAGER EXPORT
               </p>
-              {/* Dropzone states: rest (recessed well) → drag-over (border
-                  + glow light up, subtle lift) → accepted (solid blue
-                  frame, settle-in). Keyboard focus on the hidden input
-                  lights the same ring via focus-within. */}
+              {/* Dropzone states: rest (quiet well) → drag-over (cobalt
+                  invitation) → accepted (settled, filed). Keyboard focus
+                  on the hidden input lights the same ring via
+                  focus-within. */}
               <label
                 htmlFor="csv-input"
                 onDragOver={(e) => {
@@ -191,12 +192,12 @@ export function GeneratorPanel() {
                   setDragging(false);
                   handleFiles(e.dataTransfer.files);
                 }}
-                className={`mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl px-4 py-6 text-center transition focus-within:ring-2 focus-within:ring-blue-400/70 focus-within:ring-offset-2 focus-within:ring-offset-ink motion-safe:duration-200 ${
+                className={`mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg px-4 py-6 text-center transition focus-within:ring-2 focus-within:ring-blue-700/50 focus-within:ring-offset-2 focus-within:ring-offset-white motion-safe:duration-200 ${
                   dragging
-                    ? "border-2 border-blue-400/80 bg-blue-500/[0.10] shadow-[0_0_36px_-4px_rgba(59,130,246,0.45),inset_0_0_24px_rgba(59,130,246,0.12)] motion-safe:-translate-y-0.5"
+                    ? "border-2 border-blue-700 bg-blue-50 motion-safe:-translate-y-0.5"
                     : file
-                      ? "animate-settle border-2 border-blue-400/40 bg-blue-500/[0.06] shadow-[0_0_24px_-8px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(147,197,253,0.10)]"
-                      : "border-2 border-dashed border-white/15 bg-panel-deep/40 shadow-[inset_0_2px_8px_rgba(0,0,0,0.35)] hover:border-white/30 hover:bg-white/[0.03] active:border-blue-400/50"
+                      ? "animate-settle border-2 border-zinc-900/15 bg-zinc-50"
+                      : "border-2 border-dashed border-zinc-300 bg-zinc-50/60 hover:border-zinc-400 hover:bg-white active:border-blue-700/50"
                 }`}
               >
                 <input
@@ -209,13 +210,13 @@ export function GeneratorPanel() {
                 />
                 {file ? (
                   <>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-400/30 bg-blue-500/15 shadow-[0_0_16px_rgba(59,130,246,0.3)]">
-                      <FileTextIcon className="h-4.5 w-4.5 text-blue-300" />
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(23,25,29,0.06)]">
+                      <FileTextIcon className="h-4.5 w-4.5 text-blue-700" />
                     </span>
-                    <p className="mt-1 max-w-full truncate px-2 font-mono text-[13px] font-semibold text-zinc-100">
+                    <p className="mt-1 max-w-full truncate px-2 font-mono text-[13px] font-semibold text-zinc-900">
                       {file.name}
                     </p>
-                    <p className="font-mono text-[11px] text-blue-300/80">
+                    <p className="font-mono text-[11px] text-zinc-500">
                       {fmtBytes(file.size)} · ready
                     </p>
                     <button
@@ -226,7 +227,7 @@ export function GeneratorPanel() {
                         setFile(null);
                         if (inputRef.current) inputRef.current.value = "";
                       }}
-                      className="mt-0.5 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white active:text-zinc-300"
+                      className="mt-0.5 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-zinc-900 active:text-zinc-700"
                     >
                       <XIcon className="h-3 w-3" />
                       Remove
@@ -237,20 +238,20 @@ export function GeneratorPanel() {
                     <span
                       className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
                         dragging
-                          ? "border-blue-400/50 bg-blue-500/15 shadow-[0_0_16px_rgba(59,130,246,0.4)]"
-                          : "border-white/10 bg-white/[0.03]"
+                          ? "border-blue-200 bg-white"
+                          : "border-zinc-200 bg-white"
                       }`}
                     >
                       <UploadIcon
                         className={`h-4.5 w-4.5 transition-colors ${
-                          dragging ? "text-blue-300" : "text-zinc-500"
+                          dragging ? "text-blue-700" : "text-zinc-400"
                         }`}
                       />
                     </span>
-                    <p className="mt-1 text-[13px] font-semibold text-zinc-200">
+                    <p className="mt-1 text-[13px] font-semibold text-zinc-800">
                       {dragging ? "Drop to upload" : "Drop your Meta Ads CSV"}
                     </p>
-                    <p className="font-mono text-[11px] text-zinc-500">
+                    <p className="font-mono text-[11px] text-zinc-400">
                       or click to browse · max 5MB
                     </p>
                   </>
@@ -260,14 +261,14 @@ export function GeneratorPanel() {
               {/* Onboarding: how to get the CSV + what we can read.
                   <details> keeps both out of the way until needed. */}
               <div className="mt-2 space-y-1">
-                <details className="group rounded-lg border border-transparent open:border-white/10 open:bg-panel-deep/40">
-                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 group-open:px-3 group-open:pt-2.5 group-open:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 [&::-webkit-details-marker]:hidden">
+                <details className="group rounded-lg border border-transparent open:border-zinc-200 open:bg-zinc-50/70">
+                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-zinc-500 transition hover:text-zinc-800 group-open:px-3 group-open:pt-2.5 group-open:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700/50 [&::-webkit-details-marker]:hidden">
                     <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
                       ›
                     </span>
                     How to export from Meta Ads Manager
                   </summary>
-                  <ol className="space-y-1 px-3 pb-3 pt-1 text-xs leading-relaxed text-zinc-400 [counter-reset:step]">
+                  <ol className="space-y-1 px-3 pb-3 pt-1 text-xs leading-relaxed text-zinc-600">
                     {[
                       "Open Meta Ads Manager",
                       "Switch to the Ads level (not Campaigns or Ad sets)",
@@ -277,7 +278,7 @@ export function GeneratorPanel() {
                       "Drop the file above",
                     ].map((step, i) => (
                       <li key={step} className="flex gap-2">
-                        <span className="font-mono text-[10px] font-semibold text-blue-300/80">
+                        <span className="font-mono text-[10px] font-semibold text-blue-700">
                           {i + 1}.
                         </span>
                         {step}
@@ -286,18 +287,18 @@ export function GeneratorPanel() {
                   </ol>
                 </details>
 
-                <details className="group rounded-lg border border-transparent open:border-white/10 open:bg-panel-deep/40">
-                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 group-open:px-3 group-open:pt-2.5 group-open:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 [&::-webkit-details-marker]:hidden">
+                <details className="group rounded-lg border border-transparent open:border-zinc-200 open:bg-zinc-50/70">
+                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-zinc-500 transition hover:text-zinc-800 group-open:px-3 group-open:pt-2.5 group-open:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700/50 [&::-webkit-details-marker]:hidden">
                     <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
                       ›
                     </span>
                     Columns we recognize
                   </summary>
-                  <div className="px-3 pb-3 pt-1 text-xs leading-relaxed text-zinc-400">
+                  <div className="px-3 pb-3 pt-1 text-xs leading-relaxed text-zinc-600">
                     <p>
-                      Only <span className="text-zinc-200">Amount spent</span> plus
-                      the column for your chosen KPI are required. Naming varies by
-                      export — all of these resolve automatically:
+                      Only <span className="font-semibold text-zinc-800">Amount spent</span>{" "}
+                      plus the column for your chosen KPI are required. Naming
+                      varies by export — all of these resolve automatically:
                     </p>
                     <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-zinc-500">
                       Ad name · Amount spent · Impressions · Link clicks · CTR ·
@@ -316,24 +317,21 @@ export function GeneratorPanel() {
               {/* Second data source: OAuth pull rendered as the same
                   virtual-CSV File the dropzone produces. */}
               <div
-                className="my-4 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600"
+                className="my-4 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400"
                 aria-hidden="true"
               >
-                <span className="h-px flex-1 bg-white/10" />
+                <span className="h-px flex-1 bg-zinc-200" />
                 or
-                <span className="h-px flex-1 bg-white/10" />
+                <span className="h-px flex-1 bg-zinc-200" />
               </div>
-              <p className="mb-2 font-mono text-[10px] font-semibold tracking-[0.14em] text-zinc-500">
+              <p className="mb-2 font-mono text-[10px] font-semibold tracking-[0.14em] text-zinc-400">
                 B · CONNECT META ACCOUNT
               </p>
               <MetaConnect />
 
               <fieldset className="mt-6">
                 <legend className={fieldLabel}>02 · Primary KPI</legend>
-                <div
-                  role="group"
-                  className="mt-2.5 grid grid-cols-3 gap-1.5"
-                >
+                <div role="group" className="mt-2.5 grid grid-cols-3 gap-1.5">
                   {KPI_OPTIONS.map((opt) => {
                     const active = fields.kpi === opt.value;
                     return (
@@ -342,10 +340,10 @@ export function GeneratorPanel() {
                         type="button"
                         aria-pressed={active}
                         onClick={() => updateFields({ kpi: opt.value })}
-                        className={`cursor-pointer rounded-lg border px-2 py-2 font-mono text-xs font-semibold transition motion-safe:duration-200 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-ink ${
+                        className={`cursor-pointer rounded-lg border px-2 py-2 font-mono text-xs font-semibold transition motion-safe:duration-200 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                           active
-                            ? "border-blue-400/60 bg-blue-500/15 text-white shadow-[0_0_20px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(147,197,253,0.2)]"
-                            : "border-white/10 bg-white/[0.02] text-zinc-400 hover:border-white/25 hover:bg-white/[0.04] hover:text-zinc-200"
+                            ? "border-zinc-900 bg-zinc-900 text-white shadow-[0_1px_2px_rgba(23,25,29,0.25)]"
+                            : "border-zinc-300 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900"
                         }`}
                       >
                         {opt.label}
@@ -397,7 +395,7 @@ export function GeneratorPanel() {
                   />
                 </div>
 
-                <div className="grid grid-cols-[7rem_1fr] gap-3 border-t border-white/5 pt-3">
+                <div className="grid grid-cols-[7rem_1fr] gap-3 border-t border-zinc-200/70 pt-3">
                   <div>
                     <label htmlFor="targetCpa" className={fieldLabel}>
                       Target CPA
@@ -429,16 +427,16 @@ export function GeneratorPanel() {
                     />
                   </div>
                 </div>
-                <p className="font-mono text-[10px] leading-relaxed tracking-wide text-zinc-600">
+                <p className="font-mono text-[10px] leading-relaxed tracking-wide text-zinc-400">
                   * REQUIRED · TARGET CPA SHARPENS THE SPEND GATE
                 </p>
               </div>
             </div>
           </div>
 
-          {/* ---- Action row: a recessed footer strip below the panel ---- */}
-          <div className="flex flex-col gap-3 border-t border-white/[0.07] bg-panel-deep/50 px-5 py-4 shadow-[inset_0_1px_4px_rgba(0,0,0,0.25)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-600">
+          {/* ---- Action row: a quiet footer strip below the panel ---- */}
+          <div className="flex flex-col gap-3 border-t border-zinc-200 bg-zinc-50/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400">
               Parsed in memory · never stored · gone on refresh
             </p>
             <button

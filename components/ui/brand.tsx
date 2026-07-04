@@ -1,15 +1,16 @@
 /* ------------------------------------------------------------------ */
-/* Brand mark shared across the workspace shell.                       */
+/* Brand mark shared across the workspace shell: a solid ink tile with */
+/* the send glyph — a stamp, not a glow. Quietly confident.            */
 /* ------------------------------------------------------------------ */
 
 export function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
   return (
     <div
-      className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-[0_4px_16px_rgba(37,99,235,0.55),0_0_24px_rgba(59,130,246,0.4),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-white/15`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-lg bg-zinc-900 shadow-[0_1px_2px_rgba(23,25,29,0.3),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-zinc-900/10`}
     >
       <svg
         viewBox="0 0 24 24"
-        className="h-4.5 w-4.5 text-white"
+        className="text-white"
         fill="none"
         stroke="currentColor"
         strokeWidth="2.2"

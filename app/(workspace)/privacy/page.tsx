@@ -24,7 +24,7 @@ const SECTIONS = [
   },
   {
     title: "Meta affiliation",
-    body: "Debrief reads CSV exports you download yourself from Meta Ads Manager. It doesn't connect to your ad account, requests no permissions, and isn't affiliated with or endorsed by Meta Platforms, Inc.",
+    body: "Debrief reads CSV exports you download yourself, or — only if you choose to connect — pulls read-only insights (ads_read) from the Meta API. The access token lives in your browser's memory for the session and is never stored. Debrief isn't affiliated with or endorsed by Meta Platforms, Inc.",
   },
 ];
 
@@ -33,11 +33,11 @@ export default function PrivacyPage() {
     <div>
       <header className="animate-rise">
         <p className={eyebrow}>Privacy</p>
-        <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-zinc-900 sm:text-3xl">
           <span className={gradientText}>Nothing stored.</span> By design,
           not by policy.
         </h1>
-        <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-400">
+        <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-600">
           The strongest privacy guarantee is architecture: this tool has no
           database, no accounts, and no storage to leak from.
         </p>
@@ -50,25 +50,25 @@ export default function PrivacyPage() {
             className={`animate-rise ${card} ${cardLift} p-5 sm:p-6`}
             style={{ animationDelay: `${90 + i * 90}ms` }}
           >
-            <h2 className="flex items-center gap-2.5 font-display text-[15px] font-semibold text-white">
-              {/* Blue, not emerald — green is reserved for win/loss */}
+            <h2 className="flex items-center gap-2.5 font-display text-[15px] font-semibold text-zinc-900">
+              {/* Neutral chip — green is reserved for win/loss */}
               <span className={`h-7 w-7 shrink-0 ${iconChip}`}>
                 <ShieldIcon className="h-3.5 w-3.5" />
               </span>
               {section.title}
             </h2>
-            <p className="mt-2.5 text-sm leading-relaxed text-zinc-400">
+            <p className="mt-2.5 text-sm leading-relaxed text-zinc-600">
               {section.body}
             </p>
           </section>
         ))}
       </div>
 
-      <p className="animate-rise mt-8 text-sm leading-relaxed text-zinc-500" style={{ animationDelay: "360ms" }}>
+      <p className="animate-rise mt-8 text-sm leading-relaxed text-zinc-600" style={{ animationDelay: "360ms" }}>
         Questions? Contact{" "}
         <a
           href="mailto:joris.adomas@gmail.com"
-          className="rounded-sm font-medium text-zinc-300 underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-white/40 active:text-zinc-200"
+          className="rounded-sm font-medium text-zinc-800 underline decoration-zinc-300 underline-offset-4 transition hover:text-blue-700 hover:decoration-blue-400 active:text-blue-800"
         >
           joris.adomas@gmail.com
         </a>
