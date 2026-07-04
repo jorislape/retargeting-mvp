@@ -33,11 +33,11 @@ export default function PrivacyPage() {
     <div>
       <header className="animate-rise">
         <p className={eyebrow}>Privacy</p>
-        <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           <span className={gradientText}>Nothing stored.</span> By design,
           not by policy.
         </h1>
-        <p className="mt-3 max-w-lg text-sm leading-relaxed text-stone-400">
+        <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
           The strongest privacy guarantee is architecture: this tool has no
           database, no accounts, and no storage to leak from.
         </p>
@@ -50,25 +50,25 @@ export default function PrivacyPage() {
             className={`animate-rise ${card} ${cardLift} p-5 sm:p-6`}
             style={{ animationDelay: `${90 + i * 90}ms` }}
           >
-            <h2 className="flex items-center gap-2.5 font-display text-[15px] font-semibold text-white">
+            <h2 className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight text-white">
               {/* Neutral chip — green is reserved for win/loss */}
               <span className={`h-7 w-7 shrink-0 ${iconChip}`}>
                 <ShieldIcon className="h-3.5 w-3.5" />
               </span>
               {section.title}
             </h2>
-            <p className="mt-2.5 text-sm leading-relaxed text-stone-400">
+            <p className="mt-2.5 text-sm leading-relaxed text-zinc-400">
               {section.body}
             </p>
           </section>
         ))}
       </div>
 
-      <p className="animate-rise mt-8 text-sm leading-relaxed text-stone-500" style={{ animationDelay: "360ms" }}>
+      <p className="animate-rise mt-8 text-sm leading-relaxed text-zinc-500" style={{ animationDelay: "360ms" }}>
         Questions? Contact{" "}
         <a
           href="mailto:joris.adomas@gmail.com"
-          className="rounded-sm font-medium text-stone-200 underline decoration-stone-600 underline-offset-4 transition hover:text-brass-soft hover:decoration-brass/60 active:text-brass-soft"
+          className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-4 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
         >
           joris.adomas@gmail.com
         </a>

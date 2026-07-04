@@ -135,7 +135,7 @@ export function MetaConnect() {
       status === "connecting" || (config.checked && !config.configured);
     return (
       <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
-        <p className="text-sm leading-snug text-stone-400">
+        <p className="text-sm leading-snug text-zinc-400">
           Pull ad-level insights read-only over OAuth — attribution matches
           Ads Manager.
         </p>
@@ -145,12 +145,12 @@ export function MetaConnect() {
           disabled={disabled}
           className={`cursor-pointer self-start ${btnSecondary}`}
         >
-          <ZapIcon className="h-3.5 w-3.5 text-stone-400" />
+          <ZapIcon className="h-3.5 w-3.5 text-zinc-400" />
           {status === "connecting"
             ? "Waiting for Meta sign-in…"
             : "Connect Meta account"}
         </button>
-        <p className="font-mono text-[10px] leading-relaxed tracking-[0.14em] text-stone-600">
+        <p className="font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-600">
           READ-ONLY (ADS_READ) · TOKEN IN MEMORY ONLY
         </p>
         {config.checked && !config.configured && (
@@ -191,7 +191,7 @@ export function MetaConnect() {
         <button
           type="button"
           onClick={disconnect}
-          className="cursor-pointer rounded-sm text-xs font-medium text-stone-400 transition hover:text-white active:text-stone-300"
+          className="cursor-pointer rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white active:text-zinc-300"
         >
           Disconnect
         </button>
@@ -241,13 +241,13 @@ export function MetaConnect() {
         className={`mt-2.5 w-full cursor-pointer ${btnSecondary}`}
       >
         <RefreshIcon
-          className={`h-3.5 w-3.5 text-stone-400 ${pulling ? "motion-safe:animate-spin" : ""}`}
+          className={`h-3.5 w-3.5 text-zinc-400 ${pulling ? "motion-safe:animate-spin" : ""}`}
         />
         {pulling ? "Pulling ads…" : "Pull ads into the generator"}
       </button>
 
       {pullNote && (
-        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-brass-soft/90">
+        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-accent-soft/90">
           {pullNote.toUpperCase()}
         </p>
       )}
@@ -266,7 +266,7 @@ export function MetaConnect() {
         </p>
       )}
 
-      <p className="mt-2.5 border-t border-white/[0.07] pt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-stone-600">
+      <p className="mt-2.5 border-t border-white/[0.07] pt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-600">
         TOKEN IN MEMORY ONLY · GONE ON REFRESH
       </p>
     </div>

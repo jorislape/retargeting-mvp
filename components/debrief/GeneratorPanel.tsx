@@ -21,15 +21,15 @@ import {
 import { btnPrimary, btnSecondary, fieldLabel, inputBase } from "@/components/ui/theme";
 
 /* ------------------------------------------------------------------ */
-/* The generator as a WORKFLOW, not a form-in-a-card: three stages     */
-/* down a progress rail —                                              */
+/* The generator as a WORKFLOW: three stages, each opened by a light   */
+/* step header (numbered chip that fills as the stage completes) —     */
 /*   01 SOURCE   three intentional input methods (CSV export, sample  */
 /*               dataset, Meta API) as equal tiles; whatever method    */
-/*               fills the pipeline lands in one shared "loaded" bar   */
+/*               fills the pipeline lands in one shared "loaded" strip */
 /*   02 FRAMING  the KPI (underline-selected, polarity shown) and the */
 /*               context the memo is written against                   */
-/*   03 RUN      one status line, one brass action                     */
-/* The rail fills as stages complete — live state, not decoration.     */
+/*   03 RUN      one status line, one white action                     */
+/* Stage completion is real state, not decoration.                     */
 /* ------------------------------------------------------------------ */
 
 const KPI_OPTIONS: { value: KpiKey; label: string }[] = [
@@ -67,7 +67,7 @@ function ProcessingPanel() {
 
   return (
     <div
-      className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-white/[0.08] bg-panel px-6 text-center"
+      className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] px-6 text-center"
       role="status"
       aria-live="polite"
     >
@@ -82,17 +82,17 @@ function ProcessingPanel() {
             <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold transition ${
                 i < step
-                  ? "bg-brass text-[#141414]"
+                  ? "bg-accent text-zinc-950"
                   : i === step
-                    ? "border border-brass/60 text-brass-soft motion-safe:animate-pulse"
-                    : "border border-white/15 text-stone-600"
+                    ? "border border-accent/60 text-accent-soft motion-safe:animate-pulse"
+                    : "border border-white/15 text-zinc-600"
               }`}
             >
               {i < step ? "✓" : i + 1}
             </span>
             <span
-              className={`font-mono text-xs tracking-wide ${
-                i === step ? "text-stone-100" : "text-stone-500"
+              className={`text-[13px] font-medium ${
+                i === step ? "text-zinc-100" : "text-zinc-500"
               }`}
             >
               {label}…
@@ -104,59 +104,44 @@ function ProcessingPanel() {
   );
 }
 
-/* One node of the progress rail. State is real: done = the stage's
-   requirement is met, active = it's the next thing to do. */
-function StageNode({
+/* A light step header: small numbered chip that fills when the stage
+   is complete, title, and an optional hint. No rail, no weight. */
+function StageHeader({
   n,
-  state,
-  last = false,
+  title,
+  done,
+  hint,
 }: {
   n: string;
-  state: "done" | "active" | "idle";
-  last?: boolean;
+  title: string;
+  done: boolean;
+  hint?: string;
 }) {
   return (
-    <div className="flex flex-col items-center self-stretch">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <span
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-mono text-[10px] font-semibold transition-colors ${
-          state === "done"
-            ? "border-brass bg-brass text-[#141414]"
-            : state === "active"
-              ? "border-brass/60 text-brass-soft"
-              : "border-white/15 text-stone-600"
+        className={`flex h-6 w-6 items-center justify-center rounded-md font-mono text-[10px] font-semibold transition-colors ${
+          done
+            ? "bg-accent text-zinc-950"
+            : "border border-white/12 text-zinc-500"
         }`}
       >
-        {state === "done" ? "✓" : n}
+        {done ? "✓" : n}
       </span>
-      {!last && (
-        <span
-          aria-hidden="true"
-          className={`mt-2 w-px flex-1 ${
-            state === "done" ? "bg-brass/40" : "bg-white/10"
-          }`}
-        />
-      )}
-    </div>
-  );
-}
-
-function StageHeading({ title, hint }: { title: string; hint?: string }) {
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pt-0.5">
-      <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-300">
+      <h2 className="text-sm font-semibold tracking-tight text-zinc-100">
         {title}
       </h2>
-      {hint && <p className="text-xs text-stone-600">{hint}</p>}
+      {hint && <p className="text-xs text-zinc-600 sm:ml-1">{hint}</p>}
     </div>
   );
 }
 
 const methodTile =
-  "flex min-h-36 flex-col rounded-lg border border-white/[0.08] bg-panel p-4 transition-colors";
+  "flex min-h-40 flex-col rounded-xl border border-white/[0.06] bg-white/[0.03] p-5 transition-colors";
 
 function MethodLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
       {children}
     </p>
   );
@@ -217,23 +202,24 @@ export function GeneratorPanel() {
       {error && (
         <div
           role="alert"
-          className="mb-6 flex items-start gap-2.5 border-l-2 border-red-400 bg-red-400/[0.06] px-4 py-3 text-[13px] leading-relaxed text-red-200"
+          className="mb-8 flex items-start gap-2.5 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-4 py-3 text-[13px] leading-relaxed text-red-200"
         >
           <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
           {error}
         </div>
       )}
 
-      {/* ---- Stage 01 · Source ---- */}
-      <section className="grid grid-cols-[2.25rem_1fr] gap-x-4 sm:gap-x-5">
-        <StageNode n="01" state={file ? "done" : "active"} />
-        <div className="pb-10">
-          <StageHeading
+      <div className="space-y-12">
+        {/* ---- Stage 01 · Source ---- */}
+        <section>
+          <StageHeader
+            n="1"
             title="Source"
+            done={!!file}
             hint="Three ways in — all land in the same pipeline."
           />
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
             {/* Method A: CSV export (the dropzone itself) */}
             <label
               htmlFor="csv-input"
@@ -247,10 +233,10 @@ export function GeneratorPanel() {
                 setDragging(false);
                 handleFiles(e.dataTransfer.files);
               }}
-              className={`${methodTile} cursor-pointer items-start justify-between gap-3 focus-within:ring-2 focus-within:ring-brass/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
+              className={`${methodTile} cursor-pointer items-start justify-between gap-3 focus-within:ring-2 focus-within:ring-accent/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
                 dragging
-                  ? "border-brass/70 bg-brass/[0.04]"
-                  : "hover:border-white/20"
+                  ? "border-accent/60 bg-accent/[0.06]"
+                  : "hover:border-white/[0.12] hover:bg-white/[0.05]"
               }`}
             >
               <input
@@ -263,19 +249,19 @@ export function GeneratorPanel() {
               />
               <MethodLabel>
                 <UploadIcon
-                  className={`h-3.5 w-3.5 ${dragging ? "text-brass-soft" : "text-stone-500"}`}
+                  className={`h-3.5 w-3.5 ${dragging ? "text-accent-soft" : "text-zinc-500"}`}
                 />
-                A · CSV export
+                CSV export
               </MethodLabel>
               <div>
-                <p className="text-sm font-medium text-stone-200">
+                <p className="text-sm font-medium text-zinc-200">
                   {dragging ? "Drop to load" : "Drop your Ads Manager export"}
                 </p>
-                <p className="mt-1 font-mono text-[11px] text-stone-600">
+                <p className="mt-1 text-xs text-zinc-600">
                   or click to browse · max 5MB
                 </p>
               </div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-stone-600">
+              <span className="text-[11px] text-zinc-600">
                 Ad-level · any column set
               </span>
             </label>
@@ -283,10 +269,10 @@ export function GeneratorPanel() {
             {/* Method B: sample dataset */}
             <div className={`${methodTile} items-start justify-between gap-3`}>
               <MethodLabel>
-                <FlaskIcon className="h-3.5 w-3.5 text-stone-500" />
-                B · Sample dataset
+                <FlaskIcon className="h-3.5 w-3.5 text-zinc-500" />
+                Sample dataset
               </MethodLabel>
-              <p className="text-sm leading-snug text-stone-400">
+              <p className="text-sm leading-snug text-zinc-400">
                 14 synthetic ads with clear winners, losers, and thin-spend
                 traps — built to exercise every rule.
               </p>
@@ -302,8 +288,8 @@ export function GeneratorPanel() {
             {/* Method C: Meta API */}
             <div className={`${methodTile} justify-between gap-3`}>
               <MethodLabel>
-                <span className="h-1.5 w-1.5 rounded-full bg-stone-500" />
-                C · Meta API
+                <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+                Meta API
               </MethodLabel>
               <MetaConnect />
             </div>
@@ -313,18 +299,18 @@ export function GeneratorPanel() {
               data, this is the single source of truth for what's
               loaded. */}
           {file && (
-            <div className="animate-settle mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-l-2 border-brass bg-brass/[0.05] px-4 py-3">
-              <FileTextIcon className="h-4 w-4 shrink-0 text-brass-soft" />
-              <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-stone-100">
+            <div className="animate-settle mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-accent/25 bg-accent/[0.06] px-4 py-3">
+              <FileTextIcon className="h-4 w-4 shrink-0 text-accent-soft" />
+              <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-zinc-100">
                 {file.name}
               </p>
-              <span className="font-mono text-[11px] text-stone-500">
+              <span className="font-mono text-[11px] text-zinc-500">
                 {fmtBytes(file.size)} · ready
               </span>
               <button
                 type="button"
                 onClick={removeFile}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-stone-500 transition hover:text-white"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white"
               >
                 <XIcon className="h-3 w-3" />
                 Remove
@@ -332,12 +318,12 @@ export function GeneratorPanel() {
             </div>
           )}
 
-          <div className="mt-3 space-y-1">
-            <details className="group border-l border-white/10 pl-3 open:border-brass/40">
-              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-stone-500 transition hover:text-stone-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/60 [&::-webkit-details-marker]:hidden">
+          <div className="mt-4 space-y-1">
+            <details className="group border-l border-white/10 pl-3 open:border-accent/40">
+              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 How to export from Meta Ads Manager
               </summary>
-              <ol className="space-y-1 pb-2 pt-1.5 text-xs leading-relaxed text-stone-400">
+              <ol className="space-y-1 pb-2 pt-1.5 text-xs leading-relaxed text-zinc-400">
                 {[
                   "Open Meta Ads Manager",
                   "Switch to the Ads level (not Campaigns or Ad sets)",
@@ -347,7 +333,7 @@ export function GeneratorPanel() {
                   "Drop the file above",
                 ].map((step, i) => (
                   <li key={step} className="flex gap-2">
-                    <span className="font-mono text-[10px] font-semibold text-brass-soft">
+                    <span className="font-mono text-[10px] font-semibold text-accent-soft">
                       {i + 1}.
                     </span>
                     {step}
@@ -356,47 +342,45 @@ export function GeneratorPanel() {
               </ol>
             </details>
 
-            <details className="group border-l border-white/10 pl-3 open:border-brass/40">
-              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-stone-500 transition hover:text-stone-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/60 [&::-webkit-details-marker]:hidden">
+            <details className="group border-l border-white/10 pl-3 open:border-accent/40">
+              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 Columns we recognize
               </summary>
-              <div className="pb-2 pt-1.5 text-xs leading-relaxed text-stone-400">
+              <div className="pb-2 pt-1.5 text-xs leading-relaxed text-zinc-400">
                 <p>
-                  Only <span className="font-semibold text-stone-200">Amount spent</span>{" "}
+                  Only <span className="font-semibold text-zinc-200">Amount spent</span>{" "}
                   plus the column for your chosen KPI are required. Naming
                   varies by export — all of these resolve automatically:
                 </p>
-                <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-stone-500">
+                <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-zinc-500">
                   Ad name · Amount spent · Impressions · Link clicks · CTR ·
                   CPC · Purchases / Results · Purchase conversion value ·
                   Purchase ROAS · Cost per purchase / result · Leads · Cost
                   per lead · Reporting starts / ends
                 </p>
-                <p className="mt-1.5 text-stone-500">
+                <p className="mt-1.5 text-zinc-500">
                   Missing something for your KPI? You&apos;ll get a clear
                   message naming the column, not a wrong answer.
                 </p>
               </div>
             </details>
           </div>
-        </div>
+        </section>
 
         {/* ---- Stage 02 · Framing ---- */}
-        <StageNode
-          n="02"
-          state={contextDone ? "done" : file ? "active" : "idle"}
-        />
-        <div className="pb-10">
-          <StageHeading
+        <section>
+          <StageHeader
+            n="2"
             title="Framing"
+            done={contextDone}
             hint="The KPI the memo judges by, and the context it's written against."
           />
 
-          <fieldset className="mt-4">
+          <fieldset className="mt-5">
             <legend className="sr-only">Primary KPI</legend>
             <div
               role="group"
-              className="grid grid-cols-3 border-b border-white/10 sm:grid-cols-6"
+              className="grid grid-cols-3 border-b border-white/[0.08] sm:grid-cols-6"
             >
               {KPI_OPTIONS.map((opt) => {
                 const active = fields.kpi === opt.value;
@@ -406,10 +390,10 @@ export function GeneratorPanel() {
                     type="button"
                     aria-pressed={active}
                     onClick={() => updateFields({ kpi: opt.value })}
-                    className={`relative cursor-pointer px-2 pb-2.5 pt-1.5 font-mono text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass/60 ${
+                    className={`relative cursor-pointer px-2 pb-2.5 pt-1.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       active
-                        ? "text-stone-100"
-                        : "text-stone-500 hover:text-stone-300"
+                        ? "text-zinc-100"
+                        : "text-zinc-500 hover:text-zinc-300"
                     }`}
                   >
                     {opt.label}
@@ -420,14 +404,14 @@ export function GeneratorPanel() {
                           ? "Higher is better"
                           : "Lower is better"
                       }
-                      className={`ml-1 ${active ? "text-brass-soft" : "text-stone-600"}`}
+                      className={`ml-1 ${active ? "text-accent-soft" : "text-zinc-600"}`}
                     >
                       {HIGHER_IS_BETTER[opt.value] ? "↑" : "↓"}
                     </span>
                     <span
                       aria-hidden="true"
-                      className={`absolute inset-x-2 -bottom-px h-0.5 transition-opacity ${
-                        active ? "bg-brass opacity-100" : "opacity-0"
+                      className={`absolute inset-x-2 -bottom-px h-0.5 rounded-full transition-opacity ${
+                        active ? "bg-accent opacity-100" : "opacity-0"
                       }`}
                     />
                   </button>
@@ -436,7 +420,7 @@ export function GeneratorPanel() {
             </div>
           </fieldset>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="product" className={fieldLabel}>
                 Product / industry *
@@ -502,28 +486,32 @@ export function GeneratorPanel() {
               />
             </div>
           </div>
-          <p className="mt-3 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-stone-600">
-            * REQUIRED · TARGET CPA SHARPENS THE SPEND GATE
+          <p className="mt-3 text-xs text-zinc-600">
+            * Required — a target CPA sharpens the spend gate.
           </p>
-        </div>
+        </section>
 
         {/* ---- Stage 03 · Run ---- */}
-        <StageNode n="03" state={canSubmit ? "active" : "idle"} last />
-        <div>
-          <StageHeading title="Run" />
-          <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="font-mono text-[11px] leading-relaxed text-stone-500">
-              {file ? (
-                <>
-                  <span className="text-stone-300">{file.name}</span>
-                  {" · "}
-                  {KPI_OPTIONS.find((o) => o.value === fields.kpi)?.label}
-                  {contextDone ? " · ready" : " · context incomplete"}
-                </>
-              ) : (
-                "Load data in stage 01 to run."
-              )}
-            </p>
+        <section>
+          <StageHeader n="3" title="Run" done={false} />
+          <div className="mt-4 flex flex-col gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[13px] leading-relaxed text-zinc-400">
+                {file ? (
+                  <>
+                    <span className="font-mono text-zinc-200">{file.name}</span>
+                    {" · "}
+                    {KPI_OPTIONS.find((o) => o.value === fields.kpi)?.label}
+                    {contextDone ? " · ready" : " · context incomplete"}
+                  </>
+                ) : (
+                  "Load data in stage 1 to run."
+                )}
+              </p>
+              <p className="mt-1 text-xs text-zinc-600">
+                Parsed in memory — never stored, gone on refresh.
+              </p>
+            </div>
             <button
               type="submit"
               disabled={!canSubmit}
@@ -533,11 +521,8 @@ export function GeneratorPanel() {
               <ArrowIcon className="h-4 w-4" />
             </button>
           </div>
-          <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone-600">
-            Parsed in memory · never stored · gone on refresh
-          </p>
-        </div>
-      </section>
+        </section>
+      </div>
     </form>
   );
 }

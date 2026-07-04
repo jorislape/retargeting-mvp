@@ -1,19 +1,19 @@
 /* ------------------------------------------------------------------ */
-/* Brand mark: a brass-ruled square, glyph set in brass. A seal, not   */
-/* a glow — restrained, like everything else in the dossier.           */
+/* Brand mark: white tile, dark glyph — the same language as the       */
+/* primary action. Clean, current, no glow.                            */
 /* ------------------------------------------------------------------ */
 
 export function LogoMark({ size = "h-8 w-8" }: { size?: string }) {
   return (
     <div
-      className={`flex ${size} shrink-0 items-center justify-center rounded-md border border-brass/50 bg-brass/[0.06]`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-lg bg-white shadow-[0_1px_2px_rgba(0,0,0,0.4)]`}
     >
       <svg
         viewBox="0 0 24 24"
-        className="text-brass-soft"
+        className="text-zinc-950"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"

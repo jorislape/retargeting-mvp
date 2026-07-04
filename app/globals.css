@@ -1,39 +1,39 @@
 @import "tailwindcss";
 
 /*
- * "The dossier" — a performance-intelligence document, not a SaaS toy.
+ * Modern dark professional SaaS for media buyers.
  *
- * Canvas is deep neutral graphite. Surfaces are flat panels one step
- * lighter, separated by hairlines — depth comes from rules and
- * spacing, never from glows or gradients. The single accent is BRASS
- * (a muted gold): section numerals, active markers, the one primary
- * action per screen. Emerald and red are reserved exclusively for
- * win/loss and appear as plain colored text, not pills.
+ * Canvas is cool near-black graphite. Surfaces are soft translucent
+ * layers (white at 3–5% alpha) with hairline borders — depth from
+ * layering and spacing, not glows. The primary action is WHITE with
+ * dark text; the accent is a restrained icy cyan used only for
+ * markers, selection, and focus. Emerald and red are reserved
+ * exclusively for win/loss; amber only for warnings.
  *
- * Type: Source Serif 4 for display (report titles, verdicts) over
- * IBM Plex Sans body and IBM Plex Mono data labels — an intelligence
- * report, set properly.
+ * Type: Geist everywhere, hierarchy by weight and tracking; Geist
+ * Mono only for numerals and data.
  *
  * Fonts arrive as CSS variables from next/font in app/layout.tsx.
  */
 :root {
-  --background: #0e0e10;
-  --foreground: #f5f5f4;
+  --background: #0b0c0f;
+  --foreground: #fafafa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* carbon = canvas; panel = surfaces; well = recessed inputs */
-  --color-carbon: #0e0e10;
-  --color-panel: #17171a;
-  --color-well: #0a0a0b;
-  /* brass = the accent; brass-soft for text on dark */
-  --color-brass: #c6a15b;
-  --color-brass-soft: #d8bc82;
-  --font-sans: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-sg), Georgia, "Times New Roman", serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  /* carbon = canvas; panel = opaque surface (processing, tiles);
+     well = recessed inputs */
+  --color-carbon: #0b0c0f;
+  --color-panel: #131519;
+  --color-well: #08090b;
+  /* the accent: icy cyan, used sparingly */
+  --color-accent: #38bdf8;
+  --color-accent-soft: #7dd3fc;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 html {
@@ -48,39 +48,44 @@ html {
 
 body {
   background-color: var(--background);
-  /* One barely-there warm cast at the top of the page — a reading
-     lamp over the desk, held under 4% alpha. Nothing else. */
+  /* One cool, quiet light source above the fold — presence, not a
+     glow effect. Fixed so scrolling moves content over a lit surface. */
   background-image: radial-gradient(
-    1000px 420px at 50% -160px,
-    rgba(198, 161, 91, 0.04),
+    1100px 500px at 50% -200px,
+    rgba(56, 189, 248, 0.05),
     transparent 70%
   );
   background-attachment: fixed;
   color: var(--foreground);
-  font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
 ::selection {
-  background: rgb(198 161 91 / 0.3);
+  background: rgb(56 189 248 / 0.28);
 }
 
 /*
  * On-brand keyboard focus. Components that render their own
  * focus-visible ring also set outline-none, which wins over this
  * :where() rule (zero specificity by design) — so every focusable
- * element gets exactly one brass indicator.
+ * element gets exactly one accent indicator.
  */
 :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
-  outline: 2px solid rgb(198 161 91 / 0.75);
+  outline: 2px solid rgb(56 189 248 / 0.7);
   outline-offset: 2px;
 }
 
 /*
- * Key phrase in a page h1 (one per page, max): set in brass. Solid —
- * no gradient. The class name is kept so callers don't change.
+ * Key phrase in a page h1 (one per page, max): white cooling into icy
+ * cyan. Hand-rolled because Safari still needs the -webkit- prefix
+ * for background-clip: text.
  */
 .gradient-phrase {
-  color: #d8bc82;
+  background-image: linear-gradient(100deg, #ffffff, #e0f2fe 55%, #7dd3fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 /* Entrance for report sections and view changes — motion-safe only,
@@ -144,6 +149,7 @@ body {
     backdrop-filter: none !important;
   }
   body .gradient-phrase {
+    -webkit-text-fill-color: #18181b !important;
     color: #18181b !important;
   }
   body .print-win {

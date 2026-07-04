@@ -72,10 +72,10 @@ export default function HowItWorksPage() {
     <div>
       <header className="animate-rise">
         <p className={eyebrow}>How it works</p>
-        <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           Three steps. <span className={gradientText}>No black box.</span>
         </h1>
-        <p className="mt-3 max-w-lg text-sm leading-relaxed text-stone-400">
+        <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
           Every number in a debrief is computed from your CSV with rules you
           can read below — not a model&apos;s opinion.
         </p>
@@ -93,14 +93,14 @@ export default function HowItWorksPage() {
               <div className={`h-9 w-9 ${iconChip}`}>
                 <step.icon className="h-4 w-4" />
               </div>
-              <span className="font-mono text-[11px] font-semibold tracking-widest text-stone-600">
+              <span className="font-mono text-[11px] font-semibold text-zinc-600">
                 0{i + 1}
               </span>
             </div>
-            <h2 className="mt-4 font-display text-[15px] font-semibold text-white">
+            <h2 className="mt-4 text-[15px] font-semibold tracking-tight text-white">
               {step.title}
             </h2>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-stone-400">
+            <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
               {step.text}
             </p>
           </li>
@@ -110,7 +110,7 @@ export default function HowItWorksPage() {
       {/* Deterministic scoring */}
       <section className="animate-rise mt-12" style={{ animationDelay: "270ms" }}>
         <p className={eyebrow}>Deterministic scoring</p>
-        <h2 className="mt-2 font-display text-lg font-bold tracking-tight text-white">
+        <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
           The rules, in plain sight
         </h2>
         <div className={`mt-4 ${card} divide-y divide-white/[0.06]`}>
@@ -119,20 +119,20 @@ export default function HowItWorksPage() {
               key={rule.term}
               className="grid gap-1.5 px-5 py-4 sm:grid-cols-[11rem_1fr] sm:gap-6"
             >
-              <dt className="font-mono text-xs font-semibold uppercase tracking-wider text-brass-soft">
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-soft">
                 {rule.term}
               </dt>
-              <dd className="text-[13px] leading-relaxed text-stone-400">
+              <dd className="text-[13px] leading-relaxed text-zinc-400">
                 {rule.detail}
               </dd>
             </div>
           ))}
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-stone-500">
+        <p className="mt-3 text-xs leading-relaxed text-zinc-500">
           The same engine renders the{" "}
           <Link
             href="/sample"
-            className="rounded-sm text-stone-300 underline decoration-stone-600 underline-offset-2 transition hover:text-brass-soft hover:decoration-brass/60"
+            className="rounded-sm text-zinc-300 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60"
           >
             sample report
           </Link>{" "}

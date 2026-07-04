@@ -60,15 +60,15 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       cards (not tables) with a "N more … full detail in the Buyer
       view" note; confidence reads "This result is based on 14 ads and
       $3,385.50 in ad spend…". Buyer view keeps full tables and notes.
-- [ ] **Visual system ("the dossier")**: graphite canvas, flat panels
-      with hairline borders, brass as the only accent, serif display
-      type. The generator is a 3-stage workflow (Source / Framing /
-      Run) down a progress rail that fills as stages complete; the
-      three input methods are equal tiles and loaded data lands in one
-      brass-ruled strip. The report is a ruled document: brass double
-      rule under the masthead, editorial stat row (no boxes), numbered
-      sections, run-list as a ledger. No glows, no tickers, no neon.
-      PDF flattens to ink-on-paper with win/loss preserved.
+- [ ] **Visual system (modern dark SaaS)**: cool graphite canvas with
+      one quiet light source, soft translucent surface layers, white
+      primary CTA, icy-cyan accent only on markers/selection/focus.
+      The generator is three stages with light numbered step chips
+      that fill as stages complete; input methods are equal tiles and
+      loaded data lands in one accent strip. The report opens with a
+      short accent bar and reads as a structured document: stat row
+      without boxes, numbered sections, ledger run-list. No serif, no
+      gold, no neon, no glows. PDF flattens to ink-on-paper.
 - [ ] **KPI selector**: underline-selected tabs with polarity arrows
       (↑ ROAS/CTR/Leads/Purchases, ↓ CPA/CPC).
 - [ ] "Copy" copies the plain-text version of the ACTIVE view.

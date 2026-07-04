@@ -1,30 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 /*
- * Type system — the editorial commitment:
- *   Source Serif 4 → display (report titles, verdicts, section leads)
- *   IBM Plex Sans  → body
- *   IBM Plex Mono  → data labels, eyebrows, numerals in tables
+ * Type system — one contemporary family, weight-driven hierarchy:
+ *   Geist       → everything set in prose and UI (display = weight +
+ *                 tracking, not a second family)
+ *   Geist Mono  → numerals, filenames, table data
  * Wired into Tailwind via CSS variables in globals.css (@theme inline),
  * so `font-display` / `font-sans` / `font-mono` utilities map to them.
  */
-const sourceSerif = Source_Serif_4({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-sg",
+  variable: "--font-geist",
 });
 
-const plexSans = IBM_Plex_Sans({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-plex",
-});
-
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
@@ -36,7 +29,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0e0e10",
+  themeColor: "#0b0c0f",
 };
 
 export default function RootLayout({
@@ -45,10 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${sourceSerif.variable} ${plexSans.variable} ${plexMono.variable}`}
-    >
+    <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
       <body className="antialiased">{children}</body>
     </html>
   );

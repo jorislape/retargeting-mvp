@@ -25,18 +25,18 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-52 flex-col border-r border-white/[0.07] bg-carbon md:flex">
+    <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-52 flex-col border-r border-white/[0.06] bg-carbon md:flex">
       <Link
         href="/"
-        className="group flex h-16 shrink-0 items-center gap-2.5 border-b border-white/[0.07] px-4 transition-colors hover:bg-white/[0.02]"
+        className="group flex h-16 shrink-0 items-center gap-2.5 px-4 transition-opacity hover:opacity-80"
       >
         <LogoMark size="h-7 w-7" />
-        <span className="font-display text-[17px] font-semibold tracking-tight text-stone-100">
+        <span className="text-[15px] font-semibold tracking-tight text-zinc-100">
           Debrief
         </span>
       </Link>
 
-      <nav className="flex flex-col gap-0.5 px-3 py-4">
+      <nav className="flex flex-col gap-1 px-3 pt-2">
         {NAV.map((item) => {
           const active = isActive(pathname, item.href);
           return (
@@ -44,24 +44,17 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`group relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${
+              className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
                 active
-                  ? "text-stone-100"
-                  : "text-stone-500 hover:text-stone-300"
+                  ? "bg-white/[0.06] text-white"
+                  : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
               }`}
             >
-              {/* Active marker: a short brass rule on the left edge. */}
-              <span
-                aria-hidden="true"
-                className={`absolute -left-3 top-1/2 h-4 w-0.5 -translate-y-1/2 bg-brass transition-opacity ${
-                  active ? "opacity-100" : "opacity-0"
-                }`}
-              />
               <item.icon
                 className={`h-4 w-4 shrink-0 transition-colors ${
                   active
-                    ? "text-brass-soft"
-                    : "text-stone-600 group-hover:text-stone-400"
+                    ? "text-accent-soft"
+                    : "text-zinc-600 group-hover:text-zinc-400"
                 }`}
               />
               {item.label}
@@ -70,12 +63,12 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-white/[0.07] p-4">
-        <p className="flex items-start gap-2 font-mono text-[9px] leading-relaxed tracking-[0.14em] text-stone-600">
-          <ShieldIcon className="mt-0.5 h-3 w-3 shrink-0 text-stone-600" />
-          IN-MEMORY ONLY.
+      <div className="mt-auto border-t border-white/[0.06] p-4">
+        <p className="flex items-start gap-2 text-[10px] leading-relaxed text-zinc-600">
+          <ShieldIcon className="mt-0.5 h-3 w-3 shrink-0 text-zinc-600" />
+          In-memory only.
           <br />
-          NOTHING IS STORED.
+          Nothing is stored.
         </p>
       </div>
     </aside>
@@ -84,15 +77,15 @@ export function Sidebar() {
 
 export function MobileTopBar() {
   return (
-    <header className="print-hidden sticky top-0 z-30 border-b border-white/[0.07] bg-carbon/90 backdrop-blur md:hidden">
+    <header className="print-hidden sticky top-0 z-30 border-b border-white/[0.06] bg-carbon/90 backdrop-blur md:hidden">
       <div className="flex h-14 items-center justify-between px-5">
         <Link href="/" className="flex items-center gap-2">
           <LogoMark size="h-7 w-7" />
-          <span className="font-display text-[16px] font-semibold tracking-tight text-stone-100">
+          <span className="text-[15px] font-semibold tracking-tight text-zinc-100">
             Debrief
           </span>
         </Link>
-        <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-stone-600">
+        <span className="text-[10px] font-medium text-zinc-600">
           Nothing stored
         </span>
       </div>
@@ -117,18 +110,17 @@ export function MobileTabBar() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={`relative flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
-                active ? "text-stone-100" : "text-stone-500 active:text-stone-300"
+                active ? "text-zinc-100" : "text-zinc-500 active:text-zinc-300"
               }`}
             >
-              {/* Active marker: a short brass rule on the tab's top edge. */}
               <span
                 aria-hidden="true"
-                className={`absolute -top-px left-1/2 h-0.5 w-7 -translate-x-1/2 bg-brass transition-opacity ${
+                className={`absolute -top-px left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-accent transition-opacity ${
                   active ? "opacity-100" : "opacity-0"
                 }`}
               />
               <item.icon
-                className={`h-5 w-5 ${active ? "text-brass-soft" : ""}`}
+                className={`h-5 w-5 ${active ? "text-accent-soft" : ""}`}
               />
               {item.label === "How it works" ? "Guide" : item.label === "Sample report" ? "Sample" : item.label}
             </Link>
