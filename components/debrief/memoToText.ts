@@ -4,8 +4,14 @@ export type ReportView = "buyer" | "client";
 
 /** Plain-text serialization for the copy/share button — same content
  *  as the on-screen report in the active view, no markup, safe to
- *  paste into Slack, email, or a doc. */
-export function memoToText(memo: Memo, view: ReportView = "buyer"): string {
+ *  paste into Slack, email, or a doc. `briefIndices` lists the tests
+ *  whose creative briefs are currently generated/visible (buyer view);
+ *  pass none and the output is identical to a report without briefs. */
+export function memoToText(
+  memo: Memo,
+  view: ReportView = "buyer",
+  briefIndices: number[] = []
+): string {
   const lines: string[] = [];
   const { scope } = memo;
 
@@ -97,6 +103,30 @@ export function memoToText(memo: Memo, view: ReportView = "buyer"): string {
     }
   });
   lines.push("");
+
+  if (view === "buyer" && briefIndices.length > 0) {
+    lines.push("CREATIVE BRIEFS");
+    briefIndices.forEach((i) => {
+      const brief = memo.nextTests[i]?.brief;
+      if (!brief) return;
+      lines.push(`T${i + 1} — ${brief.title}`);
+      lines.push(`Objective: ${brief.objective}`);
+      lines.push("Based on:");
+      brief.basedOn.forEach((s) => lines.push(`- ${s}`));
+      lines.push(`Concept: ${brief.concept}`);
+      lines.push("Hook options:");
+      brief.hooks.forEach((h, j) => lines.push(`${j + 1}. ${h}`));
+      lines.push("Shot / asset direction:");
+      brief.assetDirection.forEach((s) => lines.push(`- ${s}`));
+      lines.push(`Keep constant: ${brief.keepConstant}`);
+      lines.push(`Change: ${brief.change}`);
+      lines.push(`Success metric: ${brief.successMetric}`);
+      lines.push("Guardrails:");
+      brief.guardrails.forEach((g) => lines.push(`- ${g}`));
+      lines.push(brief.basisNote);
+      lines.push("");
+    });
+  }
 
   const avoidBullets = view === "client" ? memo.avoid.client : memo.avoid.buyer;
   if (avoidBullets.length > 0) {

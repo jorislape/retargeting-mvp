@@ -8,6 +8,7 @@ import { assessMarketNotes, extractMarketSignals } from "./marketSignals";
 import {
   AnalysisResult,
   DebriefContext,
+  HIGHER_IS_BETTER,
   KPI_EXPLAINERS,
   KPI_LABELS,
   Memo,
@@ -265,6 +266,61 @@ const FORMAT_CHALLENGERS: Record<string, string> = {
   urgency: "the same offer without the urgency framing",
 };
 
+/** Shot / asset direction per creative format — structural direction
+ *  only (what to show, how to open), never invented claims, quotes,
+ *  offers, or competitor facts. Reused across brief kinds. */
+const ASSET_DIRECTION: Record<string, string[]> = {
+  "founder-led": [
+    "Founder on camera, speaking straight to lens — phone-grade is fine, authenticity beats polish.",
+    "Natural setting (workspace, home) — no studio look.",
+    "Burned-in captions; assume sound-off viewing.",
+    "Cut or reframe every 2–3 seconds to hold attention.",
+    "End card: product + the offer exactly as it exists today.",
+  ],
+  ugc: [
+    "Creator-shot, handheld phone footage — native to feed, not produced.",
+    "Product in real use within the first 3 seconds.",
+    "Voiceover or captions carrying the angle's core line.",
+    "Imperfect lighting is acceptable — polish reads as an ad.",
+    "End card: the offer as it exists today.",
+  ],
+  testimonial: [
+    "Use existing customer review language verbatim — never invented quotes.",
+    "Attribute only with permission; initials are enough.",
+    "Open on the review's strongest line, not the product.",
+    "Simple treatment — the words are the creative.",
+    "Close with product shot + current offer.",
+  ],
+  static: [
+    "One message per image — the angle's core claim, nothing else.",
+    "Visual hierarchy: hook line first, product second, offer last.",
+    "First read must land in under 2 seconds.",
+    "No more than ~10 words of copy on the image.",
+  ],
+  carousel: [
+    "Card 1 must work standalone — hook + visual, no setup required.",
+    "One idea per card; the sequence tells the angle start to finish.",
+    "Design cards to be read out of order — most viewers won't swipe in sequence.",
+    "Repeat the offer only on the final card.",
+  ],
+  "problem-first": [
+    "First frame states the problem plainly — no brand, no product yet.",
+    "Agitate briefly (1–2 beats), then introduce the product as the turn.",
+    "Keep the problem in the customer's words, not marketing language.",
+    "The offer appears only after the solution beat — closer, not hook.",
+    "Burned-in captions; assume sound-off viewing.",
+  ],
+  video: [
+    "Open mid-action — no logo or title card in the first 3 seconds.",
+    "Burned-in captions; assume sound-off viewing.",
+    "One idea per cut; re-hook visually every 3–5 seconds.",
+    "End card: product + the offer exactly as it exists today.",
+  ],
+};
+
+const directionFor = (tag: string | null | undefined): string[] =>
+  (tag && ASSET_DIRECTION[tag]) || ASSET_DIRECTION.video;
+
 /**
  * Next tests are CREATIVE tests. Budget movement lives in the verdict
  * and the losers section; at most one scaling action appears here, and
@@ -330,11 +386,46 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       .filter((s): s is string => typeof s === "string" && s !== "")
       .slice(0, 4);
 
+  /* ---- Creative-brief scaffolding (deterministic, shared) ---- */
+  const product = context.product || "the product";
+  const offerLabel = context.offer ? `"${context.offer}"` : "the current offer";
+  const typicalLabel =
+    median != null
+      ? `the ${medianLabel} typical result`
+      : "the account benchmark (once enough ads clear the gate to set one)";
+  const successMetric =
+    kpi === "cpa" && context.targetCpa != null
+      ? `CPA below your ${fmtMoney(context.targetCpa, currency)} target once the ~${gateLabel} spend gate is cleared.`
+      : kpi === "ctr"
+        ? `CTR above ${typicalLabel} once the ~${gateLabel} spend gate is cleared, without cost per click worsening materially.`
+        : `${kpiLabel} ${HIGHER_IS_BETTER[kpi] ? "above" : "below"} ${typicalLabel} once the ~${gateLabel} spend gate is cleared.`;
+  const briefGuardrails = (marketInformed: boolean): string[] => [
+    `Do not judge before ~${gateLabel} of spend — below the gate the ad is set aside, not failed.`,
+    `Do not scale until the test beats ${typicalLabel} by ${SCALE_TEST_MIN_DELTA_PCT}%+.`,
+    ...(marketInformed
+      ? [
+          "Do not copy competitor ads directly — adapt the observed pattern to your own claim.",
+        ]
+      : []),
+  ];
+  const basisNote = (marketInformed: boolean): string =>
+    marketInformed
+      ? "Own performance data leads this brief; market notes shaped it directionally only."
+      : market
+        ? "Based mostly on your own performance data — the market notes didn't change this test."
+        : "Based on your own performance data — no market notes were provided.";
+
   /* T1 — iterate the proven winner (creative). */
   if (top) {
     const format = winnerTag && top.nameTags.includes(winnerTag.tag) ? `${winnerTag.tag} ` : "";
     const founderLed =
-      market?.has("founder-led") && !top.nameTags.includes("founder");
+      (market?.has("founder-led") ?? false) && !top.nameTags.includes("founder");
+    const signals = sig(
+      topSignal,
+      tagSignal,
+      founderLed && "Market notes mention founder-led video — directional.",
+      gateSignal
+    );
     tests.push({
       test: founderLed
         ? `Brief 2 new ${format}variants of "${top.name}" — keep the angle; make one a founder-led version (market signal), change only the hook on the other.`
@@ -346,30 +437,84 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       }`,
       setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each clears the spend gate. Change only the opening 3 seconds / first frame between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
-      signals: sig(
-        topSignal,
-        tagSignal,
-        founderLed && "Market notes mention founder-led video — directional.",
-        gateSignal
-      ),
+      signals,
+      brief: {
+        title: founderLed
+          ? `Founder-led variant of the "${top.name}" angle`
+          : `Hook variants of "${top.name}"`,
+        objective:
+          "Learn whether the account's proven angle has more headroom — find a new opening that beats the original before fatigue does.",
+        basedOn: signals,
+        concept: `Two variants of the winning ad: identical angle, offer, and audience — only the opening changes.${
+          founderLed
+            ? " One variant is fronted by the founder, adapting an observed market pattern onto the proven angle."
+            : ""
+        }`,
+        hooks: [
+          `Cold-open on the angle's payoff moment — the outcome "${top.name}" sells, before any context.`,
+          `Question open: turn the angle's core promise for ${product} into a direct question in the first line.`,
+          founderLed
+            ? `Founder to camera: a one-sentence "why we built this" open, then cut into the proven angle (market signal — adapt, don't copy).`
+            : "Text-led open: the angle's strongest existing line as bold on-screen text before any footage.",
+        ],
+        assetDirection: directionFor(
+          founderLed
+            ? "founder-led"
+            : winnerTag && top.nameTags.includes(winnerTag.tag)
+              ? winnerTag.tag
+              : top.nameTags[0]
+        ),
+        keepConstant: `The angle, ${offerLabel} offer, audience, and placements of "${top.name}" — it earned its lead doing exactly this.`,
+        change: founderLed
+          ? "Only the opening: one variant gets a new hook, the other gets the founder-led front."
+          : "Only the opening 3 seconds / first frame — nothing else.",
+        successMetric,
+        guardrails: briefGuardrails(founderLed),
+        basisNote: basisNote(founderLed),
+      },
     });
   } else {
-    const marketAngles = market && market.hooks.length > 0;
+    const marketAngles = (market && market.hooks.length > 0) ?? false;
+    const signals = sig(
+      `No ad beat the ${medianLabel} median ${kpiLabel} this period.`,
+      marketAngles &&
+        market != null &&
+        `Market notes mention ${market.hooks.join(", ")} — directional.`,
+      gateSignal
+    );
     tests.push({
       test: `Brief 3 deliberately distinct angles${context.product ? ` for ${context.product}` : ""}: problem-led, social-proof-led, and offer-led.`,
       why: `No ad beat the ${medianLabel} median this period — flat results mean the account needs new angles, not more budget behind existing ones.${
-        marketAngles
+        marketAngles && market != null
           ? ` Your market notes point the same way (${market.hooks.join(", ")}) — directional support for the problem-led slot.`
           : ""
       }`,
       setup: `Matched budget (~${gateLabel} per ad), same audience and placement across all three, so the angle is the only variable.`,
       winningLooksLike: `At least one angle clears ${gateLabel} spend and beats ${medianLabel}.`,
-      signals: sig(
-        `No ad beat the ${medianLabel} median ${kpiLabel} this period.`,
-        marketAngles &&
-          `Market notes mention ${market.hooks.join(", ")} — directional.`,
-        gateSignal
-      ),
+      signals,
+      brief: {
+        title: "Angle exploration: problem-led vs social-proof vs offer-led",
+        objective: `Find a first winning angle — nothing beat ${typicalLabel} this period, so the account needs new direction, not iteration.`,
+        basedOn: signals,
+        concept: `Three deliberately different ads for ${product}: one leads with the problem, one with social proof, one with the offer. Same audience and budget, so the angle is the only variable.`,
+        hooks: [
+          `Problem-led: open on the problem in the customer's own words — no product in the first beat.${marketAngles ? " (Problem-first opens repeat in your market notes — directional.)" : ""}`,
+          "Social-proof-led: open on evidence you already have — real review language or real usage numbers, never invented.",
+          `Offer-led: state ${offerLabel} plainly in the first line — no build-up.`,
+        ],
+        assetDirection: [
+          "Same format across all three ads (whichever ships fastest) — the angle stays the only variable.",
+          "Open each ad inside its angle within 2 seconds — no shared intro.",
+          "Use only claims, reviews, and offer terms that already exist.",
+          "Burned-in captions; assume sound-off viewing.",
+          "Identical end card across all three: product + current offer.",
+        ],
+        keepConstant: `Audience, placement, budget (~${gateLabel} each), and the live offer.`,
+        change: "The angle — problem-led vs social-proof-led vs offer-led. Nothing else.",
+        successMetric,
+        guardrails: briefGuardrails(marketAngles),
+        basisNote: basisNote(marketAngles),
+      },
     });
   }
 
@@ -379,6 +524,11 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
     const worstStats = `${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}) on ${fmtMoney(worst.spend, currency)} spend`;
     const problemFirst = market?.has("problem-first") ?? false;
     if (worst.nameTags.includes("discount/promo")) {
+      const signals = sig(
+        worstSignal,
+        belowSignal,
+        problemFirst && "Market notes flag problem-first hooks — directional."
+      );
       tests.push({
         test: `Rebuild "${worst.name}" so the hook leads with the problem and the discount becomes the closer.`,
         why: `An offer-led ad running ${worstStats} means the discount alone isn't earning attention — the opening has to sell the problem before the price can close.${
@@ -388,13 +538,36 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         }`,
         setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateLabel} with the same audience, placement, and offer — creative is the only change.`,
         winningLooksLike: `The rebuild beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} and closes to within 20% of ${medianLabel}.`,
-        signals: sig(
-          worstSignal,
-          belowSignal,
-          problemFirst && "Market notes flag problem-first hooks — directional."
-        ),
+        signals,
+        brief: {
+          title: `Problem-first rebuild of "${worst.name}"`,
+          objective:
+            "Learn whether the hook, not the discount, is what's failing — one rebuild before the angle is retired.",
+          basedOn: signals,
+          concept:
+            "Rebuild of the discount ad: the opening sells the problem, the discount moves to the end as the closer. Same offer, same audience.",
+          hooks: [
+            `Open on the problem the product solves — plainly, no price in the first beat.${problemFirst ? " (Problem-first opens repeat in your market notes — directional.)" : ""}`,
+            "Product-first open: show it in real use before any offer language.",
+            "Cost-of-inaction open: what staying with the status quo costs — the discount arrives only as the resolution.",
+          ],
+          assetDirection: [
+            ...ASSET_DIRECTION["problem-first"].slice(0, 4),
+            `Keep the discount exactly as it exists (${offerLabel}) — never a new or bigger offer.`,
+          ],
+          keepConstant: "The offer itself, audience, and placement — only the creative changes.",
+          change: "The order of information: problem first, discount last.",
+          successMetric,
+          guardrails: briefGuardrails(problemFirst),
+          basisNote: basisNote(problemFirst),
+        },
       });
     } else if (winnerTag && !worst.nameTags.includes(winnerTag.tag)) {
+      const signals = sig(
+        worstSignal,
+        tagSignal,
+        problemFirst && "Market notes flag problem-first hooks — directional."
+      );
       tests.push({
         test: `Reshoot "${worst.name}"'s message in the ${winnerTag.tag} format carrying your winners.`,
         why: `The message got ${fmtMoney(worst.spend, currency)} of spend but ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}, while ${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots — test whether the format, not the message, is what's failing.${
@@ -404,13 +577,34 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         }`,
         setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateLabel}, same audience and offer.`,
         winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
-        signals: sig(
-          worstSignal,
-          tagSignal,
-          problemFirst && "Market notes flag problem-first hooks — directional."
-        ),
+        signals,
+        brief: {
+          title: `${winnerTag.tag} reshoot of "${worst.name}"`,
+          objective:
+            "Learn whether the message or the format is failing — the same message rebuilt in the format carrying your winners.",
+          basedOn: signals,
+          concept: `The loser's message reshot as ${winnerTag.tag} — the format holding ${winnerTag.count}/${winners.length} winner slots. Message, audience, and offer stay identical.`,
+          hooks: [
+            `Restate the original ad's core message in the first 2 seconds of the ${winnerTag.tag} treatment.`,
+            "Open on the strongest single claim the original buried — earn attention before detail.",
+            problemFirst
+              ? "Problem-first open on the pain point behind the message (observed market pattern — directional)."
+              : "Contrast open: show the before-state the message speaks to, then turn.",
+          ],
+          assetDirection: directionFor(winnerTag.tag),
+          keepConstant: `The message, audience, and offer of "${worst.name}".`,
+          change: `The format only — rebuilt as ${winnerTag.tag}, matching your winners.`,
+          successMetric,
+          guardrails: briefGuardrails(problemFirst),
+          basisNote: basisNote(problemFirst),
+        },
       });
     } else {
+      const signals = sig(
+        worstSignal,
+        belowSignal,
+        problemFirst && "Market notes flag problem-first hooks — directional."
+      );
       tests.push({
         test: problemFirst
           ? `Rebuild "${worst.name}" with a problem-first opening hook (observed market pattern) before writing the angle off.`
@@ -422,26 +616,67 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         }`,
         setup: `Reduce the original's spend. One rebuild at ~${gateLabel}, changing only the hook — same body, audience, and offer.`,
         winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
-        signals: sig(
-          worstSignal,
-          belowSignal,
-          problemFirst && "Market notes flag problem-first hooks — directional."
-        ),
+        signals,
+        brief: {
+          title: `Hook rebuild of "${worst.name}"`,
+          objective:
+            "Learn whether the angle only has a hook problem — one rebuild before retiring it.",
+          basedOn: signals,
+          concept: `The same ad with a new opening${problemFirst ? ", built problem-first (observed market pattern)" : ""} — body, audience, and offer untouched.`,
+          hooks: [
+            problemFirst
+              ? "Problem-first open: state the pain point plainly before the product appears (market notes — directional)."
+              : "Payoff-first open: move the ad's strongest moment into second one.",
+            `Question open: the angle's promise for ${product} as a direct question.`,
+            "Text-led open: the core existing line as bold on-screen text before any footage.",
+          ],
+          assetDirection: directionFor(worst.nameTags[0]),
+          keepConstant: `Everything after the opening — body, audience, placement, and ${offerLabel}.`,
+          change: "Only the opening hook.",
+          successMetric,
+          guardrails: briefGuardrails(problemFirst),
+          basisNote: basisNote(problemFirst),
+        },
       });
     }
   } else {
+    const challenger = winnerTag
+      ? FORMAT_CHALLENGERS[winnerTag.tag] ?? "a new creative format"
+      : "a new creative format";
+    const signals = sig(
+      "No judged ad is failing clearly this period.",
+      tagSignal,
+      gateSignal
+    );
     tests.push({
-      test: `Test ${winnerTag ? FORMAT_CHALLENGERS[winnerTag.tag] ?? "a new format" : "a new creative format"} against your current best ad as control.`,
+      test: `Test ${challenger} against your current best ad as control.`,
       why: hasNameSignal
         ? `Nothing is clearly failing, so the next signal comes from challenging the dominant format rather than fixing losers.`
         : `Nothing is clearly failing and no format pattern is visible yet — a controlled format test creates the pattern data future debriefs need.`,
       setup: `One challenger, one control, matched budget (~${gateLabel} each), same audience and offer.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
-      signals: sig(
-        "No judged ad is failing clearly this period.",
-        tagSignal,
-        gateSignal
-      ),
+      signals,
+      brief: {
+        title: `Format challenger: ${challenger}`,
+        objective:
+          "Learn whether the format or the message is doing the work — one controlled format-vs-format test against the current best ad.",
+        basedOn: signals,
+        concept: `${challenger.charAt(0).toUpperCase()}${challenger.slice(1)} carrying the control ad's exact message, tested head-to-head at matched budget.`,
+        hooks: [
+          "Translate the control ad's core message into the challenger format's native opening.",
+          "Keep the first line of copy identical to the control — the format stays the only variable.",
+          "Open inside the new format's strength (motion for video, one bold claim for static) with the same message.",
+        ],
+        assetDirection: [
+          `Build: ${challenger}.`,
+          ...ASSET_DIRECTION.video.slice(0, 4),
+        ],
+        keepConstant: "Message, audience, offer, and budget parity with the control.",
+        change: "The format only.",
+        successMetric,
+        guardrails: briefGuardrails(false),
+        basisNote: basisNote(false),
+      },
     });
   }
 
@@ -451,33 +686,91 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
   const scaleJustified =
     top != null && top.deltaPct != null && top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT;
   if (scaleJustified) {
+    const signals = sig(
+      topSignal,
+      `The lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`
+    );
     tests.push({
       test: `Scale "${top.name}" daily budget by 25–50%.`,
       why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} vs median on ${fmtMoney(top.spend, currency)} already spent. Everything else this period is a creative problem, not a budget one.`,
       setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
       winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
-      signals: sig(
-        topSignal,
-        `The lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`
-      ),
+      signals,
+      brief: {
+        title: `Scale readiness: "${top.name}"`,
+        objective: `Learn whether the winner holds its ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} at 25–50% higher spend.`,
+        basedOn: signals,
+        concept:
+          "No new creative launches — this is a budget-elasticity test. Prepare (don't launch) two refresh openings so a fatigue dip can be answered fast once the window closes.",
+        hooks: [
+          "Refresh A (prepare only): same angle, new opening scene — ready to swap if frequency climbs.",
+          "Refresh B (prepare only): same angle, text-led open — held in reserve.",
+          "Launch neither refresh during the measurement window — the live ad stays untouched.",
+        ],
+        assetDirection: [
+          `No edits to "${top.name}" while measuring — creative, audience, and placements stay frozen.`,
+          "Raise the budget in one step (25–50%), then hold 5–7 days.",
+          "Watch frequency and early-drop-off for fatigue signals.",
+          "Produce both refresh openings now; launch only after the window closes.",
+        ],
+        keepConstant: "Everything about the live ad — this is a budget test, not a creative one.",
+        change: "Daily budget only, one step up.",
+        successMetric: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
+        guardrails: [
+          "Do not change creative or audience during the 5–7 day window — scaling must stay the only variable.",
+          `If ${kpiLabel} drifts more than 15%, step the budget back — no chasing with edits mid-window.`,
+        ],
+        basisNote: basisNote(false),
+      },
     });
   } else if (top && market?.has("bundle")) {
     /* Market-informed offer variant on the proven angle — still a
        creative/offer test, never a budget action. */
+    const signals = sig(
+      topSignal,
+      "Market notes mention bundle offers — directional."
+    );
     tests.push({
       test: `Test "${top.name}"'s winning angle with a bundle offer variant (market signal).`,
       why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already proven at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
       setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it clears the spend gate.`,
       winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
-      signals: sig(
-        topSignal,
-        "Market notes mention bundle offers — directional."
-      ),
+      signals,
+      brief: {
+        title: `Bundle offer variant of "${top.name}"`,
+        objective:
+          "Learn whether a bundle offer lifts the proven angle — the offer is the only variable.",
+        basedOn: signals,
+        concept:
+          "The winning creative and audience with the offer switched to a bundle — adapting an offer pattern observed in your market notes (directional).",
+        hooks: [
+          `Keep the winning ad's opening untouched — the bundle appears at the offer beat, not the hook.`,
+          "Value-stack open: show the bundle contents together before any price framing.",
+          `Same-hook A/B: an opening identical to "${top.name}" so the offer is the only difference.`,
+        ],
+        assetDirection: [
+          "Show every bundle component together in one frame — clarity beats cleverness.",
+          "Use only bundle terms that actually exist — never imply extra discounts.",
+          `Match the creative structure of "${top.name}" shot-for-shot where possible.`,
+          "End card: the bundle offer stated plainly.",
+          "Burned-in captions; assume sound-off viewing.",
+        ],
+        keepConstant: `The creative, audience, and opening of "${top.name}".`,
+        change: `The offer only — from ${offerLabel} to a bundle variant.`,
+        successMetric,
+        guardrails: briefGuardrails(true),
+        basisNote: basisNote(true),
+      },
     });
   } else {
     const challenger = winnerTag
       ? FORMAT_CHALLENGERS[winnerTag.tag] ?? "a deliberately different creative format"
       : "a deliberately different creative format";
+    const signals = sig(
+      tagSignal ?? "No format is clearly winning yet.",
+      topSignal,
+      gateSignal
+    );
     tests.push({
       test: `Test ${challenger} against your ${winnerTag ? `${winnerTag.tag} ads` : "current best ad"} as the control.`,
       why: winnerTag
@@ -485,11 +778,28 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         : `No format is clearly winning${hasNameSignal ? "" : " and names carry no format signal"} — the fastest way to a pattern is one controlled format-vs-format test.${context.creativeNotes ? ` Use your notes ("${context.creativeNotes.slice(0, 60)}…") to pick the challenger.` : ""}`,
       setup: `Launch the challenger at ~${gateLabel} alongside the control, same audience and offer, until both clear the spend gate.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
-      signals: sig(
-        tagSignal ?? "No format is clearly winning yet.",
-        topSignal,
-        gateSignal
-      ),
+      signals,
+      brief: {
+        title: `Format challenger: ${challenger}`,
+        objective:
+          "Learn whether the format or the message is doing the work — one controlled format-vs-format test against the current control.",
+        basedOn: signals,
+        concept: `${challenger.charAt(0).toUpperCase()}${challenger.slice(1)} carrying the control ad's exact message, tested head-to-head at matched budget.`,
+        hooks: [
+          "Translate the control ad's core message into the challenger format's native opening.",
+          "Keep the first line of copy identical to the control — the format stays the only variable.",
+          "Open inside the new format's strength (motion for video, one bold claim for static) with the same message.",
+        ],
+        assetDirection: [
+          `Build: ${challenger}.`,
+          ...ASSET_DIRECTION.video.slice(0, 4),
+        ],
+        keepConstant: "Message, audience, offer, and budget parity with the control.",
+        change: "The format only.",
+        successMetric,
+        guardrails: briefGuardrails(false),
+        basisNote: basisNote(false),
+      },
     });
   }
 

@@ -113,6 +113,30 @@ export interface MemoWinnerLoserRow {
   reason: string;
 }
 
+/** A hand-off-ready creative brief for one next test. Generated
+ *  deterministically alongside the test from the same facts — the UI
+ *  only reveals it when the user selects the test and asks for briefs.
+ *  Hooks and directions are structural (what to show/open with), never
+ *  invented product claims, quotes, discounts, or competitor facts. */
+export interface MemoBrief {
+  title: string;
+  objective: string;
+  /** The test's own signal bullets — real data, not restated fluff. */
+  basedOn: string[];
+  concept: string;
+  /** 3 hook directions tied to this test (market-flavored only when
+   *  notes were provided). */
+  hooks: string[];
+  /** 4–6 bullets of shot / asset direction for the test's format. */
+  assetDirection: string[];
+  keepConstant: string;
+  change: string;
+  successMetric: string;
+  guardrails: string[];
+  /** Where this brief's grounding comes from (own data vs. market). */
+  basisNote: string;
+}
+
 export interface MemoTest {
   test: string;
   why: string;
@@ -123,6 +147,7 @@ export interface MemoTest {
    *  Never invented — only signals the data actually shows. Rendered
    *  as "Signals used" (buyer) / "Why this test" (client). */
   signals: string[];
+  brief: MemoBrief;
 }
 
 /** Summary of user-pasted market/competitor context. Directional by

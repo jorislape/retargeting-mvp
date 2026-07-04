@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Memo, MemoTest, MemoWinnerLoserRow } from "@/modules/debrief";
+import type { Memo, MemoBrief, MemoTest, MemoWinnerLoserRow } from "@/modules/debrief";
 import {
   CheckIcon,
   CopyIcon,
@@ -276,6 +276,108 @@ function TestRow({
   );
 }
 
+/* A generated creative brief — a hand-off document block. Everything
+   in it was computed deterministically with the memo; this component
+   only reveals it. Prints as part of the report when visible. */
+function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
+  const label = (text: string) => (
+    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+      {text}
+    </p>
+  );
+  const bullets = (items: string[]) => (
+    <ul className="mt-1.5 space-y-1">
+      {items.map((item, i) => (
+        <li
+          key={i}
+          className="flex gap-2 text-[13px] leading-relaxed text-zinc-400"
+        >
+          <span
+            aria-hidden="true"
+            className="mt-[8px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
+          />
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <article className="rounded-xl border border-white/[0.08] p-5">
+      <p className="font-mono text-[11px] font-semibold text-accent-soft">
+        Brief · T{index + 1}
+      </p>
+      <h3 className="mt-1.5 text-[15px] font-semibold tracking-tight text-zinc-50">
+        {brief.title}
+      </h3>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-zinc-300">
+        {brief.objective}
+      </p>
+
+      <div className="mt-5 space-y-5">
+        <div>
+          {label("Based on")}
+          {bullets(brief.basedOn)}
+        </div>
+        <div>
+          {label("Concept")}
+          <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
+            {brief.concept}
+          </p>
+        </div>
+        <div>
+          {label("Hook options")}
+          <ol className="mt-1.5 space-y-1">
+            {brief.hooks.map((hook, i) => (
+              <li
+                key={i}
+                className="flex gap-2.5 text-[13px] leading-relaxed text-zinc-400"
+              >
+                <span className="shrink-0 font-mono text-[11px] font-semibold text-zinc-500">
+                  {i + 1}.
+                </span>
+                {hook}
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div>
+          {label("Shot / asset direction")}
+          {bullets(brief.assetDirection)}
+        </div>
+        <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
+          <div>
+            {label("Keep constant")}
+            <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
+              {brief.keepConstant}
+            </p>
+          </div>
+          <div>
+            {label("Change")}
+            <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
+              {brief.change}
+            </p>
+          </div>
+        </div>
+        <div>
+          {label("Success metric")}
+          <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-300">
+            {brief.successMetric}
+          </p>
+        </div>
+        <div>
+          {label("Guardrails")}
+          {bullets(brief.guardrails)}
+        </div>
+      </div>
+
+      <p className="mt-5 border-t border-white/[0.06] pt-3 text-xs leading-relaxed text-zinc-600">
+        {brief.basisNote}
+      </p>
+    </article>
+  );
+}
+
 export function Report({
   memo,
   variant = "generated",
@@ -293,11 +395,16 @@ export function Report({
     memo.nextTests.map(() => false)
   );
   const queuedCount = queued.filter(Boolean).length;
+  /* Which tests currently have a generated brief shown. Session-only,
+     like everything else — snapshot of the selection at click time. */
+  const [briefIdxs, setBriefIdxs] = useState<number[]>([]);
   const client = view === "client";
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(memoToText(memo, view));
+      await navigator.clipboard.writeText(
+        memoToText(memo, view, view === "buyer" ? briefIdxs : [])
+      );
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -627,6 +734,51 @@ export function Report({
               />
             ))}
           </ol>
+
+          {/* Creative briefs: queue a test, turn it into a hand-off
+              brief. Buyer view only; session-only like everything. */}
+          {!client && (
+            <div className="print-hidden flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.08] pt-4">
+              <button
+                type="button"
+                disabled={queuedCount === 0}
+                onClick={() =>
+                  setBriefIdxs(
+                    queued.flatMap((isQueued, i) => (isQueued ? [i] : []))
+                  )
+                }
+                className={`cursor-pointer ${btnSecondary}`}
+              >
+                Generate creative briefs
+                {queuedCount > 0 ? ` (${queuedCount})` : ""}
+              </button>
+              <p className="text-xs leading-relaxed text-zinc-600">
+                {queuedCount === 0
+                  ? "Queue at least one test above to generate briefs."
+                  : "Briefs are based on your performance data and selected test signals — not generic ad copy."}
+              </p>
+            </div>
+          )}
+
+          {!client && briefIdxs.length > 0 && (
+            <div className="mt-8">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                Creative briefs
+              </p>
+              <div className="mt-3 space-y-4">
+                {briefIdxs.map(
+                  (i) =>
+                    memo.nextTests[i] && (
+                      <BriefCard
+                        key={i}
+                        brief={memo.nextTests[i].brief}
+                        index={i}
+                      />
+                    )
+                )}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ---- What not to do (only when the data supports bullets) ---- */}
