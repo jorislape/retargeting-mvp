@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { KpiKey } from "@/modules/debrief";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
+import { MetaConnect } from "@/components/debrief/MetaConnect";
 import {
   AlertTriangleIcon,
   ArrowIcon,
@@ -217,6 +218,18 @@ export function GeneratorPanel() {
                   </>
                 )}
               </label>
+
+              {/* Second data source: OAuth pull rendered as the same
+                  virtual-CSV File the dropzone produces. */}
+              <div
+                className="my-4 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600"
+                aria-hidden="true"
+              >
+                <span className="h-px flex-1 bg-white/10" />
+                or
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+              <MetaConnect />
 
               <fieldset className="mt-6">
                 <legend className={fieldLabel}>02 · Primary KPI</legend>

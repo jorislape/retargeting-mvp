@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { AuroraGlow } from "@/components/workspace/AuroraGlow";
 import { DebriefProvider } from "@/components/workspace/DebriefProvider";
+import { MetaProvider } from "@/components/workspace/MetaProvider";
 import { MobileTabBar, MobileTopBar, Sidebar } from "@/components/workspace/Nav";
 
 /*
@@ -13,6 +14,7 @@ import { MobileTabBar, MobileTopBar, Sidebar } from "@/components/workspace/Nav"
 export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   return (
     <DebriefProvider>
+      <MetaProvider>
       {/* No bg here — the body provides the ink canvas; AuroraGlow adds
           the hot core that drifts toward the pointer (decorative only) */}
       <div className="flex min-h-dvh text-zinc-100 antialiased">
@@ -32,6 +34,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         </div>
         <MobileTabBar />
       </div>
+      </MetaProvider>
     </DebriefProvider>
   );
 }

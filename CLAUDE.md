@@ -15,15 +15,17 @@ npx tsc --noEmit     # typecheck
 npx eslint .         # lint
 ```
 
-There are no tests yet. The full check is `npm run build && npx tsc --noEmit && npx eslint .`
+The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm run test:csv` (the last runs the RFC 4180 escaping proof for the Meta virtual CSV under plain Node).
 
-No environment variables are required. `npm install && npm run dev` is the entire setup.
+No environment variables are required for the CSV-upload flow. The optional Meta data source needs `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI` — see `.env.example`.
 
 ## Scope fence — read before adding anything
 
 This product has a hard, deliberate scope: **no auth, no user accounts, no database or persistent storage of any kind, no saved history, no billing, no team workspaces, no analytics dashboards.** The whole flow is CSV upload → KPI + context form → deterministic analysis → one-page memo rendered on the same page — nothing else is reachable, and nothing should become reachable as a "small addition." If a future version needs persistence, that is a new, explicit milestone to be requested — not something to add quietly while doing something else.
 
 The CSV (and the generated memo) must never be written to a database, a file, a cache, or a log. `app/api/debrief/route.ts` only logs structural facts on error (an error code, a row count) — never CSV rows or memo content. Keep it that way.
+
+**Meta data source (the one approved exception to "no auth"):** the generator can also connect a Meta account via OAuth (`modules/meta/`, `app/api/meta/*`, `MetaProvider`/`MetaConnect`) and pull ad-level insights as a "virtual CSV" that feeds the identical debrief pipeline. Its constraints are part of the fence: scope is read-only `ads_read` (never widen); the access token lives only in browser memory (`MetaProvider`) and is forwarded per-request via the Authorization header — never a cookie, never storage, never a query param, never a log (the only cookie in the flow is the short-lived OAuth CSRF nonce); insights pulls set `use_unified_attribution_setting=true` so numbers match Ads Manager; the OAuth bridge posts to an exact origin and `MetaProvider` verifies `event.origin` with strict equality — no wildcards; the Graph API version is pinned in `modules/meta/graph.ts` — check deprecation runway when bumping.
 
 ## Architecture
 
