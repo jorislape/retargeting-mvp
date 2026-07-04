@@ -4,7 +4,7 @@ import {
   fmtKpiValue,
   fmtMoney,
 } from "./format";
-import { extractMarketSignals } from "./marketSignals";
+import { assessMarketNotes, extractMarketSignals } from "./marketSignals";
 import {
   AnalysisResult,
   DebriefContext,
@@ -230,7 +230,12 @@ function buildMarketSignal(
     );
   }
 
-  return { bullets: bullets.slice(0, 4), caveat: MARKET_CAVEAT };
+  return {
+    bullets: bullets.slice(0, 4),
+    caveat: MARKET_CAVEAT,
+    /* assessMarketNotes never returns null for non-empty text. */
+    quality: assessMarketNotes(text)!,
+  };
 }
 
 /** The most common name tag in a group, or null. */
@@ -270,7 +275,18 @@ const FORMAT_CHALLENGERS: Record<string, string> = {
 const SCALE_TEST_MIN_DELTA_PCT = 30;
 
 function buildNextTests(analysis: AnalysisResult, context: DebriefContext): MemoTest[] {
-  const { winners, losers, median, kpi, currency, spendGate, hasNameSignal } = analysis;
+  const {
+    winners,
+    losers,
+    median,
+    kpi,
+    currency,
+    spendGate,
+    hasNameSignal,
+    belowBenchmarkSpend,
+    belowBenchmarkCount,
+    adsSetAside,
+  } = analysis;
   const kpiLabel = KPI_LABELS[kpi];
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : "the benchmark";
   const gateLabel = fmtMoney(spendGate, currency);
@@ -289,6 +305,31 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       ? null
       : extractMarketSignals(context.marketContext);
 
+  /* Compact signal bullets — the receipts behind each recommendation.
+     Built only from what the data actually shows: own numbers first,
+     market notes always marked directional, guardrails last. */
+  const topSignal = top
+    ? `"${top.name}" leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend.`
+    : null;
+  const worstSignal = worst
+    ? `"${worst.name}" spent ${fmtMoney(worst.spend, currency)} and ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}.`
+    : null;
+  const tagSignal = winnerTag
+    ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots.`
+    : null;
+  const belowSignal =
+    belowBenchmarkCount > 0
+      ? `Combined ${fmtMoney(belowBenchmarkSpend, currency)} spent below the median across ${fmtCount(belowBenchmarkCount)} ad${belowBenchmarkCount === 1 ? "" : "s"}.`
+      : null;
+  const gateSignal =
+    adsSetAside > 0
+      ? `${adsSetAside} thin-spend ad${adsSetAside === 1 ? " was" : "s were"} set aside, not judged.`
+      : null;
+  const sig = (...items: (string | null | false | undefined)[]) =>
+    items
+      .filter((s): s is string => typeof s === "string" && s !== "")
+      .slice(0, 4);
+
   /* T1 — iterate the proven winner (creative). */
   if (top) {
     const format = winnerTag && top.nameTags.includes(winnerTag.tag) ? `${winnerTag.tag} ` : "";
@@ -305,6 +346,12 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       }`,
       setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each clears the spend gate. Change only the opening 3 seconds / first frame between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
+      signals: sig(
+        topSignal,
+        tagSignal,
+        founderLed && "Market notes mention founder-led video — directional.",
+        gateSignal
+      ),
     });
   } else {
     const marketAngles = market && market.hooks.length > 0;
@@ -317,6 +364,12 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       }`,
       setup: `Matched budget (~${gateLabel} per ad), same audience and placement across all three, so the angle is the only variable.`,
       winningLooksLike: `At least one angle clears ${gateLabel} spend and beats ${medianLabel}.`,
+      signals: sig(
+        `No ad beat the ${medianLabel} median ${kpiLabel} this period.`,
+        marketAngles &&
+          `Market notes mention ${market.hooks.join(", ")} — directional.`,
+        gateSignal
+      ),
     });
   }
 
@@ -335,6 +388,11 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         }`,
         setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateLabel} with the same audience, placement, and offer — creative is the only change.`,
         winningLooksLike: `The rebuild beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} and closes to within 20% of ${medianLabel}.`,
+        signals: sig(
+          worstSignal,
+          belowSignal,
+          problemFirst && "Market notes flag problem-first hooks — directional."
+        ),
       });
     } else if (winnerTag && !worst.nameTags.includes(winnerTag.tag)) {
       tests.push({
@@ -346,6 +404,11 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         }`,
         setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateLabel}, same audience and offer.`,
         winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
+        signals: sig(
+          worstSignal,
+          tagSignal,
+          problemFirst && "Market notes flag problem-first hooks — directional."
+        ),
       });
     } else {
       tests.push({
@@ -359,6 +422,11 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         }`,
         setup: `Reduce the original's spend. One rebuild at ~${gateLabel}, changing only the hook — same body, audience, and offer.`,
         winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
+        signals: sig(
+          worstSignal,
+          belowSignal,
+          problemFirst && "Market notes flag problem-first hooks — directional."
+        ),
       });
     }
   } else {
@@ -369,6 +437,11 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         : `Nothing is clearly failing and no format pattern is visible yet — a controlled format test creates the pattern data future debriefs need.`,
       setup: `One challenger, one control, matched budget (~${gateLabel} each), same audience and offer.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
+      signals: sig(
+        "No judged ad is failing clearly this period.",
+        tagSignal,
+        gateSignal
+      ),
     });
   }
 
@@ -383,6 +456,10 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} vs median on ${fmtMoney(top.spend, currency)} already spent. Everything else this period is a creative problem, not a budget one.`,
       setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
       winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
+      signals: sig(
+        topSignal,
+        `The lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`
+      ),
     });
   } else if (top && market?.has("bundle")) {
     /* Market-informed offer variant on the proven angle — still a
@@ -392,6 +469,10 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already proven at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
       setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it clears the spend gate.`,
       winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
+      signals: sig(
+        topSignal,
+        "Market notes mention bundle offers — directional."
+      ),
     });
   } else {
     const challenger = winnerTag
@@ -404,10 +485,105 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         : `No format is clearly winning${hasNameSignal ? "" : " and names carry no format signal"} — the fastest way to a pattern is one controlled format-vs-format test.${context.creativeNotes ? ` Use your notes ("${context.creativeNotes.slice(0, 60)}…") to pick the challenger.` : ""}`,
       setup: `Launch the challenger at ~${gateLabel} alongside the control, same audience and offer, until both clear the spend gate.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
+      signals: sig(
+        tagSignal ?? "No format is clearly winning yet.",
+        topSignal,
+        gateSignal
+      ),
     });
   }
 
   return tests;
+}
+
+/**
+ * "What not to do" — anti-recommendations from the same deterministic
+ * facts the tests use. Each bullet exists only when its condition holds
+ * in the data (or market notes were actually provided); nothing generic
+ * ever appears. Buyer register keeps the shorthand; client register
+ * stays jargon-free ("typical result", no "kill"/"spend gate").
+ */
+function buildAvoid(
+  analysis: AnalysisResult,
+  context: DebriefContext
+): { buyer: string[]; client: string[] } {
+  const { winners, losers, median, kpi, currency, spendGate, adsSetAside } =
+    analysis;
+  const kpiLabel = KPI_LABELS[kpi];
+  const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : null;
+  const top = winners[0] ?? null;
+  const worst = losers[0] ?? null;
+  const hasMarket = context.marketContext.trim() !== "";
+  const buyer: string[] = [];
+  const client: string[] = [];
+
+  /* Loser-side: don't feed what's failing. */
+  if (worst && worst.nameTags.includes("discount/promo")) {
+    buyer.push(
+      `Do not launch more discount-led ads until the hook is rebuilt — "${worst.name}" ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}.`
+    );
+    client.push(
+      `We're not creating more discount-first ads until the message is rebuilt — the current one runs below the typical result.`
+    );
+  } else {
+    const loserTag = dominantTag(losers);
+    if (loserTag && loserTag.count >= 2) {
+      buyer.push(
+        `Do not move budget into ${loserTag.tag} ads while they hold ${loserTag.count}/${losers.length} loser slots.`
+      );
+      client.push(
+        `We're not adding budget to ${loserTag.tag}-style ads while they run below the typical result.`
+      );
+    }
+  }
+
+  /* Budget discipline. */
+  if (top && top.deltaPct != null) {
+    if (top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT) {
+      buyer.push(
+        `Do not scale anything except "${top.name}" — everything else this period is a creative problem, not a budget one.`
+      );
+      client.push(
+        `We're only increasing budget behind "${top.name}" — nowhere else until the next tests read.`
+      );
+    } else {
+      buyer.push(
+        `Do not scale budgets on this lead — "${top.name}" is ${Math.round(top.deltaPct)}% past the median, under the ${SCALE_TEST_MIN_DELTA_PCT}% bar a scale move needs.`
+      );
+      client.push(
+        `We're not increasing budgets yet — the current lead isn't decisive enough to scale safely.`
+      );
+    }
+  } else if (!top && medianLabel) {
+    buyer.push(
+      `Do not add budget to existing ads — nothing beat the ${medianLabel} median ${kpiLabel} this period.`
+    );
+    client.push(
+      `We're not adding budget to current ads — none pulled clearly ahead this period.`
+    );
+  }
+
+  /* Guardrail: thin-spend ads stay unjudged. */
+  if (adsSetAside > 0) {
+    buyer.push(
+      `Do not judge the ${adsSetAside} low-spend ad${adsSetAside === 1 ? "" : "s"} yet — below the ${fmtMoney(spendGate, currency)} spend gate they're set aside, not failed.`
+    );
+    client.push(
+      `We're not judging the ${adsSetAside} ad${adsSetAside === 1 ? "" : "s"} that ${adsSetAside === 1 ? "hasn't" : "haven't"} spent enough yet — they get a fair read once the data is there.`
+    );
+  }
+
+  /* Market honesty. */
+  if (hasMarket) {
+    buyer.push(
+      `Do not treat market context as confirmed competitor performance — it's directional only.`
+    );
+    client.push(
+      `We're not treating market observations as proof of what works — they steer tests only.`
+    );
+  }
+
+  return { buyer: buyer.slice(0, 4), client: client.slice(0, 4) };
 }
 
 /** The verdict in client language: what happened, what it means, what
@@ -451,8 +627,11 @@ function buildClientSummary(analysis: AnalysisResult): string[] {
   return lines;
 }
 
-function buildConfidence(analysis: AnalysisResult): { level: "high" | "medium" | "low"; notes: string[] } {
-  const { adsJudged, adsSetAside, adsAnalyzed, winners, losers, median, hasCreativeNotes, hasNameSignal, missingColumns, spendGate, currency } =
+function buildConfidence(
+  analysis: AnalysisResult,
+  hasMarket: boolean
+): Memo["confidence"] {
+  const { adsJudged, adsSetAside, adsAnalyzed, winners, losers, median, hasCreativeNotes, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
     analysis;
   const notes: string[] = [];
 
@@ -491,7 +670,85 @@ function buildConfidence(analysis: AnalysisResult): { level: "high" | "medium" |
     notes.push("Data was complete enough that no caveats apply beyond the usual: more days of spend always sharpens the read.");
   }
 
-  return { level, notes };
+  /* Why the level landed where it did — derived from the exact same
+     conditions that set it, so the explanation can never contradict
+     the verdict. Buyer register as bullets; one plain sentence for the
+     client view. */
+  const reasons: string[] = [];
+  let clientWhy: string;
+  const topPct = winners[0]?.deltaPct ?? null;
+
+  if (level === "high") {
+    reasons.push(
+      `${adsJudged} of ${adsAnalyzed} ads cleared the spend gate — a fair sample to judge.`
+    );
+    if (topPct != null && topPct >= 30) {
+      reasons.push(
+        `The top winner is ${Math.round(topPct)}% past the median — a meaningful lead, not noise.`
+      );
+    }
+    if (losers.length > 0 && belowBenchmarkSpend > 0) {
+      reasons.push(
+        `${fmtMoney(belowBenchmarkSpend, currency)} sat below the median — the cut side is material.`
+      );
+    }
+    if (hasMarket) {
+      reasons.push(
+        "Market notes point the same direction — directional support only."
+      );
+    }
+    clientWhy =
+      "Confidence is high because most ads had enough spend to judge fairly and the gap between what worked and what didn't is clear.";
+  } else if (level === "medium") {
+    if (adsJudged < 10) {
+      reasons.push(
+        `Only ${adsJudged} ads cleared the spend gate — patterns can still shift as more spend lands.`
+      );
+    }
+    if (winners.length < 3 || losers.length < 3) {
+      reasons.push(
+        `The winner/loser groups are small (${winners.length} vs ${losers.length}) — one ad can swing the read.`
+      );
+    }
+    if (missingColumns.length > 0) {
+      reasons.push(
+        `The export was missing ${missingColumns.length} column${missingColumns.length === 1 ? "" : "s"} — parts of the read are less precise.`
+      );
+    }
+    if (!hasCreativeNotes && !hasNameSignal) {
+      reasons.push(
+        "No creative notes or name pattern — the judgement is metrics-only."
+      );
+    }
+    if (topPct != null && topPct < 30) {
+      reasons.push(
+        `The top winner is only ${Math.round(topPct)}% past the median — a lead, not a landslide.`
+      );
+    }
+    clientWhy =
+      "Confidence is medium because the results point one way, but the sample is small enough that the next round of spend could still shift it.";
+  } else {
+    if (median == null) {
+      reasons.push(
+        "Not enough ads cleared the spend gate to set a reliable benchmark."
+      );
+    }
+    if (adsJudged < 5) {
+      reasons.push(
+        `Only ${adsJudged} ad${adsJudged === 1 ? "" : "s"} could be judged — too few to separate signal from noise.`
+      );
+    }
+    if (median != null && winners.length === 0 && losers.length === 0) {
+      reasons.push("Nothing clearly won or lost this period.");
+    }
+    reasons.push(
+      "Treat the tests below as ideas to validate, not firm decisions."
+    );
+    clientWhy =
+      "Confidence is low because too few ads had enough spend to judge — treat the next steps as ideas to test rather than firm decisions.";
+  }
+
+  return { level, notes, reasons: reasons.slice(0, 4), clientWhy };
 }
 
 export function generateMemo(analysis: AnalysisResult, context: DebriefContext): Memo {
@@ -533,6 +790,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     patterns: buildPatterns(analysis),
     marketSignal: buildMarketSignal(analysis, context),
     nextTests: buildNextTests(analysis, context),
-    confidence: buildConfidence(analysis),
+    avoid: buildAvoid(analysis, context),
+    confidence: buildConfidence(analysis, context.marketContext.trim() !== ""),
   };
 }

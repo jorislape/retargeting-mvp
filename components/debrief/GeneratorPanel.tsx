@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { KpiKey } from "@/modules/debrief";
 import {
+  assessMarketNotes,
   HIGHER_IS_BETTER,
   SAMPLE_CONTEXT,
   SAMPLE_CSV_FILENAME,
@@ -168,6 +169,9 @@ export function GeneratorPanel() {
   );
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /* Non-blocking quality read on the notes — local parsing only. */
+  const marketQuality = assessMarketNotes(fields.marketContext);
 
   /* Local, deterministic reformat of the pasted notes — no network,
      no external service, just the shared keyword map. */
@@ -599,17 +603,25 @@ export function GeneratorPanel() {
   https://www.facebook.com/ads/library/...`}
                 className={`mt-1.5 resize-none ${inputBase}`}
               />
-              {/* Helper line doubles as the non-blocking "nothing to
-                  structure" notice, so no layout ever shifts. */}
+              {/* One helper slot, three states (no layout shift):
+                  the "nothing to structure" notice wins, then the local
+                  deterministic quality meter once anything is typed,
+                  else the default helper text. */}
               <p
                 aria-live="polite"
                 className={`mt-1.5 text-xs leading-relaxed ${
-                  noteState === "empty" ? "text-amber-300" : "text-zinc-600"
+                  noteState === "empty" || marketQuality?.level === "weak"
+                    ? "text-amber-300"
+                    : marketQuality
+                      ? "text-zinc-400"
+                      : "text-zinc-600"
                 }`}
               >
                 {noteState === "empty"
                   ? "Add competitor notes or links first."
-                  : "Optional — paste Ads Library links, competitor ad copy, hooks, offers, formats, or rough notes."}
+                  : marketQuality
+                    ? `Market context: ${marketQuality.summary}`
+                    : "Optional — paste Ads Library links, competitor ad copy, hooks, offers, formats, or rough notes."}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
                 Used as directional context only — competitor

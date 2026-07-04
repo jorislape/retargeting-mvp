@@ -249,6 +249,28 @@ function TestRow({
             <dd className="inline">{test.winningLooksLike}</dd>
           </div>
         </dl>
+        {/* The receipts: which signals produced this recommendation. */}
+        {test.signals.length > 0 && (
+          <div className="mt-3 border-l border-white/10 pl-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              {view === "client" ? "Why this test" : "Signals used"}
+            </p>
+            <ul className="mt-1.5 space-y-1">
+              {test.signals.map((signal, i) => (
+                <li
+                  key={i}
+                  className="flex gap-2 text-xs leading-relaxed text-zinc-500"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
+                  />
+                  {signal}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </li>
   );
@@ -285,11 +307,13 @@ export function Report({
   };
 
   /* Section numbering shifts because the client view drops Patterns
-     and the market section only exists when context was provided. */
+     and the market/avoid sections only exist when they have content. */
   const hasMarket = memo.marketSignal !== null;
+  const avoidBullets = client ? memo.avoid.client : memo.avoid.buyer;
   const secNum = (buyerN: number, clientN: number) =>
     String(client ? clientN : buyerN).padStart(2, "0");
   const marketShift = hasMarket ? 1 : 0;
+  const avoidShift = avoidBullets.length > 0 ? 1 : 0;
 
   const stagger = (i: number) => ({ animationDelay: `${i * 80}ms` });
 
@@ -522,6 +546,9 @@ export function Report({
               ))}
             </ul>
             <p className="mt-4 text-xs leading-relaxed text-zinc-500">
+              Context quality: {memo.marketSignal.quality.summary}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
               {memo.marketSignal.caveat}
             </p>
           </section>
@@ -602,13 +629,36 @@ export function Report({
           </ol>
         </section>
 
+        {/* ---- What not to do (only when the data supports bullets) ---- */}
+        {avoidBullets.length > 0 && (
+          <section
+            className="animate-rise mt-12"
+            style={stagger((client ? 6 : 7) + marketShift)}
+          >
+            <SectionHead
+              n={secNum(6 + marketShift, 5 + marketShift)}
+              title={client ? "What we're avoiding" : "What not to do"}
+            />
+            <ul className="mt-4 space-y-2">
+              {avoidBullets.map((bullet, i) => (
+                <li
+                  key={i}
+                  className="border-l border-amber-300/40 pl-3 text-[13px] leading-relaxed text-zinc-400"
+                >
+                  {bullet}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* ---- Confidence ---- */}
         <section
           className="animate-rise mt-10"
-          style={stagger((client ? 6 : 7) + marketShift)}
+          style={stagger((client ? 6 : 7) + marketShift + avoidShift)}
         >
           <SectionHead
-            n={secNum(6 + marketShift, 5 + marketShift)}
+            n={secNum(6 + marketShift + avoidShift, 5 + marketShift + avoidShift)}
             title={client ? "Confidence & data used" : "Confidence & missing data"}
             right={
               <span
@@ -619,30 +669,57 @@ export function Report({
             }
           />
           {client ? (
-            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-300">
-              This result is based on {memo.scope.adsAnalyzed} ads and{" "}
-              {memo.scope.totalSpendLabel} in ad spend
-              {memo.scope.dateRangeLabel
-                ? ` between ${memo.scope.dateRangeLabel}`
-                : ""}
-              . {memo.scope.adsJudged} ads had enough spend to judge fairly
-              {memo.scope.adsSetAside > 0
-                ? `; ${memo.scope.adsSetAside} did not and were set aside`
-                : ""}
-              . Every number comes directly from the ad account — nothing is
-              estimated.
-            </p>
+            <>
+              <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-300">
+                {memo.confidence.clientWhy}
+              </p>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-400">
+                This result is based on {memo.scope.adsAnalyzed} ads and{" "}
+                {memo.scope.totalSpendLabel} in ad spend
+                {memo.scope.dateRangeLabel
+                  ? ` between ${memo.scope.dateRangeLabel}`
+                  : ""}
+                . {memo.scope.adsJudged} ads had enough spend to judge fairly
+                {memo.scope.adsSetAside > 0
+                  ? `; ${memo.scope.adsSetAside} did not and were set aside`
+                  : ""}
+                . Every number comes directly from the ad account — nothing is
+                estimated.
+              </p>
+            </>
           ) : (
-            <ul className="mt-4 space-y-2">
-              {memo.confidence.notes.map((note, i) => (
-                <li
-                  key={i}
-                  className="border-l border-white/10 pl-3 text-[13px] leading-relaxed text-zinc-400"
-                >
-                  {note}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                  Why {memo.confidence.level}
+                </p>
+                <ul className="mt-2.5 space-y-2">
+                  {memo.confidence.reasons.map((reason, i) => (
+                    <li
+                      key={i}
+                      className="border-l border-white/10 pl-3 text-[13px] leading-relaxed text-zinc-400"
+                    >
+                      {reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                  Caveats & missing data
+                </p>
+                <ul className="mt-2.5 space-y-2">
+                  {memo.confidence.notes.map((note, i) => (
+                    <li
+                      key={i}
+                      className="border-l border-white/10 pl-3 text-[13px] leading-relaxed text-zinc-400"
+                    >
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           )}
         </section>
 

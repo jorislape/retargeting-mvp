@@ -118,6 +118,11 @@ export interface MemoTest {
   why: string;
   setup: string;
   winningLooksLike: string;
+  /** 2–4 compact bullets naming the signals behind the recommendation
+   *  (own-data first, market context directional, guardrails last).
+   *  Never invented — only signals the data actually shows. Rendered
+   *  as "Signals used" (buyer) / "Why this test" (client). */
+  signals: string[];
 }
 
 /** Summary of user-pasted market/competitor context. Directional by
@@ -128,6 +133,11 @@ export interface MemoTest {
 export interface MemoMarketSignal {
   bullets: string[];
   caveat: string;
+  /** Deterministic quality read on the pasted notes (category count). */
+  quality: {
+    level: "strong" | "good" | "weak";
+    summary: string;
+  };
 }
 
 export interface Memo {
@@ -153,8 +163,20 @@ export interface Memo {
   /** Present only when the user pasted market/competitor context. */
   marketSignal: MemoMarketSignal | null;
   nextTests: MemoTest[];
+  /** "What not to do" — anti-recommendations derived from the same
+   *  deterministic data as the tests. Two registers, like the rest of
+   *  the memo: buyer keeps the shorthand, client stays jargon-free.
+   *  Empty arrays mean the section simply doesn't render. */
+  avoid: {
+    buyer: string[];
+    client: string[];
+  };
   confidence: {
     level: "high" | "medium" | "low";
     notes: string[];
+    /** Why the level is what it is — buyer register, bullet-ready. */
+    reasons: string[];
+    /** The same explanation as one plain-language sentence. */
+    clientWhy: string;
   };
 }

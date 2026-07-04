@@ -67,6 +67,53 @@ export function extractMarketSignals(text: string): MarketSignals {
 }
 
 /* ------------------------------------------------------------------ */
+/* Notes quality: a deterministic read on how much signal the pasted   */
+/* notes carry — counted from the categories above plus links. Powers  */
+/* the generator's non-blocking quality meter and the report's         */
+/* "context quality" line. Purely local parsing; nothing is fetched.   */
+/* ------------------------------------------------------------------ */
+
+export interface MarketQuality {
+  level: "strong" | "good" | "weak";
+  /** Full human sentence, e.g. "Strong — formats, hooks, and links detected." */
+  summary: string;
+}
+
+function listJoin(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+/** Null when the text is empty. Level is the number of distinct signal
+ *  categories present: ≥3 strong, 2 good, ≤1 weak. */
+export function assessMarketNotes(rawText: string): MarketQuality | null {
+  const text = rawText.trim();
+  if (text === "") return null;
+
+  const urls = text.match(URL_RE) ?? [];
+  const signals = extractMarketSignals(text.replace(URL_RE, " "));
+
+  const categories: string[] = [];
+  if (signals.formats.length > 0) categories.push("formats");
+  if (signals.hooks.length > 0) categories.push("hooks");
+  if (signals.offers.length > 0) categories.push("offers");
+  if (urls.length > 0) categories.push("links");
+
+  if (categories.length >= 3) {
+    return { level: "strong", summary: `Strong — ${listJoin(categories)} detected.` };
+  }
+  if (categories.length === 2) {
+    return { level: "good", summary: `Good — ${listJoin(categories)} detected.` };
+  }
+  return {
+    level: "weak",
+    summary:
+      "Weak — add competitor hooks, offers, or Ads Library links for better recommendations.",
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* "Structure notes": local, deterministic reformatting of the pasted  */
 /* textarea. Groups recognized signals, keeps every URL, and carries   */
 /* anything unrecognized verbatim under "Raw notes" — nothing is       */
