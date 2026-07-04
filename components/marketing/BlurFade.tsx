@@ -1,43 +1,50 @@
 "use client";
 
-import { ReactNode } from "react";
-import { LazyMotion, m, useReducedMotion } from "motion/react";
-
-const loadFeatures = () =>
-  import("./motionFeatures").then((mod) => mod.default);
+import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 
 /* ------------------------------------------------------------------ */
-/* Blur-fade entrance on scroll into view. Runs once, transform/       */
-/* opacity/filter only. Reduced motion renders the children plainly —  */
-/* no hidden initial state, no animation.                              */
+/* Blur-fade entrance on scroll into view. CSS does all the work: the  */
+/* hidden initial state lives behind prefers-reduced-motion:           */
+/* no-preference in globals.css, so reduced-motion users (and the      */
+/* server) always get plain, visible markup — no hydration branching,  */
+/* no motion bundle. The observer just flips a class, once.            */
 /* ------------------------------------------------------------------ */
 
 export function BlurFade({
   children,
-  className,
+  className = "",
   delay = 0,
 }: {
   children: ReactNode;
   className?: string;
   delay?: number;
 }) {
-  const reduced = useReducedMotion() ?? false;
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
 
-  if (reduced) {
-    return <div className={className}>{children}</div>;
-  }
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -60px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   return (
-    <LazyMotion features={loadFeatures} strict>
-      <m.div
-        className={className}
-        initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
-        whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        viewport={{ once: true, margin: "-60px" }}
-        transition={{ duration: 0.55, delay, ease: [0.16, 1, 0.3, 1] }}
-      >
-        {children}
-      </m.div>
-    </LazyMotion>
+    <div
+      ref={ref}
+      style={{ "--bf-delay": `${delay}s` } as CSSProperties}
+      className={`blur-fade ${inView ? "blur-fade-in" : ""} ${className}`}
+    >
+      {children}
+    </div>
   );
 }

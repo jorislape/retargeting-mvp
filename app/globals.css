@@ -105,6 +105,25 @@ body {
     }
   }
 
+  /* Scroll-into-view blur-fade for marketing tiles. The hidden state
+     exists only under motion-safe, so reduced-motion users and no-JS
+     readers always see the content plainly. */
+  .blur-fade {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(14px);
+    transition:
+      opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+      filter 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--bf-delay, 0s);
+  }
+  .blur-fade.blur-fade-in {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+
   /* Primary-CTA sheen: one soft dark sweep across the white button on
      hover. Sweep-in only — it resets instantly, no idle shimmer. */
   .btn-sheen {
