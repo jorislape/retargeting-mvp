@@ -185,8 +185,9 @@ export default function HomePage() {
           No login · Nothing stored · Optional read-only Meta connection
         </p>
 
-        {/* Live proof: the engine sorting real-shaped rows, on loop. */}
-        <div className="mx-auto mt-12 max-w-2xl text-left">
+        {/* Live proof: the engine sorting real-shaped rows, on loop.
+            Frameless — it floats on its own data surface. */}
+        <div className="mx-auto mt-16 max-w-2xl text-left sm:mt-20">
           <HeroProof />
         </div>
       </section>
