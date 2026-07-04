@@ -236,12 +236,25 @@ export function GeneratorPanel() {
                 setDragging(false);
                 handleFiles(e.dataTransfer.files);
               }}
-              className={`${methodTile} cursor-pointer justify-between gap-4 lg:col-span-3 lg:min-h-48 focus-within:ring-2 focus-within:ring-accent/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
+              className={`${methodTile} group relative cursor-pointer justify-between gap-4 overflow-hidden lg:col-span-3 lg:min-h-48 focus-within:ring-2 focus-within:ring-accent/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
                 dragging
                   ? "border-accent/60 bg-accent/[0.06]"
                   : "hover:border-white/[0.12] hover:bg-white/[0.05]"
               }`}
             >
+              {/* Decorative grid — wakes on hover, lit while dragging. */}
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_78%)] transition-opacity duration-300 ${
+                  dragging ? "opacity-100" : "opacity-35 group-hover:opacity-70"
+                }`}
+              />
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.12),transparent_62%)] transition-opacity duration-300 ${
+                  dragging ? "opacity-100" : "opacity-0"
+                }`}
+              />
               <input
                 ref={inputRef}
                 id="csv-input"
@@ -250,7 +263,7 @@ export function GeneratorPanel() {
                 className="sr-only"
                 onChange={(e) => handleFiles(e.target.files)}
               />
-              <div className="flex w-full items-center justify-between gap-2">
+              <div className="relative flex w-full items-center justify-between gap-2">
                 <MethodLabel>
                   <UploadIcon
                     className={`h-3.5 w-3.5 ${dragging ? "text-accent-soft" : "text-zinc-500"}`}
@@ -261,15 +274,25 @@ export function GeneratorPanel() {
                   Recommended
                 </span>
               </div>
-              <div className="py-2 text-center lg:py-4">
-                <p className="text-[15px] font-medium text-zinc-100">
+              <div className="relative py-2 text-center lg:py-3">
+                <div
+                  aria-hidden="true"
+                  className={`mx-auto flex h-11 w-11 items-center justify-center rounded-lg border shadow-[0_8px_16px_-8px_rgba(0,0,0,0.6)] transition motion-safe:duration-200 ${
+                    dragging
+                      ? "border-accent/50 bg-panel text-accent-soft motion-safe:scale-110 motion-safe:-rotate-2"
+                      : "border-white/[0.09] bg-panel text-zinc-400 motion-safe:group-hover:-translate-y-1 group-hover:text-zinc-200"
+                  }`}
+                >
+                  <FileTextIcon className="h-5 w-5" />
+                </div>
+                <p className="mt-3 text-[15px] font-medium text-zinc-100">
                   {dragging ? "Drop to load" : "Drop your Ads Manager export"}
                 </p>
                 <p className="mt-1 text-xs text-zinc-600">
                   or click to browse · max 5MB
                 </p>
               </div>
-              <span className="text-[11px] text-zinc-600">
+              <span className="relative text-[11px] text-zinc-600">
                 Ad-level · any column set
               </span>
             </label>
