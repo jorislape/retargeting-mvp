@@ -7,6 +7,7 @@ import {
   SAMPLE_CONTEXT,
   SAMPLE_CSV_FILENAME,
   SAMPLE_CSV_TEXT,
+  structureMarketNotes,
 } from "@/modules/debrief";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
@@ -14,13 +15,19 @@ import { MetaConnect } from "@/components/debrief/MetaConnect";
 import {
   AlertTriangleIcon,
   ArrowIcon,
+  CheckIcon,
   FileTextIcon,
   FlaskIcon,
   UploadIcon,
   XIcon,
   ZapIcon,
 } from "@/components/ui/icons";
-import { btnPrimary, fieldLabel, inputBase } from "@/components/ui/theme";
+import {
+  btnPrimary,
+  btnSecondary,
+  fieldLabel,
+  inputBase,
+} from "@/components/ui/theme";
 
 /* ------------------------------------------------------------------ */
 /* The generator as a WORKFLOW: three stages, each opened by a light   */
@@ -154,7 +161,27 @@ export function GeneratorPanel() {
     useDebrief();
   const { status: metaStatus } = useMeta();
   const [dragging, setDragging] = useState(false);
+  /* "Structure notes" feedback: "done" shows the ✓ state, "empty" swaps
+     the helper line for the nothing-to-structure notice. */
+  const [noteState, setNoteState] = useState<"idle" | "done" | "empty">(
+    "idle"
+  );
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /* Local, deterministic reformat of the pasted notes — no network,
+     no external service, just the shared keyword map. */
+  const structureNotes = () => {
+    const structured = structureMarketNotes(fields.marketContext);
+    if (structured === null) {
+      setNoteState("empty");
+    } else {
+      updateFields({ marketContext: structured });
+      setNoteState("done");
+    }
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => setNoteState("idle"), 2500);
+  };
 
   const contextDone =
     fields.product.trim() !== "" &&
@@ -537,22 +564,56 @@ export function GeneratorPanel() {
               />
             </div>
             <div className="sm:col-span-3">
-              <label htmlFor="marketContext" className={fieldLabel}>
-                Market / competitor context
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="marketContext" className={fieldLabel}>
+                  Market / competitor notes
+                </label>
+                <button
+                  type="button"
+                  onClick={structureNotes}
+                  className={`min-w-[8rem] cursor-pointer ${btnSecondary}`}
+                >
+                  {noteState === "done" ? (
+                    <span className="flex items-center gap-1.5 motion-safe:animate-settle">
+                      <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                      Structured
+                    </span>
+                  ) : (
+                    "Structure notes"
+                  )}
+                </button>
+              </div>
               <textarea
                 id="marketContext"
-                rows={2}
+                rows={5}
                 value={fields.marketContext}
-                onChange={(e) =>
-                  updateFields({ marketContext: e.target.value })
-                }
-                placeholder="Competitors are running founder-led videos, problem-first hooks, UGC testimonials, and bundle offers around first-order discounts."
+                onChange={(e) => {
+                  updateFields({ marketContext: e.target.value });
+                  if (noteState !== "idle") setNoteState("idle");
+                }}
+                placeholder={`Example:
+- Competitor A is running founder-led videos around trust
+- Competitor B repeats bundle offers and first-order discounts
+- Several ads lead with problem-first hooks
+- Ads Library links:
+  https://www.facebook.com/ads/library/...`}
                 className={`mt-1.5 resize-none ${inputBase}`}
               />
-              <p className="mt-1.5 text-xs leading-relaxed text-zinc-600">
-                Optional — paste competitor ad examples, Ads Library links,
-                hooks, offers, angles, or market notes.
+              {/* Helper line doubles as the non-blocking "nothing to
+                  structure" notice, so no layout ever shifts. */}
+              <p
+                aria-live="polite"
+                className={`mt-1.5 text-xs leading-relaxed ${
+                  noteState === "empty" ? "text-amber-300" : "text-zinc-600"
+                }`}
+              >
+                {noteState === "empty"
+                  ? "Add competitor notes or links first."
+                  : "Optional — paste Ads Library links, competitor ad copy, hooks, offers, formats, or rough notes."}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+                Used as directional context only — competitor
+                spend/performance is not inferred.
               </p>
             </div>
           </div>

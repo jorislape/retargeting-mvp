@@ -58,5 +58,5 @@ export const SAMPLE_CONTEXT: DebriefContext = {
   creativeNotes:
     "UGC_* and Testimonial_* ads are creator-shot; Static_* and ProductShot_* are designed statics; *_Video_* are edited brand cuts.",
   marketContext:
-    "Competitor serums in the Ads Library lean on founder-led videos, problem-first hooks, and UGC testimonials; bundle offers around first-order discounts keep reappearing.",
+    "Observed formats: founder-led video, UGC testimonials\nRepeated hooks: problem-first\nOffer patterns: bundle offers, first-order discounts",
 };

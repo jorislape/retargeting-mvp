@@ -4,6 +4,7 @@ import {
   fmtKpiValue,
   fmtMoney,
 } from "./format";
+import { extractMarketSignals } from "./marketSignals";
 import {
   AnalysisResult,
   DebriefContext,
@@ -160,66 +161,20 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
 }
 
 /* ------------------------------------------------------------------ */
-/* Market / competitor context (V1: manually pasted text only).        */
+/* Market / competitor context (manually pasted text only).            */
 /*                                                                     */
 /* The text is scanned for known creative-strategy terms — formats,    */
-/* hooks, offers — with the same keyword-matching honesty as ad-name   */
-/* tags: we only restate what the user wrote, grouped. No scraping,    */
-/* no inference about competitor spend or performance, ever. Own       */
-/* account data stays the primary signal; market context can only      */
-/* REFRAME a test, not create a claim.                                 */
+/* hooks, offers — via the shared keyword map in marketSignals.ts      */
+/* (the same table the generator's "Structure notes" button uses),     */
+/* with the same keyword-matching honesty as ad-name tags: we only     */
+/* restate what the user wrote, grouped. No scraping, no inference     */
+/* about competitor spend or performance, ever. Own account data       */
+/* stays the primary signal; market context can only REFRAME a test,   */
+/* not create a claim.                                                 */
 /* ------------------------------------------------------------------ */
 
 const MARKET_CAVEAT =
   "Market context is directional — it does not confirm competitor spend or performance.";
-
-interface MarketSignals {
-  formats: string[];
-  hooks: string[];
-  offers: string[];
-  has: (key: string) => boolean;
-}
-
-const MARKET_TERMS: {
-  key: string;
-  label: string;
-  group: keyof Pick<MarketSignals, "formats" | "hooks" | "offers">;
-  re: RegExp;
-}[] = [
-  { key: "founder-led", label: "founder-led video", group: "formats", re: /founder[\s-]?led|founder\s+(stor|video)/i },
-  { key: "ugc", label: "UGC / creator content", group: "formats", re: /\bugc\b|creator[\s-]shot|user[\s-]generated/i },
-  { key: "testimonial", label: "testimonials", group: "formats", re: /testimonial|customer\s+review/i },
-  { key: "video", label: "video", group: "formats", re: /\bvideos?\b/i },
-  { key: "static", label: "statics", group: "formats", re: /\bstatics?\b/i },
-  { key: "carousel", label: "carousels", group: "formats", re: /carousel/i },
-  { key: "meme", label: "meme-style creative", group: "formats", re: /\bmeme/i },
-  { key: "problem-first", label: "problem-first hooks", group: "hooks", re: /problem[\s-](first|led)|pain[\s-]?point/i },
-  { key: "before-after", label: "before/after framing", group: "hooks", re: /before[\s/&-]*after/i },
-  { key: "question", label: "question hooks", group: "hooks", re: /question\s+hook/i },
-  { key: "pov", label: "POV-style hooks", group: "hooks", re: /\bpov\b/i },
-  { key: "bundle", label: "bundle offers", group: "offers", re: /bundle/i },
-  { key: "discount", label: "discounts", group: "offers", re: /discount|%\s?off|\bsale\b/i },
-  { key: "first-order", label: "first-order offers", group: "offers", re: /first[\s-]order|new[\s-]customer\s+offer/i },
-  { key: "free-shipping", label: "free shipping", group: "offers", re: /free\s+shipping/i },
-  { key: "subscription", label: "subscription / trial offers", group: "offers", re: /subscri|free\s+trial/i },
-];
-
-function extractMarketSignals(text: string): MarketSignals {
-  const matched = MARKET_TERMS.filter((t) => t.re.test(text));
-  const keys = new Set(matched.map((t) => t.key));
-  const labels = (group: string) =>
-    matched
-      .filter((t) => t.group === group)
-      // "video" adds nothing when a specific video format also matched
-      .filter((t) => t.key !== "video" || !(keys.has("founder-led") || keys.has("ugc")))
-      .map((t) => t.label);
-  return {
-    formats: labels("formats"),
-    hooks: labels("hooks"),
-    offers: labels("offers"),
-    has: (key) => keys.has(key),
-  };
-}
 
 /** 2–4 bullets restating the user's own market notes, plus the fixed
  *  directional caveat. Null when no context was pasted — the memo is
