@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BlurFade } from "@/components/marketing/BlurFade";
 import { HeroProof } from "@/components/marketing/HeroProof";
 import {
   ArrowIcon,
@@ -147,17 +148,6 @@ function MiniClientReport() {
   );
 }
 
-function FlowArrow() {
-  return (
-    <div
-      aria-hidden="true"
-      className="flex justify-center text-zinc-600 md:block"
-    >
-      <ArrowIcon className="h-4 w-4 rotate-90 md:rotate-0" />
-    </div>
-  );
-}
-
 export default function HomePage() {
   return (
     <div>
@@ -197,46 +187,60 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ---- The pipeline, designed ---- */}
-      <section
-        className="animate-rise mt-14"
-        style={{ animationDelay: "90ms" }}
-        aria-label="How data becomes a debrief"
-      >
-        <div className={`${card} p-5 sm:p-7`}>
-          <div className="grid items-center gap-5 md:grid-cols-[1fr_auto_1.1fr_auto_1.15fr] md:gap-4">
-            {/* Inputs */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
-                <FileTextIcon className="h-4 w-4 shrink-0 text-zinc-400" />
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-[11px] font-medium text-zinc-200">
-                    meta-ads-export.csv
-                  </p>
-                  <p className="text-[10px] text-zinc-600">
-                    Ad-level · any column set
-                  </p>
+      {/* ---- How it works: asymmetric bento ---- */}
+      <section className="mt-16" aria-label="How it works">
+        <BlurFade>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+            How it works
+          </p>
+          <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
+            From export to decision in one deterministic pass
+          </h2>
+        </BlurFade>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
+          {/* Data in */}
+          <BlurFade className="lg:col-span-5">
+            <div className={`${card} flex h-full flex-col p-5`}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                Data in
+              </p>
+              <div className="mt-3.5 space-y-2.5">
+                <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+                  <FileTextIcon className="h-4 w-4 shrink-0 text-zinc-400" />
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-[11px] font-medium text-zinc-200">
+                      meta-ads-export.csv
+                    </p>
+                    <p className="text-[10px] text-zinc-600">
+                      Ad-level · any column set
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+                  <ZapIcon className="h-4 w-4 shrink-0 text-accent-soft" />
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-medium text-zinc-200">
+                      Meta Ads · read-only
+                    </p>
+                    <p className="text-[10px] text-zinc-600">OAuth · ads_read</p>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
-                <ZapIcon className="h-4 w-4 shrink-0 text-accent-soft" />
-                <div className="min-w-0">
-                  <p className="truncate text-[11px] font-medium text-zinc-200">
-                    Meta Ads · read-only
-                  </p>
-                  <p className="text-[10px] text-zinc-600">OAuth · ads_read</p>
-                </div>
-              </div>
+              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
+                The export you already have, or a read-only pull that matches
+                Ads Manager attribution.
+              </p>
             </div>
+          </BlurFade>
 
-            <FlowArrow />
-
-            {/* Engine */}
-            <div className="rounded-lg border border-accent/20 bg-accent/[0.04] p-3.5">
+          {/* Engine */}
+          <BlurFade className="lg:col-span-7" delay={0.07}>
+            <div className="flex h-full flex-col rounded-xl border border-accent/20 bg-accent/[0.04] p-5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
                 Deterministic engine
               </p>
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-3.5 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
                 {[
                   "Read every ad",
                   "Apply the spend gate",
@@ -245,28 +249,75 @@ export default function HomePage() {
                 ].map((step, i) => (
                   <li
                     key={step}
-                    className="flex items-center gap-2 text-[11px] text-zinc-300"
+                    className="flex items-center gap-2.5 text-[13px] text-zinc-200"
                   >
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-white/15 font-mono text-[8px] text-zinc-500">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/15 font-mono text-[9px] text-zinc-500">
                       {i + 1}
                     </span>
                     {step}
                   </li>
                 ))}
               </ul>
-              <p className="mt-2.5 text-[10px] text-zinc-600">
-                Rules, not a model — same input, same answer.
+              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
+                Rules, not a model — same input, same answer. Ads without
+                enough spend are set aside, never mislabeled.
               </p>
             </div>
+          </BlurFade>
 
-            <FlowArrow />
-
-            {/* Outputs */}
-            <div className="space-y-2.5">
-              <MiniBuyerMemo />
-              <MiniClientReport />
+          {/* Buyer memo */}
+          <BlurFade className="lg:col-span-4" delay={0.14}>
+            <div className={`${card} flex h-full flex-col p-5`}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                Out: buyer memo
+              </p>
+              <div className="mt-3.5">
+                <MiniBuyerMemo />
+              </div>
+              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
+                Decisions with numbers attached — scale, cut, test next.
+              </p>
             </div>
-          </div>
+          </BlurFade>
+
+          {/* Client report */}
+          <BlurFade className="lg:col-span-4" delay={0.21}>
+            <div className={`${card} flex h-full flex-col p-5`}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                Out: client report
+              </p>
+              <div className="mt-3.5">
+                <MiniClientReport />
+              </div>
+              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
+                The same run in plain language, ready to send.
+              </p>
+            </div>
+          </BlurFade>
+
+          {/* Trust */}
+          <BlurFade className="sm:col-span-2 lg:col-span-4" delay={0.28}>
+            <div className={`${card} flex h-full flex-col p-5`}>
+              <p className="flex items-center gap-2 text-[14px] font-semibold tracking-tight text-zinc-100">
+                <ShieldIcon className="h-4 w-4 text-accent-soft" />
+                Private by architecture
+              </p>
+              <ul className="mt-3.5 space-y-2.5">
+                {TRUST.map((line) => (
+                  <li
+                    key={line}
+                    className="flex items-start gap-2 text-[12px] leading-relaxed text-zinc-400"
+                  >
+                    <CheckIcon className="mt-0.5 h-3.5 w-3.5 text-emerald-400" />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
+                There is no database to leak from.
+              </p>
+            </div>
+          </BlurFade>
         </div>
       </section>
 
@@ -312,35 +363,6 @@ export default function HomePage() {
               </p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* ---- Trust ---- */}
-      <section className="animate-rise mt-16" style={{ animationDelay: "270ms" }}>
-        <div className={`${card} p-5 sm:p-6`}>
-          <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
-            <div className="max-w-[16rem]">
-              <p className="flex items-center gap-2 text-[14px] font-semibold tracking-tight text-zinc-100">
-                <ShieldIcon className="h-4 w-4 text-accent-soft" />
-                Private by architecture
-              </p>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">
-                There is no database to leak from — the strongest privacy
-                guarantee is having nothing to protect.
-              </p>
-            </div>
-            <ul className="grid flex-1 gap-x-8 gap-y-2.5 sm:grid-cols-2">
-              {TRUST.map((line) => (
-                <li
-                  key={line}
-                  className="flex items-start gap-2 text-[13px] leading-relaxed text-zinc-300"
-                >
-                  <CheckIcon className="mt-0.5 h-3.5 w-3.5 text-emerald-400" />
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </section>
 
