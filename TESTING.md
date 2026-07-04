@@ -48,8 +48,22 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 
 ## Report
 
-- [ ] "Copy memo" button copies the full plain-text memo.
-- [ ] Print/PDF looks right (`print-hidden` chrome disappears).
+- [ ] **Next tests are creative-first**: at least 2 of the 3 tests are
+      creative/angle iterations naming specific ads; a "Scale budget"
+      test appears ONLY when the top winner is ≥30% past the median
+      (sample data: yes at +100%). A flat account gets 3 creative tests.
+- [ ] **Buyer ⇄ Client toggle**: Client view shows Summary / What
+      worked / What underperformed / What we'll test next / Confidence
+      & what data was used — no "kill list" wording, KPI abbreviation
+      explained under the title, "vs typical" table header.
+- [ ] "Copy" copies the plain-text version of the ACTIVE view.
+- [ ] Print/PDF exports the active view (`print-hidden` chrome
+      disappears); Client view prints as a client-ready report.
+
+## Onboarding
+
+- [ ] "How to export from Meta Ads Manager" and "Columns we recognize"
+      expanders under the dropzone open/close and read correctly.
 
 ## Layout
 

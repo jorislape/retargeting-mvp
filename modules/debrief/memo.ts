@@ -7,6 +7,7 @@ import {
 import {
   AnalysisResult,
   DebriefContext,
+  KPI_EXPLAINERS,
   KPI_LABELS,
   Memo,
   MemoTest,
@@ -88,7 +89,7 @@ function buildTldr(analysis: AnalysisResult): string[] {
   lines.push(
     analysis.hasNameSignal
       ? `Next: brief new creative in the format your winners share (see Patterns and Next tests below).`
-      : `Next: run the reallocation test below, and start tagging ad names or creative notes so future debriefs can spot format patterns.`
+      : `Next: run the creative tests below, and start tagging ad names or creative notes so future debriefs can spot format patterns.`
   );
 
   return lines;
@@ -157,63 +158,176 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
   return { winners: winnerNotes, losers: loserNotes };
 }
 
+/** The most common name tag in a group, or null. */
+function dominantTag(group: RankedAd[]): { tag: string; count: number } | null {
+  const counts = new Map<string, number>();
+  for (const ad of group) {
+    for (const tag of ad.nameTags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  let best: { tag: string; count: number } | null = null;
+  for (const [tag, count] of counts.entries()) {
+    if (!best || count > best.count) best = { tag, count };
+  }
+  return best;
+}
+
+/** For the third test slot when no scale move is justified: pick a
+ *  structured challenger to the winning format, so the test creates
+ *  new pattern data instead of iterating in place. Deterministic. */
+const FORMAT_CHALLENGERS: Record<string, string> = {
+  ugc: "a founder/expert explainer video",
+  testimonial: "the same testimonial format with a different customer segment",
+  video: "a static distilled from the video's strongest claim",
+  static: "a 15-second video cut of the top static",
+  "before/after": "the same transformation told by the customer on camera (UGC)",
+  carousel: "the carousel's first card as a standalone static",
+  "discount/promo": "a value-led version where the discount is the closer, not the hook",
+  urgency: "the same offer without the urgency framing",
+};
+
+/**
+ * Next tests are CREATIVE tests. Budget movement lives in the verdict
+ * and the losers section; at most one scaling action appears here, and
+ * only when the data strongly supports it (top winner ≥30% past the
+ * median). The other slots are always angle/format iterations tied to
+ * named ads and their numbers.
+ */
+const SCALE_TEST_MIN_DELTA_PCT = 30;
+
 function buildNextTests(analysis: AnalysisResult, context: DebriefContext): MemoTest[] {
   const { winners, losers, median, kpi, currency, spendGate, hasNameSignal } = analysis;
   const kpiLabel = KPI_LABELS[kpi];
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : "the benchmark";
+  const gateLabel = fmtMoney(spendGate, currency);
   const tests: MemoTest[] = [];
 
-  if (winners.length > 0) {
-    const top = winners[0];
+  const top = winners[0] ?? null;
+  const worst = losers[0] ?? null; // losers arrive sorted worst-first
+  const winnerTag = dominantTag(winners);
+
+  /* T1 — iterate the proven winner (creative). */
+  if (top) {
+    const format = winnerTag && top.nameTags.includes(winnerTag.tag) ? `${winnerTag.tag} ` : "";
     tests.push({
-      test: `Scale "${top.name}" budget by 50%.`,
-      why: `It's already beating median ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend — a proven signal worth more budget.`,
-      setup: `Raise daily budget 50% for 5–7 days. Hold creative and audience constant so scaling effects aren't confused with a new variable.`,
-      winningLooksLike: `${kpiLabel} stays within 10% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend level.`,
+      test: `Brief 2 new ${format}variants of "${top.name}" — keep the angle, change the hook.`,
+      why: `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend. The angle has proven demand — new hooks find its ceiling before fatigue does.`,
+      setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each clears the spend gate. Change only the opening 3 seconds / first frame between variants.`,
+      winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
     });
   } else {
     tests.push({
-      test: `Re-test your current top-spending ad with a fresh audience or placement.`,
-      why: `No ad cleared the median this period, so the fastest signal is retesting your best-spending ad under a new condition.`,
-      setup: `Duplicate the top-spending ad into a new ad set with one changed variable (audience or placement). Run for 5–7 days.`,
-      winningLooksLike: `${kpiLabel} clears ${medianLabel}.`,
+      test: `Brief 3 deliberately distinct angles${context.product ? ` for ${context.product}` : ""}: problem-led, social-proof-led, and offer-led.`,
+      why: `No ad beat the ${medianLabel} median this period — flat results mean the account needs new angles, not more budget behind existing ones.`,
+      setup: `Matched budget (~${gateLabel} per ad), same audience and placement across all three, so the angle is the only variable.`,
+      winningLooksLike: `At least one angle clears ${gateLabel} spend and beats ${medianLabel}.`,
     });
   }
 
-  if (losers.length > 0) {
-    tests.push({
-      test: `Reallocate the ${fmtMoney(analysis.belowBenchmarkSpend, currency)} on below-benchmark ads into your top 1–2 winners.`,
-      why: `These ads are spending below ${medianLabel} with no sign of catching up.`,
-      setup: `Pause the bottom ${losers.length} ad${losers.length === 1 ? "" : "s"} over 3–5 days; move their daily budget to the winners above. Keep total account budget constant so this isolates reallocation, not a spend increase.`,
-      winningLooksLike: `Blended account ${kpiLabel} improves toward ${medianLabel} or better within 7 days.`,
-    });
+  /* T2 — rebuild the worst judged ad (creative), before killing the
+     angle outright. */
+  if (worst) {
+    const worstStats = `${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}) on ${fmtMoney(worst.spend, currency)} spend`;
+    if (worst.nameTags.includes("discount/promo")) {
+      tests.push({
+        test: `Rebuild "${worst.name}" so the hook leads with the problem and the discount becomes the closer.`,
+        why: `An offer-led ad running ${worstStats} means the discount alone isn't earning attention — the opening has to sell the problem before the price can close.`,
+        setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateLabel} with the same audience, placement, and offer — creative is the only change.`,
+        winningLooksLike: `The rebuild beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} and closes to within 20% of ${medianLabel}.`,
+      });
+    } else if (winnerTag && !worst.nameTags.includes(winnerTag.tag)) {
+      tests.push({
+        test: `Reshoot "${worst.name}"'s message in the ${winnerTag.tag} format carrying your winners.`,
+        why: `The message got ${fmtMoney(worst.spend, currency)} of spend but ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}, while ${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots — test whether the format, not the message, is what's failing.`,
+        setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateLabel}, same audience and offer.`,
+        winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
+      });
+    } else {
+      tests.push({
+        test: `Rebuild "${worst.name}" with a new opening hook before writing the angle off.`,
+        why: `At ${worstStats} it's the account's weakest judged ad — one rebuild is cheaper than losing an angle that might only have a hook problem.`,
+        setup: `Reduce the original's spend. One rebuild at ~${gateLabel}, changing only the hook — same body, audience, and offer.`,
+        winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
+      });
+    }
   } else {
     tests.push({
-      test: `Hold current spend split and extend the flat-performing ads by one more week.`,
-      why: `No ad is clearly underperforming yet — cutting now risks killing something that just needs more data.`,
-      setup: `No budget changes. Re-run this debrief in 7 days with the extra data.`,
-      winningLooksLike: `A clear winner or loser separates from ${medianLabel} once more spend has accumulated.`,
+      test: `Test ${winnerTag ? FORMAT_CHALLENGERS[winnerTag.tag] ?? "a new format" : "a new creative format"} against your current best ad as control.`,
+      why: hasNameSignal
+        ? `Nothing is clearly failing, so the next signal comes from challenging the dominant format rather than fixing losers.`
+        : `Nothing is clearly failing and no format pattern is visible yet — a controlled format test creates the pattern data future debriefs need.`,
+      setup: `One challenger, one control, matched budget (~${gateLabel} each), same audience and offer.`,
+      winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
     });
   }
 
-  if (hasNameSignal) {
-    const dominant = winners[0]?.nameTags[0] ?? losers[0]?.nameTags[0] ?? "your winning";
+  /* T3 — the ONLY slot a budget action may occupy, and only when the
+     winner's lead is emphatic. Otherwise: a structured format
+     challenger (creative again). */
+  const scaleJustified =
+    top != null && top.deltaPct != null && top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT;
+  if (scaleJustified) {
     tests.push({
-      test: `Brief 2 new ads in the "${dominant}" format showing up in your winners.`,
-      why: `That format is already overrepresented among your top performers this period.`,
-      setup: `Launch both variants with ~${fmtMoney(spendGate, currency)} budget each — enough to clear the spend gate — before judging.`,
-      winningLooksLike: `At least one new ad clears ${fmtMoney(spendGate, currency)} spend and beats ${medianLabel}.`,
+      test: `Scale "${top.name}" daily budget by 25–50%.`,
+      why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} vs median on ${fmtMoney(top.spend, currency)} already spent. Everything else this period is a creative problem, not a budget one.`,
+      setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
+      winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
     });
   } else {
+    const challenger = winnerTag
+      ? FORMAT_CHALLENGERS[winnerTag.tag] ?? "a deliberately different creative format"
+      : "a deliberately different creative format";
     tests.push({
-      test: `Brief 2–3 new creative angles distinct from your current top spenders.`,
-      why: `Metrics don't show a clear creative pattern yet — deliberately different angles is the fastest way to find one.${context.creativeNotes ? ` Consider your notes: "${context.creativeNotes.slice(0, 80)}".` : ""}`,
-      setup: `Launch with matched budget (~${fmtMoney(spendGate, currency)} per ad) and hold audience/placement constant until each clears the spend gate.`,
-      winningLooksLike: `At least one new ad clears ${fmtMoney(spendGate, currency)} spend and beats ${medianLabel}.`,
+      test: `Test ${challenger} against your ${winnerTag ? `${winnerTag.tag} ads` : "current best ad"} as the control.`,
+      why: winnerTag
+        ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive — a structured challenger shows whether the format or the message is doing the work.`
+        : `No format is clearly winning${hasNameSignal ? "" : " and names carry no format signal"} — the fastest way to a pattern is one controlled format-vs-format test.${context.creativeNotes ? ` Use your notes ("${context.creativeNotes.slice(0, 60)}…") to pick the challenger.` : ""}`,
+      setup: `Launch the challenger at ~${gateLabel} alongside the control, same audience and offer, until both clear the spend gate.`,
+      winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
     });
   }
 
   return tests;
+}
+
+/** The verdict in client language: what happened, what it means, what
+ *  we'll do — same facts as tldr, no buyer shorthand ("kill",
+ *  "benchmark", "spend gate"). */
+function buildClientSummary(analysis: AnalysisResult): string[] {
+  const { winners, losers, median, kpi, currency, belowBenchmarkSpend, belowBenchmarkCount } =
+    analysis;
+  const kpiLabel = KPI_LABELS[kpi];
+  const lines: string[] = [];
+
+  if (winners.length > 0) {
+    const top = winners[0];
+    lines.push(
+      `Your strongest ad this period was "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} — clearly ahead of the account's typical result (${median != null ? fmtKpiValue(median, kpi, currency) : "n/a"}). It earns a larger share of the budget.`
+    );
+  } else if (median != null) {
+    lines.push(
+      `No single ad pulled clearly ahead this period — performance was flat across the account, so the focus shifts to finding a new winning idea rather than shuffling budget.`
+    );
+  } else {
+    lines.push(
+      `Most ads hadn't spent enough yet to judge fairly, so this report is directional rather than conclusive.`
+    );
+  }
+
+  if (losers.length > 0) {
+    lines.push(
+      `${fmtCount(belowBenchmarkCount)} ad${belowBenchmarkCount === 1 ? "" : "s"} performed below the account's typical result, together accounting for ${fmtMoney(belowBenchmarkSpend, currency)} of spend. We're reducing or pausing their budgets so that money works harder.`
+    );
+  } else {
+    lines.push(
+      `No ad underperformed badly enough to pause — budgets stay where they are while the next tests run.`
+    );
+  }
+
+  lines.push(
+    `Next, we're testing new creative built on what this data shows works — the specific tests are listed below.`
+  );
+
+  return lines;
 }
 
 function buildConfidence(analysis: AnalysisResult): { level: "high" | "medium" | "low"; notes: string[] } {
@@ -266,6 +380,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     scope: {
       product: context.product || "Your account",
       kpiLabel: KPI_LABELS[kpi],
+      kpiExplainer: KPI_EXPLAINERS[kpi],
       dateRangeLabel: analysis.dateRange
         ? `${analysis.dateRange.start} – ${analysis.dateRange.end}`
         : null,
@@ -276,13 +391,18 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       medianLabel: median != null ? fmtKpiValue(median, kpi, currency) : "Not enough data",
     },
     tldr: buildTldr(analysis),
+    clientSummary: buildClientSummary(analysis),
     winners: analysis.winners.map((ad) => buildRow(ad, analysis, context)),
     losers: {
       rows: analysis.losers.map((ad) => buildRow(ad, analysis, context)),
       killInstruction:
         analysis.losers.length > 0
-          ? `Cut spend on the ads below. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} is going to ${fmtCount(analysis.belowBenchmarkCount)} below-benchmark ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total.`
+          ? `Cut spend on the ads below and move it behind your winners. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} is going to ${fmtCount(analysis.belowBenchmarkCount)} below-benchmark ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total.`
           : "No ad fell clearly below the benchmark this period.",
+      clientInstruction:
+        analysis.losers.length > 0
+          ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing under the account's typical result, and that budget moves behind the ads that are working.`
+          : "No ad underperformed badly enough to pause this period.",
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),
       setAsideNote:
         analysis.adsSetAside > 0

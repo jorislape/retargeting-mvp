@@ -14,6 +14,17 @@ export const KPI_LABELS: Record<KpiKey, string> = {
   purchases: "Purchases",
 };
 
+/** Plain-language explainers for the client-facing report view and
+ *  abbreviation helper text. One sentence, no jargon. */
+export const KPI_EXPLAINERS: Record<KpiKey, string> = {
+  roas: "Return on ad spend — revenue earned for every $1 spent on ads",
+  cpa: "Cost per acquisition — what one purchase or lead costs in ad spend",
+  ctr: "Click-through rate — the share of people who saw an ad and clicked",
+  cpc: "Cost per click — what one click on an ad costs",
+  leads: "Leads — the number of sign-ups or enquiries an ad generated",
+  purchases: "Purchases — the number of sales an ad generated",
+};
+
 /** Higher is better for these; lower is better for the rest. */
 export const HIGHER_IS_BETTER: Record<KpiKey, boolean> = {
   roas: true,
@@ -81,6 +92,8 @@ export interface AnalysisResult {
 export interface MemoScope {
   product: string;
   kpiLabel: string;
+  /** Plain-language expansion of the KPI abbreviation (client view). */
+  kpiExplainer: string;
   dateRangeLabel: string | null;
   adsAnalyzed: number;
   adsJudged: number;
@@ -107,10 +120,16 @@ export interface MemoTest {
 export interface Memo {
   scope: MemoScope;
   tldr: string[];
+  /** Plain-language verdict for the client-facing view — same facts as
+   *  tldr, none of the buyer shorthand. */
+  clientSummary: string[];
   winners: MemoWinnerLoserRow[];
   losers: {
     rows: MemoWinnerLoserRow[];
     killInstruction: string;
+    /** Softened phrasing of killInstruction for the client view —
+     *  "reduce/pause", never "kill". */
+    clientInstruction: string;
     belowBenchmarkSpendLabel: string;
     setAsideNote: string;
   };

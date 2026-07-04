@@ -257,6 +257,62 @@ export function GeneratorPanel() {
                 )}
               </label>
 
+              {/* Onboarding: how to get the CSV + what we can read.
+                  <details> keeps both out of the way until needed. */}
+              <div className="mt-2 space-y-1">
+                <details className="group rounded-lg border border-transparent open:border-white/10 open:bg-panel-deep/40">
+                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 group-open:px-3 group-open:pt-2.5 group-open:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 [&::-webkit-details-marker]:hidden">
+                    <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
+                      ›
+                    </span>
+                    How to export from Meta Ads Manager
+                  </summary>
+                  <ol className="space-y-1 px-3 pb-3 pt-1 text-xs leading-relaxed text-zinc-400 [counter-reset:step]">
+                    {[
+                      "Open Meta Ads Manager",
+                      "Switch to the Ads level (not Campaigns or Ad sets)",
+                      "Select your date range (30–90 days reads best)",
+                      "Choose your performance columns — spend plus your KPI",
+                      "Export → Export table data → .csv",
+                      "Drop the file above",
+                    ].map((step, i) => (
+                      <li key={step} className="flex gap-2">
+                        <span className="font-mono text-[10px] font-semibold text-blue-300/80">
+                          {i + 1}.
+                        </span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+
+                <details className="group rounded-lg border border-transparent open:border-white/10 open:bg-panel-deep/40">
+                  <summary className="cursor-pointer list-none rounded-sm px-1 py-1 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 group-open:px-3 group-open:pt-2.5 group-open:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 [&::-webkit-details-marker]:hidden">
+                    <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
+                      ›
+                    </span>
+                    Columns we recognize
+                  </summary>
+                  <div className="px-3 pb-3 pt-1 text-xs leading-relaxed text-zinc-400">
+                    <p>
+                      Only <span className="text-zinc-200">Amount spent</span> plus
+                      the column for your chosen KPI are required. Naming varies by
+                      export — all of these resolve automatically:
+                    </p>
+                    <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-zinc-500">
+                      Ad name · Amount spent · Impressions · Link clicks · CTR ·
+                      CPC · Purchases / Results · Purchase conversion value ·
+                      Purchase ROAS · Cost per purchase / result · Leads · Cost
+                      per lead · Reporting starts / ends
+                    </p>
+                    <p className="mt-1.5 text-zinc-500">
+                      Missing something for your KPI? You&apos;ll get a clear
+                      message naming the column, not a wrong answer.
+                    </p>
+                  </div>
+                </details>
+              </div>
+
               {/* Second data source: OAuth pull rendered as the same
                   virtual-CSV File the dropzone produces. */}
               <div

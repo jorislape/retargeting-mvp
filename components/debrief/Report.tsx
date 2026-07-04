@@ -19,12 +19,18 @@ import {
   chipRed,
   eyebrow,
 } from "@/components/ui/theme";
-import { memoToText } from "./memoToText";
+import { memoToText, type ReportView } from "./memoToText";
 
 /* ------------------------------------------------------------------ */
 /* The report renderer — shared by generated debriefs and the sample.  */
-/* Reads like a memo a senior buyer would send: verdict first, then    */
-/* evidence tables, then an actionable run-list of next tests.         */
+/* Two audiences, one memo:                                            */
+/*   Buyer view  — the technical memo a senior buyer works from:       */
+/*                 verdict, evidence tables, patterns, run-list.       */
+/*   Client view — the same facts in plain language: summary, what     */
+/*                 worked, what underperformed, what we'll test next,  */
+/*                 confidence. No "kill list", abbreviations explained.*/
+/* The toggle is display-only — the memo is identical underneath, and  */
+/* print/PDF exports whichever view is active.                         */
 /* ------------------------------------------------------------------ */
 
 const CONFIDENCE_CHIP: Record<Memo["confidence"]["level"], string> = {
@@ -38,7 +44,15 @@ function SectionLabel({ children }: { children: string }) {
   return <p className={eyebrow}>{children}</p>;
 }
 
-function AdTable({ rows, tone }: { rows: MemoWinnerLoserRow[]; tone: "win" | "loss" }) {
+function AdTable({
+  rows,
+  tone,
+  view,
+}: {
+  rows: MemoWinnerLoserRow[];
+  tone: "win" | "loss";
+  view: ReportView;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[540px] text-sm">
@@ -54,7 +68,7 @@ function AdTable({ rows, tone }: { rows: MemoWinnerLoserRow[]; tone: "win" | "lo
               Value
             </th>
             <th className="py-2 pr-4 text-right font-mono text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
-              vs median
+              {view === "client" ? "vs typical" : "vs median"}
             </th>
             <th className="py-2 text-right font-mono text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
               Spend
@@ -107,34 +121,40 @@ function TestRow({
   index,
   checked,
   onToggle,
+  view,
 }: {
   test: MemoTest;
   index: number;
   checked: boolean;
   onToggle: () => void;
+  view: ReportView;
 }) {
   return (
     <li className={`${card} p-4 sm:p-5`}>
       <div className="flex items-start gap-3.5">
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={checked}
-          aria-label={`Mark test ${index + 1} as queued`}
-          onClick={onToggle}
-          className={`print-hidden mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border transition motion-safe:duration-200 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-ink ${
-            checked
-              ? "border-blue-400/60 bg-blue-600 text-white shadow-[0_0_12px_rgba(59,130,246,0.45)]"
-              : "border-white/20 bg-white/[0.02] text-transparent hover:border-blue-400/50 hover:bg-blue-500/[0.06]"
-          }`}
-        >
-          <CheckIcon className="h-3.5 w-3.5 text-current" />
-        </button>
+        {view === "buyer" && (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={checked}
+            aria-label={`Mark test ${index + 1} as queued`}
+            onClick={onToggle}
+            className={`print-hidden mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border transition motion-safe:duration-200 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-ink ${
+              checked
+                ? "border-blue-400/60 bg-blue-600 text-white shadow-[0_0_12px_rgba(59,130,246,0.45)]"
+                : "border-white/20 bg-white/[0.02] text-transparent hover:border-blue-400/50 hover:bg-blue-500/[0.06]"
+            }`}
+          >
+            <CheckIcon className="h-3.5 w-3.5 text-current" />
+          </button>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <p
               className={`font-display text-[15px] font-semibold leading-snug transition ${
-                checked ? "text-zinc-500 line-through decoration-zinc-600" : "text-white"
+                view === "buyer" && checked
+                  ? "text-zinc-500 line-through decoration-zinc-600"
+                  : "text-white"
               }`}
             >
               {test.test}
@@ -152,13 +172,13 @@ function TestRow({
             </div>
             <div>
               <dt className="inline font-mono text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-                Setup{" "}
+                {view === "client" ? "How " : "Setup "}
               </dt>
               <dd className="inline">{test.setup}</dd>
             </div>
             <div>
               <dt className="inline font-mono text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-                Win ={" "}
+                {view === "client" ? "Success = " : "Win = "}
               </dt>
               <dd className="inline">{test.winningLooksLike}</dd>
             </div>
@@ -166,6 +186,43 @@ function TestRow({
         </div>
       </div>
     </li>
+  );
+}
+
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: ReportView;
+  onChange: (view: ReportView) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Report view"
+      className="print-hidden inline-flex rounded-lg border border-white/10 bg-panel-deep/70 p-0.5 shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]"
+    >
+      {(
+        [
+          ["buyer", "Buyer view"],
+          ["client", "Client view"],
+        ] as const
+      ).map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={view === value}
+          onClick={() => onChange(value)}
+          className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 ${
+            view === value
+              ? "border border-blue-400/40 bg-blue-500/15 text-white shadow-[0_0_14px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(147,197,253,0.15)]"
+              : "border border-transparent text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -180,15 +237,17 @@ export function Report({
   generatedAt?: number | null;
   onNewDebrief?: () => void;
 }) {
+  const [view, setView] = useState<ReportView>("buyer");
   const [copied, setCopied] = useState(false);
   const [queued, setQueued] = useState<boolean[]>(() =>
     memo.nextTests.map(() => false)
   );
   const queuedCount = queued.filter(Boolean).length;
+  const client = view === "client";
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(memoToText(memo));
+      await navigator.clipboard.writeText(memoToText(memo, view));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -208,13 +267,21 @@ export function Report({
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
             <p className={eyebrow}>
-              {variant === "sample" ? "Sample creative debrief" : "Creative debrief"}
+              {variant === "sample"
+                ? client
+                  ? "Sample performance report"
+                  : "Sample creative debrief"
+                : client
+                  ? "Performance report"
+                  : "Creative debrief"}
             </p>
             <h1 className="mt-2 font-display text-[26px] font-bold tracking-tight text-white sm:text-3xl">
               {memo.scope.product}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className={chipBlue}>KPI · {memo.scope.kpiLabel}</span>
+              <span className={chipBlue} title={memo.scope.kpiExplainer}>
+                KPI · {memo.scope.kpiLabel}
+              </span>
               {memo.scope.dateRangeLabel && (
                 <span className="font-mono text-[11px] tabular-nums text-zinc-500">
                   {memo.scope.dateRangeLabel}
@@ -228,9 +295,15 @@ export function Report({
                     : null}
               </span>
             </div>
+            {client && (
+              <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-500">
+                {memo.scope.kpiLabel}: {memo.scope.kpiExplainer}.
+              </p>
+            )}
           </div>
 
-          <div className="print-hidden flex items-center gap-2">
+          <div className="print-hidden flex flex-wrap items-center gap-2">
+            <ViewToggle view={view} onChange={setView} />
             <button onClick={handleCopy} className={`cursor-pointer ${btnSecondary}`}>
               {copied ? (
                 <CheckIcon className="h-3.5 w-3.5" />
@@ -262,7 +335,10 @@ export function Report({
             ["Judged", String(memo.scope.adsJudged)],
             ["Set aside", String(memo.scope.adsSetAside)],
             ["Total spend", memo.scope.totalSpendLabel],
-            [`Median ${memo.scope.kpiLabel}`, memo.scope.medianLabel],
+            [
+              `${client ? "Typical" : "Median"} ${memo.scope.kpiLabel}`,
+              memo.scope.medianLabel,
+            ],
           ].map(([label, value]) => (
             <div key={label} className="bg-panel-deep px-3.5 py-3">
               <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
@@ -276,15 +352,15 @@ export function Report({
         </div>
       </header>
 
-      {/* ---- Verdict: the one surface allowed to bloom ---- */}
+      {/* ---- Verdict / Summary: the one surface allowed to bloom ---- */}
       <section className="animate-rise mt-8" style={stagger(1)}>
         <div className="rounded-2xl border border-blue-400/30 bg-gradient-to-b from-blue-500/[0.16] to-blue-500/[0.05] p-5 shadow-[0_0_64px_-12px_rgba(59,130,246,0.5),0_20px_48px_-16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(147,197,253,0.18)] sm:p-6">
           <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-300">
             <SparklesIcon className="h-3.5 w-3.5" />
-            The verdict
+            {client ? "Summary" : "The verdict"}
           </p>
           <div className="mt-3 space-y-2.5">
-            {memo.tldr.map((line, i) => (
+            {(client ? memo.clientSummary : memo.tldr).map((line, i) => (
               <p
                 key={i}
                 className="font-display text-[16px] font-medium leading-relaxed text-zinc-50 sm:text-[17px]"
@@ -296,36 +372,39 @@ export function Report({
         </div>
       </section>
 
-      {/* ---- Winners ---- */}
+      {/* ---- Winners / What worked ---- */}
       <section className="animate-rise mt-8" style={stagger(2)}>
-        <SectionLabel>Winners</SectionLabel>
+        <SectionLabel>{client ? "What worked" : "Winners"}</SectionLabel>
         <div className={`mt-2 ${card} px-4 py-1 sm:px-5`}>
           {memo.winners.length === 0 ? (
             <div className="my-4 rounded-lg border border-dashed border-white/15 bg-panel-deep/40 px-4 py-6 text-center">
               <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
-                No winners this period
+                {client ? "No clear standout this period" : "No winners this period"}
               </p>
               <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">
-                No ad cleared the benchmark by enough to call a winner — the
-                next tests below are how you find one.
+                {client
+                  ? "No ad pulled clearly ahead — the tests below are designed to find the next standout."
+                  : "No ad cleared the benchmark by enough to call a winner — the next tests below are how you find one."}
               </p>
             </div>
           ) : (
-            <AdTable rows={memo.winners} tone="win" />
+            <AdTable rows={memo.winners} tone="win" view={view} />
           )}
         </div>
       </section>
 
-      {/* ---- Losers ---- */}
+      {/* ---- Losers / What underperformed ---- */}
       <section className="animate-rise mt-8" style={stagger(3)}>
-        <SectionLabel>Losers / kill list</SectionLabel>
+        <SectionLabel>
+          {client ? "What underperformed" : "Losers / kill list"}
+        </SectionLabel>
         <div className={`mt-2 ${card} p-4 sm:p-5`}>
           <p className="text-sm leading-relaxed text-zinc-200">
-            {memo.losers.killInstruction}
+            {client ? memo.losers.clientInstruction : memo.losers.killInstruction}
           </p>
           {memo.losers.rows.length > 0 && (
             <div className="mt-2">
-              <AdTable rows={memo.losers.rows} tone="loss" />
+              <AdTable rows={memo.losers.rows} tone="loss" view={view} />
             </div>
           )}
           <p className="mt-3 border-t border-white/5 pt-3 text-xs leading-relaxed text-zinc-500">
@@ -334,46 +413,53 @@ export function Report({
         </div>
       </section>
 
-      {/* ---- Patterns ---- */}
-      <section className="animate-rise mt-8" style={stagger(4)}>
-        <SectionLabel>Patterns</SectionLabel>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          {(
-            [
-              ["What winners share", memo.patterns.winners, "bg-emerald-400", "print-win"],
-              ["What losers share", memo.patterns.losers, "bg-red-400", "print-loss"],
-            ] as const
-          ).map(([title, items, dot]) => (
-            <div key={title} className={`${card} p-4 sm:p-5`}>
-              <p className="font-display text-[13px] font-semibold text-zinc-200">
-                {title}
-              </p>
-              <ul className="mt-2.5 space-y-2">
-                {items.map((point, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2.5 text-[13px] leading-relaxed text-zinc-400"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`mt-[7px] h-1 w-1 shrink-0 rounded-full ${dot}`}
-                    />
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* ---- Patterns (buyer view only — the client version folds the
+             takeaway into the summary) ---- */}
+      {!client && (
+        <section className="animate-rise mt-8" style={stagger(4)}>
+          <SectionLabel>Patterns</SectionLabel>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                ["What winners share", memo.patterns.winners, "bg-emerald-400", "print-win"],
+                ["What losers share", memo.patterns.losers, "bg-red-400", "print-loss"],
+              ] as const
+            ).map(([title, items, dot]) => (
+              <div key={title} className={`${card} p-4 sm:p-5`}>
+                <p className="font-display text-[13px] font-semibold text-zinc-200">
+                  {title}
+                </p>
+                <ul className="mt-2.5 space-y-2">
+                  {items.map((point, i) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-2.5 text-[13px] leading-relaxed text-zinc-400"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`mt-[7px] h-1 w-1 shrink-0 rounded-full ${dot}`}
+                      />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ---- Next tests: an actionable run-list ---- */}
-      <section className="animate-rise mt-8" style={stagger(5)}>
+      <section className="animate-rise mt-8" style={stagger(client ? 4 : 5)}>
         <div className="flex items-baseline justify-between gap-3">
-          <SectionLabel>Next tests — run list</SectionLabel>
-          <span className="print-hidden font-mono text-[11px] tabular-nums text-zinc-500">
-            {queuedCount}/{memo.nextTests.length} queued
-          </span>
+          <SectionLabel>
+            {client ? "What we'll test next" : "Next tests — run list"}
+          </SectionLabel>
+          {!client && (
+            <span className="print-hidden font-mono text-[11px] tabular-nums text-zinc-500">
+              {queuedCount}/{memo.nextTests.length} queued
+            </span>
+          )}
         </div>
         <ol className="mt-2 space-y-3">
           {memo.nextTests.map((test, i) => (
@@ -382,6 +468,7 @@ export function Report({
               test={test}
               index={i}
               checked={queued[i]}
+              view={view}
               onToggle={() =>
                 setQueued((prev) => prev.map((q, j) => (j === i ? !q : q)))
               }
@@ -391,12 +478,24 @@ export function Report({
       </section>
 
       {/* ---- Confidence ---- */}
-      <section className="animate-rise mt-8" style={stagger(6)}>
-        <SectionLabel>Confidence &amp; missing data</SectionLabel>
+      <section className="animate-rise mt-8" style={stagger(client ? 5 : 6)}>
+        <SectionLabel>
+          {client ? "Confidence & what data was used" : "Confidence & missing data"}
+        </SectionLabel>
         <div className={`mt-2 ${card} p-4 sm:p-5`}>
           <span className={`${CONFIDENCE_CHIP[memo.confidence.level]} font-mono`}>
             {memo.confidence.level.toUpperCase()} CONFIDENCE
           </span>
+          {client && (
+            <p className="mt-3 text-[13px] leading-relaxed text-zinc-400">
+              This report was generated from {memo.scope.adsAnalyzed} ads
+              {memo.scope.dateRangeLabel ? ` (${memo.scope.dateRangeLabel})` : ""} totalling{" "}
+              {memo.scope.totalSpendLabel} in spend. {memo.scope.adsJudged} ads had
+              enough spend to judge fairly; {memo.scope.adsSetAside} were set aside
+              rather than misjudged on thin data. Every number comes directly from
+              the ad account data — nothing is estimated.
+            </p>
+          )}
           <ul className="mt-3 space-y-1.5">
             {memo.confidence.notes.map((note, i) => (
               <li
