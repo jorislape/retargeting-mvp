@@ -35,15 +35,15 @@ export const metadata: Metadata = {
     siteName: "Debrief",
     type: "website",
     url: "/",
-    title: "Debrief — Turn Meta Ads data into creative decisions",
+    title: "Debrief — Your Meta Ads export, turned into a decision",
     description:
-      "CSV in → buyer memo + client report out. Deterministic engine: same input, same answer. No login, nothing stored.",
+      "Buyer memo, client report, next creative tests, and briefs — from the CSV you already have. No login, nothing stored.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Debrief — Turn Meta Ads data into creative decisions",
+    title: "Debrief — Your Meta Ads export, turned into a decision",
     description:
-      "CSV in → buyer memo + client report out. Deterministic engine: same input, same answer. No login, nothing stored.",
+      "Buyer memo, client report, next creative tests, and briefs — from the CSV you already have. No login, nothing stored.",
   },
 };
 

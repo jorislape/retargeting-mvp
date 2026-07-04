@@ -8,11 +8,7 @@ import {
   FileTextIcon,
   FlaskIcon,
   GaugeIcon,
-  LayersIcon,
   ShieldIcon,
-  TrendingDownIcon,
-  TrendingUpIcon,
-  ZapIcon,
 } from "@/components/ui/icons";
 import {
   btnPrimary,
@@ -24,62 +20,62 @@ import {
 } from "@/components/ui/theme";
 
 export const metadata = {
-  title: "Debrief — Turn Meta Ads data into creative decisions",
+  title: "Debrief — Your Meta Ads export, turned into a decision",
   description:
-    "Upload a Meta Ads CSV or connect Meta read-only. Debrief turns ad performance into a buyer memo and a client-ready report. No login, nothing stored.",
+    "Upload the CSV you already have, add competitor notes if you want, and get a buyer memo, a client-ready report, next creative tests, and briefs your team can act on. No login, nothing stored.",
 };
 
 /* ------------------------------------------------------------------ */
-/* Home: the first impression. Positions the product, shows the        */
-/* pipeline (data in → deterministic engine → two reports out) as a    */
-/* designed visual, then hands off to the Generator. Server component  */
-/* — all interaction is CSS (hover lift, entrance stagger).            */
+/* Home: the first impression. Positions the product for solo buyers,  */
+/* freelancers, and small agencies — export in, decision out — then    */
+/* hands off to the Generator. Server component; interaction is CSS    */
+/* plus the isolated marketing demos.                                  */
 /* ------------------------------------------------------------------ */
 
-const FEATURES = [
-  {
-    icon: TrendingUpIcon,
-    iconClass: "text-emerald-400",
-    title: "Top performers",
-    text: "Which ads beat the account median, by how much, and on what spend.",
-  },
-  {
-    icon: TrendingDownIcon,
-    iconClass: "text-red-400",
-    title: "Underperformers",
-    text: "The kill list — ads running below benchmark, with the combined spend at stake.",
-  },
+const BENEFITS = [
   {
     icon: GaugeIcon,
-    iconClass: "text-accent-soft",
-    title: "Fair judgement",
-    text: "Ads without enough spend are set aside, never mislabeled winners or losers.",
-  },
-  {
-    icon: LayersIcon,
-    iconClass: "text-accent-soft",
-    title: "Winner / loser patterns",
-    text: "Format signals across your winners and losers — UGC vs static vs video.",
-  },
-  {
-    icon: FlaskIcon,
-    iconClass: "text-accent-soft",
-    title: "Next creative tests",
-    text: "Three concrete tests tied to your data: why, setup, and what winning looks like.",
+    title: "Decide faster",
+    text: "See what worked, what underperformed, and what deserves the next test — without building another spreadsheet.",
   },
   {
     icon: FileTextIcon,
-    iconClass: "text-accent-soft",
-    title: "Client-ready report",
-    text: "One toggle turns the buyer memo into a plain-language report you can send.",
+    title: "Explain it to clients",
+    text: "Turn the same analysis into a plain-English client report with the key decisions and next steps.",
+  },
+  {
+    icon: FlaskIcon,
+    title: "Brief the next creative",
+    text: "Select recommended tests and turn them into grounded creative briefs based on your own performance signals.",
+  },
+  {
+    icon: ShieldIcon,
+    title: "Avoid bad calls",
+    text: "Spend gates and confidence notes help you avoid killing low-spend ads too early or scaling weak winners.",
+  },
+];
+
+const STEPS: { title: string; text: string }[] = [
+  {
+    title: "Upload Meta Ads CSV",
+    text: "Use your ad-level export from Meta Ads Manager. Debrief detects rows, columns, and KPI availability before running.",
+  },
+  {
+    title: "Add market notes",
+    text: "Optional — paste competitor hooks, offers, Ads Library links, or rough notes. They stay directional and never override your own data.",
+  },
+  {
+    title: "Get the decision",
+    text: "Buyer memo, client report, next tests, what not to do, confidence explanation, and optional creative briefs.",
   },
 ];
 
 const TRUST = [
-  "No login required for the CSV flow",
-  "Nothing stored — parsed in memory, gone on refresh",
-  "Meta connection is optional and read-only (ads_read)",
-  "Reports render in your session only",
+  "No login required",
+  "CSV processed in your session only — no database, nothing stored",
+  "No scraping — market context stays directional",
+  "Ads are never launched or changed",
+  "Meta connection optional and read-only (ads_read)",
 ];
 
 /* A miniature document — designed, not screenshotted. Real numbers
@@ -160,19 +156,21 @@ export default function HomePage() {
             aria-hidden="true"
             className="h-1.5 w-1.5 rounded-full bg-accent"
           />
-          Creative debrief for Meta Ads
+          For solo buyers, freelancers & small agencies
         </p>
         <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl">
-          Turn Meta Ads data into your{" "}
-          <span className={gradientText}>next creative decisions.</span>
+          Your Meta Ads export,{" "}
+          <span className={gradientText}>turned into a decision</span> — in
+          two minutes.
         </h1>
-        <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-zinc-400">
-          Upload a Meta Ads CSV or connect Meta read-only. Debrief turns ad
-          performance into a buyer memo and a client-ready report.
+        <p className="mx-auto mt-5 max-w-2xl text-[15px] leading-relaxed text-zinc-400">
+          Upload the CSV you already have. Add competitor notes if you want.
+          Get an opinionated buyer memo, a client-ready report, next creative
+          tests, and briefs your team can act on. No login. No dashboard.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link href="/generator" className={`btn-sheen ${btnPrimary}`}>
-            Generate a debrief
+            Debrief your ads
             <ArrowIcon className="h-4 w-4" />
           </Link>
           <Link href="/sample" className={btnSecondaryMd}>
@@ -197,76 +195,36 @@ export default function HomePage() {
             How it works
           </p>
           <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
-            From export to decision in one deterministic pass
+            Three steps from export to decision
           </h2>
         </BlurFade>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
-          {/* Data in */}
-          <BlurFade className="lg:col-span-5">
-            <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                Data in
-              </p>
-              <div className="mt-3.5 space-y-2.5">
-                <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
-                  <FileTextIcon className="h-4 w-4 shrink-0 text-zinc-400" />
-                  <div className="min-w-0">
-                    <p className="truncate font-mono text-[11px] font-medium text-zinc-200">
-                      meta-ads-export.csv
-                    </p>
-                    <p className="text-[10px] text-zinc-600">
-                      Ad-level · any column set
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
-                  <ZapIcon className="h-4 w-4 shrink-0 text-accent-soft" />
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-medium text-zinc-200">
-                      Meta Ads · read-only
-                    </p>
-                    <p className="text-[10px] text-zinc-600">OAuth · ads_read</p>
-                  </div>
-                </div>
+          {/* The three steps */}
+          {STEPS.map((step, i) => (
+            <BlurFade
+              key={step.title}
+              className={
+                i === 2 ? "sm:col-span-2 lg:col-span-4" : "lg:col-span-4"
+              }
+              delay={i * 0.07}
+            >
+              <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
+                <p className="flex items-center gap-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/12 font-mono text-[10px] text-accent-soft">
+                    {i + 1}
+                  </span>
+                  Step {i + 1}
+                </p>
+                <h3 className="mt-3 text-[14px] font-semibold tracking-tight text-zinc-100">
+                  {step.title}
+                </h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
+                  {step.text}
+                </p>
               </div>
-              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
-                The export you already have, or a read-only pull that matches
-                Ads Manager attribution.
-              </p>
-            </div>
-          </BlurFade>
-
-          {/* Engine */}
-          <BlurFade className="lg:col-span-7" delay={0.07}>
-            <div className="flex h-full flex-col rounded-xl border border-accent/20 bg-accent/[0.04] p-5 transition-colors hover:border-accent/35">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
-                Deterministic engine
-              </p>
-              <ul className="mt-3.5 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
-                {[
-                  "Read every ad",
-                  "Apply the spend gate",
-                  "Rank against the median",
-                  "Write both reports",
-                ].map((step, i) => (
-                  <li
-                    key={step}
-                    className="flex items-center gap-2.5 text-[13px] text-zinc-200"
-                  >
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/15 font-mono text-[9px] text-zinc-500">
-                      {i + 1}
-                    </span>
-                    {step}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
-                Rules, not a model — same input, same answer. Ads without
-                enough spend are set aside, never mislabeled.
-              </p>
-            </div>
-          </BlurFade>
+            </BlurFade>
+          ))}
 
           {/* Buyer memo */}
           <BlurFade className="lg:col-span-4" delay={0.14}>
@@ -278,7 +236,8 @@ export default function HomePage() {
                 <MiniBuyerMemo />
               </div>
               <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
-                Decisions with numbers attached — scale, cut, test next.
+                Decisions with numbers attached — scale, cut, test next, and
+                briefs when you&apos;re ready to hand off.
               </p>
             </div>
           </BlurFade>
@@ -317,7 +276,8 @@ export default function HomePage() {
                 ))}
               </ul>
               <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
-                There is no database to leak from.
+                Rules, not a model — same input, same answer. There is no
+                database to leak from.
               </p>
             </div>
           </BlurFade>
@@ -341,7 +301,7 @@ export default function HomePage() {
         <p className="mt-4 text-sm leading-relaxed text-zinc-500">
           Debrief reads the same export you already have and answers the
           questions that actually end a reporting call: what worked, what
-          failed, what to test next.
+          failed, what to test next — and what to tell the client.
         </p>
       </section>
 
@@ -364,20 +324,20 @@ export default function HomePage() {
       <section className="animate-rise mt-16" style={{ animationDelay: "210ms" }}>
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-lg font-semibold tracking-tight text-white">
-            Every debrief answers six questions
+            Decide, explain, brief — from the export you already have
           </h2>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.title} className={`${card} ${cardLift} p-5`}>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {BENEFITS.map((benefit) => (
+            <div key={benefit.title} className={`${card} ${cardLift} p-5`}>
               <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04]">
-                <f.icon className={`h-4 w-4 ${f.iconClass}`} />
+                <benefit.icon className="h-4 w-4 text-accent-soft" />
               </div>
               <h3 className="mt-3.5 text-[14px] font-semibold tracking-tight text-zinc-100">
-                {f.title}
+                {benefit.title}
               </h3>
               <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
-                {f.text}
+                {benefit.text}
               </p>
             </div>
           ))}
@@ -400,7 +360,7 @@ export default function HomePage() {
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Link href="/generator" className={`btn-sheen ${btnPrimary}`}>
-              Generate a debrief
+              Debrief your ads
               <ArrowIcon className="h-4 w-4" />
             </Link>
             <Link href="/generator" className={btnSecondaryMd}>

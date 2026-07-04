@@ -7,7 +7,7 @@ import { ImageResponse } from "next/og";
 /* ------------------------------------------------------------------ */
 
 export const alt =
-  "Debrief — turn Meta Ads data into your next creative decisions";
+  "Debrief — your Meta Ads export, turned into a decision";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -76,14 +76,14 @@ export default function OgImage() {
               fontWeight: 700,
               letterSpacing: -2,
               lineHeight: 1.08,
-              maxWidth: 900,
+              maxWidth: 1000,
             }}
           >
-            Turn Meta Ads data into your next creative decisions.
+            Your Meta Ads export, turned into a decision.
           </div>
           <div style={{ display: "flex", fontSize: 28, color: "#a1a1aa" }}>
-            CSV in → buyer memo + client report out. No login, nothing
-            stored.
+            Buyer memo · client report · next tests · creative briefs. No
+            login, nothing stored.
           </div>
         </div>
 

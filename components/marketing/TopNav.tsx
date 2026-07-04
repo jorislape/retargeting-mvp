@@ -42,7 +42,7 @@ export function TopNav() {
             </Link>
           ))}
           <Link href="/generator" className={btnPrimarySm}>
-            Generate a debrief
+            Debrief your ads
             <ArrowIcon className="h-3.5 w-3.5" />
           </Link>
         </nav>
@@ -87,7 +87,7 @@ export function TopNav() {
               onClick={() => setOpen(false)}
               className={`mt-2 ${btnPrimarySm}`}
             >
-              Generate a debrief
+              Debrief your ads
               <ArrowIcon className="h-3.5 w-3.5" />
             </Link>
           </div>
