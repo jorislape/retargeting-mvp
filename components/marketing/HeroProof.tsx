@@ -59,11 +59,7 @@ function Ticker({
   const [progress, setProgress] = useState(run ? 0 : 1);
 
   useEffect(() => {
-    if (!run) {
-      setProgress(1);
-      return;
-    }
-    setProgress(0);
+    if (!run) return;
     let raf: number;
     const start = performance.now();
     const tick = (t: number) => {
@@ -75,7 +71,7 @@ function Ticker({
     return () => cancelAnimationFrame(raf);
   }, [run, value]);
 
-  return <>{format(value * progress)}</>;
+  return <>{format(run ? value * progress : value)}</>;
 }
 
 function ColumnHeader({
@@ -129,14 +125,16 @@ export function HeroProof() {
 
   useEffect(() => {
     if (!looping || reduced) return;
-    setSorted(false);
-    let sortT = setTimeout(() => setSorted(true), RAW_MS);
-    const cycle = setInterval(() => {
+    let sortT: ReturnType<typeof setTimeout> | undefined;
+    const startCycle = () => {
       setSorted(false);
       sortT = setTimeout(() => setSorted(true), RAW_MS);
-    }, CYCLE_MS);
+    };
+    const kick = setTimeout(startCycle, 0);
+    const cycle = setInterval(startCycle, CYCLE_MS);
     return () => {
-      clearTimeout(sortT);
+      clearTimeout(kick);
+      if (sortT) clearTimeout(sortT);
       clearInterval(cycle);
     };
   }, [looping, reduced]);
