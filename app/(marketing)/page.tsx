@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { BlurFade } from "@/components/marketing/BlurFade";
 import { HeroProof } from "@/components/marketing/HeroProof";
-import { HeroSpotlight } from "@/components/marketing/HeroSpotlight";
 import { KpiDemo } from "@/components/marketing/KpiDemo";
 import {
   ArrowIcon,
@@ -155,8 +154,7 @@ export default function HomePage() {
   return (
     <div>
       {/* ---- Hero ---- */}
-      <section className="animate-rise relative pt-4 text-center sm:pt-10">
-        <HeroSpotlight />
+      <section className="animate-rise pt-4 text-center sm:pt-10">
         <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium text-zinc-400">
           <span
             aria-hidden="true"

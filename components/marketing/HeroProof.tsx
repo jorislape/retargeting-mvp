@@ -8,14 +8,14 @@ import { LazyMotion, m, useReducedMotion } from "motion/react";
 /* CUT columns while the ROAS figures count up — the deterministic     */
 /* engine shown, not described.                                        */
 /*                                                                     */
-/* Composition: no card frame. The rows float as chips on a data       */
-/* surface — a masked hairline mesh with one soft accent bloom that    */
-/* bleeds past the content, so the demo reads as part of the hero      */
-/* scene rather than a box inside it.                                  */
+/* Composition: no card frame, no grid. The rows float as individual   */
+/* chips over one soft accent bloom that bleeds past the content, so   */
+/* the demo reads as part of the hero scene rather than a box inside   */
+/* it.                                                                 */
 /*                                                                     */
-/* Pacing (one ~11s cycle, deliberately slow):                         */
-/*   raw rows hold ≈4s → rows cascade into columns over ≈1s while      */
-/*   figures count up → the decision state holds ≈6s → repeat.         */
+/* Pacing (one ~11s cycle): long dwells, quick smooth sort —           */
+/*   raw rows hold ≈4s → rows snap into columns in ≈0.6s while         */
+/*   figures count up → the decision state holds ≈6.5s → repeat.       */
 /*                                                                     */
 /* Constraints honored here:                                           */
 /* - reduced motion → the final sorted state, static, no loop          */
@@ -49,15 +49,15 @@ const ADS: Ad[] = [
   { name: "UGC_Unboxing_Demo", spend: "$243.87", roas: 3.05, delta: 32, win: true, rank: 2 },
 ];
 
-/* Dwell times: long enough to read each state, no churn. */
+/* Dwell times: long enough to read each state, no churn. The sort
+   itself stays quick — a crisp spring reads as one clean motion;
+   slow movement is what looked broken. */
 const RAW_MS = 4200;
 const CYCLE_MS = 11500;
-const TICK_MS = 1300;
-/* Gentle spring ≈1s settle; rows cascade with a small per-rank delay. */
-const spring = { type: "spring", stiffness: 150, damping: 24 } as const;
-const CASCADE_S = 0.09;
+const TICK_MS = 900;
+const spring = { type: "spring", stiffness: 260, damping: 30 } as const;
 
-/* Counts a number up over ~1.3s when `run` flips true; renders the
+/* Counts a number up over ~0.9s when `run` flips true; renders the
    final value immediately otherwise (SSR, reduced motion). */
 function Ticker({
   value,
@@ -163,12 +163,9 @@ export function HeroProof() {
       </p>
 
       <div aria-hidden="true" className="relative">
-        {/* Data surface: hairline mesh + one soft accent bloom, bleeding
-            past the content so the demo belongs to the scene. */}
-        <div className="pointer-events-none absolute -inset-x-6 -inset-y-8 sm:-inset-x-24 sm:-inset-y-12">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:26px_26px] [mask-image:radial-gradient(ellipse_62%_72%_at_50%_46%,black_32%,transparent_80%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_58%_at_50%_44%,rgba(56,189,248,0.055),transparent_72%)]" />
-        </div>
+        {/* Background depth: one soft accent bloom bleeding past the
+            content. No grid, no mesh — just light. */}
+        <div className="pointer-events-none absolute -inset-x-6 -inset-y-8 bg-[radial-gradient(ellipse_52%_58%_at_50%_44%,rgba(56,189,248,0.05),transparent_72%)] sm:-inset-x-24 sm:-inset-y-12" />
 
         <div className="relative">
           {/* Floating header strip — fixed height, content swaps */}
@@ -192,10 +189,9 @@ export function HeroProof() {
               )}
             </span>
           </div>
-          <div className="mt-2.5 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
           <LazyMotion features={loadFeatures} strict>
-            <div className="mt-3.5 grid h-[264px] grid-cols-2 content-start gap-x-3 gap-y-1.5 sm:gap-x-5">
+            <div className="mt-4 grid h-[264px] grid-cols-2 content-start gap-x-3 gap-y-1.5 sm:gap-x-5">
               <ColumnHeader
                 show={!sorted}
                 tone="text-zinc-500"
@@ -231,13 +227,11 @@ export function HeroProof() {
                 const style = sorted
                   ? { gridColumn: ad.win ? 1 : 2, gridRow: ad.rank + 2 }
                   : { gridColumn: "1 / -1", gridRow: i + 2 };
-                /* Cascade: rows peel off top-down in both directions. */
-                const delay = (sorted ? ad.rank : i) * CASCADE_S;
                 return (
                   <m.div
                     key={ad.name}
                     layout={animate}
-                    transition={{ ...spring, delay }}
+                    transition={spring}
                     style={style}
                     className={`min-w-0 rounded-md border shadow-[0_10px_24px_-14px_rgba(0,0,0,0.8)] transition-colors duration-500 ${
                       sorted
