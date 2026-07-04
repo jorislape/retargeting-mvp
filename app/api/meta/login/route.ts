@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
+  bridgeResponse,
   FACEBOOK_OAUTH_DIALOG,
   META_OAUTH_SCOPE,
+  requestOrigin,
+  resolveMetaConfig,
   STATE_COOKIE,
 } from "@/modules/meta";
 
@@ -13,29 +16,44 @@ import {
  * access token itself never touches a cookie or any server storage),
  * and redirects to Facebook's OAuth dialog with the read-only
  * ads_read scope.
+ *
+ * The redirect URI is resolved per environment (see modules/meta/
+ * config.ts): derived from the request origin unless META_REDIRECT_URI
+ * explicitly overrides it. If configuration is broken, the popup gets
+ * the bridge page with an error message instead of raw JSON, so it
+ * hands the error to the app and closes itself.
  */
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const appId = process.env.META_APP_ID;
-  const redirectUri = process.env.META_REDIRECT_URI;
+export async function GET(request: NextRequest) {
+  const config = resolveMetaConfig(request);
 
-  if (!appId || !redirectUri || !process.env.META_APP_SECRET) {
+  if (!config.ok) {
+    const origin = requestOrigin(request);
+    if (origin) {
+      return bridgeResponse(
+        { type: "meta-oauth", ok: false, error: config.error },
+        origin
+      );
+    }
     return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "Meta connection isn't configured. Set META_APP_ID, META_APP_SECRET, and META_REDIRECT_URI.",
-      },
+      { ok: false, error: config.error },
       { status: 500, headers: { "Cache-Control": "no-store" } }
     );
   }
 
+  // Structural log only — the redirect URI and its source are public
+  // facts (they appear in the OAuth dialog URL); the secret never is.
+  console.log("meta: oauth login", {
+    redirectUri: config.redirectUri,
+    source: config.redirectSource,
+  });
+
   const state = crypto.randomUUID();
   const params = new URLSearchParams({
-    client_id: appId,
-    redirect_uri: redirectUri,
+    client_id: config.appId,
+    redirect_uri: config.redirectUri,
     state,
     scope: META_OAUTH_SCOPE,
     response_type: "code",
@@ -46,7 +64,7 @@ export async function GET() {
   res.cookies.set(STATE_COOKIE, state, {
     httpOnly: true,
     sameSite: "lax",
-    secure: redirectUri.startsWith("https://"),
+    secure: config.redirectUri.startsWith("https://"),
     path: "/api/meta",
     maxAge: 600,
   });

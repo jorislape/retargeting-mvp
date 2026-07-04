@@ -1,24 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DatePreset } from "@/modules/meta/types";
 import { DATE_PRESET_LABELS, DATE_PRESETS } from "@/modules/meta/types";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
 import { RefreshIcon, ZapIcon } from "@/components/ui/icons";
-import { btnSecondaryMd, inputBase } from "@/components/ui/theme";
+import { btnSecondaryMd, cardCompact, inputBase } from "@/components/ui/theme";
 
 /* ------------------------------------------------------------------ */
 /* The second way into the pipeline: connect Meta read-only, pull      */
 /* ad-level insights, and drop them into the generator as a "virtual   */
 /* CSV" File. From that point on the flow is identical to an upload —  */
 /* the engine never knows the difference.                              */
+/*                                                                     */
+/* Before offering the button, the component asks /api/meta/config     */
+/* whether OAuth is configured at all. If not, the button is disabled  */
+/* with the exact missing env vars — a dead-end popup never opens.     */
 /* ------------------------------------------------------------------ */
+
+interface MetaConfigState {
+  checked: boolean;
+  configured: boolean;
+  /** The exact redirect URI this deployment sends to Facebook. */
+  redirectUri: string | null;
+  message: string | null;
+}
+
+function useMetaConfig(): MetaConfigState {
+  const [state, setState] = useState<MetaConfigState>({
+    checked: false,
+    configured: false,
+    redirectUri: null,
+    message: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/meta/config", { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled) return;
+        setState({
+          checked: true,
+          configured: data.configured === true,
+          redirectUri: data.redirectUri ?? null,
+          message: data.configured
+            ? null
+            : (data.error ??
+              "Meta connection isn't configured on this deployment."),
+        });
+      } catch {
+        if (cancelled) return;
+        // Config check unreachable — leave the button usable; the
+        // login route repeats the same check and fails safely.
+        setState({
+          checked: true,
+          configured: true,
+          redirectUri: null,
+          message: null,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return state;
+}
 
 export function MetaConnect() {
   const { status, accounts, token, error, connect, disconnect, expire } =
     useMeta();
   const { setFile } = useDebrief();
+  const config = useMetaConfig();
 
   const [accountId, setAccountId] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("last_30d");
@@ -66,12 +123,14 @@ export function MetaConnect() {
   };
 
   if (status !== "connected") {
+    const disabled =
+      status === "connecting" || (config.checked && !config.configured);
     return (
       <div>
         <button
           type="button"
           onClick={connect}
-          disabled={status === "connecting"}
+          disabled={disabled}
           className={`w-full cursor-pointer ${btnSecondaryMd}`}
         >
           <ZapIcon className="h-4 w-4 text-blue-300" />
@@ -82,6 +141,21 @@ export function MetaConnect() {
         <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-600">
           READ-ONLY (ADS_READ) · TOKEN HELD IN MEMORY, GONE ON REFRESH
         </p>
+        {config.checked && !config.configured && (
+          <div
+            role="alert"
+            className="mt-2 rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2.5"
+          >
+            <p className="text-xs leading-relaxed text-amber-200">
+              {config.message}
+            </p>
+            {config.redirectUri && (
+              <p className="mt-1.5 break-all font-mono text-[10px] leading-relaxed text-zinc-500">
+                OAUTH REDIRECT · {config.redirectUri}
+              </p>
+            )}
+          </div>
+        )}
         {error && (
           <p role="alert" className="mt-2 text-xs leading-relaxed text-red-300">
             {error}
@@ -92,8 +166,26 @@ export function MetaConnect() {
   }
 
   return (
-    <div className="space-y-2.5">
-      <div className="grid grid-cols-[1fr_auto] gap-2">
+    <div className={`${cardCompact} p-3.5`}>
+      {/* Connected header: live status dot + identity + disconnect. */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
+          <span className="relative flex h-2 w-2" aria-hidden="true">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400/60 motion-safe:animate-ping" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+          </span>
+          Meta connected · read-only
+        </p>
+        <button
+          type="button"
+          onClick={disconnect}
+          className="cursor-pointer rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white active:text-zinc-300"
+        >
+          Disconnect
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
         <div>
           <label htmlFor="meta-account" className="sr-only">
             Ad account
@@ -134,7 +226,7 @@ export function MetaConnect() {
         type="button"
         onClick={() => void pull()}
         disabled={pulling || !selectedAccount}
-        className={`w-full cursor-pointer ${btnSecondaryMd}`}
+        className={`mt-2.5 w-full cursor-pointer ${btnSecondaryMd}`}
       >
         <RefreshIcon
           className={`h-4 w-4 text-blue-300 ${pulling ? "motion-safe:animate-spin" : ""}`}
@@ -143,25 +235,18 @@ export function MetaConnect() {
       </button>
 
       {pullNote && (
-        <p className="font-mono text-[10px] leading-relaxed tracking-wide text-blue-300/80">
+        <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-blue-300/80">
           {pullNote.toUpperCase()}
         </p>
       )}
       {pullError && (
-        <p role="alert" className="text-xs leading-relaxed text-red-300">
+        <p role="alert" className="mt-2 text-xs leading-relaxed text-red-300">
           {pullError}
         </p>
       )}
 
-      <p className="flex items-baseline justify-between gap-2 font-mono text-[10px] tracking-[0.14em] text-zinc-600">
-        CONNECTED · READ-ONLY
-        <button
-          type="button"
-          onClick={disconnect}
-          className="cursor-pointer rounded-sm font-sans text-xs font-medium normal-case tracking-normal text-zinc-400 transition hover:text-white"
-        >
-          Disconnect
-        </button>
+      <p className="mt-2.5 border-t border-white/5 pt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-600">
+        TOKEN IN MEMORY ONLY · GONE ON REFRESH
       </p>
     </div>
   );

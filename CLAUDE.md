@@ -17,7 +17,7 @@ npx eslint .         # lint
 
 The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm run test:csv` (the last runs the RFC 4180 escaping proof for the Meta virtual CSV under plain Node).
 
-No environment variables are required for the CSV-upload flow. The optional Meta data source needs `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI` — see `.env.example`.
+No environment variables are required for the CSV-upload flow. The optional Meta data source needs `META_APP_ID` and `META_APP_SECRET`; the OAuth redirect URI is derived from the request origin per environment (`modules/meta/config.ts`), with `META_REDIRECT_URI` as an optional explicit override — see `.env.example`. `GET /api/meta/config` reports the resolved redirect URI (never the secret).
 
 ## Scope fence — read before adding anything
 

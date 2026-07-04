@@ -136,7 +136,10 @@ export function GeneratorPanel() {
           <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[5fr_6fr] lg:gap-8">
             {/* ---- Left pane: data in ---- */}
             <div>
-              <p className={fieldLabel}>01 · Data</p>
+              <p className={fieldLabel}>01 · Data source</p>
+              <p className="mt-2.5 font-mono text-[10px] font-semibold tracking-[0.14em] text-zinc-500">
+                A · UPLOAD ADS MANAGER EXPORT
+              </p>
               {/* Dropzone states: rest (recessed well) → drag-over (border
                   + glow light up, subtle lift) → accepted (solid blue
                   frame, settle-in). Keyboard focus on the hidden input
@@ -153,7 +156,7 @@ export function GeneratorPanel() {
                   setDragging(false);
                   handleFiles(e.dataTransfer.files);
                 }}
-                className={`mt-2.5 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl px-4 py-6 text-center transition focus-within:ring-2 focus-within:ring-blue-400/70 focus-within:ring-offset-2 focus-within:ring-offset-ink motion-safe:duration-200 ${
+                className={`mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl px-4 py-6 text-center transition focus-within:ring-2 focus-within:ring-blue-400/70 focus-within:ring-offset-2 focus-within:ring-offset-ink motion-safe:duration-200 ${
                   dragging
                     ? "border-2 border-blue-400/80 bg-blue-500/[0.10] shadow-[0_0_36px_-4px_rgba(59,130,246,0.45),inset_0_0_24px_rgba(59,130,246,0.12)] motion-safe:-translate-y-0.5"
                     : file
@@ -229,6 +232,9 @@ export function GeneratorPanel() {
                 or
                 <span className="h-px flex-1 bg-white/10" />
               </div>
+              <p className="mb-2 font-mono text-[10px] font-semibold tracking-[0.14em] text-zinc-500">
+                B · CONNECT META ACCOUNT
+              </p>
               <MetaConnect />
 
               <fieldset className="mt-6">
