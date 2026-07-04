@@ -9,7 +9,7 @@ import {
   RefreshIcon,
 } from "@/components/ui/icons";
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
-import { memoToText, type ReportView } from "./memoToText";
+import { clientizeText, memoToText, type ReportView } from "./memoToText";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -166,7 +166,7 @@ function ClientAdList({
                 tone === "win" ? "text-emerald-400" : "text-red-400"
               }`}
             >
-              {ad.vsMedianLabel}
+              {clientizeText(ad.vsMedianLabel)}
             </p>
           </div>
         ))}
@@ -196,6 +196,9 @@ function TestRow({
   onToggle: () => void;
   view: ReportView;
 }) {
+  /* Client view gets the plain-English register; buyer untouched. */
+  const c = (text: string) =>
+    view === "client" ? clientizeText(text) : text;
   return (
     <li className="grid grid-cols-[2.75rem_1fr] gap-x-3 py-5 sm:gap-x-4">
       <span className="pt-0.5 font-mono text-sm font-semibold text-accent-soft">
@@ -210,7 +213,7 @@ function TestRow({
                 : "text-zinc-50"
             }`}
           >
-            {test.test}
+            {c(test.test)}
           </p>
           {view === "buyer" && (
             <button
@@ -234,26 +237,26 @@ function TestRow({
             <dt className="inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
               Why{" "}
             </dt>
-            <dd className="inline">{test.why}</dd>
+            <dd className="inline">{c(test.why)}</dd>
           </div>
           <div>
             <dt className="inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
               {view === "client" ? "How " : "Setup "}
             </dt>
-            <dd className="inline">{test.setup}</dd>
+            <dd className="inline">{c(test.setup)}</dd>
           </div>
           <div>
             <dt className="inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
               {view === "client" ? "Success = " : "Win = "}
             </dt>
-            <dd className="inline">{test.winningLooksLike}</dd>
+            <dd className="inline">{c(test.winningLooksLike)}</dd>
           </div>
         </dl>
         {/* The receipts: which signals produced this recommendation. */}
         {test.signals.length > 0 && (
           <div className="mt-3 border-l border-white/10 pl-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-              {view === "client" ? "Why this test" : "Signals used"}
+              {view === "client" ? "Why it's worth testing" : "Signals used"}
             </p>
             <ul className="mt-1.5 space-y-1">
               {test.signals.map((signal, i) => (
@@ -265,7 +268,7 @@ function TestRow({
                     aria-hidden="true"
                     className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
                   />
-                  {signal}
+                  {c(signal)}
                 </li>
               ))}
             </ul>

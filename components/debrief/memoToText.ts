@@ -2,6 +2,19 @@ import { Memo } from "@/modules/debrief";
 
 export type ReportView = "buyer" | "client";
 
+/** The client view never says "median" or "spend gate" — swap the
+ *  buyer terms for plain-English equivalents at render time, so the
+ *  engine keeps one canonical string and the buyer view is untouched.
+ *  Idempotent; applied only when rendering/serializing client view. */
+export function clientizeText(text: string): string {
+  return text
+    .replace(/clears the spend gate/g, "has enough spend to judge fairly")
+    .replace(/clear the spend gate/g, "have enough spend to judge fairly")
+    .replace(/spend gate/g, "spend needed to judge fairly")
+    .replace(/\bmedian (ROAS|CPA|CTR|CPC|Leads|Purchases)\b/g, "typical $1")
+    .replace(/\bmedian\b/g, "typical result");
+}
+
 /** Plain-text serialization for the copy/share button — same content
  *  as the on-screen report in the active view, no markup, safe to
  *  paste into Slack, email, or a doc. `briefIndices` lists the tests
@@ -14,6 +27,9 @@ export function memoToText(
 ): string {
   const lines: string[] = [];
   const { scope } = memo;
+  /* Client view swaps buyer terms for plain English; buyer view is
+     passed through untouched. */
+  const c = (text: string) => (view === "client" ? clientizeText(text) : text);
 
   lines.push(`${scope.product} — ${scope.kpiLabel} ${view === "client" ? "PERFORMANCE REPORT" : "DEBRIEF"}`);
   if (view === "client") lines.push(`${scope.kpiLabel}: ${scope.kpiExplainer}`);
@@ -45,7 +61,7 @@ export function memoToText(
     );
   } else {
     winnerRows.forEach((w) => {
-      lines.push(`- ${w.name} | ${w.valueLabel} (${w.vsMedianLabel}) | ${w.spendLabel} | ${w.reason}`);
+      lines.push(`- ${w.name} | ${w.valueLabel} (${c(w.vsMedianLabel)}) | ${w.spendLabel} | ${w.reason}`);
     });
     if (view === "client" && memo.winners.length > winnerRows.length) {
       lines.push(
@@ -58,7 +74,7 @@ export function memoToText(
   lines.push(view === "client" ? "WHAT UNDERPERFORMED" : "LOSERS / KILL LIST");
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
   loserRows.forEach((l) => {
-    lines.push(`- ${l.name} | ${l.valueLabel} (${l.vsMedianLabel}) | ${l.spendLabel} | ${l.reason}`);
+    lines.push(`- ${l.name} | ${l.valueLabel} (${c(l.vsMedianLabel)}) | ${l.spendLabel} | ${l.reason}`);
   });
   if (view === "client" && memo.losers.rows.length > loserRows.length) {
     lines.push(
@@ -93,13 +109,13 @@ export function memoToText(
 
   lines.push(view === "client" ? "WHAT WE'LL TEST NEXT" : "NEXT 3 TESTS");
   memo.nextTests.forEach((t, i) => {
-    lines.push(`${i + 1}. ${t.test}`);
-    lines.push(`   Why: ${t.why}`);
-    lines.push(`   ${view === "client" ? "How" : "Setup"}: ${t.setup}`);
-    lines.push(`   ${view === "client" ? "Success looks like" : "Winning looks like"}: ${t.winningLooksLike}`);
+    lines.push(`${i + 1}. ${c(t.test)}`);
+    lines.push(`   Why: ${c(t.why)}`);
+    lines.push(`   ${view === "client" ? "How" : "Setup"}: ${c(t.setup)}`);
+    lines.push(`   ${view === "client" ? "Success looks like" : "Winning looks like"}: ${c(t.winningLooksLike)}`);
     if (t.signals.length > 0) {
-      lines.push(`   ${view === "client" ? "Why this test" : "Signals used"}:`);
-      t.signals.forEach((s) => lines.push(`   - ${s}`));
+      lines.push(`   ${view === "client" ? "Why it's worth testing" : "Signals used"}:`);
+      t.signals.forEach((s) => lines.push(`   - ${c(s)}`));
     }
   });
   lines.push("");
