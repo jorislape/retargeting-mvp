@@ -12,9 +12,9 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 
 ## Sample data
 
-- [ ] **Load**: click "Use sample data" (top-right of Data source) →
-      dropzone shows the sample file, empty context fields prefill,
-      typed values are kept.
+- [ ] **Load**: click "Load the sample dataset" in the helper row under
+      the source tiles → the loaded strip shows the sample file, empty
+      context fields prefill, typed values are kept.
 - [ ] **ROAS** (default KPI) → Generate: `UGC_MorningRoutine_V1` tops
       winners (4.62×), `Static_StockPhoto_Generic_V1` in the kill list
       (0.62×), 3 ads set aside.

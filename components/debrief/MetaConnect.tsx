@@ -6,7 +6,7 @@ import { DATE_PRESET_LABELS, DATE_PRESETS } from "@/modules/meta/types";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
 import { RefreshIcon, ZapIcon } from "@/components/ui/icons";
-import { btnSecondary, inputBase } from "@/components/ui/theme";
+import { btnSecondary, btnSecondaryMd, inputBase } from "@/components/ui/theme";
 
 /* ------------------------------------------------------------------ */
 /* The second way into the pipeline: connect Meta read-only, pull      */
@@ -136,22 +136,22 @@ export function MetaConnect() {
     return (
       <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
         <p className="text-sm leading-snug text-zinc-400">
-          Pull ad-level insights read-only over OAuth — attribution matches
-          Ads Manager.
+          Pull ad-level insights straight from your ad account — attribution
+          matches Ads Manager.
         </p>
         <button
           type="button"
           onClick={connect}
           disabled={disabled}
-          className={`cursor-pointer self-start ${btnSecondary}`}
+          className={`w-full cursor-pointer ${btnSecondaryMd}`}
         >
-          <ZapIcon className="h-3.5 w-3.5 text-zinc-400" />
+          <ZapIcon className="h-4 w-4 text-accent-soft" />
           {status === "connecting"
             ? "Waiting for Meta sign-in…"
             : "Connect Meta account"}
         </button>
-        <p className="font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-600">
-          READ-ONLY (ADS_READ) · TOKEN IN MEMORY ONLY
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-600">
+          OAuth · ads_read only · token stays in memory
         </p>
         {config.checked && !config.configured && (
           <div

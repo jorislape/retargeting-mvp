@@ -9,6 +9,7 @@ import {
   SAMPLE_CSV_TEXT,
 } from "@/modules/debrief";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
+import { useMeta } from "@/components/workspace/MetaProvider";
 import { MetaConnect } from "@/components/debrief/MetaConnect";
 import {
   AlertTriangleIcon,
@@ -17,15 +18,16 @@ import {
   FlaskIcon,
   UploadIcon,
   XIcon,
+  ZapIcon,
 } from "@/components/ui/icons";
-import { btnPrimary, btnSecondary, fieldLabel, inputBase } from "@/components/ui/theme";
+import { btnPrimary, fieldLabel, inputBase } from "@/components/ui/theme";
 
 /* ------------------------------------------------------------------ */
 /* The generator as a WORKFLOW: three stages, each opened by a light   */
 /* step header (numbered chip that fills as the stage completes) —     */
-/*   01 SOURCE   three intentional input methods (CSV export, sample  */
-/*               dataset, Meta API) as equal tiles; whatever method    */
-/*               fills the pipeline lands in one shared "loaded" strip */
+/*   01 SOURCE   CSV upload is the primary path, Meta connect the     */
+/*               integration alternative, sample data a helper row —  */
+/*               whatever fills the pipeline lands in one shared strip */
 /*   02 FRAMING  the KPI (underline-selected, polarity shown) and the */
 /*               context the memo is written against                   */
 /*   03 RUN      one status line, one white action                     */
@@ -150,6 +152,7 @@ function MethodLabel({ children }: { children: React.ReactNode }) {
 export function GeneratorPanel() {
   const { status, file, fields, error, setFile, updateFields, generate } =
     useDebrief();
+  const { status: metaStatus } = useMeta();
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -216,10 +219,10 @@ export function GeneratorPanel() {
             n="1"
             title="Source"
             done={!!file}
-            hint="Three ways in — all land in the same pipeline."
+            hint="Upload your export, or pull straight from Meta."
           />
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          <div className="mt-5 grid gap-3 lg:grid-cols-5">
             {/* Method A: CSV export (the dropzone itself) */}
             <label
               htmlFor="csv-input"
@@ -233,7 +236,7 @@ export function GeneratorPanel() {
                 setDragging(false);
                 handleFiles(e.dataTransfer.files);
               }}
-              className={`${methodTile} cursor-pointer items-start justify-between gap-3 focus-within:ring-2 focus-within:ring-accent/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
+              className={`${methodTile} cursor-pointer justify-between gap-4 lg:col-span-3 lg:min-h-48 focus-within:ring-2 focus-within:ring-accent/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
                 dragging
                   ? "border-accent/60 bg-accent/[0.06]"
                   : "hover:border-white/[0.12] hover:bg-white/[0.05]"
@@ -247,14 +250,19 @@ export function GeneratorPanel() {
                 className="sr-only"
                 onChange={(e) => handleFiles(e.target.files)}
               />
-              <MethodLabel>
-                <UploadIcon
-                  className={`h-3.5 w-3.5 ${dragging ? "text-accent-soft" : "text-zinc-500"}`}
-                />
-                CSV export
-              </MethodLabel>
-              <div>
-                <p className="text-sm font-medium text-zinc-200">
+              <div className="flex w-full items-center justify-between gap-2">
+                <MethodLabel>
+                  <UploadIcon
+                    className={`h-3.5 w-3.5 ${dragging ? "text-accent-soft" : "text-zinc-500"}`}
+                  />
+                  CSV export
+                </MethodLabel>
+                <span className="rounded-full border border-accent/25 bg-accent/[0.08] px-2 py-0.5 text-[10px] font-medium text-accent-soft">
+                  Recommended
+                </span>
+              </div>
+              <div className="py-2 text-center lg:py-4">
+                <p className="text-[15px] font-medium text-zinc-100">
                   {dragging ? "Drop to load" : "Drop your Ads Manager export"}
                 </p>
                 <p className="mt-1 text-xs text-zinc-600">
@@ -266,34 +274,51 @@ export function GeneratorPanel() {
               </span>
             </label>
 
-            {/* Method B: sample dataset */}
-            <div className={`${methodTile} items-start justify-between gap-3`}>
-              <MethodLabel>
-                <FlaskIcon className="h-3.5 w-3.5 text-zinc-500" />
-                Sample dataset
-              </MethodLabel>
-              <p className="text-sm leading-snug text-zinc-400">
-                14 synthetic ads with clear winners, losers, and thin-spend
-                traps — built to exercise every rule.
-              </p>
-              <button
-                type="button"
-                onClick={loadSample}
-                className={`cursor-pointer ${btnSecondary}`}
-              >
-                Load sample data
-              </button>
-            </div>
-
-            {/* Method C: Meta API */}
-            <div className={`${methodTile} justify-between gap-3`}>
-              <MethodLabel>
-                <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
-                Meta API
-              </MethodLabel>
+            {/* The alternative: Meta as a real integration, not a
+                side button. Status lives in the card header (hidden
+                once connected — MetaConnect shows its own). */}
+            <div
+              className={`${methodTile} justify-between gap-4 lg:col-span-2 lg:min-h-48`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <MethodLabel>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.04]">
+                    <ZapIcon className="h-3.5 w-3.5 text-accent-soft" />
+                  </span>
+                  Meta Ads
+                </MethodLabel>
+                {metaStatus !== "connected" && (
+                  <span className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-600">
+                    <span
+                      aria-hidden="true"
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        metaStatus === "connecting"
+                          ? "bg-amber-400"
+                          : "bg-zinc-600"
+                      }`}
+                    />
+                    {metaStatus === "connecting" ? "Connecting…" : "Not connected"}
+                  </span>
+                )}
+              </div>
               <MetaConnect />
             </div>
           </div>
+
+          {/* Helper path, deliberately quiet: sample data is a demo
+              aid, not a workflow. */}
+          <p className="mt-3 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-600">
+            <FlaskIcon className="h-3.5 w-3.5 text-zinc-600" />
+            No CSV handy?
+            <button
+              type="button"
+              onClick={loadSample}
+              className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              Load the sample dataset
+            </button>
+            — 14 synthetic ads for a full test run.
+          </p>
 
           {/* The shared landing strip: whichever method produced the
               data, this is the single source of truth for what's
