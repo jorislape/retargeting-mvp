@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { KpiKey } from "@/modules/debrief";
+import type { CompetitorSource, KpiKey } from "@/modules/debrief";
 import {
   assessMarketNotes,
+  EMPTY_COMPETITOR_SOURCE,
   HIGHER_IS_BETTER,
   KPI_LABELS,
+  MAX_COMPETITOR_SOURCES,
+  mergeCompetitorSourcesIntoNotes,
   parseCsv,
   requiredColumnsFor,
   resolveColumns,
@@ -177,9 +180,11 @@ export function GeneratorPanel() {
     status,
     file,
     fields,
+    competitorSources,
     error,
     setFile,
     updateFields,
+    setCompetitorSources,
     generate,
     clearError,
   } = useDebrief();
@@ -191,6 +196,12 @@ export function GeneratorPanel() {
     "idle"
   );
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* "Use as market notes" feedback, same three-state pattern as the
+     notes button above. */
+  const [sourceState, setSourceState] = useState<"idle" | "done" | "empty">(
+    "idle"
+  );
+  const sourceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   /* Non-blocking quality read on the notes — local parsing only. */
@@ -265,6 +276,44 @@ export function GeneratorPanel() {
     }
     if (noteTimer.current) clearTimeout(noteTimer.current);
     noteTimer.current = setTimeout(() => setNoteState("idle"), 2500);
+  };
+
+  /* Competitor sources: structured manual input that only ever becomes
+     text in the market-notes field. Nothing here fetches a URL. */
+  const addSource = () => {
+    if (competitorSources.length >= MAX_COMPETITOR_SOURCES) return;
+    setCompetitorSources([...competitorSources, EMPTY_COMPETITOR_SOURCE]);
+  };
+
+  const updateSource = (index: number, patch: Partial<CompetitorSource>) => {
+    setCompetitorSources(
+      competitorSources.map((s, i) => (i === index ? { ...s, ...patch } : s))
+    );
+    if (sourceState !== "idle") setSourceState("idle");
+  };
+
+  const removeSource = (index: number) => {
+    setCompetitorSources(competitorSources.filter((_, i) => i !== index));
+    if (sourceState !== "idle") setSourceState("idle");
+  };
+
+  /* Serializes the filled-in sources and APPENDS them to the market
+     notes — existing text is never overwritten, and a repeat click
+     with the same sources is a no-op instead of a duplicate block. */
+  const useAsMarketNotes = () => {
+    const merged = mergeCompetitorSourcesIntoNotes(
+      fields.marketContext,
+      competitorSources
+    );
+    if (merged === null) {
+      setSourceState("empty");
+    } else {
+      updateFields({ marketContext: merged });
+      setSourceState("done");
+      setNoteState("idle");
+    }
+    if (sourceTimer.current) clearTimeout(sourceTimer.current);
+    sourceTimer.current = setTimeout(() => setSourceState("idle"), 2500);
   };
 
   const contextDone =
@@ -801,6 +850,159 @@ export function GeneratorPanel() {
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
                 Used as directional context only — competitor
                 spend/performance is not inferred.
+              </p>
+            </div>
+
+            {/* Competitor sources: optional structured input that only
+                ever becomes text in the field above. Manual context
+                only — URLs are never fetched or monitored. */}
+            <div className="sm:col-span-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className={fieldLabel}>Competitor sources</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {competitorSources.length < MAX_COMPETITOR_SOURCES && (
+                    <button
+                      type="button"
+                      onClick={addSource}
+                      className={`cursor-pointer ${btnSecondary}`}
+                    >
+                      Add competitor source
+                    </button>
+                  )}
+                  {competitorSources.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={useAsMarketNotes}
+                      className={`min-w-[9.5rem] cursor-pointer ${btnSecondary}`}
+                    >
+                      {sourceState === "done" ? (
+                        <span className="flex items-center gap-1.5 motion-safe:animate-settle">
+                          <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                          Added to notes
+                        </span>
+                      ) : (
+                        "Use as market notes"
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {competitorSources.length > 0 && (
+                <div className="mt-2.5 space-y-3">
+                  {competitorSources.map((source, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                          Source {i + 1}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => removeSource(i)}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                        >
+                          <XIcon className="h-3 w-3" />
+                          Remove
+                        </button>
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label
+                            htmlFor={`competitor-name-${i}`}
+                            className={fieldLabel}
+                          >
+                            Competitor name
+                          </label>
+                          <input
+                            id={`competitor-name-${i}`}
+                            value={source.name}
+                            onChange={(e) =>
+                              updateSource(i, { name: e.target.value })
+                            }
+                            placeholder="GlowLab"
+                            className={`mt-1.5 ${inputBase}`}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`competitor-url-${i}`}
+                            className={fieldLabel}
+                          >
+                            Website / landing page URL
+                          </label>
+                          <input
+                            id={`competitor-url-${i}`}
+                            value={source.url}
+                            onChange={(e) =>
+                              updateSource(i, { url: e.target.value })
+                            }
+                            placeholder="https://example.com"
+                            className={`mt-1.5 ${inputBase}`}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`competitor-ads-${i}`}
+                            className={fieldLabel}
+                          >
+                            Ads Library links / examples
+                          </label>
+                          <textarea
+                            id={`competitor-ads-${i}`}
+                            rows={2}
+                            value={source.adsLibraryLinks}
+                            onChange={(e) =>
+                              updateSource(i, {
+                                adsLibraryLinks: e.target.value,
+                              })
+                            }
+                            placeholder={"One per line:\nhttps://www.facebook.com/ads/library/?id=..."}
+                            className={`mt-1.5 resize-none ${inputBase}`}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`competitor-notes-${i}`}
+                            className={fieldLabel}
+                          >
+                            Notes
+                          </label>
+                          <textarea
+                            id={`competitor-notes-${i}`}
+                            rows={2}
+                            value={source.notes}
+                            onChange={(e) =>
+                              updateSource(i, { notes: e.target.value })
+                            }
+                            placeholder="founder-led videos, first-order discount, problem-first hooks"
+                            className={`mt-1.5 resize-none ${inputBase}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p
+                aria-live="polite"
+                className={`mt-1.5 text-xs leading-relaxed ${
+                  sourceState === "empty" ? "text-amber-300" : "text-zinc-600"
+                }`}
+              >
+                {sourceState === "empty"
+                  ? "Add a competitor name, link, or note first."
+                  : competitorSources.length === 0
+                    ? "Optional — list competitors by name, landing page, and Ads Library examples, then merge them into the market notes above."
+                    : `Up to ${MAX_COMPETITOR_SOURCES} sources. “Use as market notes” appends a structured summary to the field above — your existing notes are kept.`}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+                Competitor sources are used as directional context only —
+                Debrief does not infer competitor spend or performance, and
+                URLs are never fetched or monitored. Manual context only.
               </p>
             </div>
           </div>

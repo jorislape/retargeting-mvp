@@ -114,6 +114,131 @@ export function assessMarketNotes(rawText: string): MarketQuality | null {
 }
 
 /* ------------------------------------------------------------------ */
+/* Competitor sources (V1, manual only): a small structured input for  */
+/* competitor context — name, landing page, Ads Library links, notes — */
+/* that serializes into the market-notes textarea. The serialization   */
+/* only restates what the user typed, grouped and counted; URLs are    */
+/* carried verbatim and NEVER fetched, monitored, or stored. The       */
+/* "Observed competitor context" summary lines are structural facts    */
+/* (who was mentioned, how many links) plus signal labels from the     */
+/* shared term table above — never a claim about competitor spend or   */
+/* performance.                                                        */
+/* TODO(future): a later version may support a one-time URL fetch or   */
+/* competitor watchlists; V1 is deliberately manual-input only.        */
+/* ------------------------------------------------------------------ */
+
+export interface CompetitorSource {
+  name: string;
+  url: string;
+  /** Free text — one Ads Library link or example per line. */
+  adsLibraryLinks: string;
+  notes: string;
+}
+
+export const MAX_COMPETITOR_SOURCES = 5;
+
+export const EMPTY_COMPETITOR_SOURCE: CompetitorSource = {
+  name: "",
+  url: "",
+  adsLibraryLinks: "",
+  notes: "",
+};
+
+function competitorSourceIsEmpty(s: CompetitorSource): boolean {
+  return (
+    s.name.trim() === "" &&
+    s.url.trim() === "" &&
+    s.adsLibraryLinks.trim() === "" &&
+    s.notes.trim() === ""
+  );
+}
+
+/** Ads Library entries as pasted, one per line, bullet markers stripped. */
+function adsLibraryLines(s: CompetitorSource): string[] {
+  return s.adsLibraryLinks
+    .split(/\n+/)
+    .map((line) => line.replace(/^[\s•*·-]+/, "").trim())
+    .filter((line) => line !== "");
+}
+
+/**
+ * Serializes competitor sources into a market-notes text block, or null
+ * when every source is empty. Pure restatement of user input — nothing
+ * fetched, nothing inferred.
+ */
+export function formatCompetitorSources(
+  sources: CompetitorSource[]
+): string | null {
+  const filled = sources.filter((s) => !competitorSourceIsEmpty(s));
+  if (filled.length === 0) return null;
+
+  const out: string[] = ["Competitor sources:"];
+  for (const s of filled) {
+    out.push(`- Competitor: ${s.name.trim() || "(unnamed)"}`);
+    if (s.url.trim() !== "") {
+      out.push(`  Website / landing page: ${s.url.trim()}`);
+    }
+    const libLines = adsLibraryLines(s);
+    if (libLines.length > 0) {
+      out.push("  Ads Library examples:");
+      for (const line of libLines) out.push(`  - ${line}`);
+    }
+    if (s.notes.trim() !== "") {
+      out.push(`  Notes: ${s.notes.trim().replace(/\s*\n+\s*/g, "; ")}`);
+    }
+  }
+
+  out.push("");
+  out.push("Observed competitor context:");
+  const names = filled.map((s) => s.name.trim()).filter((n) => n !== "");
+  if (names.length > 0) {
+    out.push(`- Competitors mentioned: ${names.join(", ")}`);
+  }
+  const siteCount = filled.filter((s) => s.url.trim() !== "").length;
+  const libCount = filled.reduce((n, s) => n + adsLibraryLines(s).length, 0);
+  const linkParts: string[] = [];
+  if (siteCount > 0) {
+    linkParts.push(
+      `${siteCount} website${siteCount === 1 ? " / landing page" : "s / landing pages"}`
+    );
+  }
+  if (libCount > 0) {
+    linkParts.push(
+      `${libCount} Ads Library example${libCount === 1 ? "" : "s"}`
+    );
+  }
+  if (linkParts.length > 0) {
+    out.push(`- Links provided: ${linkParts.join(", ")}`);
+  }
+  const combinedNotes = filled.map((s) => s.notes).join("\n");
+  const signals = extractMarketSignals(combinedNotes.replace(URL_RE, " "));
+  const mentioned = [...signals.formats, ...signals.hooks, ...signals.offers];
+  if (mentioned.length > 0) {
+    out.push(`- Notes mention: ${mentioned.join(", ")}`);
+  }
+
+  return out.join("\n");
+}
+
+/**
+ * Appends the serialized competitor sources to the existing market
+ * notes without touching what the user already wrote. Returns null
+ * when there is nothing to merge; returns the notes unchanged when the
+ * identical block is already present (a second click is a no-op, not a
+ * duplicate).
+ */
+export function mergeCompetitorSourcesIntoNotes(
+  existingNotes: string,
+  sources: CompetitorSource[]
+): string | null {
+  const block = formatCompetitorSources(sources);
+  if (block === null) return null;
+  const existing = existingNotes.trim();
+  if (existing.includes(block)) return existingNotes;
+  return existing === "" ? block : `${existing}\n\n${block}`;
+}
+
+/* ------------------------------------------------------------------ */
 /* "Structure notes": local, deterministic reformatting of the pasted  */
 /* textarea. Groups recognized signals, keeps every URL, and carries   */
 /* anything unrecognized verbatim under "Raw notes" — nothing is       */

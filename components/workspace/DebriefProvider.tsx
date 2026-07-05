@@ -8,7 +8,12 @@ import {
   useMemo,
   useState,
 } from "react";
-import type { DebriefApiError, KpiKey, Memo } from "@/modules/debrief";
+import type {
+  CompetitorSource,
+  DebriefApiError,
+  KpiKey,
+  Memo,
+} from "@/modules/debrief";
 
 /* ------------------------------------------------------------------ */
 /* Session state for the generator, lifted to the workspace layout so  */
@@ -28,6 +33,12 @@ export interface GeneratorFields {
   /** Optional pasted market/competitor notes — never required. */
   marketContext: string;
 }
+
+/* Competitor sources are an input aid for the market-notes field, not
+   a request field: they reach the engine only after the user merges
+   them into marketContext ("Use as market notes"). Same privacy rules
+   as everything else here — React state only, gone on refresh, and
+   the URLs they hold are never fetched. */
 
 export type GeneratorStatus = "idle" | "processing" | "ready";
 
@@ -72,11 +83,13 @@ interface DebriefContextValue {
   status: GeneratorStatus;
   file: File | null;
   fields: GeneratorFields;
+  competitorSources: CompetitorSource[];
   memo: Memo | null;
   error: DebriefApiError | null;
   generatedAt: number | null;
   setFile: (file: File | null) => void;
   updateFields: (patch: Partial<GeneratorFields>) => void;
+  setCompetitorSources: (sources: CompetitorSource[]) => void;
   generate: () => Promise<void>;
   clearError: () => void;
   reset: () => void;
@@ -88,6 +101,9 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<GeneratorStatus>("idle");
   const [file, setFile] = useState<File | null>(null);
   const [fields, setFields] = useState<GeneratorFields>(DEFAULT_FIELDS);
+  const [competitorSources, setCompetitorSources] = useState<
+    CompetitorSource[]
+  >([]);
   const [memo, setMemo] = useState<Memo | null>(null);
   const [error, setError] = useState<DebriefApiError | null>(null);
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
@@ -145,6 +161,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     setStatus("idle");
     setFile(null);
     setFields(DEFAULT_FIELDS);
+    setCompetitorSources([]);
     setMemo(null);
     setError(null);
     setGeneratedAt(null);
@@ -155,16 +172,18 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       status,
       file,
       fields,
+      competitorSources,
       memo,
       error,
       generatedAt,
       setFile,
       updateFields,
+      setCompetitorSources,
       generate,
       clearError,
       reset,
     }),
-    [status, file, fields, memo, error, generatedAt, updateFields, generate, clearError, reset]
+    [status, file, fields, competitorSources, memo, error, generatedAt, updateFields, generate, clearError, reset]
   );
 
   return (

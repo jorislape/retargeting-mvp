@@ -34,6 +34,24 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] Non-CSV file / empty CSV / CSV missing the KPI's column → clear
       400 error banner naming what's missing, no crash.
 
+## Market notes & competitor sources
+
+- [ ] **Competitor sources**: "Add competitor source" adds a card (name /
+      URL / Ads Library links / notes); up to 5, the add button hides at
+      the cap; Remove deletes a card; all fields optional and generation
+      is never blocked by them.
+- [ ] **Use as market notes**: appends a "Competitor sources:" +
+      "Observed competitor context:" block to the market-notes field
+      WITHOUT touching existing text; clicking again with unchanged
+      sources doesn't duplicate the block; all-empty cards → amber "Add
+      a competitor name, link, or note first."
+- [ ] **Structure notes after merge**: still groups formats/hooks/offers,
+      keeps every URL (website + Ads Library), carries competitor lines
+      under "Raw notes", and stays idempotent.
+- [ ] **Report**: merged notes produce the Market signal section (marked
+      directional) exactly like hand-pasted notes; empty market notes →
+      no market wording anywhere. No URL is ever fetched.
+
 ## Meta data source
 
 - [ ] `GET /api/meta/config` shows the redirect URI; button disabled

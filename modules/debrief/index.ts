@@ -3,7 +3,15 @@ export { resolveColumns, requiredColumnsFor } from "./columns";
 export { extractAds } from "./extract";
 export { analyze, DEFAULT_SPEND_FLOOR } from "./analysis";
 export { generateMemo } from "./memo";
-export { assessMarketNotes, structureMarketNotes } from "./marketSignals";
+export {
+  assessMarketNotes,
+  EMPTY_COMPETITOR_SOURCE,
+  formatCompetitorSources,
+  MAX_COMPETITOR_SOURCES,
+  mergeCompetitorSourcesIntoNotes,
+  structureMarketNotes,
+} from "./marketSignals";
+export type { CompetitorSource } from "./marketSignals";
 export {
   SAMPLE_CONTEXT,
   SAMPLE_CSV_FILENAME,

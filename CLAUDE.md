@@ -28,7 +28,7 @@ The CSV (and the generated memo) must never be written to a database, a file, a 
 
 **Meta data source (the one approved exception to "no auth"):** the generator can also connect a Meta account via OAuth (`modules/meta/`, `app/api/meta/*`, `MetaProvider`/`MetaConnect`) and pull ad-level insights as a "virtual CSV" that feeds the identical debrief pipeline. Its constraints are part of the fence: scope is read-only `ads_read` (never widen); the access token lives only in browser memory (`MetaProvider`) and is forwarded per-request via the Authorization header — never a cookie, never storage, never a query param, never a log (the only cookie in the flow is the short-lived OAuth CSRF nonce); insights pulls set `use_unified_attribution_setting=true` so numbers match Ads Manager; the OAuth bridge (`modules/meta/bridge.ts`) posts to an exact origin and `MetaProvider` verifies `event.origin` with strict equality — no wildcards; the Graph API version is pinned in `modules/meta/graph.ts` — check deprecation runway when bumping.
 
-**Market / competitor notes (manual input only):** the optional `marketContext` textarea is V1 pasted text, full stop. No Ads Library scraping, no URL fetching, no competitor watchlists, and never a claim about competitor spend or performance. Everything derived from it — the "Structure notes" button, the quality meter, the memo's Market signal section, market-flavored test/brief wording — is local, deterministic keyword matching (`modules/debrief/marketSignals.ts`), always marked "directional," and own account data stays the primary signal. An empty `marketContext` must leave the memo's content exactly as if the feature didn't exist (`marketSignal: null`, no market wording anywhere).
+**Market / competitor notes (manual input only):** the optional `marketContext` textarea is V1 pasted text, full stop. No Ads Library scraping, no URL fetching, no competitor watchlists, and never a claim about competitor spend or performance. Everything derived from it — the "Structure notes" button, the quality meter, the memo's Market signal section, market-flavored test/brief wording — is local, deterministic keyword matching (`modules/debrief/marketSignals.ts`), always marked "directional," and own account data stays the primary signal. An empty `marketContext` must leave the memo's content exactly as if the feature didn't exist (`marketSignal: null`, no market wording anywhere). The "Competitor sources" cards in the generator are the same rule wearing a form: manual fields (name / URL / Ads Library links / notes) that "Use as market notes" serializes into `marketContext` as plain text — append-only, restating only what the user typed, URLs never fetched or monitored. The engine and API never see competitor sources as a separate input.
 
 ## Architecture
 
@@ -46,7 +46,12 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
   marketSignals.ts# ONE keyword map (formats/hooks/offers) shared by memo generation and
                   # the generator UI: extractMarketSignals, structureMarketNotes (the
                   # local "Structure notes" reformat, idempotent, never drops a URL),
-                  # assessMarketNotes (quality meter: category count → strong/good/weak)
+                  # assessMarketNotes (quality meter: category count → strong/good/weak),
+                  # plus competitor sources V1 (CompetitorSource, formatCompetitorSources,
+                  # mergeCompetitorSourcesIntoNotes): manual structured competitor input
+                  # serialized into the market-notes text — append-only, restates user
+                  # input, URLs never fetched (V1 is manual only; watchlists are a
+                  # future milestone, not a quiet addition)
   format.ts       # money/count/KPI value formatting
   sampleCsv.ts    # THE sample dataset (client-safe, no engine imports) — tuned to the
                   # rules engine; its header comment lists invariants to keep when
@@ -101,8 +106,9 @@ components/debrief/
                        # load + sample CSV download, CSV requirements helper, client-side
                        # upload preview (rows/columns/KPI check via the same parser +
                        # alias matcher — structure only, no analysis), market-notes field
-                       # with Structure button + quality meter, structured-error display
-                       # with one-click KPI switch
+                       # with Structure button + quality meter, competitor-sources cards
+                       # (up to 5; "Use as market notes" appends, never overwrites),
+                       # structured-error display with one-click KPI switch
   MetaConnect.tsx      # connect button / connected controls; checks /api/meta/config first
   Report.tsx           # the memo document; Buyer/Client view toggle is display-only.
                        # Section numbering is computed (market + what-not-to-do sections
