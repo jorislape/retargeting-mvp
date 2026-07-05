@@ -2,7 +2,10 @@
 
 Everything below runs against `npm run dev` with no env vars (except the
 Meta cases, which need `META_APP_ID`/`META_APP_SECRET`). Nothing is
-persisted anywhere, so every case starts clean after a refresh.
+persisted server-side, so every case starts clean after a refresh — the
+one exception is the competitor watchlist, which survives refresh in the
+browser's localStorage and is cleared with "Clear watchlist" (see the
+watchlist cases below).
 
 The sample dataset lives in `modules/debrief/sampleCsv.ts` (14 ads,
 June 2026). Engine facts to check against: spend gate ≈ **$120.91**

@@ -57,12 +57,12 @@ const BENEFITS = [
 
 const STEPS: { title: string; text: string }[] = [
   {
-    title: "Upload Meta Ads CSV",
-    text: "Use your ad-level export from Meta Ads Manager. Debrief detects rows, columns, and KPI availability before running.",
+    title: "Load your Meta Ads data",
+    text: "Upload an ad-level CSV export from Meta Ads Manager, or connect Meta (read-only) and pull the same data. Debrief detects rows, columns, and KPI availability before running.",
   },
   {
     title: "Add competitor context",
-    text: "Optional — add competitor pages, Ads Library examples, hooks, offers, or rough notes, and confirm creative formats. Context stays directional and never overrides your own data.",
+    text: "Optional — add competitor pages, Ads Library examples, hooks, offers, or rough notes, and review creative formats. Context stays directional and never overrides your own data.",
   },
   {
     title: "Get the decision",

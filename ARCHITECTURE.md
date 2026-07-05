@@ -1,6 +1,11 @@
 # Architecture
 
-Pivot: **Meta Ads reporting/monitoring SaaS → Meta Ads Creative Debrief, a single-flow CSV tool.**
+Pivot: **Meta Ads reporting/monitoring SaaS → Meta Ads Creative Debrief, a single-flow creative debrief tool.**
+
+> This doc's lasting job is §1 — what was deleted in the pivot and why.
+> For the *current* module/component tree and the live scope fence, read
+> `CLAUDE.md`, which is kept in sync with the code; the sections below
+> describe the shape of the flow, not an exhaustive file list.
 
 ## 1. What changed
 

@@ -27,10 +27,6 @@ export const cardHover =
 export const cardLift =
   "transition motion-safe:duration-200 hover:border-white/[0.12] hover:bg-white/[0.05] motion-safe:hover:-translate-y-0.5";
 
-/* Compact card: same material at higher density. */
-export const cardCompact =
-  "rounded-lg border border-white/[0.06] bg-white/[0.03]";
-
 /* Primary action: white, dark text. One per screen. */
 export const btnPrimary =
   "inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition hover:bg-zinc-200 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-carbon";
@@ -44,9 +40,6 @@ export const btnSecondary =
 /* Page-level secondary action: same material, 44px touch target. */
 export const btnSecondaryMd =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60";
-
-export const textLink =
-  "inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-zinc-400 transition hover:text-white active:text-zinc-300";
 
 /* Section/eyebrow labels: quiet sans, light tracking — not the small-
    caps mono of the previous era. */
@@ -66,26 +59,3 @@ export const gradientText = "gradient-phrase";
 /* Icon chip for section tiles: soft layer, accent icon. */
 export const iconChip =
   "flex items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.04] text-accent-soft";
-
-/* Understated colored text markers (chip names kept for callers). */
-export const chipBlue =
-  "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft";
-
-export const chipEmerald =
-  "inline-flex items-center gap-1 font-mono text-[11px] font-semibold tabular-nums text-emerald-400";
-
-export const chipAmber =
-  "inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-amber-300";
-
-export const chipNeutral =
-  "inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500";
-
-export const chipRed =
-  "inline-flex items-center gap-1 font-mono text-[11px] font-semibold tabular-nums text-red-400";
-
-/* Skeletons mimic the surface layer they stand in for. */
-export const skeletonTile =
-  "h-20 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]";
-
-export const skeletonPanel =
-  "animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]";
