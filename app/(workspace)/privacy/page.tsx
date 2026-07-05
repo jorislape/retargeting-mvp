@@ -23,6 +23,10 @@ const SECTIONS = [
     body: "Nothing. No login, no tracking, no analytics. The only data involved is the CSV you upload and the context you type, both used solely to render the debrief shown back to you in that same session.",
   },
   {
+    title: "Competitor watchlist (optional)",
+    body: "If you use the competitor watchlist, its entries — competitor names, page URLs, your notes, and the public-page signal summaries you fetch — are saved in your own browser's localStorage, never on a server. Pages are read only when you click refresh; there is no background monitoring. Clearing the watchlist or your browser data removes it completely. Your CSV, reports, and Meta token are never saved this way.",
+  },
+  {
     title: "Meta affiliation",
     body: "Debrief reads CSV exports you download yourself, or — only if you choose to connect — pulls read-only insights (ads_read) from the Meta API. The access token lives in your browser's memory for the session and is never stored. Debrief isn't affiliated with or endorsed by Meta Platforms, Inc.",
   },
@@ -39,7 +43,9 @@ export default function PrivacyPage() {
         </h1>
         <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
           The strongest privacy guarantee is architecture: this tool has no
-          database, no accounts, and no storage to leak from.
+          database, no accounts, and no server-side storage to leak from.
+          The one thing kept anywhere is the optional competitor watchlist,
+          and it lives in your own browser.
         </p>
       </header>
 

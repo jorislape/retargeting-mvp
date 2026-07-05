@@ -7,6 +7,19 @@
  * modules/meta/graph.ts. */
 export { extractPageText } from "./pageText";
 export {
+  diffPageSignals,
+  EMPTY_WATCHLIST_ITEM,
+  formatWatchlistSignalsAsNotes,
+  getWatchlistServerSnapshot,
+  getWatchlistSnapshot,
+  MAX_WATCHLIST_ITEMS,
+  sanitizeWatchlist,
+  setWatchlist,
+  subscribeWatchlist,
+  WATCHLIST_CAVEAT,
+  type WatchlistItem,
+} from "./watchlist";
+export {
   appendPageSignalsToNotes,
   extractPageSignals,
   formatPageSignalsAsNotes,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CompetitorSource, KpiKey } from "@/modules/debrief";
 import {
   assessMarketNotes,
@@ -23,8 +23,17 @@ import {
 } from "@/modules/debrief";
 import {
   appendPageSignalsToNotes,
+  diffPageSignals,
+  EMPTY_WATCHLIST_ITEM,
   formatPageSignalsAsNotes,
+  formatWatchlistSignalsAsNotes,
+  getWatchlistServerSnapshot,
+  getWatchlistSnapshot,
+  MAX_WATCHLIST_ITEMS,
+  setWatchlist,
+  subscribeWatchlist,
   type FetchPageResponse,
+  type WatchlistItem,
 } from "@/modules/competitor";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
@@ -247,6 +256,25 @@ export function GeneratorPanel() {
   const [pageFetch, setPageFetch] = useState<Record<number, PageFetchState>>(
     {}
   );
+  /* Competitor watchlist: browser-local store (localStorage when
+     available, session memory otherwise). Server snapshot is empty,
+     so saved items appear right after hydration — no mismatch. */
+  const watchlist = useSyncExternalStore(
+    subscribeWatchlist,
+    getWatchlistSnapshot,
+    getWatchlistServerSnapshot
+  );
+  const [watchFetch, setWatchFetch] = useState<Record<number, PageFetchState>>(
+    {}
+  );
+  const [watchNoteState, setWatchNoteState] = useState<
+    "idle" | "done" | "empty"
+  >("idle");
+  const watchNoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [refreshingAll, setRefreshingAll] = useState(false);
+  /* In-flight refresh guard by index — refs, not render state, so a
+     double click can't race a second fetch. */
+  const watchInFlight = useRef<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   /* Non-blocking quality read on the notes — local parsing only. */
@@ -478,6 +506,140 @@ export function GeneratorPanel() {
       };
     }
     setPageFetch((prev) => ({ ...prev, [index]: state }));
+  };
+
+  /* ---- Competitor watchlist (browser-local, manual refresh only) ---- */
+
+  const addWatchItem = () => {
+    const current = getWatchlistSnapshot();
+    if (current.length >= MAX_WATCHLIST_ITEMS) return;
+    setWatchlist([...current, EMPTY_WATCHLIST_ITEM]);
+  };
+
+  const updateWatchItem = (index: number, patch: Partial<WatchlistItem>) => {
+    setWatchlist(
+      getWatchlistSnapshot().map((item, i) =>
+        i === index ? { ...item, ...patch } : item
+      )
+    );
+    if (watchNoteState !== "idle") setWatchNoteState("idle");
+    if ("url" in patch && watchFetch[index]) {
+      setWatchFetch((prev) => {
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
+    }
+  };
+
+  const removeWatchItem = (index: number) => {
+    setWatchlist(getWatchlistSnapshot().filter((_, i) => i !== index));
+    setWatchFetch((prev) => {
+      const next: Record<number, PageFetchState> = {};
+      for (const [key, value] of Object.entries(prev)) {
+        const i = Number(key);
+        if (i === index) continue;
+        next[i > index ? i - 1 : i] = value;
+      }
+      return next;
+    });
+  };
+
+  /* One manual refresh of one watchlist page — the same guarded
+     one-time fetch route the sources use. The previous signals become
+     the diff baseline; the new signals + timestamp are saved locally.
+     Never runs unless the user just clicked. */
+  const refreshWatchItem = async (index: number) => {
+    const item = getWatchlistSnapshot()[index];
+    const url = item?.url.trim() ?? "";
+    if (url === "" || watchInFlight.current.has(index)) return;
+    watchInFlight.current.add(index);
+    setWatchFetch((prev) => ({ ...prev, [index]: { status: "loading" } }));
+    let state: PageFetchState;
+    try {
+      const res = await fetch("/api/competitor/fetch-page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data: FetchPageResponse = await res.json();
+      if (data.ok === true) {
+        setWatchlist(
+          getWatchlistSnapshot().map((it, i) =>
+            i === index
+              ? {
+                  ...it,
+                  previousSignals: it.signals,
+                  signals: data.signals ?? {},
+                  refreshedAt: new Date().toISOString(),
+                }
+              : it
+          )
+        );
+        state = { status: "done" };
+      } else {
+        state = {
+          status: "error",
+          title: typeof data.title === "string" ? data.title : "Refresh failed",
+          message:
+            typeof data.message === "string"
+              ? data.message
+              : "The page couldn't be fetched.",
+          fix:
+            typeof data.fix === "string"
+              ? data.fix
+              : "Try again, or paste the page's key points into the item's notes.",
+        };
+      }
+    } catch {
+      state = {
+        status: "error",
+        title: "Network error",
+        message: "The request didn't reach Debrief.",
+        fix: "Check your connection and try again.",
+      };
+    }
+    watchInFlight.current.delete(index);
+    setWatchFetch((prev) => ({ ...prev, [index]: state }));
+  };
+
+  /* Sequential on purpose — one page at a time, and one item failing
+     never stops the rest. */
+  const refreshAllWatch = async () => {
+    if (refreshingAll) return;
+    setRefreshingAll(true);
+    const count = getWatchlistSnapshot().length;
+    for (let i = 0; i < count; i++) {
+      if ((getWatchlistSnapshot()[i]?.url.trim() ?? "") !== "") {
+        await refreshWatchItem(i);
+      }
+    }
+    setRefreshingAll(false);
+  };
+
+  /* Appends the refreshed-signals block to the market notes — same
+     append-dedupe semantics as everything else: existing notes kept,
+     an identical block is a no-op. */
+  const addWatchSignalsToNotes = () => {
+    const block = formatWatchlistSignalsAsNotes(getWatchlistSnapshot());
+    if (block === null) {
+      setWatchNoteState("empty");
+    } else {
+      updateFields({
+        marketContext: appendPageSignalsToNotes(fields.marketContext, block),
+      });
+      setWatchNoteState("done");
+      setNoteState("idle");
+    }
+    if (watchNoteTimer.current) clearTimeout(watchNoteTimer.current);
+    watchNoteTimer.current = setTimeout(() => setWatchNoteState("idle"), 2500);
+  };
+
+  const clearWatchlist = () => {
+    setWatchlist([]);
+    setWatchFetch({});
+    watchInFlight.current.clear();
+    setWatchNoteState("idle");
   };
 
   /* Serializes the filled-in sources and APPENDS them to the market
@@ -1259,6 +1421,264 @@ export function GeneratorPanel() {
                 &ldquo;Fetch page signals&rdquo; reads the public page once,
                 when you click — no monitoring, no storage, no Ads Library
                 fetching, and no competitor-performance inference.
+              </p>
+            </div>
+
+            {/* Competitor watchlist: up to 5 pages saved in THIS
+                browser (localStorage; session memory if unavailable),
+                refreshed only by explicit clicks through the same
+                guarded fetch route. Signals reach the report only via
+                "Add refreshed signals to market notes". */}
+            <div className="mt-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className={fieldLabel}>Competitor watchlist</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {watchlist.length < MAX_WATCHLIST_ITEMS && (
+                    <button
+                      type="button"
+                      onClick={addWatchItem}
+                      className={`cursor-pointer ${btnSecondary}`}
+                    >
+                      Add watchlist item
+                    </button>
+                  )}
+                  {watchlist.some((w) => w.url.trim() !== "") && (
+                    <button
+                      type="button"
+                      onClick={() => void refreshAllWatch()}
+                      disabled={refreshingAll}
+                      className={`cursor-pointer ${btnSecondary}`}
+                    >
+                      {refreshingAll ? (
+                        <span className="motion-safe:animate-pulse">
+                          Refreshing…
+                        </span>
+                      ) : (
+                        "Refresh all"
+                      )}
+                    </button>
+                  )}
+                  {watchlist.some((w) => w.signals !== null) && (
+                    <button
+                      type="button"
+                      onClick={addWatchSignalsToNotes}
+                      className={`cursor-pointer ${btnSecondary}`}
+                      title="Appends the refreshed signals to the market notes above. Existing notes are kept."
+                    >
+                      {watchNoteState === "done" ? (
+                        <span className="flex items-center gap-1.5 motion-safe:animate-settle">
+                          <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                          Added to notes
+                        </span>
+                      ) : (
+                        "Add refreshed signals to market notes"
+                      )}
+                    </button>
+                  )}
+                  {watchlist.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearWatchlist}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    >
+                      <XIcon className="h-3 w-3" />
+                      Clear watchlist
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {watchlist.length > 0 && (
+                <div className="mt-2.5 space-y-3">
+                  {watchlist.map((item, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                          Watch {i + 1}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => removeWatchItem(i)}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                        >
+                          <XIcon className="h-3 w-3" />
+                          Remove
+                        </button>
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label
+                            htmlFor={`watch-name-${i}`}
+                            className={fieldLabel}
+                          >
+                            Competitor name
+                          </label>
+                          <input
+                            id={`watch-name-${i}`}
+                            value={item.name}
+                            onChange={(e) =>
+                              updateWatchItem(i, { name: e.target.value })
+                            }
+                            placeholder="The Ordinary"
+                            className={`mt-1.5 ${inputBase}`}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`watch-url-${i}`}
+                            className={fieldLabel}
+                          >
+                            Website / landing page URL
+                          </label>
+                          <div className="mt-1.5 flex gap-2">
+                            <input
+                              id={`watch-url-${i}`}
+                              value={item.url}
+                              onChange={(e) =>
+                                updateWatchItem(i, { url: e.target.value })
+                              }
+                              placeholder="https://example.com"
+                              className={`min-w-0 flex-1 ${inputBase}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void refreshWatchItem(i)}
+                              disabled={
+                                item.url.trim() === "" ||
+                                watchFetch[i]?.status === "loading"
+                              }
+                              className={`shrink-0 cursor-pointer ${btnSecondary}`}
+                            >
+                              {watchFetch[i]?.status === "loading" ? (
+                                <span className="motion-safe:animate-pulse">
+                                  Refreshing…
+                                </span>
+                              ) : watchFetch[i]?.status === "done" ? (
+                                <span className="flex items-center gap-1.5 motion-safe:animate-settle">
+                                  <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                                  Refreshed
+                                </span>
+                              ) : (
+                                "Refresh signals"
+                              )}
+                            </button>
+                          </div>
+                          {watchFetch[i]?.status === "error" && (
+                            <p
+                              role="alert"
+                              className="mt-1.5 text-xs leading-relaxed text-amber-300"
+                            >
+                              {watchFetch[i].title}: {watchFetch[i].message}{" "}
+                              <span className="text-zinc-500">
+                                {watchFetch[i].fix}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label
+                            htmlFor={`watch-notes-${i}`}
+                            className={fieldLabel}
+                          >
+                            Notes
+                          </label>
+                          <textarea
+                            id={`watch-notes-${i}`}
+                            rows={2}
+                            value={item.notes}
+                            onChange={(e) =>
+                              updateWatchItem(i, { notes: e.target.value })
+                            }
+                            placeholder="Why this competitor matters"
+                            className={`mt-1.5 resize-none ${inputBase}`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Compact result card: latest signals + a simple
+                          deterministic diff vs the previous refresh. */}
+                      {item.signals && (
+                        <div className="mt-3 border-t border-white/[0.06] pt-3">
+                          {item.refreshedAt && (
+                            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-500">
+                              Last refreshed:{" "}
+                              {new Date(item.refreshedAt).toLocaleString()}
+                            </p>
+                          )}
+                          <ul className="mt-2 space-y-1 text-xs leading-relaxed text-zinc-400">
+                            {item.signals.headline && (
+                              <li>Headline: {item.signals.headline}</li>
+                            )}
+                            {(item.signals.offer || item.signals.cta) && (
+                              <li>
+                                CTA / offer:{" "}
+                                {[
+                                  item.signals.offer,
+                                  item.signals.cta
+                                    ? `CTA "${item.signals.cta}"`
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </li>
+                            )}
+                            {item.signals.positioning && (
+                              <li>Positioning: {item.signals.positioning}</li>
+                            )}
+                            {item.signals.benefits &&
+                              item.signals.benefits.length > 0 && (
+                                <li>
+                                  Claims / benefits:{" "}
+                                  {item.signals.benefits.join(", ")}
+                                </li>
+                              )}
+                            {item.signals.trustSignals &&
+                              item.signals.trustSignals.length > 0 && (
+                                <li>
+                                  Trust signals:{" "}
+                                  {item.signals.trustSignals.join(", ")}
+                                </li>
+                              )}
+                          </ul>
+                          {item.previousSignals && (
+                            <div className="mt-2.5">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                                Changes since last refresh
+                              </p>
+                              <ul className="mt-1 space-y-0.5 text-xs leading-relaxed text-zinc-500">
+                                {diffPageSignals(
+                                  item.previousSignals,
+                                  item.signals
+                                ).map((change) => (
+                                  <li key={change}>– {change}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p
+                aria-live="polite"
+                className={`mt-1.5 text-xs leading-relaxed ${
+                  watchNoteState === "empty" ? "text-amber-300" : "text-zinc-600"
+                }`}
+              >
+                {watchNoteState === "empty"
+                  ? "Refresh at least one competitor page first."
+                  : "Optional — save a few competitor pages and manually refresh their public page signals. Debrief uses them as directional market context only."}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+                No background monitoring. No Ads Library fetching. Nothing is
+                sent to the report until you add it to market notes. Saved in
+                this browser only — never on a server.
               </p>
             </div>
           </div>

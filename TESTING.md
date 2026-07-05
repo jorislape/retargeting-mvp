@@ -79,6 +79,24 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       user-friendly error (never a stack trace); a non-HTML URL returns
       "Not a web page"; facebook.com/ads/library URLs return the "not
       fetched in this version — paste manually" message.
+- [ ] **Competitor watchlist**: "Add watchlist item" adds a card (name /
+      URL / notes), capped at 5; items survive a page refresh
+      (localStorage) and "Clear watchlist" removes them; in private
+      mode / storage-blocked browsers the section still works for the
+      session.
+- [ ] **Watchlist refresh is manual only**: "Refresh signals" fetches
+      that one page via the same guarded route (Ads Library URLs still
+      refused); "Refresh all" runs items one at a time and a failing
+      item shows its own error without stopping the rest; nothing
+      fetches on page load or on a timer.
+- [ ] **Watchlist result card**: after refresh shows "Last refreshed"
+      plus headline / CTA-offer / positioning / benefits / trust; a
+      second refresh shows "Changes since last refresh" (or "No
+      meaningful change detected").
+- [ ] **Add refreshed signals to market notes**: appends the
+      "Competitor watchlist signals — directional only:" block with the
+      caveat line, keeps existing notes, and clicking again with the
+      same data doesn't duplicate; Structure notes still works after.
 - [ ] **Fetched signals flow like typed notes**: after a fetch, "Use as
       market notes" and "Structure notes" behave exactly as with manual
       notes, and the report's Market signal section picks them up.
