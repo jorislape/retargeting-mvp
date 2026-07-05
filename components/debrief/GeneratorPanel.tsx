@@ -146,16 +146,24 @@ function ProcessingPanel() {
 }
 
 /* A light step header: small numbered chip that fills when the stage
-   is complete, title, and an optional hint. No rail, no weight. */
+   is complete, title, a status pill (Required / Optional / Ready /
+   Complete — real state, same material as the tile badges), and an
+   optional hint. No rail, no weight. */
 function StageHeader({
   n,
   title,
   done,
+  status,
+  statusTone = "muted",
   hint,
 }: {
   n: string;
   title: string;
   done: boolean;
+  /** Short state label; accent tone for Complete/Ready, muted for
+   *  Required/Optional. */
+  status?: string;
+  statusTone?: "muted" | "accent";
   hint?: string;
 }) {
   return (
@@ -172,6 +180,17 @@ function StageHeader({
       <h2 className="text-sm font-semibold tracking-tight text-zinc-100">
         {title}
       </h2>
+      {status && (
+        <span
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+            statusTone === "accent"
+              ? "border-accent/25 bg-accent/[0.08] text-accent-soft"
+              : "border-white/10 text-zinc-500"
+          }`}
+        >
+          {status}
+        </span>
+      )}
       {hint && <p className="text-xs text-zinc-600 sm:ml-1">{hint}</p>}
     </div>
   );
@@ -582,6 +601,8 @@ export function GeneratorPanel() {
             n="1"
             title="Data"
             done={!!file}
+            status={file ? "Complete" : "Required"}
+            statusTone={file ? "accent" : "muted"}
             hint="Upload your export, or pull straight from Meta."
           />
 
@@ -854,6 +875,8 @@ export function GeneratorPanel() {
             n="2"
             title="Context"
             done={contextDone}
+            status={contextDone ? "Complete" : "Required"}
+            statusTone={contextDone ? "accent" : "muted"}
             hint="The KPI the memo judges by, your framing, and optional market context."
           />
 
@@ -982,9 +1005,10 @@ export function GeneratorPanel() {
                 Market / competitor context
               </h3>
               <p className="text-xs text-zinc-600">
-                Optional — add competitor pages, Ads Library examples, hooks,
-                offers, or rough notes. Debrief uses this as directional
-                market context only.
+                Optional. Add this if you want Debrief to consider competitor
+                hooks, offers, landing pages, or market patterns —
+                directional context only, and it never changes your
+                performance numbers.
               </p>
             </div>
 
@@ -996,6 +1020,7 @@ export function GeneratorPanel() {
                 <button
                   type="button"
                   onClick={structureNotes}
+                  title="Use after adding rough notes or competitor sources."
                   className={`min-w-[8rem] cursor-pointer ${btnSecondary}`}
                 >
                   {noteState === "done" ? (
@@ -1068,6 +1093,7 @@ export function GeneratorPanel() {
                     <button
                       type="button"
                       onClick={useAsMarketNotes}
+                      title="Adds competitor source details into the notes above. Existing notes are kept."
                       className={`min-w-[9.5rem] cursor-pointer ${btnSecondary}`}
                     >
                       {sourceState === "done" ? (
@@ -1226,8 +1252,8 @@ export function GeneratorPanel() {
                 {sourceState === "empty"
                   ? "Add a competitor name, link, or note first."
                   : competitorSources.length === 0
-                    ? "List competitors by name, landing page, and Ads Library examples — “Use as market notes” merges them into the notes above."
-                    : `Up to ${MAX_COMPETITOR_SOURCES} sources. “Use as market notes” appends a structured summary to the notes above — your existing notes are kept.`}
+                    ? "Optional. Use this when you want to turn competitor pages or notes into market context."
+                    : `“Use as market notes” adds competitor source details into the notes above — existing notes are kept. Up to ${MAX_COMPETITOR_SOURCES} sources.`}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
                 &ldquo;Fetch page signals&rdquo; reads the public page once,
@@ -1248,10 +1274,25 @@ export function GeneratorPanel() {
             n="3"
             title="Verify"
             done={Object.keys(formatOverrides).length > 0}
-            hint="Optional — confirm the creative format so Debrief does not rely only on ad names."
+            status={
+              Object.keys(formatOverrides).length > 0
+                ? "Complete"
+                : "Optional accuracy step"
+            }
+            statusTone={
+              Object.keys(formatOverrides).length > 0 ? "accent" : "muted"
+            }
+            hint="Confirm the creative format so Debrief does not rely only on ad names."
           />
+          <p className="mt-2 text-xs leading-relaxed text-zinc-600">
+            {preview &&
+            preview.ads.length > 0 &&
+            Object.keys(formatOverrides).length === 0
+              ? "Skipped — Debrief will use ad names and creative notes."
+              : "Recommended for better pattern detection, but not required."}
+          </p>
           {preview && preview.ads.length > 0 ? (
-            <details className="group mt-5 rounded-xl border border-white/[0.06] bg-white/[0.02] open:border-white/[0.09]">
+            <details className="group mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02] open:border-white/[0.09]">
               <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 <span className="text-sm font-semibold tracking-tight text-zinc-100">
                   Confirm creative formats
@@ -1371,7 +1412,7 @@ export function GeneratorPanel() {
               </div>
             </details>
           ) : (
-            <p className="mt-4 text-xs leading-relaxed text-zinc-600">
+            <p className="mt-2 text-xs leading-relaxed text-zinc-600">
               Load your data in stage 1 — the detected ads and their formats
               will be listed here for review.
             </p>
@@ -1384,8 +1425,15 @@ export function GeneratorPanel() {
             n="4"
             title="Run"
             done={false}
-            hint="Turns your data and context into a buyer memo, client report, next tests, and creative briefs."
+            status={canSubmit ? "Ready" : undefined}
+            statusTone="accent"
           />
+          {/* What happens next — one compact line, shown once. */}
+          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-zinc-500">
+            Next: Debrief will use your performance data, optional market
+            context, and any confirmed formats to generate the buyer memo,
+            client report, next tests, and creative briefs.
+          </p>
           <div className="mt-4 flex flex-col gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[13px] leading-relaxed text-zinc-400">
@@ -1394,7 +1442,9 @@ export function GeneratorPanel() {
                     <span className="font-mono text-zinc-200">{file.name}</span>
                     {" · "}
                     {KPI_OPTIONS.find((o) => o.value === fields.kpi)?.label}
-                    {contextDone ? " · ready" : " · context incomplete"}
+                    {contextDone
+                      ? " · ready"
+                      : " · fill product, offer, and goal in stage 2"}
                   </>
                 ) : (
                   "Load data in stage 1 to run."
