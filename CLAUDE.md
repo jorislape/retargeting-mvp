@@ -130,9 +130,12 @@ components/debrief/
                        # load + sample CSV download, CSV requirements helper, client-side
                        # upload preview (rows/columns/spend total/date range/KPI columns
                        # via the same parser + alias matcher — display only, the API
-                       # recomputes everything), ONE combined
-                       # "Market / competitor context" area in stage 2 (notes field with
-                       # Structure button + quality meter, competitor-sources cards — up
+                       # recomputes everything), a "Fast path" helper naming the
+                       # required route up front, ONE combined
+                       # "Optional competitor context" area in stage 2 (notes field with
+                       # Structure button + quality meter, then an "Advanced competitor
+                       # context" collapsible — auto-open when it has content — holding
+                       # competitor-sources cards — up
                        # to 5, "Use as market notes" appends, never overwrites — the
                        # one-time "Fetch page signals" action, and the competitor
                        # watchlist: up to 5 browser-saved pages, manual per-item /

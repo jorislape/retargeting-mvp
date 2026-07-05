@@ -79,6 +79,11 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       user-friendly error (never a stack trace); a non-HTML URL returns
       "Not a web page"; facebook.com/ads/library URLs return the "not
       fetched in this version — paste manually" message.
+- [ ] **Advanced collapse**: competitor sources + watchlist sit under
+      the "Advanced competitor context" collapsible — collapsed on a
+      fresh generator, auto-expanded when sources or saved watchlist
+      items exist; the "Fast path" helper renders at the top of the
+      generator.
 - [ ] **Competitor watchlist**: "Add watchlist item" adds a card (name /
       URL / notes), capped at 5; items survive a page refresh
       (localStorage) and "Clear watchlist" removes them; in private

@@ -756,6 +756,13 @@ export function GeneratorPanel() {
         </div>
       )}
 
+      {/* The required path, stated once up front — everything else on
+          this page is an optional enhancement. */}
+      <p className="mb-8 border-l-2 border-accent/40 pl-3 text-xs leading-relaxed text-zinc-500">
+        Fast path: load data, fill product / offer / goal, then generate.
+        Competitor context and format review are optional.
+      </p>
+
       <div className="space-y-12">
         {/* ---- Stage 01 · Data ---- */}
         <section>
@@ -1164,13 +1171,12 @@ export function GeneratorPanel() {
           <div className="mt-8 border-t border-white/[0.06] pt-6">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h3 className="text-[13px] font-semibold tracking-tight text-zinc-200">
-                Market / competitor context
+                Optional competitor context
               </h3>
               <p className="text-xs text-zinc-600">
-                Optional. Add this if you want Debrief to consider competitor
-                hooks, offers, landing pages, or market patterns —
-                directional context only, and it never changes your
-                performance numbers.
+                Use this only if competitor hooks, offers, pages, or market
+                patterns would help explain what to test next — directional
+                context only, and it never changes your performance numbers.
               </p>
             </div>
 
@@ -1233,12 +1239,26 @@ export function GeneratorPanel() {
               </p>
             </div>
 
+            {/* Advanced tools stay out of the first-time path: collapsed
+                by default, auto-expanded when sources or watchlist
+                items already exist (React re-applies `open` only when
+                the computed value changes, so a manual toggle wins
+                between renders). */}
+            <details
+              open={competitorSources.length > 0 || watchlist.length > 0}
+              className="group mt-6 border-l border-white/10 pl-3 open:border-accent/40"
+            >
+              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+                Advanced competitor context — one-off sources &amp; a local
+                watchlist
+              </summary>
+
             {/* Competitor sources: structured input that only ever
                 becomes text in the notes field above. A landing-page
                 URL can be fetched ONCE via the explicit "Fetch page
                 signals" button — never automatically, never
                 monitored. */}
-            <div className="mt-6">
+            <div className="mt-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className={fieldLabel}>Competitor sources</p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1414,7 +1434,7 @@ export function GeneratorPanel() {
                 {sourceState === "empty"
                   ? "Add a competitor name, link, or note first."
                   : competitorSources.length === 0
-                    ? "Optional — one-off context for this debrief: add competitor notes, Ads Library examples, or a single page you want included in this report."
+                    ? "One-off context for this debrief — paste notes, Ads Library examples, or fetch one page for this report."
                     : `“Use as market notes” adds competitor source details into the notes above — existing notes are kept. Up to ${MAX_COMPETITOR_SOURCES} sources.`}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
@@ -1673,14 +1693,16 @@ export function GeneratorPanel() {
               >
                 {watchNoteState === "empty"
                   ? "Refresh at least one competitor page first."
-                  : "Optional — saved in this browser for manual refresh later: use this for competitors you may want to revisit across debriefs."}
+                  : "Local watchlist for later — keep a few competitor pages in this browser and manually refresh them when needed."}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
-                No background monitoring. No Ads Library fetching. Nothing is
-                sent to the report until you add it to market notes. Saved in
-                this browser only — never on a server.
+                Stored locally in this browser only — Debrief does not save
+                it on a server. No background monitoring, no Ads Library
+                fetching, and nothing is sent to the report until you add it
+                to market notes.
               </p>
             </div>
+            </details>
           </div>
         </section>
 
