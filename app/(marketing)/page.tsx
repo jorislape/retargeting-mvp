@@ -22,7 +22,7 @@ import {
 export const metadata = {
   title: "Debrief — Your Meta Ads export, turned into a decision",
   description:
-    "Upload the CSV you already have, add competitor notes if you want, and get a buyer memo, a client-ready report, next creative tests, and briefs your team can act on. No login, nothing stored.",
+    "Upload the CSV you already have, add competitor notes if you want, and get a buyer memo, a client-ready report, next creative tests, and briefs your team can act on. No login, nothing stored on our servers.",
 };
 
 /* ------------------------------------------------------------------ */
@@ -72,7 +72,7 @@ const STEPS: { title: string; text: string }[] = [
 
 const TRUST = [
   "No login required",
-  "CSV processed in your session only — no database, nothing stored",
+  "CSV processed in your session only — no database, nothing stored server-side",
   "No monitoring or scraping — a competitor page is read once, only when you ask",
   "Ads are never launched or changed",
   "Meta connection optional and read-only (ads_read)",
@@ -178,7 +178,7 @@ export default function HomePage() {
           </Link>
         </div>
         <p className="mt-4 text-xs text-zinc-600">
-          No login · Nothing stored · Optional read-only Meta connection
+          No login · Nothing stored server-side · Optional read-only Meta connection
         </p>
 
         {/* Live proof: the engine sorting real-shaped rows, on loop.

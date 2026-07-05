@@ -24,8 +24,8 @@ export const metadata = {
 const STEPS = [
   {
     icon: FileTextIcon,
-    title: "Upload your CSV",
-    text: "Export ad-level performance from Meta Ads Manager and drop it in. Column names vary by export — Debrief resolves the common variants automatically.",
+    title: "Load your ad data",
+    text: "Export ad-level performance from Meta Ads Manager and drop the CSV in — column names vary by export and Debrief resolves the common variants automatically. Or connect Meta (read-only) and pull the same ad-level data without an export.",
   },
   {
     icon: SparklesIcon,

@@ -67,7 +67,7 @@ export function Sidebar() {
           <ShieldIcon className="mt-0.5 h-3 w-3 shrink-0 text-zinc-600" />
           In-memory only.
           <br />
-          Nothing is stored.
+          Nothing stored server-side.
         </p>
       </div>
     </aside>
@@ -82,7 +82,7 @@ export function MobileTopBar() {
           <Wordmark />
         </Link>
         <span className="text-[10px] font-medium text-zinc-600">
-          Nothing stored
+          Nothing stored server-side
         </span>
       </div>
     </header>

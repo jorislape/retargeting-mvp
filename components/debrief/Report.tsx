@@ -99,7 +99,10 @@ function AdTable({
                 {String(i + 1).padStart(2, "0")}
               </td>
               <td className="max-w-72 py-3 pr-4 align-top">
-                <p className="text-[13px] font-semibold leading-snug text-zinc-100">
+                {/* break-words: underscore-joined ad names have no
+                    natural break points — they must wrap, not clip,
+                    especially in print where the table can't scroll. */}
+                <p className="break-words text-[13px] font-semibold leading-snug text-zinc-100">
                   {ad.name}
                 </p>
                 <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">
