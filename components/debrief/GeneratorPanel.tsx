@@ -19,6 +19,9 @@ import {
   SAMPLE_CONTEXT,
   SAMPLE_CSV_FILENAME,
   SAMPLE_CSV_TEXT,
+  formatSelectedSignals,
+  SIGNAL_BUILDER_GROUPS,
+  SIGNAL_PRESETS,
   structureMarketNotes,
 } from "@/modules/debrief";
 import {
@@ -252,6 +255,15 @@ export function GeneratorPanel() {
     "idle"
   );
   const sourceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* Market signal builder: a flat set of selected chip labels (labels
+     are unique across groups) + the usual three-state feedback. */
+  const [selectedSignals, setSelectedSignals] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [builderState, setBuilderState] = useState<"idle" | "done" | "empty">(
+    "idle"
+  );
+  const builderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /* "Fetch page signals" state per competitor-source index. */
   const [pageFetch, setPageFetch] = useState<Record<number, PageFetchState>>(
     {}
@@ -408,6 +420,47 @@ export function GeneratorPanel() {
     }
     if (noteTimer.current) clearTimeout(noteTimer.current);
     noteTimer.current = setTimeout(() => setNoteState("idle"), 2500);
+  };
+
+  /* Market signal builder: chips → structured text in the notes field.
+     Pure selection state until "Add selected signals to notes". */
+  const toggleSignal = (chip: string) => {
+    setSelectedSignals((prev) => {
+      const next = new Set(prev);
+      if (next.has(chip)) {
+        next.delete(chip);
+      } else {
+        next.add(chip);
+      }
+      return next;
+    });
+    if (builderState !== "idle") setBuilderState("idle");
+  };
+
+  /* Presets FILL the selection; the user still reviews and appends. */
+  const applyPreset = (chips: string[]) => {
+    setSelectedSignals(new Set(chips));
+    if (builderState !== "idle") setBuilderState("idle");
+  };
+
+  const clearSelectedSignals = () => {
+    setSelectedSignals(new Set());
+    if (builderState !== "idle") setBuilderState("idle");
+  };
+
+  const addSelectedSignals = () => {
+    const block = formatSelectedSignals([...selectedSignals]);
+    if (block === null) {
+      setBuilderState("empty");
+    } else {
+      updateFields({
+        marketContext: appendPageSignalsToNotes(fields.marketContext, block),
+      });
+      setBuilderState("done");
+      setNoteState("idle");
+    }
+    if (builderTimer.current) clearTimeout(builderTimer.current);
+    builderTimer.current = setTimeout(() => setBuilderState("idle"), 2500);
   };
 
   /* Competitor sources: structured manual input that only ever becomes
@@ -1180,6 +1233,100 @@ export function GeneratorPanel() {
               </p>
             </div>
 
+            {/* Market signal builder: guided chips → the same notes
+                field. Selection is UI state only until the user clicks
+                "Add selected signals to notes". */}
+            <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <p className={fieldLabel}>Market signal builder</p>
+                <p className="text-xs text-zinc-600">
+                  Optional — select the patterns you notice. Debrief turns
+                  them into structured notes for better creative test
+                  suggestions.
+                </p>
+              </div>
+              <p className="mt-1 text-xs text-zinc-600">
+                Short on time? Skip this — Debrief will still generate from
+                your ad data.
+              </p>
+
+              <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-600">
+                Examples:
+                {SIGNAL_PRESETS.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => applyPreset(preset.chips)}
+                    className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </p>
+
+              <div className="mt-3 space-y-3">
+                {SIGNAL_BUILDER_GROUPS.map((group) => (
+                  <div key={group.key}>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                      {group.label}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {group.chips.map((chip) => {
+                        const active = selectedSignals.has(chip);
+                        return (
+                          <button
+                            key={chip}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => toggleSignal(chip)}
+                            className={`cursor-pointer rounded-full border px-2.5 py-1 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                              active
+                                ? "border-accent/50 bg-accent/[0.08] text-accent-soft"
+                                : "border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                            }`}
+                          >
+                            {chip}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <button
+                  type="button"
+                  onClick={addSelectedSignals}
+                  className={`min-w-[12rem] cursor-pointer ${btnSecondary}`}
+                >
+                  {builderState === "done" ? (
+                    <span className="flex items-center gap-1.5 motion-safe:animate-settle">
+                      <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                      Added to notes
+                    </span>
+                  ) : (
+                    `Add selected signals to notes${selectedSignals.size > 0 ? ` (${selectedSignals.size})` : ""}`
+                  )}
+                </button>
+                {selectedSignals.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearSelectedSignals}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    <XIcon className="h-3 w-3" />
+                    Clear selected signals
+                  </button>
+                )}
+                {builderState === "empty" && (
+                  <p aria-live="polite" className="text-xs text-amber-300">
+                    Select at least one signal first.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="mt-4">
               <div className="flex items-center justify-between gap-3">
                 <label htmlFor="marketContext" className={fieldLabel}>
@@ -1235,7 +1382,7 @@ export function GeneratorPanel() {
                   ? "Add competitor notes or links first."
                   : marketQuality
                     ? `Market context: ${marketQuality.summary}`
-                    : "Paste rough notes — “Structure notes” groups them into formats, hooks, offers, and links."}
+                    : "Market context: Optional — add notes, selected signals, competitor sources, or watchlist signals to improve creative test suggestions."}
               </p>
             </div>
 

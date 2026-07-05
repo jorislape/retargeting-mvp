@@ -79,14 +79,13 @@ export interface MarketQuality {
   summary: string;
 }
 
-function listJoin(items: string[]): string {
-  if (items.length <= 1) return items.join("");
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
-}
+const countLabel = (n: number, singular: string, plural: string): string =>
+  `${n} ${n === 1 ? singular : plural}`;
 
 /** Null when the text is empty. Level is the number of distinct signal
- *  categories present: ≥3 strong, 2 good, ≤1 weak. */
+ *  categories present: ≥3 strong, 2 good, ≤1 weak. The summary names
+ *  compact per-category COUNTS so the meter is measurable ("3 formats,
+ *  2 hooks…"), derived from the exact same parse that sets the level. */
 export function assessMarketNotes(rawText: string): MarketQuality | null {
   const text = rawText.trim();
   if (text === "") return null;
@@ -94,17 +93,31 @@ export function assessMarketNotes(rawText: string): MarketQuality | null {
   const urls = text.match(URL_RE) ?? [];
   const signals = extractMarketSignals(text.replace(URL_RE, " "));
 
-  const categories: string[] = [];
-  if (signals.formats.length > 0) categories.push("formats");
-  if (signals.hooks.length > 0) categories.push("hooks");
-  if (signals.offers.length > 0) categories.push("offers");
-  if (urls.length > 0) categories.push("links");
-
-  if (categories.length >= 3) {
-    return { level: "strong", summary: `Strong — ${listJoin(categories)} detected.` };
+  const counts: string[] = [];
+  if (signals.formats.length > 0) {
+    counts.push(countLabel(signals.formats.length, "format", "formats"));
   }
-  if (categories.length === 2) {
-    return { level: "good", summary: `Good — ${listJoin(categories)} detected.` };
+  if (signals.hooks.length > 0) {
+    counts.push(countLabel(signals.hooks.length, "hook", "hooks"));
+  }
+  if (signals.offers.length > 0) {
+    counts.push(countLabel(signals.offers.length, "offer", "offers"));
+  }
+  if (urls.length > 0) {
+    counts.push(countLabel(urls.length, "link/source", "links/sources"));
+  }
+
+  if (counts.length >= 3) {
+    return { level: "strong", summary: `Strong — ${counts.join(", ")} detected.` };
+  }
+  if (counts.length === 2) {
+    return { level: "good", summary: `Good — ${counts.join(", ")} detected.` };
+  }
+  if (counts.length === 1) {
+    return {
+      level: "weak",
+      summary: `Weak — ${counts[0]} detected; add competitor hooks, offers, or links for better recommendations.`,
+    };
   }
   return {
     level: "weak",

@@ -56,6 +56,24 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] **File change clears confirmations**: loading a different CSV (or
       the sample) resets the dropdowns and the count chip.
 
+## Market signal builder
+
+- [ ] **Chips select/deselect**: chips toggle with a visible active
+      state; "Clear selected signals" empties the selection without
+      touching the textarea; the count shows on the add button.
+- [ ] **Presets fill, never append**: each example (Skincare /
+      E-commerce / SaaS / Local service) selects its chips; nothing
+      lands in notes until "Add selected signals to notes".
+- [ ] **Append behavior**: adds the "Selected market signals —
+      directional only:" block (grouped, with caveat) below existing
+      notes; the same selection added twice doesn't duplicate;
+      Structure notes still works after; the quality meter updates.
+- [ ] **Quality counts**: with context the meter reads like "Strong —
+      3 formats, 2 hooks, 2 offers, 1 link/source detected."; empty
+      context shows the "Market context: Optional — …" guidance line.
+- [ ] **Skippable**: generating without touching the builder works and
+      the "Short on time? Skip this" note renders.
+
 ## Market notes & competitor sources
 
 - [ ] **Competitor sources**: "Add competitor source" adds a card (name /

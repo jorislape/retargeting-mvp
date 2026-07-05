@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:csv": "node scripts/csv-escaping.test.ts",
-    "test:watchlist": "node scripts/watchlist.test.ts"
+    "test:watchlist": "node scripts/watchlist.test.ts",
+    "test:signals": "node scripts/signal-builder.test.ts"
   },
   "dependencies": {
     "motion": "^12.42.2",

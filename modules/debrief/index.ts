@@ -14,6 +14,12 @@ export {
 } from "./marketSignals";
 export type { CompetitorSource } from "./marketSignals";
 export {
+  formatSelectedSignals,
+  SIGNAL_BUILDER_CAVEAT,
+  SIGNAL_BUILDER_GROUPS,
+  SIGNAL_PRESETS,
+} from "./signalBuilder";
+export {
   SAMPLE_CONTEXT,
   SAMPLE_CSV_FILENAME,
   SAMPLE_CSV_TEXT,

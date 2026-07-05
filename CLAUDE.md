@@ -15,9 +15,10 @@ npx tsc --noEmit     # typecheck
 npx eslint .         # lint
 npm run test:csv     # RFC 4180 escaping proof for the Meta virtual CSV (plain Node)
 npm run test:watchlist # watchlist sanitize/diff/format/append proofs (plain Node)
+npm run test:signals # signal-builder tables/format/append + quality-count proofs
 ```
 
-The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm run test:csv && npm run test:watchlist`. There is no other test runner; behavioral verification is manual against the dev server — `TESTING.md` is the checklist, and the sample dataset's expected numbers (spend gate ≈ $120.91, 11 judged / 3 set aside, per-KPI medians) are documented in `modules/debrief/sampleCsv.ts` for asserting against.
+The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm run test:csv && npm run test:watchlist && npm run test:signals`. There is no other test runner; behavioral verification is manual against the dev server — `TESTING.md` is the checklist, and the sample dataset's expected numbers (spend gate ≈ $120.91, 11 judged / 3 set aside, per-KPI medians) are documented in `modules/debrief/sampleCsv.ts` for asserting against.
 
 No environment variables are required for the CSV-upload flow. The optional Meta data source needs `META_APP_ID` and `META_APP_SECRET`; the OAuth redirect URI is derived from the request origin per environment (`modules/meta/config.ts`), with `META_REDIRECT_URI` as an optional explicit override — see `.env.example`. `GET /api/meta/config` reports the resolved redirect URI (never the secret).
 
@@ -51,13 +52,22 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
   marketSignals.ts# ONE keyword map (formats/hooks/offers) shared by memo generation and
                   # the generator UI: extractMarketSignals, structureMarketNotes (the
                   # local "Structure notes" reformat, idempotent, never drops a URL),
-                  # assessMarketNotes (quality meter: category count → strong/good/weak),
+                  # assessMarketNotes (quality meter: category count → strong/good/weak;
+                  # summary carries measurable per-category counts, e.g. "Strong — 3
+                  # formats, 2 hooks…" — also rendered in the report's context-quality
+                  # line),
                   # plus competitor sources V1 (CompetitorSource, formatCompetitorSources,
                   # mergeCompetitorSourcesIntoNotes): manual structured competitor input
                   # serialized into the market-notes text — append-only, restates user
                   # input. URLs are fetched only by the explicit one-time "Fetch page
                   # signals" action (modules/competitor); watchlists/monitoring stay a
                   # future milestone, not a quiet addition
+  signalBuilder.ts# Market signal builder tables (4 chip groups, 4 example presets —
+                  # presets only FILL the selection, never auto-append) +
+                  # formatSelectedSignals ("Selected market signals — directional
+                  # only:" block + caveat). Pure, runtime-import-free (node-tested);
+                  # output is ordinary notes text — nothing downstream knows the
+                  # builder exists
   format.ts       # money/count/KPI value formatting
   sampleCsv.ts    # THE sample dataset (client-safe, no engine imports) — tuned to the
                   # rules engine; its header comment lists invariants to keep when
@@ -132,7 +142,9 @@ components/debrief/
                        # via the same parser + alias matcher — display only, the API
                        # recomputes everything), a "Fast path" helper naming the
                        # required route up front, ONE combined
-                       # "Optional competitor context" area in stage 2 (notes field with
+                       # "Optional competitor context" area in stage 2 (Market signal
+                       # builder — selectable chips + example presets feeding the notes
+                       # field as structured text — then the notes field with
                        # Structure button + quality meter, then an "Advanced competitor
                        # context" collapsible — auto-open when it has content — holding
                        # competitor-sources cards — up
