@@ -121,8 +121,9 @@ components/workspace/
 components/debrief/
   GeneratorPanel.tsx   # 4-stage workflow (Data / Context / Verify / Run): dropzone, sample
                        # load + sample CSV download, CSV requirements helper, client-side
-                       # upload preview (rows/columns/KPI check via the same parser +
-                       # alias matcher — structure only, no analysis), ONE combined
+                       # upload preview (rows/columns/spend total/date range/KPI columns
+                       # via the same parser + alias matcher — display only, the API
+                       # recomputes everything), ONE combined
                        # "Market / competitor context" area in stage 2 (notes field with
                        # Structure button + quality meter, competitor-sources cards — up
                        # to 5, "Use as market notes" appends, never overwrites — and the

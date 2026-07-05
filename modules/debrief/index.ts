@@ -2,6 +2,7 @@ export { parseCsv, toTable, parseNumericCell } from "./csv";
 export { resolveColumns, requiredColumnsFor } from "./columns";
 export { applyFormatOverrides, extractAds, extractNameTags } from "./extract";
 export { analyze, DEFAULT_SPEND_FLOOR } from "./analysis";
+export { fmtMoney } from "./format";
 export { generateMemo } from "./memo";
 export {
   assessMarketNotes,

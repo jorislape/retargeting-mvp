@@ -100,6 +100,14 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] Date ranges: last 7/14/30/90 days (native presets) and last
       180/365 days (sent as time_range) all pull without error.
 - [ ] Pull with data → file lands in the dropzone → Generate works.
+- [ ] The loaded strip's preview shows rows, columns, total spend, the
+      reporting date range, and the KPI columns available.
+- [ ] Account without purchase tracking + ROAS selected → amber note in
+      the Meta card: "ROAS is not available for this account/date
+      range. Try … if available." — the file stays loaded and switching
+      KPI in Context works.
+- [ ] Permission-denied and rate-limited Graph responses surface their
+      specific friendly messages, not the generic pull error.
 
 ## Report
 

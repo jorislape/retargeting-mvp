@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import type { DatePreset } from "@/modules/meta/types";
 import { DATE_PRESET_LABELS, DATE_PRESETS } from "@/modules/meta/types";
+import type { KpiKey } from "@/modules/debrief";
+import {
+  extractAds,
+  KPI_LABELS,
+  parseCsv,
+  requiredColumnsFor,
+  resolveColumns,
+  toTable,
+} from "@/modules/debrief";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
 import { RefreshIcon, ZapIcon } from "@/components/ui/icons";
@@ -18,6 +27,23 @@ import { btnSecondary, btnSecondaryMd, inputBase } from "@/components/ui/theme";
 /* whether OAuth is configured at all. If not, the button is disabled  */
 /* with the exact missing env vars — a dead-end popup never opens.     */
 /* ------------------------------------------------------------------ */
+
+const KPI_KEYS: KpiKey[] = ["roas", "cpa", "ctr", "cpc", "leads", "purchases"];
+
+/** Which KPIs the pulled virtual CSV actually carries DATA for — the
+ *  Meta export always ships every column, so column presence alone
+ *  can't tell an account that never tracked purchases from one that
+ *  did. Runs the same client-safe engine helpers the preview uses;
+ *  display-only, no analysis. */
+function kpisWithData(csvText: string): KpiKey[] {
+  const { headers, rows } = toTable(parseCsv(csvText));
+  const columns = resolveColumns(headers);
+  return KPI_KEYS.filter(
+    (kpi) =>
+      requiredColumnsFor(kpi, columns).length === 0 &&
+      extractAds(rows, columns, kpi).some((ad) => ad.kpiValue != null)
+  );
+}
 
 interface MetaConfigState {
   checked: boolean;
@@ -74,7 +100,7 @@ function useMetaConfig(): MetaConfigState {
 export function MetaConnect() {
   const { status, accounts, token, error, connect, disconnect, expire } =
     useMeta();
-  const { setFile } = useDebrief();
+  const { fields, setFile } = useDebrief();
   const config = useMetaConfig();
 
   const [accountId, setAccountId] = useState("");
@@ -83,6 +109,9 @@ export function MetaConnect() {
   const [pullError, setPullError] = useState<string | null>(null);
   const [pullNote, setPullNote] = useState<string | null>(null);
   const [pullEmpty, setPullEmpty] = useState(false);
+  /** Set when the pull succeeded but the currently-selected KPI has no
+   *  data in the pulled rows — guidance toward a KPI that does. */
+  const [kpiNote, setKpiNote] = useState<string | null>(null);
 
   const selectedAccount =
     accounts.find((a) => a.id === accountId) ?? accounts[0] ?? null;
@@ -93,6 +122,7 @@ export function MetaConnect() {
     setPullError(null);
     setPullNote(null);
     setPullEmpty(false);
+    setKpiNote(null);
     try {
       const res = await fetch("/api/meta/insights", {
         method: "POST",
@@ -123,6 +153,18 @@ export function MetaConnect() {
       setPullNote(
         `${data.rowCount} ads pulled${data.truncated ? " (capped)" : ""} · attribution matches Ads Manager`
       );
+      /* Meta always ships every column, so check for DATA: if the
+         selected KPI has none in this pull, say so and name the KPIs
+         that would work — the file stays loaded either way. */
+      const available = kpisWithData(data.csv);
+      if (!available.includes(fields.kpi)) {
+        const alternatives = available.map((k) => KPI_LABELS[k]).join(", ");
+        setKpiNote(
+          `${KPI_LABELS[fields.kpi]} is not available for this account/date range. Try ${
+            alternatives || "a different account or date range"
+          }${alternatives ? " if available" : ""}.`
+        );
+      }
     } catch {
       setPullError("Network error — check your connection and try again.");
     } finally {
@@ -136,8 +178,8 @@ export function MetaConnect() {
     return (
       <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
         <p className="text-sm leading-snug text-zinc-400">
-          Pull ad-level insights straight from your ad account — attribution
-          matches Ads Manager.
+          Pull ad-level insights from Meta instead of uploading a CSV —
+          attribution matches Ads Manager.
         </p>
         <button
           type="button"
@@ -249,6 +291,14 @@ export function MetaConnect() {
       {pullNote && (
         <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-accent-soft/90">
           {pullNote.toUpperCase()}
+        </p>
+      )}
+      {kpiNote && (
+        <p
+          role="status"
+          className="mt-2 border-l-2 border-amber-400/70 bg-amber-400/[0.05] px-3 py-2.5 text-xs leading-relaxed text-amber-200"
+        >
+          {kpiNote}
         </p>
       )}
       {pullEmpty && (

@@ -77,6 +77,26 @@ export async function POST(request: NextRequest) {
         401
       );
     }
+    if (error instanceof GraphApiError && error.isPermissionError) {
+      return noStore(
+        {
+          ok: false,
+          error:
+            "This Meta login doesn't have permission to read that account's insights. Check your access in Business Manager, or upload a CSV instead.",
+        },
+        403
+      );
+    }
+    if (error instanceof GraphApiError && error.isRateLimit) {
+      return noStore(
+        {
+          ok: false,
+          error:
+            "Meta is rate-limiting requests right now — wait a minute and try again.",
+        },
+        429
+      );
+    }
     return noStore(
       { ok: false, error: "Couldn't pull ads from Meta. Try again." },
       502

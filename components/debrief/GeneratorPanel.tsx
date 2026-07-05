@@ -7,11 +7,13 @@ import {
   CREATIVE_FORMAT_OPTIONS,
   EMPTY_COMPETITOR_SOURCE,
   extractNameTags,
+  fmtMoney,
   HIGHER_IS_BETTER,
   KPI_LABELS,
   MAX_COMPETITOR_SOURCES,
   mergeCompetitorSourcesIntoNotes,
   parseCsv,
+  parseNumericCell,
   requiredColumnsFor,
   resolveColumns,
   SAMPLE_CONTEXT,
@@ -240,6 +242,11 @@ export function GeneratorPanel() {
     rows: number;
     cols: number;
     kpisFound: KpiKey[];
+    /** Total of the spend column (display only — the API recomputes
+     *  everything) and the file's reporting range, when present. */
+    spendTotal: number | null;
+    currency: string | null;
+    dateRange: { start: string; stop: string } | null;
     /** Deduped ad names + their name-derived format tags, in file
      *  order — feeds the optional "Confirm creative formats" list.
      *  Structure only; no analysis. */
@@ -277,11 +284,42 @@ export function GeneratorPanel() {
             ads.push({ name, tags: extractNameTags(name) });
           }
         }
+        /* Display-only extras (the API recomputes everything): spend
+           column total and the file's reporting range. */
+        const spendIdx = columns.spend ? headers.indexOf(columns.spend) : -1;
+        let spendTotal: number | null = null;
+        if (spendIdx >= 0) {
+          for (const row of matrix.slice(1)) {
+            const v = parseNumericCell(row[spendIdx] ?? "");
+            if (v != null) spendTotal = (spendTotal ?? 0) + v;
+          }
+        }
+        const startIdx = columns.reportingStarts
+          ? headers.indexOf(columns.reportingStarts)
+          : -1;
+        const stopIdx = columns.reportingEnds
+          ? headers.indexOf(columns.reportingEnds)
+          : -1;
+        let dateRange: { start: string; stop: string } | null = null;
+        if (startIdx >= 0 && stopIdx >= 0) {
+          let start = "";
+          let stop = "";
+          for (const row of matrix.slice(1)) {
+            const s = (row[startIdx] ?? "").trim();
+            const e = (row[stopIdx] ?? "").trim();
+            if (s !== "" && (start === "" || s < start)) start = s;
+            if (e !== "" && (stop === "" || e > stop)) stop = e;
+          }
+          if (start !== "" && stop !== "") dateRange = { start, stop };
+        }
         setPreviewState({
           forFile: file,
           rows: Math.max(0, matrix.length - 1),
           cols: headers.length,
           kpisFound,
+          spendTotal,
+          currency: columns.currency,
+          dateRange,
           ads,
         });
       })
@@ -709,7 +747,18 @@ export function GeneratorPanel() {
                   }`}
                 >
                   {previewKpiOk
-                    ? `Detected ${preview.rows} row${preview.rows === 1 ? "" : "s"}, ${preview.cols} columns. ${KPI_LABELS[fields.kpi]} column found.`
+                    ? `Detected ${preview.rows} row${preview.rows === 1 ? "" : "s"}, ${preview.cols} columns${
+                        preview.spendTotal != null
+                          ? ` · ${fmtMoney(preview.spendTotal, preview.currency)} total spend`
+                          : ""
+                      }${
+                        preview.dateRange
+                          ? ` · ${preview.dateRange.start} → ${preview.dateRange.stop}`
+                          : ""
+                      }. KPI columns: ${
+                        preview.kpisFound.map((k) => KPI_LABELS[k]).join(", ") ||
+                        "none detected"
+                      } — ${KPI_LABELS[fields.kpi]} selected.`
                     : `${KPI_LABELS[fields.kpi]} was selected, but no ${KPI_LABELS[fields.kpi]}-like column was detected. You can still run, but Debrief may return a missing-column error.${
                         preview.kpisFound.length > 0
                           ? ` Columns found for: ${preview.kpisFound.map((k) => KPI_LABELS[k]).join(", ")}.`

@@ -56,6 +56,19 @@ export class GraphApiError extends Error {
   get isAuthError(): boolean {
     return this.status === 401 || this.code === 190;
   }
+
+  /** Graph throttling codes — the user should wait, not reconnect. */
+  get isRateLimit(): boolean {
+    return (
+      this.code === 4 || this.code === 17 || this.code === 32 || this.code === 613
+    );
+  }
+
+  /** Permission-shaped failures: the login works but can't read this
+   *  account's insights (missing ads_read grant on the asset, etc.). */
+  get isPermissionError(): boolean {
+    return this.code === 10 || this.code === 200 || this.code === 294 || this.code === 3;
+  }
 }
 
 interface GraphErrorBody {
