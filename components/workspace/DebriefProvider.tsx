@@ -10,6 +10,7 @@ import {
 } from "react";
 import type {
   CompetitorSource,
+  CreativeFormatOverrides,
   DebriefApiError,
   KpiKey,
   Memo,
@@ -84,12 +85,17 @@ interface DebriefContextValue {
   file: File | null;
   fields: GeneratorFields;
   competitorSources: CompetitorSource[];
+  /** Creative Format Confirmation: ad name → confirmed format tag.
+   *  Keyed to the loaded file — changing the file clears them. Sent to
+   *  the API as an optional JSON field; never stored anywhere. */
+  formatOverrides: CreativeFormatOverrides;
   memo: Memo | null;
   error: DebriefApiError | null;
   generatedAt: number | null;
   setFile: (file: File | null) => void;
   updateFields: (patch: Partial<GeneratorFields>) => void;
   setCompetitorSources: (sources: CompetitorSource[]) => void;
+  setFormatOverrides: (overrides: CreativeFormatOverrides) => void;
   generate: () => Promise<void>;
   clearError: () => void;
   reset: () => void;
@@ -99,11 +105,21 @@ const DebriefContext = createContext<DebriefContextValue | null>(null);
 
 export function DebriefProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<GeneratorStatus>("idle");
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFileState] = useState<File | null>(null);
   const [fields, setFields] = useState<GeneratorFields>(DEFAULT_FIELDS);
   const [competitorSources, setCompetitorSources] = useState<
     CompetitorSource[]
   >([]);
+  const [formatOverrides, setFormatOverrides] =
+    useState<CreativeFormatOverrides>({});
+
+  /* Format confirmations describe the loaded CSV's ads by name — a
+     different file makes them stale (or wrongly matching), so any file
+     change clears them. */
+  const setFile = useCallback((next: File | null) => {
+    setFileState(next);
+    setFormatOverrides({});
+  }, []);
   const [memo, setMemo] = useState<Memo | null>(null);
   const [error, setError] = useState<DebriefApiError | null>(null);
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
@@ -127,6 +143,9 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     if (fields.targetCpa.trim() !== "") body.append("targetCpa", fields.targetCpa);
     body.append("creativeNotes", fields.creativeNotes);
     body.append("marketContext", fields.marketContext);
+    if (Object.keys(formatOverrides).length > 0) {
+      body.append("creativeFormatOverrides", JSON.stringify(formatOverrides));
+    }
 
     try {
       const res = await fetch("/api/debrief", { method: "POST", body });
@@ -153,15 +172,16 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       });
       setStatus("idle");
     }
-  }, [file, fields]);
+  }, [file, fields, formatOverrides]);
 
   const clearError = useCallback(() => setError(null), []);
 
   const reset = useCallback(() => {
     setStatus("idle");
-    setFile(null);
+    setFileState(null);
     setFields(DEFAULT_FIELDS);
     setCompetitorSources([]);
+    setFormatOverrides({});
     setMemo(null);
     setError(null);
     setGeneratedAt(null);
@@ -173,17 +193,19 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       file,
       fields,
       competitorSources,
+      formatOverrides,
       memo,
       error,
       generatedAt,
       setFile,
       updateFields,
       setCompetitorSources,
+      setFormatOverrides,
       generate,
       clearError,
       reset,
     }),
-    [status, file, fields, competitorSources, memo, error, generatedAt, updateFields, generate, clearError, reset]
+    [status, file, fields, competitorSources, formatOverrides, memo, error, generatedAt, setFile, updateFields, generate, clearError, reset]
   );
 
   return (

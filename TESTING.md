@@ -34,6 +34,27 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] Non-CSV file / empty CSV / CSV missing the KPI's column → clear
       400 error banner naming what's missing, no crash.
 
+## Creative format confirmation
+
+- [ ] **Section appears after load**: with a CSV (or sample) loaded, the
+      collapsible "Confirm creative formats" block shows under Framing —
+      deduped ad names, detected format from the name, and a Correct
+      format dropdown per ad. Nothing is required; Run never blocks.
+- [ ] **First 25 / show all**: a CSV with >25 distinct ads shows 25 rows
+      plus "Show all N ads"; toggling back works; a huge CSV stays usable.
+- [ ] **No corrections → identical output**: generating without touching
+      the dropdowns produces the exact same memo as before the feature
+      (sample expected numbers unchanged).
+- [ ] **Corrected rows change wording only**: a confirmed ad's row reads
+      "Format confirmed as … — user-provided context, not proof of why
+      it performed"; unconfirmed ads keep "Ad name suggests…"; every
+      number, order, and the kill list stay identical.
+- [ ] **Patterns/tests/briefs pick it up**: with confirmations, Patterns
+      and test "Signals used" append "(N formats user-confirmed)";
+      briefs' Based on carries the same signal.
+- [ ] **File change clears confirmations**: loading a different CSV (or
+      the sample) resets the dropdowns and the count chip.
+
 ## Market notes & competitor sources
 
 - [ ] **Competitor sources**: "Add competitor source" adds a card (name /

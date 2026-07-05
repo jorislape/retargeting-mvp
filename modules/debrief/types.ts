@@ -35,6 +35,41 @@ export const HIGHER_IS_BETTER: Record<KpiKey, boolean> = {
   cpc: false,
 };
 
+/* ------------------------------------------------------------------ */
+/* Creative Format Confirmation V1: the user can confirm each ad's     */
+/* creative format before generating, replacing the ad-name GUESS with */
+/* user-provided context. Confirmations feed pattern detection, test   */
+/* wording, and briefs ONLY — never spend, KPI values, the gate, the   */
+/* median, or winner/loser ranking. A confirmed format is still just   */
+/* user context, not proof of why an ad performed. No asset uploads,   */
+/* no vision, no fetching — the user simply tells us what they already */
+/* know about their own creative.                                      */
+/* ------------------------------------------------------------------ */
+
+/** The confirmable formats. `tag` values line up with the tag
+ *  vocabulary the memo's pattern/test/brief code keys off (name-derived
+ *  tags use the same strings where they overlap). */
+export const CREATIVE_FORMAT_OPTIONS: { tag: string; label: string }[] = [
+  { tag: "ugc", label: "UGC" },
+  { tag: "testimonial", label: "Testimonial" },
+  { tag: "founder-led", label: "Founder-led" },
+  { tag: "static", label: "Static" },
+  { tag: "product shot", label: "Product shot" },
+  { tag: "video", label: "Video" },
+  { tag: "carousel", label: "Carousel" },
+  { tag: "before/after", label: "Before/after" },
+  { tag: "discount/promo", label: "Discount / promo" },
+  { tag: "comparison", label: "Comparison" },
+];
+
+/** Display label for a format tag (confirmed or name-derived). */
+export const CREATIVE_FORMAT_LABELS: Record<string, string> =
+  Object.fromEntries(CREATIVE_FORMAT_OPTIONS.map((o) => [o.tag, o.label]));
+
+/** Ad name → confirmed format tag. Sent as an optional JSON field with
+ *  the debrief request; lives only for that request, like the CSV. */
+export type CreativeFormatOverrides = Record<string, string>;
+
 /** Structured, user-actionable error returned by /api/debrief. Every
  *  failure reads as a product guide (what happened, how to fix it),
  *  never a stack trace. `detectedColumns` are the CSV's own headers —
@@ -70,8 +105,14 @@ export interface ParsedAd {
   /** The value for the selected KPI, in that KPI's own units. */
   kpiValue: number | null;
   /** Best-effort lowercase keyword tags pulled from the ad name, used
-   *  only for structural pattern hints — never presented as certainty. */
+   *  only for structural pattern hints — never presented as certainty.
+   *  When the user confirms a format, this holds exactly that one tag
+   *  and `formatConfirmed` is set. */
   nameTags: string[];
+  /** True when the user confirmed this ad's format in the generator —
+   *  the memo then says "Format confirmed as …" instead of "Ad name
+   *  suggests …". Still user context, never proof of causation. */
+  formatConfirmed?: boolean;
 }
 
 export type GateReason = "judged" | "below_spend_gate" | "no_kpi_value";

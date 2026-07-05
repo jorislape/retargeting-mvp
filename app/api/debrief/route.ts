@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   analyze,
+  applyFormatOverrides,
+  CREATIVE_FORMAT_LABELS,
   extractAds,
   generateMemo,
   KPI_LABELS,
@@ -9,6 +11,7 @@ import {
   requiredColumnsFor,
   resolveColumns,
   toTable,
+  type CreativeFormatOverrides,
   type DebriefApiError,
 } from "@/modules/debrief";
 
@@ -130,6 +133,39 @@ export async function POST(request: NextRequest) {
     marketContext: String(form.get("marketContext") ?? "").trim().slice(0, 2000),
   };
 
+  /* Optional creative-format confirmations (ad name → format tag).
+     User-provided context only: they replace the ad-name format GUESS
+     for pattern detection, test wording, and briefs — never any
+     performance number. Read into memory for this request like the
+     CSV; never logged, never stored. Entries with unknown formats or
+     unusable names are dropped rather than failed — the field is an
+     enhancement, not a requirement. */
+  const overridesRaw = form.get("creativeFormatOverrides");
+  const formatOverrides: CreativeFormatOverrides = {};
+  if (typeof overridesRaw === "string" && overridesRaw.trim() !== "") {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(overridesRaw);
+    } catch {
+      parsed = null;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return fail(400, {
+        title: "Format confirmations could not be read",
+        message: "The creative format confirmations sent with this request weren't valid.",
+        fix: "Reset the \"Confirm creative formats\" section and try again — the debrief also runs fine without confirmations.",
+      });
+    }
+    let kept = 0;
+    for (const [name, format] of Object.entries(parsed)) {
+      if (kept >= MAX_DATA_ROWS) break;
+      if (typeof format !== "string" || !(format in CREATIVE_FORMAT_LABELS)) continue;
+      if (name.trim() === "" || name.length > 500) continue;
+      formatOverrides[name] = format;
+      kept += 1;
+    }
+  }
+
   let text: string;
   try {
     text = await file.text();
@@ -231,7 +267,13 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const ads = extractAds(rows, columns, context.kpi);
+  /* Overrides touch only the format tags on matched ads — spend, KPI
+     values, the gate, the median, and ranking read the same numbers
+     either way. */
+  const ads = applyFormatOverrides(
+    extractAds(rows, columns, context.kpi),
+    formatOverrides
+  );
   if (ads.length === 0) {
     return fail(400, {
       title: "No ad rows found",

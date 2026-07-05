@@ -40,7 +40,11 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # only (as substrings they hit "leads"/"return on ad spend"), and the
                   # generic "spend" alias never resolves into ROAS-shaped headers —
                   # a spend-less CSV must error, not silently misuse the ROAS column
-  extract.ts      # raw rows -> ParsedAd[], KPI value derivation, ad-name tag extraction
+  extract.ts      # raw rows -> ParsedAd[], KPI value derivation, ad-name tag extraction,
+                  # applyFormatOverrides (Creative Format Confirmation V1: user-confirmed
+                  # formats replace the ad-name tag GUESS and set formatConfirmed — they
+                  # feed pattern/test/brief wording only, never spend/KPI/gate/ranking;
+                  # no overrides in → the same array back out, output byte-identical)
   analysis.ts     # spend gate, median benchmark, winners/losers, pattern hints
   memo.ts         # assembles the memo — templated, not an LLM call (see below)
   marketSignals.ts# ONE keyword map (formats/hooks/offers) shared by memo generation and
@@ -108,6 +112,9 @@ components/debrief/
                        # alias matcher — structure only, no analysis), market-notes field
                        # with Structure button + quality meter, competitor-sources cards
                        # (up to 5; "Use as market notes" appends, never overwrites),
+                       # "Confirm creative formats" list (optional per-ad format dropdowns
+                       # over the client-side preview; first 25 ads + show-all; sent as
+                       # creativeFormatOverrides JSON, cleared whenever the file changes),
                        # structured-error display with one-click KPI switch
   MetaConnect.tsx      # connect button / connected controls; checks /api/meta/config first
   Report.tsx           # the memo document; Buyer/Client view toggle is display-only.
@@ -133,6 +140,7 @@ components/debrief/
 - Benchmark = median KPI across gated ads only. Polarity per KPI is in `HIGHER_IS_BETTER` (`types.ts`) — higher wins for ROAS/CTR/Leads/Purchases, lower wins for CPA/CPC.
 - Combined below-benchmark spend in the kill list sums *all* judged ads worse than the median, not just the displayed rows.
 - When there's no creative-notes context and no ad-name keyword signal, the memo must say so plainly ("metrics only — angle unknown") rather than inventing a creative narrative. Name tags are extracted with separators (`_-./`) normalized to spaces (`extract.ts`) — real exports use underscore naming.
+- Creative format confirmations (`creativeFormatOverrides`, optional request field) upgrade the wording from "Ad name suggests…" to "Format confirmed as… — user-provided context, not proof of why it performed", and count into pattern/test/brief tag detection. They must never touch spend, KPI values, the gate, the median, or ranking — and a run without them must stay byte-identical to the pre-feature engine. No asset upload, no vision, no fetching: the user is just stating what their own creative is.
 - The stat row in the report masthead steps long values down in size and wraps as a last resort (`min-w-0` + `break-words`) — long non-USD spend values overlapped in A4 PDF export once; don't reintroduce fixed 22px values there.
 
 ## Design constraints to preserve

@@ -7,6 +7,7 @@ import {
 import { assessMarketNotes, extractMarketSignals } from "./marketSignals";
 import {
   AnalysisResult,
+  CREATIVE_FORMAT_LABELS,
   DebriefContext,
   HIGHER_IS_BETTER,
   KPI_EXPLAINERS,
@@ -28,11 +29,20 @@ import {
  * the product honest, fast, and free to run.
  */
 
+/** Display label for a format tag ("ugc" → "UGC"); name-derived tags
+ *  not in the confirmable list pass through as-is. */
+const formatLabel = (tag: string): string => CREATIVE_FORMAT_LABELS[tag] ?? tag;
+
 function describeAdReason(
   ad: RankedAd,
   hasCreativeNotes: boolean,
   creativeNotes: string
 ): string {
+  /* User-confirmed format: state it as confirmed — but it's still user
+     context about WHAT the ad is, never proof of WHY it performed. */
+  if (ad.formatConfirmed && ad.nameTags.length > 0) {
+    return `Format confirmed as ${ad.nameTags.map(formatLabel).join("/")} — user-provided context, not proof of why it performed.`;
+  }
   if (ad.nameTags.length > 0) {
     return `Ad name suggests ${ad.nameTags.join("/")} creative — confirm against the actual asset.`;
   }
@@ -118,28 +128,24 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
   }
 
   if (hasNameSignal) {
-    const tagShare = (group: typeof winners) => {
-      const counts = new Map<string, number>();
-      for (const ad of group) {
-        for (const tag of ad.nameTags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-      }
-      let best: [string, number] | null = null;
-      for (const entry of counts.entries()) {
-        if (!best || entry[1] > best[1]) best = entry;
-      }
-      return best;
-    };
-    const winnerTag = tagShare(winners);
+    /* When any of the counted formats were user-confirmed, say so —
+       the read is stronger than a name guess, but still context. With
+       no confirmations the wording is byte-identical to before. */
+    const tagNote = (
+      best: { tag: string; count: number; confirmed: number },
+      group: RankedAd[],
+      groupLabel: "winners" | "losers"
+    ): string =>
+      best.confirmed > 0
+        ? `"${best.tag}" ads make up ${best.count}/${group.length} ${groupLabel} (${best.confirmed} format${best.confirmed === 1 ? "" : "s"} user-confirmed).`
+        : `"${best.tag}"-tagged ads make up ${best.count}/${group.length} ${groupLabel}.`;
+    const winnerTag = dominantTag(winners);
     if (winnerTag) {
-      winnerNotes.push(
-        `"${winnerTag[0]}"-tagged ads make up ${winnerTag[1]}/${winners.length} winners.`
-      );
+      winnerNotes.push(tagNote(winnerTag, winners, "winners"));
     }
-    const loserTag = tagShare(losers);
+    const loserTag = dominantTag(losers);
     if (loserTag) {
-      loserNotes.push(
-        `"${loserTag[0]}"-tagged ads make up ${loserTag[1]}/${losers.length} losers.`
-      );
+      loserNotes.push(tagNote(loserTag, losers, "losers"));
     }
   }
 
@@ -213,7 +219,7 @@ function buildMarketSignal(
   }
 
   /* What seems worth adapting — always tied back to own data. */
-  if (top && signals.has("founder-led") && !top.nameTags.includes("founder")) {
+  if (top && signals.has("founder-led") && !isFounderLed(top)) {
     bullets.push(
       `Worth testing: a founder-led take on "${top.name}"'s proven angle — adapt, don't copy.`
     );
@@ -239,18 +245,33 @@ function buildMarketSignal(
   };
 }
 
-/** The most common name tag in a group, or null. */
-function dominantTag(group: RankedAd[]): { tag: string; count: number } | null {
-  const counts = new Map<string, number>();
+/** The most common format tag in a group, or null. `confirmed` counts
+ *  how many of those ads carry a user-confirmed format (Creative Format
+ *  Confirmation) rather than a name guess — 0 on any run without
+ *  confirmations, keeping legacy wording untouched. */
+function dominantTag(
+  group: RankedAd[]
+): { tag: string; count: number; confirmed: number } | null {
+  const counts = new Map<string, { count: number; confirmed: number }>();
   for (const ad of group) {
-    for (const tag of ad.nameTags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    for (const tag of ad.nameTags) {
+      const entry = counts.get(tag) ?? { count: 0, confirmed: 0 };
+      entry.count += 1;
+      if (ad.formatConfirmed) entry.confirmed += 1;
+      counts.set(tag, entry);
+    }
   }
-  let best: { tag: string; count: number } | null = null;
-  for (const [tag, count] of counts.entries()) {
-    if (!best || count > best.count) best = { tag, count };
+  let best: { tag: string; count: number; confirmed: number } | null = null;
+  for (const [tag, entry] of counts.entries()) {
+    if (!best || entry.count > best.count) best = { tag, ...entry };
   }
   return best;
 }
+
+/** True when the ad is already founder-fronted — via a confirmed
+ *  "founder-led" format or a founder-ish name tag. */
+const isFounderLed = (ad: RankedAd): boolean =>
+  ad.nameTags.some((t) => t.startsWith("founder"));
 
 /** For the third test slot when no scale move is justified: pick a
  *  structured challenger to the winning format, so the test creates
@@ -264,6 +285,11 @@ const FORMAT_CHALLENGERS: Record<string, string> = {
   carousel: "the carousel's first card as a standalone static",
   "discount/promo": "a value-led version where the discount is the closer, not the hook",
   urgency: "the same offer without the urgency framing",
+  /* Reachable only via user-confirmed formats — ad names never
+     produce these tags. */
+  "founder-led": "a customer-voiced (UGC) version of the founder story",
+  "product shot": "the product shown in real use instead of the studio shot",
+  comparison: "the winning claim stated on its own, without the comparison frame",
 };
 
 /** Shot / asset direction per creative format — structural direction
@@ -314,6 +340,22 @@ const ASSET_DIRECTION: Record<string, string[]> = {
     "Open mid-action — no logo or title card in the first 3 seconds.",
     "Burned-in captions; assume sound-off viewing.",
     "One idea per cut; re-hook visually every 3–5 seconds.",
+    "End card: product + the offer exactly as it exists today.",
+  ],
+  /* Reachable only via user-confirmed formats (Creative Format
+     Confirmation) — name tags never produce these. */
+  "product shot": [
+    "One hero frame: the product sharp, large, and unobstructed.",
+    "Show scale and texture — context props only if they clarify use.",
+    "Hook line as short overlay text; the product stays the visual.",
+    "First read must land in under 2 seconds.",
+    "Offer stated plainly, once — never stacked on the hero frame.",
+  ],
+  comparison: [
+    "Split-frame or sequential A/B — make the two sides instantly readable.",
+    "Compare only on claims that already exist — never invented competitor facts.",
+    "Lead with the dimension the viewer cares about, not the product name.",
+    "Keep labels plain; the contrast does the talking.",
     "End card: product + the offer exactly as it exists today.",
   ],
 };
@@ -371,7 +413,11 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
     ? `"${worst.name}" spent ${fmtMoney(worst.spend, currency)} and ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}.`
     : null;
   const tagSignal = winnerTag
-    ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots.`
+    ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots${
+        winnerTag.confirmed > 0
+          ? ` (${winnerTag.confirmed} format${winnerTag.confirmed === 1 ? "" : "s"} user-confirmed)`
+          : ""
+      }.`
     : null;
   const belowSignal =
     belowBenchmarkCount > 0
@@ -419,7 +465,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
   if (top) {
     const format = winnerTag && top.nameTags.includes(winnerTag.tag) ? `${winnerTag.tag} ` : "";
     const founderLed =
-      (market?.has("founder-led") ?? false) && !top.nameTags.includes("founder");
+      (market?.has("founder-led") ?? false) && !isFounderLed(top);
     const signals = sig(
       topSignal,
       tagSignal,

@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type { CompetitorSource, KpiKey } from "@/modules/debrief";
 import {
   assessMarketNotes,
+  CREATIVE_FORMAT_OPTIONS,
   EMPTY_COMPETITOR_SOURCE,
+  extractNameTags,
   HIGHER_IS_BETTER,
   KPI_LABELS,
   MAX_COMPETITOR_SOURCES,
@@ -181,10 +183,12 @@ export function GeneratorPanel() {
     file,
     fields,
     competitorSources,
+    formatOverrides,
     error,
     setFile,
     updateFields,
     setCompetitorSources,
+    setFormatOverrides,
     generate,
     clearError,
   } = useDebrief();
@@ -216,7 +220,18 @@ export function GeneratorPanel() {
     rows: number;
     cols: number;
     kpisFound: KpiKey[];
+    /** Deduped ad names + their name-derived format tags, in file
+     *  order — feeds the optional "Confirm creative formats" list.
+     *  Structure only; no analysis. */
+    ads: { name: string; tags: string[] }[];
   } | null>(null);
+  /* "Confirm creative formats" list expansion past the first 25 ads —
+     keyed to the File object so a new file starts collapsed without an
+     effect-driven reset. */
+  const [expandedFormatsFor, setExpandedFormatsFor] = useState<File | null>(
+    null
+  );
+  const showAllFormats = expandedFormatsFor !== null && expandedFormatsFor === file;
 
   useEffect(() => {
     if (!file || file.size > 5 * 1024 * 1024) return;
@@ -231,11 +246,23 @@ export function GeneratorPanel() {
         const kpisFound = KPI_OPTIONS.map((o) => o.value).filter(
           (k) => requiredColumnsFor(k, columns).length === 0
         );
+        const nameIdx = columns.adName ? headers.indexOf(columns.adName) : -1;
+        const seen = new Set<string>();
+        const ads: { name: string; tags: string[] }[] = [];
+        if (nameIdx >= 0) {
+          for (const row of matrix.slice(1)) {
+            const name = (row[nameIdx] ?? "").trim();
+            if (name === "" || seen.has(name)) continue;
+            seen.add(name);
+            ads.push({ name, tags: extractNameTags(name) });
+          }
+        }
         setPreviewState({
           forFile: file,
           rows: Math.max(0, matrix.length - 1),
           cols: headers.length,
           kpisFound,
+          ads,
         });
       })
       .catch(() => {
@@ -1009,6 +1036,132 @@ export function GeneratorPanel() {
           <p className="mt-3 text-xs text-zinc-600">
             * Required — a target CPA sharpens the spend gate.
           </p>
+
+          {/* Creative Format Confirmation V1: optional per-ad format
+              corrections for the loaded CSV. Local parsing only —
+              corrections replace the ad-name guess as pattern context,
+              never a performance number. */}
+          {preview && preview.ads.length > 0 && (
+            <details className="group mt-8 rounded-xl border border-white/[0.06] bg-white/[0.02] open:border-white/[0.09]">
+              <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+                <span className="text-sm font-semibold tracking-tight text-zinc-100">
+                  Confirm creative formats
+                </span>
+                <span className="text-xs text-zinc-600">
+                  Optional — Debrief guesses format from ad names. Correct
+                  anything important before generating.
+                </span>
+                <span className="ml-auto font-mono text-[11px] tabular-nums text-zinc-500">
+                  {Object.keys(formatOverrides).length > 0
+                    ? `${Object.keys(formatOverrides).length} confirmed`
+                    : `${preview.ads.length} ad${preview.ads.length === 1 ? "" : "s"}`}
+                </span>
+              </summary>
+              <div className="border-t border-white/[0.06] px-5 pb-5">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[540px] text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10 text-left">
+                        <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                          Ad name
+                        </th>
+                        <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                          Detected format
+                        </th>
+                        <th className="w-52 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                          Correct format
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(showAllFormats
+                        ? preview.ads
+                        : preview.ads.slice(0, 25)
+                      ).map((ad) => (
+                        <tr
+                          key={ad.name}
+                          className="border-b border-white/[0.06] last:border-0"
+                        >
+                          <td className="max-w-72 py-2.5 pr-4 align-middle">
+                            <p className="truncate text-[13px] font-medium text-zinc-200">
+                              {ad.name}
+                            </p>
+                          </td>
+                          <td className="py-2.5 pr-4 align-middle text-xs text-zinc-500">
+                            {ad.tags.length > 0 ? ad.tags.join(", ") : "—"}
+                          </td>
+                          <td className="py-2 align-middle">
+                            <select
+                              aria-label={`Correct format for ${ad.name}`}
+                              value={formatOverrides[ad.name] ?? ""}
+                              onChange={(e) => {
+                                const next = { ...formatOverrides };
+                                if (e.target.value === "") {
+                                  delete next[ad.name];
+                                } else {
+                                  next[ad.name] = e.target.value;
+                                }
+                                setFormatOverrides(next);
+                              }}
+                              className={`${inputBase} py-1.5 text-xs`}
+                            >
+                              <option value="" className="bg-zinc-900">
+                                Unknown / leave as-is
+                              </option>
+                              {CREATIVE_FORMAT_OPTIONS.map((opt) => (
+                                <option
+                                  key={opt.tag}
+                                  value={opt.tag}
+                                  className="bg-zinc-900"
+                                >
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {preview.ads.length > 25 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedFormatsFor(showAllFormats ? null : file)
+                      }
+                      className={`cursor-pointer ${btnSecondary}`}
+                    >
+                      {showAllFormats
+                        ? "Show first 25 ads"
+                        : `Show all ${preview.ads.length} ads`}
+                    </button>
+                    {!showAllFormats && (
+                      <p className="text-xs text-zinc-600">
+                        Showing the first 25 of {preview.ads.length} ads.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {Object.keys(formatOverrides).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFormatOverrides({})}
+                    className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    <XIcon className="h-3 w-3" />
+                    Clear all confirmations
+                  </button>
+                )}
+                <p className="mt-3 text-xs leading-relaxed text-zinc-600">
+                  Format corrections are used as context for pattern
+                  detection, next tests, and creative briefs. They do not
+                  change your performance numbers.
+                </p>
+              </div>
+            </details>
+          )}
         </section>
 
         {/* ---- Stage 03 · Run ---- */}

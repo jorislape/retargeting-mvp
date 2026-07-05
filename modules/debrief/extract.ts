@@ -1,6 +1,11 @@
 import { ColumnMap } from "./columns";
 import { parseNumericCell } from "./csv";
-import { KpiKey, ParsedAd } from "./types";
+import {
+  CREATIVE_FORMAT_LABELS,
+  CreativeFormatOverrides,
+  KpiKey,
+  ParsedAd,
+} from "./types";
 
 /** Lightweight, best-effort creative-format hints from the ad name only
  *  — never presented as a confirmed angle, only as a structural signal
@@ -16,7 +21,7 @@ const NAME_TAGS: { tag: string; pattern: RegExp }[] = [
   { tag: "urgency", pattern: /\blimited|hurry|ends soon|last chance\b/i },
 ];
 
-function extractNameTags(name: string): string[] {
+export function extractNameTags(name: string): string[] {
   // Ad names routinely use separator conventions like
   // "UGC_MorningRoutine_V1" — underscores/dots/dashes are \w chars, so
   // \b-anchored patterns would miss them. Normalize to spaces first.
@@ -107,4 +112,27 @@ export function extractAds(
       };
     })
     .filter((ad) => ad.spend > 0 || ad.kpiValue != null); // drop fully-blank rows
+}
+
+/**
+ * Applies user-confirmed creative formats (Creative Format Confirmation
+ * V1). A matched ad's tags become exactly the confirmed format and it's
+ * flagged `formatConfirmed`, so the memo can say "Format confirmed as …"
+ * instead of "Ad name suggests …". Touches ONLY nameTags — spend, KPI
+ * values, and everything the gate/median/ranking reads stay untouched.
+ * Unknown format tags are ignored; no overrides in → the exact same
+ * array back out.
+ */
+export function applyFormatOverrides(
+  ads: ParsedAd[],
+  overrides: CreativeFormatOverrides
+): ParsedAd[] {
+  if (Object.keys(overrides).length === 0) return ads;
+  return ads.map((ad) => {
+    // The generator's confirmation list shows trimmed names; extraction
+    // keeps the raw cell — accept either so a padded cell still matches.
+    const format = overrides[ad.name] ?? overrides[ad.name.trim()];
+    if (!format || !(format in CREATIVE_FORMAT_LABELS)) return ad;
+    return { ...ad, nameTags: [format], formatConfirmed: true };
+  });
 }
