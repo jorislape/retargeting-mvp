@@ -160,6 +160,11 @@ components/debrief/
                        # structured-error display with one-click KPI switch
   MetaConnect.tsx      # connect button / connected controls; checks /api/meta/config first
   Report.tsx           # the memo document; Buyer/Client view toggle is display-only.
+                       # Client view adds presentation-only blocks over existing memo
+                       # fields (executive stat cards replacing the stat row, a
+                       # prominent "What this means" box around clientSummary, a
+                       # worked/needs-improvement/not-enough-data split, next tests
+                       # as cards) — never new calculations; buyer view untouched.
                        # Section numbering is computed (market + what-not-to-do sections
                        # exist conditionally). The queue checkboxes double as creative-
                        # brief selection ("Generate creative briefs", buyer view only)

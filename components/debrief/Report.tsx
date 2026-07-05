@@ -185,6 +185,174 @@ function ClientAdList({
   );
 }
 
+/* ---------- Client-view presentation blocks (V1 polish) ----------- */
+/* Presentation ONLY: every value below is read straight off the memo —
+   no new calculations, no invented metrics. Debrief is not a
+   dashboard; these blocks just make the client-facing decision faster
+   to read. Buyer view renders none of this. */
+
+/* Executive summary cards — the client's version of the stat row. */
+function ClientStatCards({ memo }: { memo: Memo }) {
+  const { scope } = memo;
+  const best = memo.winners[0] ?? null;
+  const cards: { label: string; value: string; sub: string }[] = [
+    {
+      label: "Total spend",
+      value: scope.totalSpendLabel,
+      sub: "in the period reviewed",
+    },
+    {
+      label: `Typical ${scope.kpiLabel}`,
+      value: scope.medianLabel,
+      sub: "the account's midpoint result",
+    },
+    ...(best
+      ? [
+          {
+            label: "Best performer",
+            value: best.valueLabel,
+            sub: best.name,
+          },
+        ]
+      : []),
+    {
+      label: "Judged fairly",
+      value: `${scope.adsJudged} of ${scope.adsAnalyzed}`,
+      sub: "ads had enough spend to judge",
+    },
+    {
+      label: "Next tests",
+      value: String(memo.nextTests.length),
+      sub: "recommended below",
+    },
+  ];
+  return (
+    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {cards.map((card) => (
+        <div
+          key={card.label}
+          className="break-inside-avoid rounded-xl border border-white/[0.06] bg-white/[0.03] p-4"
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+            {card.label}
+          </p>
+          <p
+            className={`mt-1.5 break-words font-mono font-semibold tabular-nums text-zinc-50 ${
+              card.value.length > 12
+                ? "text-[15px] leading-tight"
+                : "text-[19px] leading-none"
+            }`}
+          >
+            {card.value}
+          </p>
+          <p className="mt-1.5 break-words text-[11px] leading-snug text-zinc-500">
+            {card.sub}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* The at-a-glance decision split: worked / needs improvement / not
+   enough data yet. Counts are the groups the report itself shows
+   (winners/losers lists, set-aside total) — no new math. */
+function ClientDecisionSplit({ memo }: { memo: Memo }) {
+  const groups = [
+    {
+      title: "Worked well",
+      titleClass: "print-win text-emerald-400",
+      count: memo.winners.length,
+      names: memo.winners.slice(0, 3).map((a) => a.name),
+      meaning: "These ads performed above the typical result.",
+    },
+    {
+      title: "Needs improvement",
+      titleClass: "print-loss text-red-400",
+      count: memo.losers.rows.length,
+      names: memo.losers.rows.slice(0, 3).map((a) => a.name),
+      meaning: "These ads performed below the typical result.",
+    },
+    {
+      title: "Not enough data yet",
+      titleClass: "text-zinc-400",
+      count: memo.scope.adsSetAside,
+      names: [] as string[],
+      meaning: "These ads need more spend before judging fairly.",
+    },
+  ].filter((g) => g.count > 0);
+  if (groups.length === 0) return null;
+  return (
+    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      {groups.map((group) => (
+        <div
+          key={group.title}
+          className="break-inside-avoid rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
+        >
+          <p
+            className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${group.titleClass}`}
+          >
+            {group.title}
+            <span className="ml-2 font-mono tabular-nums text-zinc-500">
+              {group.count}
+            </span>
+          </p>
+          {group.names.length > 0 && (
+            <ul className="mt-2 space-y-0.5">
+              {group.names.map((name) => (
+                <li
+                  key={name}
+                  className="break-words text-xs leading-snug text-zinc-300"
+                >
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+            {group.meaning}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* Client next-steps roadmap: the same three tests as scannable cards —
+   test idea, why, success. Setup detail stays in the buyer view and in
+   the Copy output; the recommendation logic is untouched. */
+function ClientTestCards({ tests }: { tests: MemoTest[] }) {
+  return (
+    <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      {tests.slice(0, 3).map((test, i) => (
+        <article
+          key={i}
+          className="break-inside-avoid rounded-xl border border-white/[0.08] p-4"
+        >
+          <p className="font-mono text-[11px] font-semibold text-accent-soft">
+            T{i + 1}
+          </p>
+          <p className="mt-1.5 break-words text-[13px] font-semibold leading-snug text-zinc-100">
+            {clientizeText(test.test)}
+          </p>
+          <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+            Why it&apos;s worth testing
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+            {clientizeText(test.why)}
+          </p>
+          <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+            Success looks like
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+            {clientizeText(test.winningLooksLike)}
+          </p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 /* One run-list entry: a ledger row, not a card. */
 function TestRow({
   test,
@@ -542,8 +710,11 @@ export function Report({
 
           <div aria-hidden="true" className="mt-8 h-px bg-white/[0.08]" />
 
-          {/* Editorial stat row: numerals over small caps, hairline
-              separated — no boxes. */}
+          {/* Client view: executive summary cards (existing values
+              only). Buyer view keeps the editorial stat row below. */}
+          {client ? (
+            <ClientStatCards memo={memo} />
+          ) : (
           <div className="mt-6 grid grid-cols-2 gap-y-5 sm:grid-cols-5">
             {[
               ["Analyzed", String(memo.scope.adsAnalyzed)],
@@ -579,21 +750,46 @@ export function Report({
               </div>
             ))}
           </div>
+          )}
         </header>
 
         {/* ---- 01 · Verdict / Summary ---- */}
         <section className="animate-rise mt-12" style={stagger(2)}>
           <SectionHead n="01" title={client ? "Summary" : "The verdict"} />
-          <div className="mt-5 space-y-3.5">
-            {(client ? memo.clientSummary : memo.tldr).map((line, i) => (
-              <p
-                key={i}
-                className="max-w-3xl text-[18px] font-medium leading-relaxed text-zinc-100 sm:text-[19px]"
-              >
-                {line}
-              </p>
-            ))}
-          </div>
+          {client ? (
+            <>
+              {/* "What this means" — the clientSummary lines made
+                  visually prominent (same content, not duplicated),
+                  followed by the at-a-glance decision split. */}
+              <div className="break-inside-avoid mt-5 rounded-xl border border-accent/20 bg-accent/[0.04] p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
+                  What this means
+                </p>
+                <div className="mt-3 space-y-3">
+                  {memo.clientSummary.map((line, i) => (
+                    <p
+                      key={i}
+                      className="max-w-3xl text-[15px] font-medium leading-relaxed text-zinc-100"
+                    >
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <ClientDecisionSplit memo={memo} />
+            </>
+          ) : (
+            <div className="mt-5 space-y-3.5">
+              {memo.tldr.map((line, i) => (
+                <p
+                  key={i}
+                  className="max-w-3xl text-[18px] font-medium leading-relaxed text-zinc-100 sm:text-[19px]"
+                >
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ---- 02 · Winners / What worked ---- */}
@@ -719,13 +915,16 @@ export function Report({
               ) : undefined
             }
           />
-          {client && (
-            <p className="mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
-              We&apos;ll test new creative based on what performed strongest this
-              period — each test says why it&apos;s worth running, how it&apos;ll
-              be set up, and what success looks like.
-            </p>
-          )}
+          {client ? (
+            <>
+              <p className="mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
+                We&apos;ll test new creative based on what performed strongest
+                this period — each test says why it&apos;s worth running and
+                what success looks like.
+              </p>
+              <ClientTestCards tests={memo.nextTests} />
+            </>
+          ) : (
           <ol className="mt-1 divide-y divide-white/[0.08]">
             {memo.nextTests.map((test, i) => (
               <TestRow
@@ -740,6 +939,7 @@ export function Report({
               />
             ))}
           </ol>
+          )}
 
           {/* Creative briefs: queue a test, turn it into a hand-off
               brief. Buyer view only; session-only like everything. */}

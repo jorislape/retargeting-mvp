@@ -164,6 +164,14 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       cards (not tables) with a "N more … full detail in the Buyer
       view" note; confidence reads "This result is based on 14 ads and
       $3,385.50 in ad spend…". Buyer view keeps full tables and notes.
+- [ ] **Client visual blocks**: masthead shows 4–5 executive cards
+      (spend / typical result / best performer / judged fairly / next
+      tests) instead of the stat row; Summary renders the "What this
+      means" accent box plus the worked / needs-improvement / not-
+      enough-data split (groups with zero count disappear); next tests
+      render as three cards (idea / why / success). All values match
+      the buyer view's numbers exactly; long ad names wrap inside
+      cards, on screen and in print.
 - [ ] **Visual system (modern dark SaaS)**: cool graphite canvas with
       one quiet light source, soft translucent surface layers, white
       primary CTA, icy-cyan accent only on markers/selection/focus.
