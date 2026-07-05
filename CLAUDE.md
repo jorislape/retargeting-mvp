@@ -28,7 +28,7 @@ The CSV (and the generated memo) must never be written to a database, a file, a 
 
 **Meta data source (the one approved exception to "no auth"):** the generator can also connect a Meta account via OAuth (`modules/meta/`, `app/api/meta/*`, `MetaProvider`/`MetaConnect`) and pull ad-level insights as a "virtual CSV" that feeds the identical debrief pipeline. Its constraints are part of the fence: scope is read-only `ads_read` (never widen); the access token lives only in browser memory (`MetaProvider`) and is forwarded per-request via the Authorization header — never a cookie, never storage, never a query param, never a log (the only cookie in the flow is the short-lived OAuth CSRF nonce); insights pulls set `use_unified_attribution_setting=true` so numbers match Ads Manager; the OAuth bridge (`modules/meta/bridge.ts`) posts to an exact origin and `MetaProvider` verifies `event.origin` with strict equality — no wildcards; the Graph API version is pinned in `modules/meta/graph.ts` — check deprecation runway when bumping.
 
-**Market / competitor notes (manual input only):** the optional `marketContext` textarea is V1 pasted text, full stop. No Ads Library scraping, no URL fetching, no competitor watchlists, and never a claim about competitor spend or performance. Everything derived from it — the "Structure notes" button, the quality meter, the memo's Market signal section, market-flavored test/brief wording — is local, deterministic keyword matching (`modules/debrief/marketSignals.ts`), always marked "directional," and own account data stays the primary signal. An empty `marketContext` must leave the memo's content exactly as if the feature didn't exist (`marketSignal: null`, no market wording anywhere). The "Competitor sources" cards in the generator are the same rule wearing a form: manual fields (name / URL / Ads Library links / notes) that "Use as market notes" serializes into `marketContext` as plain text — append-only, restating only what the user typed, URLs never fetched or monitored. The engine and API never see competitor sources as a separate input.
+**Market / competitor notes (manual input, plus ONE approved fetch):** the optional `marketContext` textarea is pasted text. No Ads Library scraping, no competitor watchlists, no monitoring, and never a claim about competitor spend or performance. The one approved network action is **Competitor Landing Page Fetch V1** (`modules/competitor/`, `POST /api/competitor/fetch-page`): a single user-triggered fetch of one public landing page per click of "Fetch page signals" on a competitor-source card. Its constraints are part of the fence: SSRF-guarded (http/https only, no credentials, standard ports, hostname blocklist, every DNS answer checked against private/reserved ranges, every redirect hop re-validated — see `modules/competitor/server.ts`), hard timeout + response-size cap, text/html only; Ads Library URLs are refused by policy with a "paste manually" message, never fetched; extraction is deterministic keyword work ("observed on page" wording only); the result is appended to that source's NOTES field for the user to review — it reaches the report only through the existing "Use as market notes" → `marketContext` path; nothing is stored, cached, or logged (no URLs, no page text). Never widen this into recurring fetches, watchlists, or Ads Library reading. Everything derived from it — the "Structure notes" button, the quality meter, the memo's Market signal section, market-flavored test/brief wording — is local, deterministic keyword matching (`modules/debrief/marketSignals.ts`), always marked "directional," and own account data stays the primary signal. An empty `marketContext` must leave the memo's content exactly as if the feature didn't exist (`marketSignal: null`, no market wording anywhere). The "Competitor sources" cards in the generator are the same rule wearing a form: manual fields (name / URL / Ads Library links / notes) that "Use as market notes" serializes into `marketContext` as plain text — append-only, restating only what the user typed, URLs never fetched or monitored. The engine and API never see competitor sources as a separate input.
 
 ## Architecture
 
@@ -54,8 +54,9 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # plus competitor sources V1 (CompetitorSource, formatCompetitorSources,
                   # mergeCompetitorSourcesIntoNotes): manual structured competitor input
                   # serialized into the market-notes text — append-only, restates user
-                  # input, URLs never fetched (V1 is manual only; watchlists are a
-                  # future milestone, not a quiet addition)
+                  # input. URLs are fetched only by the explicit one-time "Fetch page
+                  # signals" action (modules/competitor); watchlists/monitoring stay a
+                  # future milestone, not a quiet addition
   format.ts       # money/count/KPI value formatting
   sampleCsv.ts    # THE sample dataset (client-safe, no engine imports) — tuned to the
                   # rules engine; its header comment lists invariants to keep when
@@ -66,6 +67,17 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # MemoBrief, MemoMarketSignal, avoid lists, confidence reasons,
                   # DebriefApiError (the structured error contract)
   index.ts        # public surface — import only from here, not the internal files
+
+modules/competitor/            # Competitor Landing Page Fetch V1 (one-time, user-triggered)
+  types.ts        # CompetitorPageSignals, FetchPageResponse (flat ok/title/message/fix)
+  pageText.ts     # hand-written HTML → text parts (title, meta, h1/h2, CTA candidates,
+                  # capped body text) — pure string work, no dependency
+  pageSignals.ts  # deterministic keyword extraction (CTA/offer/positioning/benefits/
+                  # trust) + formatPageSignalsAsNotes / appendPageSignalsToNotes —
+                  # "observed on page" wording only, never performance claims
+  server.ts       # SERVER-ONLY (node:dns/net): SSRF guard + guarded capped fetch;
+                  # import from API routes only (same rule as modules/meta/graph.ts)
+  index.ts        # client-safe surface (everything except server.ts)
 
 modules/meta/                  # optional OAuth data source ("virtual CSV")
   graph.ts        # server-only Graph client; version pin; token via Authorization header
@@ -81,6 +93,7 @@ app/api/debrief/route.ts       # the entire debrief backend — validate, parse,
                                # validation: binary/XLSX sniff, Ad name required
                                # ("export at ad level" guidance)
 app/api/meta/{login,callback,config,ad-accounts,insights}/route.ts
+app/api/competitor/fetch-page/route.ts  # one-time landing-page fetch (see scope fence)
 
 app/(marketing)/               # home route only: conventional top-nav shell, no providers
   layout.tsx, page.tsx         # hero (frameless HeroProof demo), bento, KPI demo, CTAs

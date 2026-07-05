@@ -66,6 +66,21 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       WITHOUT touching existing text; clicking again with unchanged
       sources doesn't duplicate the block; all-empty cards → amber "Add
       a competitor name, link, or note first."
+- [ ] **Fetch page signals (one-time fetch)**: button on each source
+      card is disabled with an empty URL; shows "Fetching…" then
+      "Signals added"; extracted signals land in that card's Notes under
+      "Fetched page signals (host) — observed on page, directional
+      only:" WITHOUT touching existing notes; repeat fetch of an
+      unchanged page doesn't duplicate the block.
+- [ ] **Fetch guardrails**: invalid URL, localhost/127.0.0.1/private
+      IPs/[::1]/169.254.169.254, file:/javascript:/data: URLs, custom
+      ports, and decimal-IP spellings all return a structured
+      user-friendly error (never a stack trace); a non-HTML URL returns
+      "Not a web page"; facebook.com/ads/library URLs return the "not
+      fetched in this version — paste manually" message.
+- [ ] **Fetched signals flow like typed notes**: after a fetch, "Use as
+      market notes" and "Structure notes" behave exactly as with manual
+      notes, and the report's Market signal section picks them up.
 - [ ] **Structure notes after merge**: still groups formats/hooks/offers,
       keeps every URL (website + Ads Library), carries competitor lines
       under "Raw notes", and stays idempotent.

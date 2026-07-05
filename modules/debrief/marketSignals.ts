@@ -123,8 +123,11 @@ export function assessMarketNotes(rawText: string): MarketQuality | null {
 /* (who was mentioned, how many links) plus signal labels from the     */
 /* shared term table above — never a claim about competitor spend or   */
 /* performance.                                                        */
-/* TODO(future): a later version may support a one-time URL fetch or   */
-/* competitor watchlists; V1 is deliberately manual-input only.        */
+/* A landing-page URL can additionally be fetched ONCE via the         */
+/* explicit "Fetch page signals" button (modules/competitor) — the     */
+/* result lands in the source's Notes as text and flows through here   */
+/* like anything typed. Watchlists/monitoring remain out of scope — a  */
+/* future explicit milestone, never a quiet addition.                  */
 /* ------------------------------------------------------------------ */
 
 export interface CompetitorSource {

@@ -19,6 +19,11 @@ import {
   SAMPLE_CSV_TEXT,
   structureMarketNotes,
 } from "@/modules/debrief";
+import {
+  appendPageSignalsToNotes,
+  formatPageSignalsAsNotes,
+  type FetchPageResponse,
+} from "@/modules/competitor";
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
 import { MetaConnect } from "@/components/debrief/MetaConnect";
@@ -169,6 +174,13 @@ function StageHeader({
 const methodTile =
   "flex min-h-40 flex-col rounded-xl border border-white/[0.06] bg-white/[0.03] p-5 transition-colors";
 
+/** Per-card state of the one-time "Fetch page signals" action. Absent
+ *  means idle. Session-only, like everything in the generator. */
+type PageFetchState =
+  | { status: "loading" }
+  | { status: "done" }
+  | { status: "error"; title: string; message: string; fix: string };
+
 function MethodLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
@@ -206,6 +218,10 @@ export function GeneratorPanel() {
     "idle"
   );
   const sourceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* "Fetch page signals" state per competitor-source index. */
+  const [pageFetch, setPageFetch] = useState<Record<number, PageFetchState>>(
+    {}
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
   /* Non-blocking quality read on the notes — local parsing only. */
@@ -317,11 +333,90 @@ export function GeneratorPanel() {
       competitorSources.map((s, i) => (i === index ? { ...s, ...patch } : s))
     );
     if (sourceState !== "idle") setSourceState("idle");
+    /* A new URL invalidates the card's fetch state. */
+    if ("url" in patch && pageFetch[index]) {
+      setPageFetch((prev) => {
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
+    }
   };
 
   const removeSource = (index: number) => {
     setCompetitorSources(competitorSources.filter((_, i) => i !== index));
     if (sourceState !== "idle") setSourceState("idle");
+    /* Reindex fetch states to follow the shifted cards. */
+    setPageFetch((prev) => {
+      const next: Record<number, PageFetchState> = {};
+      for (const [key, value] of Object.entries(prev)) {
+        const i = Number(key);
+        if (i === index) continue;
+        next[i > index ? i - 1 : i] = value;
+      }
+      return next;
+    });
+  };
+
+  /* One-time, user-triggered fetch of the card's landing page URL.
+     Success appends the extracted signals to the card's NOTES (the
+     user reviews them there) — they reach the report only through the
+     existing "Use as market notes" path. The server does the fetching
+     with SSRF guards; nothing is stored or monitored. */
+  const fetchPageSignals = async (index: number) => {
+    const source = competitorSources[index];
+    const url = source?.url.trim() ?? "";
+    if (url === "" || pageFetch[index]?.status === "loading") return;
+    setPageFetch((prev) => ({ ...prev, [index]: { status: "loading" } }));
+    let state: PageFetchState;
+    try {
+      const res = await fetch("/api/competitor/fetch-page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data: FetchPageResponse = await res.json();
+      if (data.ok === true) {
+        let host: string | undefined;
+        try {
+          host = new URL(url).hostname;
+        } catch {
+          /* display label only — omit if unparseable */
+        }
+        const block = formatPageSignalsAsNotes(data.signals ?? {}, host);
+        /* Functional update: append to the notes as they are NOW, not
+           as they were when the fetch started. */
+        setCompetitorSources((prev) =>
+          prev.map((s, i) =>
+            i === index
+              ? { ...s, notes: appendPageSignalsToNotes(s.notes, block) }
+              : s
+          )
+        );
+        state = { status: "done" };
+      } else {
+        state = {
+          status: "error",
+          title: typeof data.title === "string" ? data.title : "Fetch failed",
+          message:
+            typeof data.message === "string"
+              ? data.message
+              : "The page couldn't be fetched.",
+          fix:
+            typeof data.fix === "string"
+              ? data.fix
+              : "Try again, or paste the page's key points into Notes manually.",
+        };
+      }
+    } catch {
+      state = {
+        status: "error",
+        title: "Network error",
+        message: "The request didn't reach Debrief.",
+        fix: "Check your connection and try again.",
+      };
+    }
+    setPageFetch((prev) => ({ ...prev, [index]: state }));
   };
 
   /* Serializes the filled-in sources and APPENDS them to the market
@@ -881,8 +976,9 @@ export function GeneratorPanel() {
             </div>
 
             {/* Competitor sources: optional structured input that only
-                ever becomes text in the field above. Manual context
-                only — URLs are never fetched or monitored. */}
+                ever becomes text in the field above. A landing-page URL
+                can be fetched ONCE via the explicit "Fetch page signals"
+                button — never automatically, never monitored. */}
             <div className="sm:col-span-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className={fieldLabel}>Competitor sources</p>
@@ -960,15 +1056,50 @@ export function GeneratorPanel() {
                           >
                             Website / landing page URL
                           </label>
-                          <input
-                            id={`competitor-url-${i}`}
-                            value={source.url}
-                            onChange={(e) =>
-                              updateSource(i, { url: e.target.value })
-                            }
-                            placeholder="https://example.com"
-                            className={`mt-1.5 ${inputBase}`}
-                          />
+                          <div className="mt-1.5 flex gap-2">
+                            <input
+                              id={`competitor-url-${i}`}
+                              value={source.url}
+                              onChange={(e) =>
+                                updateSource(i, { url: e.target.value })
+                              }
+                              placeholder="https://example.com"
+                              className={`min-w-0 flex-1 ${inputBase}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void fetchPageSignals(i)}
+                              disabled={
+                                source.url.trim() === "" ||
+                                pageFetch[i]?.status === "loading"
+                              }
+                              className={`shrink-0 cursor-pointer ${btnSecondary}`}
+                            >
+                              {pageFetch[i]?.status === "loading" ? (
+                                <span className="motion-safe:animate-pulse">
+                                  Fetching…
+                                </span>
+                              ) : pageFetch[i]?.status === "done" ? (
+                                <span className="flex items-center gap-1.5 motion-safe:animate-settle">
+                                  <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                                  Signals added
+                                </span>
+                              ) : (
+                                "Fetch page signals"
+                              )}
+                            </button>
+                          </div>
+                          {pageFetch[i]?.status === "error" && (
+                            <p
+                              role="alert"
+                              className="mt-1.5 text-xs leading-relaxed text-amber-300"
+                            >
+                              {pageFetch[i].title}: {pageFetch[i].message}{" "}
+                              <span className="text-zinc-500">
+                                {pageFetch[i].fix}
+                              </span>
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label
@@ -1028,8 +1159,10 @@ export function GeneratorPanel() {
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
                 Competitor sources are used as directional context only —
-                Debrief does not infer competitor spend or performance, and
-                URLs are never fetched or monitored. Manual context only.
+                Debrief does not infer competitor spend or performance.
+                &ldquo;Fetch page signals&rdquo; reads the public page once,
+                at your request — Debrief does not monitor it, store it, or
+                fetch anything automatically.
               </p>
             </div>
           </div>

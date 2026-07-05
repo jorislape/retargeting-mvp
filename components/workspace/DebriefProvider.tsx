@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  Dispatch,
   ReactNode,
+  SetStateAction,
   createContext,
   useCallback,
   useContext,
@@ -38,8 +40,10 @@ export interface GeneratorFields {
 /* Competitor sources are an input aid for the market-notes field, not
    a request field: they reach the engine only after the user merges
    them into marketContext ("Use as market notes"). Same privacy rules
-   as everything else here — React state only, gone on refresh, and
-   the URLs they hold are never fetched. */
+   as everything else here — React state only, gone on refresh. The
+   URLs they hold are fetched ONLY by the explicit one-time "Fetch page
+   signals" action (POST /api/competitor/fetch-page) — never
+   automatically, never monitored, never stored. */
 
 export type GeneratorStatus = "idle" | "processing" | "ready";
 
@@ -94,7 +98,7 @@ interface DebriefContextValue {
   generatedAt: number | null;
   setFile: (file: File | null) => void;
   updateFields: (patch: Partial<GeneratorFields>) => void;
-  setCompetitorSources: (sources: CompetitorSource[]) => void;
+  setCompetitorSources: Dispatch<SetStateAction<CompetitorSource[]>>;
   setFormatOverrides: (overrides: CreativeFormatOverrides) => void;
   generate: () => Promise<void>;
   clearError: () => void;
