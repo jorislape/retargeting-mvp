@@ -20,9 +20,9 @@ import {
 } from "@/components/ui/theme";
 
 export const metadata = {
-  title: "Debrief — Your Meta Ads export, turned into a decision",
+  title: "Debrief — Your Meta Ads data, turned into a decision",
   description:
-    "Upload the CSV you already have, add competitor notes if you want, and get a buyer memo, a client-ready report, next creative tests, and briefs your team can act on. No login, nothing stored on our servers.",
+    "Upload a CSV or pull data from Meta, add market / competitor signals if useful, and get a buyer memo, client-ready report, next creative tests, and creative briefs. No login, nothing stored on our servers.",
 };
 
 /* ------------------------------------------------------------------ */
@@ -159,14 +159,14 @@ export default function HomePage() {
           For solo buyers, freelancers & small agencies
         </p>
         <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl">
-          Your Meta Ads export,{" "}
+          Your Meta Ads data,{" "}
           <span className={gradientText}>turned into a decision</span> — in
           two minutes.
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-[15px] leading-relaxed text-zinc-400">
-          Upload the CSV you already have. Add competitor notes if you want.
-          Get an opinionated buyer memo, a client-ready report, next creative
-          tests, and briefs your team can act on. No login. No dashboard.
+          Upload a CSV or pull data from Meta. Add market / competitor
+          signals if useful. Get a buyer memo, client-ready report, next
+          creative tests, and creative briefs. No login. No dashboard.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link href="/generator" className={`btn-sheen ${btnPrimary}`}>

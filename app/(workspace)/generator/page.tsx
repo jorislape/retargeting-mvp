@@ -19,11 +19,11 @@ export default function GeneratorPage() {
         <div>
           <p className={eyebrow}>Debrief generator</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Upload your ads.{" "}
+            Load your ads.{" "}
             <span className={gradientText}>Get your next tests.</span>
           </h1>
           <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
-            A decision-first debrief from your Meta Ads CSV — what worked,
+            A decision-first debrief from your Meta Ads data — what worked,
             what failed, and what to test next.{" "}
             <Link
               href="/sample"

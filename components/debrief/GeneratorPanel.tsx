@@ -825,7 +825,7 @@ export function GeneratorPanel() {
             done={!!file}
             status={file ? "Complete" : "Required"}
             statusTone={file ? "accent" : "muted"}
-            hint="Upload your export, or pull straight from Meta."
+            hint="Upload an Ads Manager export, or pull read-only data from Meta."
           />
 
           <div className="mt-5 grid gap-3 lg:grid-cols-5">

@@ -7,7 +7,7 @@ import { ImageResponse } from "next/og";
 /* ------------------------------------------------------------------ */
 
 export const alt =
-  "Debrief — your Meta Ads export, turned into a decision";
+  "Debrief — your Meta Ads data, turned into a decision";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -79,7 +79,7 @@ export default function OgImage() {
               maxWidth: 1000,
             }}
           >
-            Your Meta Ads export, turned into a decision.
+            Your Meta Ads data, turned into a decision.
           </div>
           <div style={{ display: "flex", fontSize: 28, color: "#a1a1aa" }}>
             Buyer memo · client report · next tests · creative briefs. No
