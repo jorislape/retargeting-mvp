@@ -184,7 +184,7 @@ export function diffPageSignals(
 /* ----------------------- notes serialization ---------------------- */
 
 export const WATCHLIST_CAVEAT =
-  "These signals are observed from public pages only. Debrief does not infer competitor spend, traffic, or performance.";
+  "These signals are observed from public pages only. Debrief uses them as directional creative context, but does not infer competitor spend, traffic, or performance.";
 
 function displayName(item: WatchlistItem): string {
   if (item.name.trim() !== "") return item.name.trim();

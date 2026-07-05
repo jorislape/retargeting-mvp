@@ -201,8 +201,14 @@ body {
   body .print-loss {
     color: #b91c1c !important;
   }
+  /* Center the document on paper. The screen shell offsets content
+     for the (print-hidden) sidebar — that offset is zeroed on the
+     wrapper (print:pl-0 in the workspace layout), and main then fills
+     the printable width symmetrically inside the @page margins. */
   main {
     padding: 0 !important;
-    max-width: none !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }

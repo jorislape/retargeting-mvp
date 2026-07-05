@@ -139,7 +139,7 @@ components/debrief/
                        # sequential "Refresh all" refreshes, diff display, "Add
                        # refreshed signals to market notes"; the shared directional
                        # caveat lives once in the area's intro line), stage 3 Verify =
-                       # "Confirm creative formats" (optional per-ad format dropdowns
+                       # "Review creative formats" (optional per-ad format dropdowns
                        # over the client-side preview; first 25 ads + show-all; sent as
                        # creativeFormatOverrides JSON, cleared whenever the file changes),
                        # structured-error display with one-click KPI switch

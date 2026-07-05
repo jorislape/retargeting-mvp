@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       return fail(400, {
         title: "Format confirmations could not be read",
         message: "The creative format confirmations sent with this request weren't valid.",
-        fix: "Reset the \"Confirm creative formats\" section and try again — the debrief also runs fine without confirmations.",
+        fix: "Reset the \"Review creative formats\" section and try again — the debrief also runs fine without format edits.",
       });
     }
     let kept = 0;

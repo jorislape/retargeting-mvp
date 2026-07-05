@@ -17,7 +17,9 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         {/* No bg here — the body provides the carbon canvas. */}
         <div className="flex min-h-dvh text-zinc-100 antialiased">
           <Sidebar />
-          <div className="min-w-0 flex-1 md:pl-52">
+          {/* print:pl-0 — the sidebar is print-hidden, so its layout
+              offset must go too or the printed report sits off-center. */}
+          <div className="min-w-0 flex-1 md:pl-52 print:pl-0">
             <MobileTopBar />
             <main className="mx-auto max-w-4xl px-5 py-10 pb-24 sm:px-8 sm:py-14 md:pb-16">
               {children}

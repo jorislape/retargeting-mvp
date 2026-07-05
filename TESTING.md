@@ -38,7 +38,7 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 
 - [ ] **Section appears after load**: stage 3 (Verify) shows a quiet
       "load your data first" line until a CSV is loaded, then the
-      collapsible "Confirm creative formats" block — deduped ad names,
+      collapsible "Review creative formats" block — deduped ad names,
       detected format from the name, and a Correct format dropdown per
       ad. Nothing is required; Run never blocks.
 - [ ] **First 25 / show all**: a CSV with >25 distinct ads shows 25 rows
@@ -147,8 +147,8 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       The generator is four stages (Data / Context / Verify / Run) with
       light numbered step chips that fill as stages complete and a
       status pill per stage (Required/Optional → Complete/Ready; Verify
-      shows "Skipped — …ad names and creative notes" once data is
-      loaded with nothing confirmed); input
+      shows "Auto-detected — Debrief will use ad names unless you edit
+      formats" once data is loaded with no edits); input
       methods are equal tiles and loaded data lands in one accent strip;
       market/competitor inputs sit in one combined context area with a
       single shared directional caveat. The report opens with a

@@ -295,11 +295,11 @@ export function GeneratorPanel() {
     currency: string | null;
     dateRange: { start: string; stop: string } | null;
     /** Deduped ad names + their name-derived format tags, in file
-     *  order — feeds the optional "Confirm creative formats" list.
+     *  order — feeds the optional "Review creative formats" list.
      *  Structure only; no analysis. */
     ads: { name: string; tags: string[] }[];
   } | null>(null);
-  /* "Confirm creative formats" list expansion past the first 25 ads —
+  /* "Review creative formats" list expansion past the first 25 ads —
      keyed to the File object so a new file starts collapsed without an
      effect-driven reset. */
   const [expandedFormatsFor, setExpandedFormatsFor] = useState<File | null>(
@@ -1414,7 +1414,7 @@ export function GeneratorPanel() {
                 {sourceState === "empty"
                   ? "Add a competitor name, link, or note first."
                   : competitorSources.length === 0
-                    ? "Optional. Use this when you want to turn competitor pages or notes into market context."
+                    ? "Optional — one-off context for this debrief: add competitor notes, Ads Library examples, or a single page you want included in this report."
                     : `“Use as market notes” adds competitor source details into the notes above — existing notes are kept. Up to ${MAX_COMPETITOR_SOURCES} sources.`}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
@@ -1673,7 +1673,7 @@ export function GeneratorPanel() {
               >
                 {watchNoteState === "empty"
                   ? "Refresh at least one competitor page first."
-                  : "Optional — save a few competitor pages and manually refresh their public page signals. Debrief uses them as directional market context only."}
+                  : "Optional — saved in this browser for manual refresh later: use this for competitors you may want to revisit across debriefs."}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
                 No background monitoring. No Ads Library fetching. Nothing is
@@ -1702,28 +1702,28 @@ export function GeneratorPanel() {
             statusTone={
               Object.keys(formatOverrides).length > 0 ? "accent" : "muted"
             }
-            hint="Confirm the creative format so Debrief does not rely only on ad names."
+            hint="Debrief auto-detects creative formats from ad names. Review or edit only if something looks wrong."
           />
           <p className="mt-2 text-xs leading-relaxed text-zinc-600">
             {preview &&
             preview.ads.length > 0 &&
             Object.keys(formatOverrides).length === 0
-              ? "Skipped — Debrief will use ad names and creative notes."
+              ? "Auto-detected — Debrief will use ad names unless you edit formats."
               : "Recommended for better pattern detection, but not required."}
           </p>
           {preview && preview.ads.length > 0 ? (
             <details className="group mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02] open:border-white/[0.09]">
               <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 <span className="text-sm font-semibold tracking-tight text-zinc-100">
-                  Confirm creative formats
+                  Review creative formats
                 </span>
                 <span className="text-xs text-zinc-600">
-                  Debrief guesses format from ad names — correct anything
-                  important before generating.
+                  Auto-detected from ad names — edit anything that looks
+                  wrong.
                 </span>
                 <span className="ml-auto font-mono text-[11px] tabular-nums text-zinc-500">
                   {Object.keys(formatOverrides).length > 0
-                    ? `${Object.keys(formatOverrides).length} confirmed`
+                    ? `${Object.keys(formatOverrides).length} edited`
                     : `${preview.ads.length} ad${preview.ads.length === 1 ? "" : "s"}`}
                 </span>
               </summary>
@@ -1821,13 +1821,13 @@ export function GeneratorPanel() {
                     className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                   >
                     <XIcon className="h-3 w-3" />
-                    Clear all confirmations
+                    Clear all format edits
                   </button>
                 )}
                 <p className="mt-3 text-xs leading-relaxed text-zinc-600">
-                  Format corrections are used as context for pattern
-                  detection, next tests, and creative briefs. They do not
-                  change your performance numbers.
+                  Auto-detected formats are used by default. Your edits
+                  improve pattern wording but do not change performance
+                  numbers.
                 </p>
               </div>
             </details>
