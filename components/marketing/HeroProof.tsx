@@ -162,7 +162,10 @@ export function HeroProof() {
         against the account median.
       </p>
 
-      <div aria-hidden="true" className="relative">
+      {/* overflow-x-clip contains the bloom's horizontal bleed so it can't
+          add a few px of page width on narrow screens; the vertical glow
+          still shows. */}
+      <div aria-hidden="true" className="relative overflow-x-clip">
         {/* Background depth: one soft accent bloom bleeding past the
             content. No grid, no mesh — just light. */}
         <div className="pointer-events-none absolute -inset-x-6 -inset-y-8 bg-[radial-gradient(ellipse_52%_58%_at_50%_44%,rgba(56,189,248,0.05),transparent_72%)] sm:-inset-x-24 sm:-inset-y-12" />

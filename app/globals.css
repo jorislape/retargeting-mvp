@@ -195,11 +195,20 @@ body {
     -webkit-text-fill-color: #18181b !important;
     color: #18181b !important;
   }
+  /* Win/loss are the two colors that carry meaning — re-assert them for
+     both text and the colored left-rails on the client report's cards
+     and reading lists (higher specificity than the body * flatten
+     above, so the accent survives as subtle print-safe ink). */
   body .print-win {
     color: #047857 !important;
+    border-left-color: #047857 !important;
   }
   body .print-loss {
     color: #b91c1c !important;
+    border-left-color: #b91c1c !important;
+  }
+  body .print-neutral {
+    border-left-color: #a1a1aa !important;
   }
   /* Center the document on paper. The screen shell offsets content
      for the (print-hidden) sidebar — that offset is zeroed on the

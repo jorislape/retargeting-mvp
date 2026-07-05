@@ -322,15 +322,16 @@ export default function HomePage() {
 
       {/* ---- What you get ---- */}
       <section className="animate-rise mt-16" style={{ animationDelay: "210ms" }}>
-        <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-lg font-semibold tracking-tight text-white">
-            Decide, explain, brief — from the export you already have
-          </h2>
-        </div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          What you get
+        </p>
+        <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
+          Decide, explain, brief — from the data you already have
+        </h2>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {BENEFITS.map((benefit) => (
             <div key={benefit.title} className={`${card} ${cardLift} p-5`}>
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/20 bg-accent/[0.06]">
                 <benefit.icon className="h-4 w-4 text-accent-soft" />
               </div>
               <h3 className="mt-3.5 text-[14px] font-semibold tracking-tight text-zinc-100">

@@ -195,49 +195,57 @@ function ClientAdList({
 function ClientStatCards({ memo }: { memo: Memo }) {
   const { scope } = memo;
   const best = memo.winners[0] ?? null;
-  const cards: { label: string; value: string; sub: string }[] = [
-    {
-      label: "Total spend",
-      value: scope.totalSpendLabel,
-      sub: "in the period reviewed",
-    },
-    {
-      label: `Typical ${scope.kpiLabel}`,
-      value: scope.medianLabel,
-      sub: "the account's midpoint result",
-    },
-    ...(best
-      ? [
-          {
-            label: "Best performer",
-            value: best.valueLabel,
-            sub: best.name,
-          },
-        ]
-      : []),
-    {
-      label: "Judged fairly",
-      value: `${scope.adsJudged} of ${scope.adsAnalyzed}`,
-      sub: "ads had enough spend to judge",
-    },
-    {
-      label: "Next tests",
-      value: String(memo.nextTests.length),
-      sub: "recommended below",
-    },
-  ];
+  /* tone colors the value only — the standout metrics (best performer,
+     next tests) get a subtle accent so the card grid reads at a glance.
+     print-win keeps the best-performer green in the PDF. */
+  const cards: { label: string; value: string; sub: string; tone?: string }[] =
+    [
+      {
+        label: "Total spend",
+        value: scope.totalSpendLabel,
+        sub: "in the period reviewed",
+      },
+      {
+        label: `Typical ${scope.kpiLabel}`,
+        value: scope.medianLabel,
+        sub: "the account's midpoint result",
+      },
+      ...(best
+        ? [
+            {
+              label: "Best performer",
+              value: best.valueLabel,
+              sub: best.name,
+              tone: "print-win text-emerald-400",
+            },
+          ]
+        : []),
+      {
+        label: "Judged fairly",
+        value: `${scope.adsJudged} of ${scope.adsAnalyzed}`,
+        sub: "ads had enough spend to judge",
+      },
+      {
+        label: "Next tests",
+        value: String(memo.nextTests.length),
+        sub: "recommended below",
+        tone: "text-accent-soft",
+      },
+    ];
   return (
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {cards.map((card) => (
         <div
           key={card.label}
-          className="break-inside-avoid rounded-xl border border-white/[0.06] bg-white/[0.03] p-4"
+          className="break-inside-avoid flex flex-col rounded-xl border border-white/[0.06] bg-white/[0.03] p-4"
         >
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
             {card.label}
           </p>
           <p
-            className={`mt-1.5 break-words font-mono font-semibold tabular-nums text-zinc-50 ${
+            className={`mt-1.5 break-words font-mono font-semibold tabular-nums ${
+              card.tone ?? "text-zinc-50"
+            } ${
               card.value.length > 12
                 ? "text-[15px] leading-tight"
                 : "text-[19px] leading-none"
@@ -262,6 +270,9 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
     {
       title: "Worked well",
       titleClass: "print-win text-emerald-400",
+      /* Colored left-rail + tint: green survives PDF via print-win. */
+      rail: "border-l-emerald-400/60 print-win",
+      tint: "bg-emerald-400/[0.04]",
       count: memo.winners.length,
       names: memo.winners.slice(0, 3).map((a) => a.name),
       meaning: "These ads performed above the typical result.",
@@ -269,6 +280,8 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
     {
       title: "Needs improvement",
       titleClass: "print-loss text-red-400",
+      rail: "border-l-red-400/50 print-loss",
+      tint: "bg-red-400/[0.04]",
       count: memo.losers.rows.length,
       names: memo.losers.rows.slice(0, 3).map((a) => a.name),
       meaning: "These ads performed below the typical result.",
@@ -276,6 +289,8 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
     {
       title: "Not enough data yet",
       titleClass: "text-zinc-400",
+      rail: "border-l-white/20 print-neutral",
+      tint: "bg-white/[0.02]",
       count: memo.scope.adsSetAside,
       names: [] as string[],
       meaning: "These ads need more spend before judging fairly.",
@@ -287,18 +302,22 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
       {groups.map((group) => (
         <div
           key={group.title}
-          className="break-inside-avoid rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
+          className={`break-inside-avoid rounded-xl border border-white/[0.06] border-l-2 ${group.rail} ${group.tint} p-4`}
         >
-          <p
-            className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${group.titleClass}`}
-          >
-            {group.title}
-            <span className="ml-2 font-mono tabular-nums text-zinc-500">
+          <div className="flex items-baseline justify-between gap-2">
+            <p
+              className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${group.titleClass}`}
+            >
+              {group.title}
+            </p>
+            <span
+              className={`font-mono text-[17px] font-semibold leading-none tabular-nums ${group.titleClass}`}
+            >
               {group.count}
             </span>
-          </p>
+          </div>
           {group.names.length > 0 && (
-            <ul className="mt-2 space-y-0.5">
+            <ul className="mt-2.5 space-y-0.5">
               {group.names.map((name) => (
                 <li
                   key={name}
@@ -309,7 +328,7 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
               ))}
             </ul>
           )}
-          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+          <p className="mt-2.5 text-[11px] leading-relaxed text-zinc-500">
             {group.meaning}
           </p>
         </div>
@@ -327,21 +346,27 @@ function ClientTestCards({ tests }: { tests: MemoTest[] }) {
       {tests.slice(0, 3).map((test, i) => (
         <article
           key={i}
-          className="break-inside-avoid rounded-xl border border-white/[0.08] p-4"
+          className="break-inside-avoid flex flex-col rounded-xl border border-white/[0.08] border-t-2 border-t-accent/40 p-4"
         >
-          <p className="font-mono text-[11px] font-semibold text-accent-soft">
-            T{i + 1}
-          </p>
-          <p className="mt-1.5 break-words text-[13px] font-semibold leading-snug text-zinc-100">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md border border-accent/30 bg-accent/[0.06] font-mono text-[11px] font-semibold text-accent-soft">
+              {i + 1}
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              Next test
+            </span>
+          </div>
+          <p className="mt-3 break-words text-[13px] font-semibold leading-snug text-zinc-100">
             {clientizeText(test.test)}
           </p>
-          <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
             Why it&apos;s worth testing
           </p>
           <p className="mt-1 text-xs leading-relaxed text-zinc-400">
             {clientizeText(test.why)}
           </p>
-          <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          <p className="mt-2.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-400 print-win">
+            <CheckIcon className="h-3 w-3" />
             Success looks like
           </p>
           <p className="mt-1 text-xs leading-relaxed text-zinc-400">
@@ -761,15 +786,23 @@ export function Report({
               {/* "What this means" — the clientSummary lines made
                   visually prominent (same content, not duplicated),
                   followed by the at-a-glance decision split. */}
-              <div className="break-inside-avoid mt-5 rounded-xl border border-accent/20 bg-accent/[0.04] p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
+              <div className="break-inside-avoid mt-5 rounded-xl border border-accent/25 border-l-[3px] border-l-accent/70 bg-accent/[0.05] p-5 sm:p-6">
+                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
+                  <span
+                    aria-hidden="true"
+                    className="h-1.5 w-1.5 rounded-full bg-accent"
+                  />
                   What this means
                 </p>
                 <div className="mt-3 space-y-3">
                   {memo.clientSummary.map((line, i) => (
                     <p
                       key={i}
-                      className="max-w-3xl text-[15px] font-medium leading-relaxed text-zinc-100"
+                      className={`max-w-3xl leading-relaxed text-zinc-100 ${
+                        i === 0
+                          ? "text-[16px] font-semibold sm:text-[17px]"
+                          : "text-[15px] font-medium"
+                      }`}
                     >
                       {line}
                     </p>
@@ -933,9 +966,16 @@ export function Report({
                 index={i}
                 checked={queued[i]}
                 view={view}
-                onToggle={() =>
-                  setQueued((prev) => prev.map((q, j) => (j === i ? !q : q)))
-                }
+                onToggle={() => {
+                  const wasQueued = queued[i];
+                  setQueued((prev) => prev.map((q, j) => (j === i ? !q : q)));
+                  /* Unqueuing a test drops any brief already shown for it,
+                     so visible briefs (and Copy/PDF) never outlive the
+                     selection. Re-select + Generate brings it back. */
+                  if (wasQueued) {
+                    setBriefIdxs((prev) => prev.filter((idx) => idx !== i));
+                  }
+                }}
               />
             ))}
           </ol>
