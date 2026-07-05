@@ -30,12 +30,12 @@ const STEPS = [
   {
     icon: SparklesIcon,
     title: "Set KPI and context",
-    text: "Pick the metric that matters this period and add one line each of product, offer, and goal. A target CPA sharpens the spend gate; creative notes sharpen the angle analysis.",
+    text: "Pick the metric that matters this period and add one line each of product, offer, and goal. Optional: competitor context (notes, sources, a one-time page read) as directional signal, and creative-format confirmations so the read doesn't rely on ad names alone.",
   },
   {
     icon: FlaskIcon,
     title: "Read the debrief",
-    text: "A one-page memo: verdict first, then winners, kill list, patterns, and the next three tests as a run-list. Copy it or save it as a PDF.",
+    text: "One analysis, two registers: a buyer memo and a client report — verdict first, then winners, kill list, patterns, next tests, and hand-off creative briefs. Copy it or save it as a PDF.",
   },
 ];
 

@@ -36,10 +36,11 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 
 ## Creative format confirmation
 
-- [ ] **Section appears after load**: with a CSV (or sample) loaded, the
-      collapsible "Confirm creative formats" block shows under Framing —
-      deduped ad names, detected format from the name, and a Correct
-      format dropdown per ad. Nothing is required; Run never blocks.
+- [ ] **Section appears after load**: stage 3 (Verify) shows a quiet
+      "load your data first" line until a CSV is loaded, then the
+      collapsible "Confirm creative formats" block — deduped ad names,
+      detected format from the name, and a Correct format dropdown per
+      ad. Nothing is required; Run never blocks.
 - [ ] **First 25 / show all**: a CSV with >25 distinct ads shows 25 rows
       plus "Show all N ads"; toggling back works; a huge CSV stays usable.
 - [ ] **No corrections → identical output**: generating without touching
@@ -117,9 +118,11 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] **Visual system (modern dark SaaS)**: cool graphite canvas with
       one quiet light source, soft translucent surface layers, white
       primary CTA, icy-cyan accent only on markers/selection/focus.
-      The generator is three stages with light numbered step chips
-      that fill as stages complete; input methods are equal tiles and
-      loaded data lands in one accent strip. The report opens with a
+      The generator is four stages (Data / Context / Verify / Run) with
+      light numbered step chips that fill as stages complete; input
+      methods are equal tiles and loaded data lands in one accent strip;
+      market/competitor inputs sit in one combined context area with a
+      single shared directional caveat. The report opens with a
       short accent bar and reads as a structured document: stat row
       without boxes, numbered sections, ledger run-list. No serif, no
       gold, no neon, no glows. PDF flattens to ink-on-paper.

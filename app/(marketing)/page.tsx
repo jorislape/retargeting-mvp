@@ -61,8 +61,8 @@ const STEPS: { title: string; text: string }[] = [
     text: "Use your ad-level export from Meta Ads Manager. Debrief detects rows, columns, and KPI availability before running.",
   },
   {
-    title: "Add market notes",
-    text: "Optional — paste competitor hooks, offers, Ads Library links, or rough notes. They stay directional and never override your own data.",
+    title: "Add competitor context",
+    text: "Optional — add competitor pages, Ads Library examples, hooks, offers, or rough notes, and confirm creative formats. Context stays directional and never overrides your own data.",
   },
   {
     title: "Get the decision",
@@ -73,7 +73,7 @@ const STEPS: { title: string; text: string }[] = [
 const TRUST = [
   "No login required",
   "CSV processed in your session only — no database, nothing stored",
-  "No scraping — market context stays directional",
+  "No monitoring or scraping — a competitor page is read once, only when you ask",
   "Ads are never launched or changed",
   "Meta connection optional and read-only (ads_read)",
 ];

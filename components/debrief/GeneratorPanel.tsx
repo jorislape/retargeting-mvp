@@ -45,14 +45,18 @@ import {
 } from "@/components/ui/theme";
 
 /* ------------------------------------------------------------------ */
-/* The generator as a WORKFLOW: three stages, each opened by a light   */
+/* The generator as a WORKFLOW: four stages, each opened by a light    */
 /* step header (numbered chip that fills as the stage completes) —     */
-/*   01 SOURCE   CSV upload is the primary path, Meta connect the     */
+/*   01 DATA     CSV upload is the primary path, Meta connect the     */
 /*               integration alternative, sample data a helper row —  */
 /*               whatever fills the pipeline lands in one shared strip */
-/*   02 FRAMING  the KPI (underline-selected, polarity shown) and the */
-/*               context the memo is written against                   */
-/*   03 RUN      one status line, one white action                     */
+/*   02 CONTEXT  the KPI (underline-selected, polarity shown), the    */
+/*               required framing, and ONE combined optional market /  */
+/*               competitor area (notes + sources + one-time page      */
+/*               fetch + Structure notes + Use as market notes)        */
+/*   03 VERIFY   optional creative-format confirmation over the        */
+/*               loaded CSV — trust step, not a requirement            */
+/*   04 RUN      one status line, one white action                     */
 /* Stage completion is real state, not decoration.                     */
 /* ------------------------------------------------------------------ */
 
@@ -534,11 +538,11 @@ export function GeneratorPanel() {
       )}
 
       <div className="space-y-12">
-        {/* ---- Stage 01 · Source ---- */}
+        {/* ---- Stage 01 · Data ---- */}
         <section>
           <StageHeader
             n="1"
-            title="Source"
+            title="Data"
             done={!!file}
             hint="Upload your export, or pull straight from Meta."
           />
@@ -795,13 +799,13 @@ export function GeneratorPanel() {
           </div>
         </section>
 
-        {/* ---- Stage 02 · Framing ---- */}
+        {/* ---- Stage 02 · Context ---- */}
         <section>
           <StageHeader
             n="2"
-            title="Framing"
+            title="Context"
             done={contextDone}
-            hint="The KPI the memo judges by, and the context it's written against."
+            hint="The KPI the memo judges by, your framing, and optional market context."
           />
 
           <fieldset className="mt-5">
@@ -913,7 +917,29 @@ export function GeneratorPanel() {
                 className={`mt-1.5 resize-none ${inputBase}`}
               />
             </div>
-            <div className="sm:col-span-3">
+          </div>
+          <p className="mt-3 text-xs text-zinc-600">
+            * Required — a target CPA sharpens the spend gate.
+          </p>
+
+          {/* ONE combined market/competitor context area: notes,
+              competitor sources, the one-time page fetch, Structure
+              notes, and Use as market notes all live here. The intro
+              line carries the shared caveat so it isn't repeated under
+              every field. */}
+          <div className="mt-8 border-t border-white/[0.06] pt-6">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 className="text-[13px] font-semibold tracking-tight text-zinc-200">
+                Market / competitor context
+              </h3>
+              <p className="text-xs text-zinc-600">
+                Optional — add competitor pages, Ads Library examples, hooks,
+                offers, or rough notes. Debrief uses this as directional
+                market context only.
+              </p>
+            </div>
+
+            <div className="mt-4">
               <div className="flex items-center justify-between gap-3">
                 <label htmlFor="marketContext" className={fieldLabel}>
                   Market / competitor notes
@@ -967,19 +993,16 @@ export function GeneratorPanel() {
                   ? "Add competitor notes or links first."
                   : marketQuality
                     ? `Market context: ${marketQuality.summary}`
-                    : "Optional — paste Ads Library links, competitor ad copy, hooks, offers, formats, or rough notes."}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-600">
-                Used as directional context only — competitor
-                spend/performance is not inferred.
+                    : "Paste rough notes — “Structure notes” groups them into formats, hooks, offers, and links."}
               </p>
             </div>
 
-            {/* Competitor sources: optional structured input that only
-                ever becomes text in the field above. A landing-page URL
-                can be fetched ONCE via the explicit "Fetch page signals"
-                button — never automatically, never monitored. */}
-            <div className="sm:col-span-3">
+            {/* Competitor sources: structured input that only ever
+                becomes text in the notes field above. A landing-page
+                URL can be fetched ONCE via the explicit "Fetch page
+                signals" button — never automatically, never
+                monitored. */}
+            <div className="mt-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className={fieldLabel}>Competitor sources</p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1154,35 +1177,39 @@ export function GeneratorPanel() {
                 {sourceState === "empty"
                   ? "Add a competitor name, link, or note first."
                   : competitorSources.length === 0
-                    ? "Optional — list competitors by name, landing page, and Ads Library examples, then merge them into the market notes above."
-                    : `Up to ${MAX_COMPETITOR_SOURCES} sources. “Use as market notes” appends a structured summary to the field above — your existing notes are kept.`}
+                    ? "List competitors by name, landing page, and Ads Library examples — “Use as market notes” merges them into the notes above."
+                    : `Up to ${MAX_COMPETITOR_SOURCES} sources. “Use as market notes” appends a structured summary to the notes above — your existing notes are kept.`}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600">
-                Competitor sources are used as directional context only —
-                Debrief does not infer competitor spend or performance.
                 &ldquo;Fetch page signals&rdquo; reads the public page once,
-                at your request — Debrief does not monitor it, store it, or
-                fetch anything automatically.
+                when you click — no monitoring, no storage, no Ads Library
+                fetching, and no competitor-performance inference.
               </p>
             </div>
           </div>
-          <p className="mt-3 text-xs text-zinc-600">
-            * Required — a target CPA sharpens the spend gate.
-          </p>
+        </section>
 
-          {/* Creative Format Confirmation V1: optional per-ad format
-              corrections for the loaded CSV. Local parsing only —
-              corrections replace the ad-name guess as pattern context,
-              never a performance number. */}
-          {preview && preview.ads.length > 0 && (
-            <details className="group mt-8 rounded-xl border border-white/[0.06] bg-white/[0.02] open:border-white/[0.09]">
+        {/* ---- Stage 03 · Verify ---- */}
+        {/* Creative Format Confirmation V1: optional per-ad format
+            corrections for the loaded CSV. Local parsing only —
+            corrections replace the ad-name guess as pattern context,
+            never a performance number. */}
+        <section>
+          <StageHeader
+            n="3"
+            title="Verify"
+            done={Object.keys(formatOverrides).length > 0}
+            hint="Optional — confirm the creative format so Debrief does not rely only on ad names."
+          />
+          {preview && preview.ads.length > 0 ? (
+            <details className="group mt-5 rounded-xl border border-white/[0.06] bg-white/[0.02] open:border-white/[0.09]">
               <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 <span className="text-sm font-semibold tracking-tight text-zinc-100">
                   Confirm creative formats
                 </span>
                 <span className="text-xs text-zinc-600">
-                  Optional — Debrief guesses format from ad names. Correct
-                  anything important before generating.
+                  Debrief guesses format from ad names — correct anything
+                  important before generating.
                 </span>
                 <span className="ml-auto font-mono text-[11px] tabular-nums text-zinc-500">
                   {Object.keys(formatOverrides).length > 0
@@ -1294,12 +1321,22 @@ export function GeneratorPanel() {
                 </p>
               </div>
             </details>
+          ) : (
+            <p className="mt-4 text-xs leading-relaxed text-zinc-600">
+              Load your data in stage 1 — the detected ads and their formats
+              will be listed here for review.
+            </p>
           )}
         </section>
 
-        {/* ---- Stage 03 · Run ---- */}
+        {/* ---- Stage 04 · Run ---- */}
         <section>
-          <StageHeader n="3" title="Run" done={false} />
+          <StageHeader
+            n="4"
+            title="Run"
+            done={false}
+            hint="Turns your data and context into a buyer memo, client report, next tests, and creative briefs."
+          />
           <div className="mt-4 flex flex-col gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[13px] leading-relaxed text-zinc-400">

@@ -119,13 +119,16 @@ components/workspace/
                        # brand (components/ui/brand.tsx — glyph is for icon surfaces only)
 
 components/debrief/
-  GeneratorPanel.tsx   # 3-stage workflow (Source / Framing / Run): dropzone, sample
+  GeneratorPanel.tsx   # 4-stage workflow (Data / Context / Verify / Run): dropzone, sample
                        # load + sample CSV download, CSV requirements helper, client-side
                        # upload preview (rows/columns/KPI check via the same parser +
-                       # alias matcher — structure only, no analysis), market-notes field
-                       # with Structure button + quality meter, competitor-sources cards
-                       # (up to 5; "Use as market notes" appends, never overwrites),
-                       # "Confirm creative formats" list (optional per-ad format dropdowns
+                       # alias matcher — structure only, no analysis), ONE combined
+                       # "Market / competitor context" area in stage 2 (notes field with
+                       # Structure button + quality meter, competitor-sources cards — up
+                       # to 5, "Use as market notes" appends, never overwrites — and the
+                       # one-time "Fetch page signals" action; the shared directional
+                       # caveat lives once in the area's intro line), stage 3 Verify =
+                       # "Confirm creative formats" (optional per-ad format dropdowns
                        # over the client-side preview; first 25 ads + show-all; sent as
                        # creativeFormatOverrides JSON, cleared whenever the file changes),
                        # structured-error display with one-click KPI switch

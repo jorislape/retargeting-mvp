@@ -127,26 +127,29 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
     }
   }
 
-  if (hasNameSignal) {
-    /* When any of the counted formats were user-confirmed, say so —
-       the read is stronger than a name guess, but still context. With
-       no confirmations the wording is byte-identical to before. */
-    const tagNote = (
-      best: { tag: string; count: number; confirmed: number },
-      group: RankedAd[],
-      groupLabel: "winners" | "losers"
-    ): string =>
-      best.confirmed > 0
-        ? `"${best.tag}" ads make up ${best.count}/${group.length} ${groupLabel} (${best.confirmed} format${best.confirmed === 1 ? "" : "s"} user-confirmed).`
-        : `"${best.tag}"-tagged ads make up ${best.count}/${group.length} ${groupLabel}.`;
-    const winnerTag = dominantTag(winners);
-    if (winnerTag) {
-      winnerNotes.push(tagNote(winnerTag, winners, "winners"));
-    }
-    const loserTag = dominantTag(losers);
-    if (loserTag) {
-      loserNotes.push(tagNote(loserTag, losers, "losers"));
-    }
+  /* Format-share bullets. Gating matches how the tags are used
+     downstream (Next Tests signals, What-not-to-do): a name-derived
+     GUESS still needs group-level support (hasNameSignal) before
+     Patterns asserts it, but a user-CONFIRMED format is direct context
+     and shows on its own — if the Next Tests signals can say "ugc ads
+     hold 2/5 winner slots (2 formats user-confirmed)", Patterns must
+     show the same share. Runs without confirmations are byte-identical
+     to the legacy wording and gate. */
+  const tagNote = (
+    best: { tag: string; count: number; confirmed: number },
+    group: RankedAd[],
+    groupLabel: "winners" | "underperformers"
+  ): string =>
+    best.confirmed > 0
+      ? `${formatLabel(best.tag)} ads make up ${best.count}/${group.length} ${groupLabel} (${best.confirmed} format${best.confirmed === 1 ? "" : "s"} user-confirmed).`
+      : `"${best.tag}"-tagged ads make up ${best.count}/${group.length} ${groupLabel === "winners" ? "winners" : "losers"}.`;
+  const winnerTag = dominantTag(winners);
+  if (winnerTag && (hasNameSignal || winnerTag.confirmed > 0)) {
+    winnerNotes.push(tagNote(winnerTag, winners, "winners"));
+  }
+  const loserTag = dominantTag(losers);
+  if (loserTag && (hasNameSignal || loserTag.confirmed > 0)) {
+    loserNotes.push(tagNote(loserTag, losers, "underperformers"));
   }
 
   if (winnerNotes.length === 0) {
