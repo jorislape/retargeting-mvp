@@ -15,7 +15,7 @@ export default function MarketingLayout({
   return (
     <div className="flex min-h-dvh flex-col text-zinc-100 antialiased">
       <TopNav />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-10 sm:px-8 sm:py-14">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-10 sm:px-8 sm:py-14 lg:py-8">
         {children}
       </main>
       <footer className="border-t border-white/[0.06]">

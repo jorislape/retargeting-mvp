@@ -150,7 +150,7 @@ export default function HomePage() {
   return (
     <div>
       {/* ---- Hero ---- */}
-      <section className="animate-rise pt-4 text-center sm:pt-10 lg:pt-8">
+      <section className="animate-rise pt-4 text-center sm:pt-10 lg:pt-4">
         <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium text-zinc-400">
           <span
             aria-hidden="true"
@@ -168,7 +168,7 @@ export default function HomePage() {
           signals if useful. Get a buyer memo, client-ready report, next
           creative tests, and creative briefs. No login. No dashboard.
         </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:mt-6">
           <Link href="/generator" className={`btn-sheen ${btnPrimary}`}>
             Debrief your ads
             <ArrowIcon className="h-4 w-4" />
@@ -177,7 +177,7 @@ export default function HomePage() {
             View sample report
           </Link>
         </div>
-        <p className="mt-4 text-xs text-zinc-600">
+        <p className="mt-4 text-xs text-zinc-600 lg:mt-3">
           No login · Nothing stored server-side · Optional read-only Meta connection
         </p>
 
@@ -185,7 +185,7 @@ export default function HomePage() {
             Frameless — it floats on its own data surface. lg: tightens
             this gap on desktop/laptop so the demo clears the fold
             instead of sitting mostly below it. */}
-        <div className="mx-auto mt-16 max-w-2xl text-left sm:mt-20 lg:mt-12">
+        <div className="mx-auto mt-16 max-w-2xl text-left sm:mt-20 lg:mt-8">
           <HeroProof />
         </div>
       </section>
