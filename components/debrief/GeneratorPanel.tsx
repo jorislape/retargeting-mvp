@@ -934,29 +934,35 @@ export function GeneratorPanel() {
             </div>
           </div>
 
-          {/* Helper path, deliberately quiet: sample data is a demo
-              aid, not a workflow. */}
-          <p className="mt-3 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-600">
-            <FlaskIcon className="h-3.5 w-3.5 text-zinc-600" />
-            No CSV handy?
-            <button
-              type="button"
-              onClick={loadSample}
-              className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
-              Load the sample dataset
-            </button>
-            — 14 synthetic ads for a full test run. Want to check the format
-            first?
-            <button
-              type="button"
-              onClick={downloadSample}
-              className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
-              Download sample CSV
-            </button>
-            .
-          </p>
+          {/* Demo-first path: a cold visitor can see a full debrief
+              before uploading anything. Framed (not a bare text link) so
+              it reads as a real option, but kept understated so CSV
+              upload stays the recommended route. */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+            <span className="flex items-center gap-2 text-xs text-zinc-400">
+              <FlaskIcon className="h-4 w-4 shrink-0 text-accent-soft" />
+              <span>
+                <span className="font-medium text-zinc-200">New here?</span> See
+                a full debrief on 14 synthetic ads — no upload needed.
+              </span>
+            </span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <button
+                type="button"
+                onClick={loadSample}
+                className={`cursor-pointer ${btnSecondary}`}
+              >
+                Load the sample dataset
+              </button>
+              <button
+                type="button"
+                onClick={downloadSample}
+                className="cursor-pointer rounded-sm text-xs font-medium text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                Download sample CSV
+              </button>
+            </div>
+          </div>
 
           {/* The shared landing strip: whichever method produced the
               data, this is the single source of truth for what's
@@ -1200,16 +1206,20 @@ export function GeneratorPanel() {
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="creativeNotes" className={fieldLabel}>
-                Creative notes
+                Creative / brand constraints
               </label>
               <textarea
                 id="creativeNotes"
                 rows={2}
                 value={fields.creativeNotes}
                 onChange={(e) => updateFields({ creativeNotes: e.target.value })}
-                placeholder="e.g. Ads 3 & 5 are UGC; rest are statics"
+                placeholder="e.g. brand tone, country restrictions, segment limits, claims to avoid, required offer language"
                 className={`mt-1.5 resize-none ${inputBase}`}
               />
+              <p className="mt-1.5 text-xs text-zinc-600">
+                Optional — when provided, these carry into the creative briefs
+                as guardrails. Doesn&apos;t affect scoring or ranking.
+              </p>
             </div>
           </div>
           <p className="mt-3 text-xs text-zinc-600">

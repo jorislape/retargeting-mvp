@@ -448,6 +448,20 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       : kpi === "ctr"
         ? `CTR above ${typicalLabel} once the ~${gateLabel} spend gate is cleared, without cost per click worsening materially.`
         : `${kpiLabel} ${HIGHER_IS_BETTER[kpi] ? "above" : "below"} ${typicalLabel} once the ~${gateLabel} spend gate is cleared.`;
+  /* Creative / brand constraints the user typed (tone, geo, claims to
+     avoid, required offer language). Surfaced as a brief guardrail so
+     the hand-off respects them — never touches scoring, ranking, or the
+     gate. Empty field → empty array → briefs byte-identical to before. */
+  const creativeConstraints = context.creativeNotes.trim();
+  const constraintSnippet =
+    creativeConstraints.length > 140
+      ? `${creativeConstraints.slice(0, 137)}…`
+      : creativeConstraints.replace(/\.+$/, ""); // avoid a double period before the close-quote
+  const constraintGuardrail: string[] = creativeConstraints
+    ? [
+        `Honor the creative / brand constraints you provided: "${constraintSnippet}".`,
+      ]
+    : [];
   const briefGuardrails = (marketInformed: boolean): string[] => [
     `Do not judge before ~${gateLabel} of spend — below the gate the ad is set aside, not failed.`,
     `Do not scale until the test beats ${typicalLabel} by ${SCALE_TEST_MIN_DELTA_PCT}%+.`,
@@ -456,6 +470,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
           "Do not copy competitor ads directly — adapt the observed pattern to your own claim.",
         ]
       : []),
+    ...constraintGuardrail,
   ];
   const basisNote = (marketInformed: boolean): string =>
     marketInformed
@@ -768,6 +783,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         guardrails: [
           "Do not change creative or audience during the 5–7 day window — scaling must stay the only variable.",
           `If ${kpiLabel} drifts more than 15%, step the budget back — no chasing with edits mid-window.`,
+          ...constraintGuardrail,
         ],
         basisNote: basisNote(false),
       },

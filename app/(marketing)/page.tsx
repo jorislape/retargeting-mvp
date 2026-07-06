@@ -156,7 +156,7 @@ export default function HomePage() {
             aria-hidden="true"
             className="h-1.5 w-1.5 rounded-full bg-accent"
           />
-          For solo buyers, freelancers & small agencies
+          For media buyers and lean marketing teams
         </p>
         <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl">
           Your Meta Ads data,{" "}
@@ -177,7 +177,17 @@ export default function HomePage() {
             View sample report
           </Link>
         </div>
-        <p className="mt-4 text-xs text-zinc-600 lg:mt-3">
+        <p className="mt-3.5 text-[13px] text-zinc-400 lg:mt-3">
+          No CSV ready?{" "}
+          <Link
+            href="/sample"
+            className="rounded-sm font-medium text-accent-soft underline decoration-accent/40 underline-offset-2 transition hover:decoration-accent"
+          >
+            Start with the sample report
+          </Link>{" "}
+          — see a full debrief before uploading anything.
+        </p>
+        <p className="mt-2.5 text-xs text-zinc-600">
           No login · Nothing stored server-side · Optional read-only Meta connection
         </p>
 
