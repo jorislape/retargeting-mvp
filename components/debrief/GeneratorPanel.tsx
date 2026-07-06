@@ -26,15 +26,16 @@ import {
 } from "@/modules/debrief";
 import {
   appendPageSignalsToNotes,
-  diffPageSignals,
   EMPTY_WATCHLIST_ITEM,
+  formatCompetitorSignalNotes,
   formatPageSignalsAsNotes,
-  formatWatchlistSignalsAsNotes,
   getWatchlistServerSnapshot,
   getWatchlistSnapshot,
+  groupSignalChanges,
   MAX_WATCHLIST_ITEMS,
   setWatchlist,
   subscribeWatchlist,
+  summarizePageSignals,
   type FetchPageResponse,
   type WatchlistItem,
 } from "@/modules/competitor";
@@ -674,13 +675,30 @@ export function GeneratorPanel() {
      append-dedupe semantics as everything else: existing notes kept,
      an identical block is a no-op. */
   const addWatchSignalsToNotes = () => {
-    const block = formatWatchlistSignalsAsNotes(getWatchlistSnapshot());
-    if (block === null) {
+    const watchlist = getWatchlistSnapshot();
+    const refreshed = watchlist.filter((i) => i.signals !== null);
+    if (refreshed.length === 0) {
       setWatchNoteState("empty");
     } else {
-      updateFields({
-        marketContext: appendPageSignalsToNotes(fields.marketContext, block),
-      });
+      // Build improved blocks for each refreshed item with signal summary
+      let notes = fields.marketContext;
+      for (const item of refreshed) {
+        if (item.signals === null) continue;
+        const summary = summarizePageSignals(item.signals);
+        const changes = item.previousSignals
+          ? groupSignalChanges(item.previousSignals, item.signals)
+          : [];
+        const block = formatCompetitorSignalNotes(
+          item.signals,
+          summary,
+          changes,
+          item.name || new URL(item.url).hostname,
+          item.url,
+          item.refreshedAt
+        );
+        notes = appendPageSignalsToNotes(notes, block);
+      }
+      updateFields({ marketContext: notes });
       setWatchNoteState("done");
       setNoteState("idle");
     }
@@ -1775,8 +1793,7 @@ export function GeneratorPanel() {
                         </div>
                       </div>
 
-                      {/* Compact result card: latest signals + a simple
-                          deterministic diff vs the previous refresh. */}
+                      {/* Improved result card: signal summary + raw signals + grouped changes */}
                       {item.signals && (
                         <div className="mt-3 border-t border-white/[0.06] pt-3">
                           {item.refreshedAt && (
@@ -1785,52 +1802,115 @@ export function GeneratorPanel() {
                               {new Date(item.refreshedAt).toLocaleString()}
                             </p>
                           )}
-                          <ul className="mt-2 space-y-1 text-xs leading-relaxed text-zinc-400">
-                            {item.signals.headline && (
-                              <li>Headline: {item.signals.headline}</li>
-                            )}
-                            {(item.signals.offer || item.signals.cta) && (
-                              <li>
-                                CTA / offer:{" "}
-                                {[
-                                  item.signals.offer,
-                                  item.signals.cta
-                                    ? `CTA "${item.signals.cta}"`
-                                    : null,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </li>
-                            )}
-                            {item.signals.positioning && (
-                              <li>Positioning: {item.signals.positioning}</li>
-                            )}
-                            {item.signals.benefits &&
-                              item.signals.benefits.length > 0 && (
+
+                          {/* Signal Summary: interpreted categories */}
+                          {(() => {
+                            const summary = summarizePageSignals(item.signals);
+                            return (
+                              <div className="mt-2.5 space-y-1.5 rounded border border-accent/20 bg-accent/[0.04] p-2.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
+                                  Interpretation (signal strength:{" "}
+                                  {summary.signalStrength})
+                                </p>
+                                <ul className="space-y-1 text-xs leading-relaxed text-zinc-400">
+                                  <li>
+                                    <strong>Angle / message:</strong>{" "}
+                                    {summary.angleOrMessage}
+                                  </li>
+                                  <li>
+                                    <strong>Offer / CTA pattern:</strong>{" "}
+                                    {summary.offerCTAPattern}
+                                  </li>
+                                  <li>
+                                    <strong>Proof / trust pattern:</strong>{" "}
+                                    {summary.proofTrustPattern}
+                                  </li>
+                                  <li>
+                                    <strong>Landing page emphasis:</strong>{" "}
+                                    {summary.landingPageEmphasis}
+                                  </li>
+                                  <li>
+                                    <strong>Creative inspiration:</strong>{" "}
+                                    {summary.creativeInspiration}
+                                  </li>
+                                </ul>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Raw Observed Signals: collapsible for detail */}
+                          <details className="mt-2.5">
+                            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500 hover:text-zinc-400">
+                              Raw observed signals
+                            </summary>
+                            <ul className="mt-1 space-y-1 text-xs leading-relaxed text-zinc-400">
+                              {item.signals.headline && (
+                                <li>Headline: {item.signals.headline}</li>
+                              )}
+                              {(item.signals.offer || item.signals.cta) && (
                                 <li>
-                                  Claims / benefits:{" "}
-                                  {item.signals.benefits.join(", ")}
+                                  CTA / offer:{" "}
+                                  {[
+                                    item.signals.offer,
+                                    item.signals.cta
+                                      ? `CTA "${item.signals.cta}"`
+                                      : null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")}
                                 </li>
                               )}
-                            {item.signals.trustSignals &&
-                              item.signals.trustSignals.length > 0 && (
+                              {item.signals.positioning && (
                                 <li>
-                                  Trust signals:{" "}
-                                  {item.signals.trustSignals.join(", ")}
+                                  Positioning: {item.signals.positioning}
                                 </li>
                               )}
-                          </ul>
+                              {item.signals.benefits &&
+                                item.signals.benefits.length > 0 && (
+                                  <li>
+                                    Claims / benefits:{" "}
+                                    {item.signals.benefits.join(", ")}
+                                  </li>
+                                )}
+                              {item.signals.trustSignals &&
+                                item.signals.trustSignals.length > 0 && (
+                                  <li>
+                                    Trust signals:{" "}
+                                    {item.signals.trustSignals.join(", ")}
+                                  </li>
+                                )}
+                            </ul>
+                          </details>
+
+                          {/* Grouped Changes: with explanations */}
                           {item.previousSignals && (
                             <div className="mt-2.5">
                               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
                                 Changes since last refresh
                               </p>
-                              <ul className="mt-1 space-y-0.5 text-xs leading-relaxed text-zinc-500">
-                                {diffPageSignals(
+                              <ul className="mt-1 space-y-1.5 text-xs leading-relaxed text-zinc-500">
+                                {groupSignalChanges(
                                   item.previousSignals,
                                   item.signals
-                                ).map((change) => (
-                                  <li key={change}>– {change}</li>
+                                ).map((group) => (
+                                  <li key={group.category}>
+                                    <div className="font-medium text-zinc-400">
+                                      {group.category}
+                                    </div>
+                                    <div className="mt-0.5 ml-2 space-y-0.5">
+                                      {group.changes.map((change) => (
+                                        <div
+                                          key={change}
+                                          className="text-zinc-500"
+                                        >
+                                          – {change}
+                                        </div>
+                                      ))}
+                                      <div className="text-zinc-600 italic">
+                                        → {group.whyItMatters}
+                                      </div>
+                                    </div>
+                                  </li>
                                 ))}
                               </ul>
                             </div>

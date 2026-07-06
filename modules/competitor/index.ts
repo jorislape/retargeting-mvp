@@ -24,6 +24,13 @@ export {
   extractPageSignals,
   formatPageSignalsAsNotes,
 } from "./pageSignals";
+export {
+  formatCompetitorSignalNotes,
+  groupSignalChanges,
+  summarizePageSignals,
+  type CompetitorSignalSummary,
+  type GroupedSignalChange,
+} from "./signalSummary";
 export type {
   CompetitorPageSignals,
   FetchPageResponse,
