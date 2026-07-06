@@ -150,7 +150,7 @@ export default function HomePage() {
   return (
     <div>
       {/* ---- Hero ---- */}
-      <section className="animate-rise pt-4 text-center sm:pt-10">
+      <section className="animate-rise pt-4 text-center sm:pt-10 lg:pt-8">
         <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium text-zinc-400">
           <span
             aria-hidden="true"
@@ -182,8 +182,10 @@ export default function HomePage() {
         </p>
 
         {/* Live proof: the engine sorting real-shaped rows, on loop.
-            Frameless — it floats on its own data surface. */}
-        <div className="mx-auto mt-16 max-w-2xl text-left sm:mt-20">
+            Frameless — it floats on its own data surface. lg: tightens
+            this gap on desktop/laptop so the demo clears the fold
+            instead of sitting mostly below it. */}
+        <div className="mx-auto mt-16 max-w-2xl text-left sm:mt-20 lg:mt-12">
           <HeroProof />
         </div>
       </section>
