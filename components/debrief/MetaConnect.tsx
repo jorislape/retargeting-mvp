@@ -192,7 +192,7 @@ export function MetaConnect() {
             ? "Waiting for Meta sign-in…"
             : "Connect Meta account"}
         </button>
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-600">
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
           OAuth · ads_read only · token stays in memory
         </p>
         {config.checked && !config.configured && (
@@ -316,7 +316,7 @@ export function MetaConnect() {
         </p>
       )}
 
-      <p className="mt-2.5 border-t border-white/[0.07] pt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-600">
+      <p className="mt-2.5 border-t border-white/[0.07] pt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-400">
         TOKEN IN MEMORY ONLY · GONE ON REFRESH
       </p>
     </div>

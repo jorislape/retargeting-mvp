@@ -93,7 +93,7 @@ export default function HowItWorksPage() {
               <div className={`h-9 w-9 ${iconChip}`}>
                 <step.icon className="h-4 w-4" />
               </div>
-              <span className="font-mono text-[11px] font-semibold text-zinc-600">
+              <span className="font-mono text-[11px] font-semibold text-zinc-400">
                 0{i + 1}
               </span>
             </div>
@@ -128,7 +128,7 @@ export default function HowItWorksPage() {
             </div>
           ))}
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+        <p className="mt-3 text-xs leading-relaxed text-zinc-400">
           The same engine renders the{" "}
           <Link
             href="/sample"

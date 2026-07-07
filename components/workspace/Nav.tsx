@@ -46,14 +46,14 @@ export function Sidebar() {
               className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
                 active
                   ? "bg-white/[0.06] text-white"
-                  : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
+                  : "text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-300"
               }`}
             >
               <item.icon
                 className={`h-4 w-4 shrink-0 transition-colors ${
                   active
                     ? "text-accent-soft"
-                    : "text-zinc-600 group-hover:text-zinc-400"
+                    : "text-zinc-500 group-hover:text-zinc-400"
                 }`}
               />
               {item.label}
@@ -63,8 +63,8 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto border-t border-white/[0.06] p-4">
-        <p className="flex items-start gap-2 text-[10px] leading-relaxed text-zinc-600">
-          <ShieldIcon className="mt-0.5 h-3 w-3 shrink-0 text-zinc-600" />
+        <p className="flex items-start gap-2 text-[10px] leading-relaxed text-zinc-400">
+          <ShieldIcon className="mt-0.5 h-3 w-3 shrink-0 text-zinc-400" />
           In-memory only.
           <br />
           Nothing stored server-side.
@@ -81,7 +81,7 @@ export function MobileTopBar() {
         <Link href="/" className="flex items-center">
           <Wordmark />
         </Link>
-        <span className="text-[10px] font-medium text-zinc-600">
+        <span className="text-[10px] font-medium text-zinc-400">
           Nothing stored server-side
         </span>
       </div>
@@ -106,7 +106,7 @@ export function MobileTabBar() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={`relative flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
-                active ? "text-zinc-100" : "text-zinc-500 active:text-zinc-300"
+                active ? "text-zinc-100" : "text-zinc-400 active:text-zinc-300"
               }`}
             >
               <span

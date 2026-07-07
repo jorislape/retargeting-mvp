@@ -77,7 +77,7 @@ export function KpiDemo() {
                 {k.label}
                 <span
                   aria-hidden="true"
-                  className={`ml-1 ${active ? "text-zinc-500" : "text-zinc-600"}`}
+                  className={`ml-1 ${active ? "text-zinc-400" : "text-zinc-500"}`}
                 >
                   {k.higher ? "↑" : "↓"}
                 </span>
@@ -85,7 +85,7 @@ export function KpiDemo() {
             );
           })}
         </div>
-        <p className="font-mono text-[11px] tabular-nums text-zinc-500">
+        <p className="font-mono text-[11px] tabular-nums text-zinc-400">
           account median&nbsp;
           <span className="text-zinc-300">{kpi.fmt(median)}</span>
         </p>
@@ -111,7 +111,7 @@ export function KpiDemo() {
                       : "border-red-400/15 bg-red-400/[0.03]"
                 }`}
               >
-                <span className="w-5 shrink-0 font-mono text-[10px] tabular-nums text-zinc-600">
+                <span className="w-5 shrink-0 font-mono text-[10px] tabular-nums text-zinc-400">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-300">
@@ -123,7 +123,7 @@ export function KpiDemo() {
                 <span
                   className={`w-24 shrink-0 text-right font-mono text-[10px] font-semibold tabular-nums sm:w-28 ${
                     atMedian
-                      ? "text-zinc-500"
+                      ? "text-zinc-400"
                       : win
                         ? "text-emerald-400"
                         : "text-red-400"
@@ -139,7 +139,7 @@ export function KpiDemo() {
         </ol>
       </LazyMotion>
 
-      <p className="mt-3.5 text-xs leading-relaxed text-zinc-600">
+      <p className="mt-3.5 text-xs leading-relaxed text-zinc-400">
         Five ads from the sample dataset. Change the KPI and the ranking,
         median, and deltas recompute — nothing else moves the numbers.
       </p>

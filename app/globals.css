@@ -16,7 +16,7 @@
  * Fonts arrive as CSS variables from next/font in app/layout.tsx.
  */
 :root {
-  --background: #0b0c0f;
+  --background: #0e0f13;
   --foreground: #fafafa;
 }
 
@@ -24,10 +24,13 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   /* carbon = canvas; panel = opaque surface (processing, tiles);
-     well = recessed inputs */
-  --color-carbon: #0b0c0f;
-  --color-panel: #131519;
-  --color-well: #08090b;
+     well = recessed inputs. Kept one step above true black so the
+     canvas reads as graphite, not void — long reading sessions on a
+     card/well/canvas ladder that's too close together is what makes a
+     dark UI feel "tiring" and flat. */
+  --color-carbon: #0e0f13;
+  --color-panel: #16181d;
+  --color-well: #0a0b0e;
   /* the accent: icy cyan, used sparingly */
   --color-accent: #38bdf8;
   --color-accent-soft: #7dd3fc;

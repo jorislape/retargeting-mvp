@@ -121,7 +121,7 @@ function ProcessingPanel() {
 
   return (
     <div
-      className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.02] px-6 text-center"
+      className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.04] px-6 text-center"
       role="status"
       aria-live="polite"
     >
@@ -185,7 +185,7 @@ function StageHeader({
         className={`flex h-6 w-6 items-center justify-center rounded-md font-mono text-[10px] font-semibold transition-colors ${
           done
             ? "bg-accent text-zinc-950"
-            : "border border-white/12 text-zinc-500"
+            : "border border-white/12 text-zinc-400"
         }`}
       >
         {done ? "✓" : n}
@@ -198,19 +198,19 @@ function StageHeader({
           className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
             statusTone === "accent"
               ? "border-accent/25 bg-accent/[0.08] text-accent-soft"
-              : "border-white/10 text-zinc-500"
+              : "border-white/10 text-zinc-400"
           }`}
         >
           {status}
         </span>
       )}
-      {hint && <p className="text-xs text-zinc-600 sm:ml-1">{hint}</p>}
+      {hint && <p className="text-xs text-zinc-400 sm:ml-1">{hint}</p>}
     </div>
   );
 }
 
 const methodTile =
-  "flex min-h-40 flex-col rounded-xl border border-white/[0.06] bg-white/[0.03] p-5 transition-colors";
+  "flex min-h-40 flex-col rounded-xl border border-white/[0.08] bg-white/[0.045] p-5 transition-colors";
 
 /** Per-card state of the one-time "Fetch page signals" action. Absent
  *  means idle. Session-only, like everything in the generator. */
@@ -221,7 +221,7 @@ type PageFetchState =
 
 function MethodLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
       {children}
     </p>
   );
@@ -829,7 +829,7 @@ export function GeneratorPanel() {
 
       {/* The required path, stated once up front — everything else on
           this page is an optional enhancement. */}
-      <p className="mb-8 border-l-2 border-accent/40 pl-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-8 border-l-2 border-accent/40 pl-3 text-xs leading-relaxed text-zinc-400">
         Fast path: load data, fill product / offer / goal, then generate.
         Competitor context and format review are optional.
       </p>
@@ -890,7 +890,7 @@ export function GeneratorPanel() {
               <div className="relative flex w-full items-center justify-between gap-2">
                 <MethodLabel>
                   <UploadIcon
-                    className={`h-3.5 w-3.5 ${dragging ? "text-accent-soft" : "text-zinc-500"}`}
+                    className={`h-3.5 w-3.5 ${dragging ? "text-accent-soft" : "text-zinc-400"}`}
                   />
                   CSV export
                 </MethodLabel>
@@ -912,11 +912,11 @@ export function GeneratorPanel() {
                 <p className="mt-3 text-[15px] font-medium text-zinc-100">
                   {dragging ? "Drop to load" : "Drop your Ads Manager export"}
                 </p>
-                <p className="mt-1 text-xs text-zinc-600">
+                <p className="mt-1 text-xs text-zinc-400">
                   or click to browse · max 5MB
                 </p>
               </div>
-              <span className="relative text-[11px] text-zinc-600">
+              <span className="relative text-[11px] text-zinc-400">
                 Ad-level · any column set
               </span>
             </label>
@@ -935,7 +935,7 @@ export function GeneratorPanel() {
                   Meta Ads
                 </MethodLabel>
                 {metaStatus !== "connected" && (
-                  <span className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-600">
+                  <span className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-400">
                     <span
                       aria-hidden="true"
                       className={`h-1.5 w-1.5 rounded-full ${
@@ -956,7 +956,7 @@ export function GeneratorPanel() {
               before uploading anything. Framed (not a bare text link) so
               it reads as a real option, but kept understated so CSV
               upload stays the recommended route. */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-3">
             <span className="flex items-center gap-2 text-xs text-zinc-400">
               <FlaskIcon className="h-4 w-4 shrink-0 text-accent-soft" />
               <span>
@@ -975,7 +975,7 @@ export function GeneratorPanel() {
               <button
                 type="button"
                 onClick={downloadSample}
-                className="cursor-pointer rounded-sm text-xs font-medium text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                className="cursor-pointer rounded-sm text-xs font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               >
                 Download sample CSV
               </button>
@@ -992,13 +992,13 @@ export function GeneratorPanel() {
                 <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-zinc-100">
                   {file.name}
                 </p>
-                <span className="font-mono text-[11px] text-zinc-500">
+                <span className="font-mono text-[11px] text-zinc-400">
                   {fmtBytes(file.size)} · ready
                 </span>
                 <button
                   type="button"
                   onClick={removeFile}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white"
                 >
                   <XIcon className="h-3 w-3" />
                   Remove
@@ -1038,7 +1038,7 @@ export function GeneratorPanel() {
 
           <div className="mt-4 space-y-1">
             <details className="group border-l border-white/10 pl-3 open:border-accent/40">
-              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-400 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 How to export from Meta Ads Manager
               </summary>
               <ol className="space-y-1 pb-2 pt-1.5 text-xs leading-relaxed text-zinc-400">
@@ -1061,11 +1061,11 @@ export function GeneratorPanel() {
             </details>
 
             <details className="group border-l border-white/10 pl-3 open:border-accent/40">
-              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-400 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 CSV requirements
               </summary>
               <div className="space-y-3 pb-2 pt-1.5 text-xs leading-relaxed text-zinc-400">
-                <p className="text-zinc-500">
+                <p className="text-zinc-400">
                   From Meta Ads Manager, export ads at ad level. Include
                   delivery/performance columns and the KPI you want Debrief
                   to judge.
@@ -1083,7 +1083,7 @@ export function GeneratorPanel() {
                 </div>
                 <div>
                   <p className="font-semibold text-zinc-200">Recommended</p>
-                  <p className="mt-1 font-mono text-[11px] leading-relaxed text-zinc-500">
+                  <p className="mt-1 font-mono text-[11px] leading-relaxed text-zinc-400">
                     Campaign name · Ad set name · Impressions · Clicks ·
                     Purchases or Leads · Cost per result · Website purchase
                     ROAS
@@ -1099,14 +1099,14 @@ export function GeneratorPanel() {
                         <dt className="w-16 shrink-0 font-semibold text-zinc-300">
                           {kpiName}
                         </dt>
-                        <dd className="font-mono text-[11px] leading-relaxed text-zinc-500">
+                        <dd className="font-mono text-[11px] leading-relaxed text-zinc-400">
                           {aliases}
                         </dd>
                       </div>
                     ))}
                   </dl>
                 </div>
-                <p className="text-zinc-500">
+                <p className="text-zinc-400">
                   Missing something for your KPI? You&apos;ll get a clear
                   message naming the column, not a wrong answer.
                 </p>
@@ -1143,7 +1143,7 @@ export function GeneratorPanel() {
                     className={`relative cursor-pointer px-2 pb-2.5 pt-1.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       active
                         ? "text-zinc-100"
-                        : "text-zinc-500 hover:text-zinc-300"
+                        : "text-zinc-400 hover:text-zinc-300"
                     }`}
                   >
                     {opt.label}
@@ -1154,7 +1154,7 @@ export function GeneratorPanel() {
                           ? "Higher is better"
                           : "Lower is better"
                       }
-                      className={`ml-1 ${active ? "text-accent-soft" : "text-zinc-600"}`}
+                      className={`ml-1 ${active ? "text-accent-soft" : "text-zinc-400"}`}
                     >
                       {HIGHER_IS_BETTER[opt.value] ? "↑" : "↓"}
                     </span>
@@ -1234,13 +1234,13 @@ export function GeneratorPanel() {
                 placeholder="e.g. brand tone, country restrictions, segment limits, claims to avoid, required offer language"
                 className={`mt-1.5 resize-none ${inputBase}`}
               />
-              <p className="mt-1.5 text-xs text-zinc-600">
+              <p className="mt-1.5 text-xs text-zinc-400">
                 Optional — when provided, these carry into the creative briefs
                 as guardrails. Doesn&apos;t affect scoring or ranking.
               </p>
             </div>
           </div>
-          <p className="mt-3 text-xs text-zinc-600">
+          <p className="mt-3 text-xs text-zinc-400">
             * Required — a target CPA sharpens the spend gate.
           </p>
 
@@ -1254,7 +1254,7 @@ export function GeneratorPanel() {
               <h3 className="text-[13px] font-semibold tracking-tight text-zinc-200">
                 Optional competitor context
               </h3>
-              <p className="text-xs text-zinc-600">
+              <p className="text-xs text-zinc-400">
                 Use this only if competitor hooks, offers, pages, or market
                 patterns would help explain what to test next — directional
                 context only, and it never changes your performance numbers.
@@ -1264,21 +1264,21 @@ export function GeneratorPanel() {
             {/* Market signal builder: guided chips → the same notes
                 field. Selection is UI state only until the user clicks
                 "Add selected signals to notes". */}
-            <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] p-4">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <p className={fieldLabel}>Market signal builder</p>
-                <p className="text-xs text-zinc-600">
+                <p className="text-xs text-zinc-400">
                   Optional — select the patterns you notice. Debrief turns
                   them into structured notes for better creative test
                   suggestions.
                 </p>
               </div>
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs text-zinc-400">
                 Short on time? Skip this — Debrief will still generate from
                 your ad data.
               </p>
 
-              <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-600">
+              <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
                 Examples:
                 {SIGNAL_PRESETS.map((preset) => (
                   <button
@@ -1295,7 +1295,7 @@ export function GeneratorPanel() {
               <div className="mt-3 space-y-3">
                 {SIGNAL_BUILDER_GROUPS.map((group) => (
                   <div key={group.key}>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                       {group.label}
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -1341,7 +1341,7 @@ export function GeneratorPanel() {
                   <button
                     type="button"
                     onClick={clearSelectedSignals}
-                    className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                   >
                     <XIcon className="h-3 w-3" />
                     Clear selected signals
@@ -1401,9 +1401,11 @@ export function GeneratorPanel() {
                 className={`mt-1.5 text-xs leading-relaxed ${
                   noteState === "empty" || marketQuality?.level === "weak"
                     ? "text-amber-300"
-                    : marketQuality
-                      ? "text-zinc-400"
-                      : "text-zinc-600"
+                    : marketQuality?.level === "strong"
+                      ? "font-medium text-accent-soft"
+                      : marketQuality
+                        ? "text-zinc-300"
+                        : "text-zinc-400"
                 }`}
               >
                 {noteState === "empty"
@@ -1423,7 +1425,7 @@ export function GeneratorPanel() {
               open={competitorSources.length > 0 || watchlist.length > 0}
               className="group mt-6 border-l border-white/10 pl-3 open:border-accent/40"
             >
-              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-400 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 Advanced competitor context — one-off sources &amp; a local
                 watchlist
               </summary>
@@ -1471,16 +1473,16 @@ export function GeneratorPanel() {
                   {competitorSources.map((source, i) => (
                     <div
                       key={i}
-                      className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
+                      className="rounded-lg border border-white/[0.07] bg-white/[0.04] p-4"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Source {i + 1}
                         </p>
                         <button
                           type="button"
                           onClick={() => removeSource(i)}
-                          className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                         >
                           <XIcon className="h-3 w-3" />
                           Remove
@@ -1550,7 +1552,7 @@ export function GeneratorPanel() {
                               className="mt-1.5 text-xs leading-relaxed text-amber-300"
                             >
                               {pageFetch[i].title}: {pageFetch[i].message}{" "}
-                              <span className="text-zinc-500">
+                              <span className="text-zinc-400">
                                 {pageFetch[i].fix}
                               </span>
                             </p>
@@ -1603,7 +1605,7 @@ export function GeneratorPanel() {
               <p
                 aria-live="polite"
                 className={`mt-1.5 text-xs leading-relaxed ${
-                  sourceState === "empty" ? "text-amber-300" : "text-zinc-600"
+                  sourceState === "empty" ? "text-amber-300" : "text-zinc-400"
                 }`}
               >
                 {sourceState === "empty"
@@ -1612,7 +1614,7 @@ export function GeneratorPanel() {
                     ? "One-off context for this debrief — paste notes, Ads Library examples, or fetch one page for this report."
                     : `“Use as market notes” adds competitor source details into the notes above — existing notes are kept. Up to ${MAX_COMPETITOR_SOURCES} sources.`}
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
                 &ldquo;Fetch page signals&rdquo; reads the public page once,
                 when you click — no monitoring, no storage, no Ads Library
                 fetching, and no competitor-performance inference.
@@ -1674,7 +1676,7 @@ export function GeneratorPanel() {
                     <button
                       type="button"
                       onClick={clearWatchlist}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                     >
                       <XIcon className="h-3 w-3" />
                       Clear watchlist
@@ -1688,16 +1690,16 @@ export function GeneratorPanel() {
                   {watchlist.map((item, i) => (
                     <div
                       key={i}
-                      className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
+                      className="rounded-lg border border-white/[0.07] bg-white/[0.04] p-4"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Watch {i + 1}
                         </p>
                         <button
                           type="button"
                           onClick={() => removeWatchItem(i)}
-                          className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                         >
                           <XIcon className="h-3 w-3" />
                           Remove
@@ -1767,7 +1769,7 @@ export function GeneratorPanel() {
                               className="mt-1.5 text-xs leading-relaxed text-amber-300"
                             >
                               {watchFetch[i].title}: {watchFetch[i].message}{" "}
-                              <span className="text-zinc-500">
+                              <span className="text-zinc-400">
                                 {watchFetch[i].fix}
                               </span>
                             </p>
@@ -1797,7 +1799,7 @@ export function GeneratorPanel() {
                       {item.signals && (
                         <div className="mt-3 border-t border-white/[0.06] pt-3">
                           {item.refreshedAt && (
-                            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-500">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-zinc-400">
                               Last refreshed:{" "}
                               {new Date(item.refreshedAt).toLocaleString()}
                             </p>
@@ -1840,7 +1842,7 @@ export function GeneratorPanel() {
 
                           {/* Raw Observed Signals: collapsible for detail */}
                           <details className="mt-2.5">
-                            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500 hover:text-zinc-400">
+                            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400 hover:text-zinc-300">
                               Raw observed signals
                             </summary>
                             <ul className="mt-1 space-y-1 text-xs leading-relaxed text-zinc-400">
@@ -1885,10 +1887,10 @@ export function GeneratorPanel() {
                           {/* Grouped Changes: with explanations */}
                           {item.previousSignals && (
                             <div className="mt-2.5">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                                 Changes since last refresh
                               </p>
-                              <ul className="mt-1 space-y-1.5 text-xs leading-relaxed text-zinc-500">
+                              <ul className="mt-1 space-y-1.5 text-xs leading-relaxed text-zinc-400">
                                 {groupSignalChanges(
                                   item.previousSignals,
                                   item.signals
@@ -1901,12 +1903,12 @@ export function GeneratorPanel() {
                                       {group.changes.map((change) => (
                                         <div
                                           key={change}
-                                          className="text-zinc-500"
+                                          className="text-zinc-400"
                                         >
                                           – {change}
                                         </div>
                                       ))}
-                                      <div className="text-zinc-600 italic">
+                                      <div className="text-zinc-400 italic">
                                         → {group.whyItMatters}
                                       </div>
                                     </div>
@@ -1925,14 +1927,14 @@ export function GeneratorPanel() {
               <p
                 aria-live="polite"
                 className={`mt-1.5 text-xs leading-relaxed ${
-                  watchNoteState === "empty" ? "text-amber-300" : "text-zinc-600"
+                  watchNoteState === "empty" ? "text-amber-300" : "text-zinc-400"
                 }`}
               >
                 {watchNoteState === "empty"
                   ? "Refresh at least one competitor page first."
                   : "Local watchlist for later — keep a few competitor pages in this browser and manually refresh them when needed."}
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
                 Stored locally in this browser only — Debrief does not save
                 it on a server. No background monitoring, no Ads Library
                 fetching, and nothing is sent to the report until you add it
@@ -1963,7 +1965,7 @@ export function GeneratorPanel() {
             }
             hint="Debrief auto-detects creative formats from ad names. Review or edit only if something looks wrong."
           />
-          <p className="mt-2 text-xs leading-relaxed text-zinc-600">
+          <p className="mt-2 text-xs leading-relaxed text-zinc-400">
             {preview &&
             preview.ads.length > 0 &&
             Object.keys(formatOverrides).length === 0
@@ -1971,16 +1973,16 @@ export function GeneratorPanel() {
               : "Recommended for better pattern detection, but not required."}
           </p>
           {preview && preview.ads.length > 0 ? (
-            <details className="group mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02] open:border-white/[0.09]">
+            <details className="group mt-3 rounded-xl border border-white/[0.07] bg-white/[0.04] open:border-white/[0.09]">
               <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 <span className="text-sm font-semibold tracking-tight text-zinc-100">
                   Review creative formats
                 </span>
-                <span className="text-xs text-zinc-600">
+                <span className="text-xs text-zinc-400">
                   Auto-detected from ad names — edit anything that looks
                   wrong.
                 </span>
-                <span className="ml-auto font-mono text-[11px] tabular-nums text-zinc-500">
+                <span className="ml-auto font-mono text-[11px] tabular-nums text-zinc-400">
                   {Object.keys(formatOverrides).length > 0
                     ? `${Object.keys(formatOverrides).length} edited`
                     : `${preview.ads.length} ad${preview.ads.length === 1 ? "" : "s"}`}
@@ -1991,13 +1993,13 @@ export function GeneratorPanel() {
                   <table className="w-full min-w-[540px] text-sm">
                     <thead>
                       <tr className="border-b border-white/10 text-left">
-                        <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                        <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Ad name
                         </th>
-                        <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                        <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Detected format
                         </th>
-                        <th className="w-52 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                        <th className="w-52 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Correct format
                         </th>
                       </tr>
@@ -2016,7 +2018,7 @@ export function GeneratorPanel() {
                               {ad.name}
                             </p>
                           </td>
-                          <td className="py-2.5 pr-4 align-middle text-xs text-zinc-500">
+                          <td className="py-2.5 pr-4 align-middle text-xs text-zinc-400">
                             {ad.tags.length > 0 ? ad.tags.join(", ") : "—"}
                           </td>
                           <td className="py-2 align-middle">
@@ -2067,7 +2069,7 @@ export function GeneratorPanel() {
                         : `Show all ${preview.ads.length} ads`}
                     </button>
                     {!showAllFormats && (
-                      <p className="text-xs text-zinc-600">
+                      <p className="text-xs text-zinc-400">
                         Showing the first 25 of {preview.ads.length} ads.
                       </p>
                     )}
@@ -2077,13 +2079,13 @@ export function GeneratorPanel() {
                   <button
                     type="button"
                     onClick={() => setFormatOverrides({})}
-                    className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-500 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                   >
                     <XIcon className="h-3 w-3" />
                     Clear all format edits
                   </button>
                 )}
-                <p className="mt-3 text-xs leading-relaxed text-zinc-600">
+                <p className="mt-3 text-xs leading-relaxed text-zinc-400">
                   Auto-detected formats are used by default. Your edits
                   improve pattern wording but do not change performance
                   numbers.
@@ -2091,7 +2093,7 @@ export function GeneratorPanel() {
               </div>
             </details>
           ) : (
-            <p className="mt-2 text-xs leading-relaxed text-zinc-600">
+            <p className="mt-2 text-xs leading-relaxed text-zinc-400">
               Load your data in stage 1 — the detected ads and their formats
               will be listed here for review.
             </p>
@@ -2108,12 +2110,12 @@ export function GeneratorPanel() {
             statusTone="accent"
           />
           {/* What happens next — one compact line, shown once. */}
-          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-zinc-500">
+          <p className="mt-2 max-w-2xl text-xs leading-relaxed text-zinc-400">
             Next: Debrief will use your performance data, optional market
             context, and any confirmed formats to generate the buyer memo,
             client report, next tests, and creative briefs.
           </p>
-          <div className="mt-4 flex flex-col gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-4 rounded-xl border border-white/[0.07] bg-white/[0.04] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[13px] leading-relaxed text-zinc-400">
                 {file ? (
@@ -2129,7 +2131,7 @@ export function GeneratorPanel() {
                   "Load data in stage 1 to run."
                 )}
               </p>
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs text-zinc-400">
                 Parsed in memory — never stored, gone on refresh.
               </p>
             </div>

@@ -84,7 +84,7 @@ function MiniBuyerMemo() {
   return (
     <div className="rounded-lg border border-white/[0.09] bg-panel p-3.5 shadow-[0_16px_32px_-16px_rgba(0,0,0,0.7)] transition motion-safe:duration-200 motion-safe:hover:-translate-y-1">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
           Buyer memo
         </p>
         <span className="h-1 w-6 rounded-full bg-accent" aria-hidden="true" />
@@ -120,7 +120,7 @@ function MiniClientReport() {
   return (
     <div className="rounded-lg border border-white/[0.09] bg-panel p-3.5 shadow-[0_16px_32px_-16px_rgba(0,0,0,0.7)] transition motion-safe:duration-200 motion-safe:hover:-translate-y-1">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
           Client report
         </p>
         <span className="h-1 w-6 rounded-full bg-accent/50" aria-hidden="true" />
@@ -187,7 +187,7 @@ export default function HomePage() {
           </Link>{" "}
           — see a full debrief before uploading anything.
         </p>
-        <p className="mt-2.5 text-xs text-zinc-600">
+        <p className="mt-2.5 text-xs text-zinc-400">
           No login · Nothing stored server-side · Optional read-only Meta connection
         </p>
 
@@ -203,7 +203,7 @@ export default function HomePage() {
       {/* ---- How it works: asymmetric bento ---- */}
       <section className="mt-16" aria-label="How it works">
         <BlurFade>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             How it works
           </p>
           <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
@@ -222,7 +222,7 @@ export default function HomePage() {
               delay={i * 0.07}
             >
               <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
-                <p className="flex items-center gap-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                <p className="flex items-center gap-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                   <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/12 font-mono text-[10px] text-accent-soft">
                     {i + 1}
                   </span>
@@ -241,13 +241,13 @@ export default function HomePage() {
           {/* Buyer memo */}
           <BlurFade className="lg:col-span-4" delay={0.14}>
             <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 Out: buyer memo
               </p>
               <div className="mt-3.5">
                 <MiniBuyerMemo />
               </div>
-              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
+              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-400">
                 Decisions with numbers attached — scale, cut, test next, and
                 briefs when you&apos;re ready to hand off.
               </p>
@@ -257,13 +257,13 @@ export default function HomePage() {
           {/* Client report */}
           <BlurFade className="lg:col-span-4" delay={0.21}>
             <div className={`${card} ${cardHover} flex h-full flex-col p-5`}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 Out: client report
               </p>
               <div className="mt-3.5">
                 <MiniClientReport />
               </div>
-              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
+              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-400">
                 The same run in plain language, ready to send.
               </p>
             </div>
@@ -287,7 +287,7 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-500">
+              <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-400">
                 Rules, not a model — same input, same answer. There is no
                 database to leak from.
               </p>
@@ -301,16 +301,16 @@ export default function HomePage() {
         className="animate-rise mx-auto mt-16 max-w-2xl text-center"
         style={{ animationDelay: "150ms" }}
       >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
           The problem
         </p>
         <p className="mt-4 text-xl font-medium leading-relaxed text-zinc-200 sm:text-2xl">
           Dashboards show numbers.{" "}
-          <span className="text-zinc-500">
+          <span className="text-zinc-400">
             Media buyers still have to decide what to do next.
           </span>
         </p>
-        <p className="mt-4 text-sm leading-relaxed text-zinc-500">
+        <p className="mt-4 text-sm leading-relaxed text-zinc-400">
           Debrief reads the same export you already have and answers the
           questions that actually end a reporting call: what worked, what
           failed, what to test next — and what to tell the client.
@@ -320,7 +320,7 @@ export default function HomePage() {
       {/* ---- Interactive proof: the KPI drives the ranking ---- */}
       <section className="mt-16" aria-label="Interactive KPI demo">
         <BlurFade>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             Try the judgement
           </p>
           <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
@@ -334,7 +334,7 @@ export default function HomePage() {
 
       {/* ---- What you get ---- */}
       <section className="animate-rise mt-16" style={{ animationDelay: "210ms" }}>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
           What you get
         </p>
         <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">

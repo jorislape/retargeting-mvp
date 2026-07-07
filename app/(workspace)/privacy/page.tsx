@@ -70,7 +70,7 @@ export default function PrivacyPage() {
         ))}
       </div>
 
-      <p className="animate-rise mt-8 text-sm leading-relaxed text-zinc-500" style={{ animationDelay: "360ms" }}>
+      <p className="animate-rise mt-8 text-sm leading-relaxed text-zinc-400" style={{ animationDelay: "360ms" }}>
         Questions? Contact{" "}
         <a
           href="mailto:joris.adomas@gmail.com"

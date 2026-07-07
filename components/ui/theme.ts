@@ -15,17 +15,26 @@
 /* and gated behind motion-safe.                                       */
 /* ------------------------------------------------------------------ */
 
-/* Surface card: a soft layer above the canvas. */
+/* Surface card: a soft layer above the canvas — raised enough to read
+   as a distinct surface at a glance, not just a slightly-different
+   shade of the background. */
 export const card =
-  "rounded-xl border border-white/[0.06] bg-white/[0.03]";
+  "rounded-xl border border-white/[0.08] bg-white/[0.045]";
+
+/* Nested/secondary surface: content one level inside a `card` (e.g. a
+   sub-item within a card-level section). Deliberately quieter than
+   `card` so nesting reads as hierarchy, not as another equally-loud
+   block. */
+export const cardNested =
+  "rounded-lg border border-white/[0.05] bg-white/[0.02]";
 
 /* Layer wakes on hover — border and fill lighten together. */
 export const cardHover =
-  "transition-colors hover:border-white/[0.12] hover:bg-white/[0.05]";
+  "transition-colors hover:border-white/[0.14] hover:bg-white/[0.065]";
 
 /* Interactive tile: the card material plus a gentle lift. */
 export const cardLift =
-  "transition motion-safe:duration-200 hover:border-white/[0.12] hover:bg-white/[0.05] motion-safe:hover:-translate-y-0.5";
+  "transition motion-safe:duration-200 hover:border-white/[0.14] hover:bg-white/[0.065] motion-safe:hover:-translate-y-0.5";
 
 /* Primary action: white, dark text. One per screen. */
 export const btnPrimary =
@@ -44,7 +53,7 @@ export const btnSecondaryMd =
 /* Section/eyebrow labels: quiet sans, light tracking — not the small-
    caps mono of the previous era. */
 export const eyebrow =
-  "text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500";
+  "text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400";
 
 /* Inputs: soft field on the surface, accent on focus. */
 export const inputBase =

@@ -25,7 +25,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
               {children}
             </main>
             <footer className="print-hidden border-t border-white/[0.06] md:ml-0">
-              <div className="mx-auto max-w-4xl px-5 py-5 pb-24 text-xs leading-relaxed text-zinc-600 sm:px-8 md:pb-5">
+              <div className="mx-auto max-w-4xl px-5 py-5 pb-24 text-xs leading-relaxed text-zinc-400 sm:px-8 md:pb-5">
                 Not affiliated with Meta Platforms, Inc. Your CSV is processed
                 in memory for this session only — nothing is stored server-side.
               </div>
