@@ -53,6 +53,8 @@ import {
   ZapIcon,
 } from "@/components/ui/icons";
 import {
+  badgeAccent,
+  badgeMuted,
   btnPrimary,
   btnSecondary,
   btnSecondaryMd,
@@ -195,13 +197,7 @@ function StageHeader({
         {title}
       </h2>
       {status && (
-        <span
-          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-            statusTone === "accent"
-              ? "border-accent/25 bg-accent/[0.08] text-accent-soft"
-              : "border-white/10 text-zinc-400"
-          }`}
-        >
+        <span className={statusTone === "accent" ? badgeAccent : badgeMuted}>
           {status}
         </span>
       )}
@@ -902,9 +898,7 @@ export function GeneratorPanel() {
                   />
                   CSV export
                 </MethodLabel>
-                <span className="rounded-full border border-accent/25 bg-accent/[0.08] px-2 py-0.5 text-[10px] font-medium text-accent-soft">
-                  Recommended for exports
-                </span>
+                <span className={badgeAccent}>Best for exports</span>
               </div>
               <div className="relative py-2 text-center lg:py-3">
                 <div
@@ -965,9 +959,7 @@ export function GeneratorPanel() {
                   <FlaskIcon className="h-3.5 w-3.5 text-accent-soft" />
                   Sample data
                 </MethodLabel>
-                <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-                  No setup
-                </span>
+                <span className={badgeMuted}>No setup</span>
               </div>
               <p className="text-xs leading-relaxed text-zinc-400">
                 See a full debrief on 14 synthetic ads — one click, nothing

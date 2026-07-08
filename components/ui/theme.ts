@@ -55,6 +55,18 @@ export const btnSecondaryMd =
 export const eyebrow =
   "text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400";
 
+/* Compact status pill: one shared shape for stage status, card-level
+   recommendations, and other short static labels. `shrink-0
+   whitespace-nowrap` is load-bearing — badges are short by
+   convention and must never wrap internally, even in a tight card
+   header. accent = noticeable but still secondary (a recommendation,
+   a completed/ready state); muted = quiet metadata (required/
+   optional, a default state). */
+export const badgeAccent =
+  "shrink-0 whitespace-nowrap rounded-full border border-accent/25 bg-accent/[0.08] px-2 py-0.5 text-[10px] font-medium text-accent-soft";
+export const badgeMuted =
+  "shrink-0 whitespace-nowrap rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-400";
+
 /* Inputs: soft field on the surface, accent on focus. */
 export const inputBase =
   "w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-zinc-100 transition-colors placeholder:text-zinc-600 hover:border-white/20 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-50";
