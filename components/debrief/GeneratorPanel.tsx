@@ -830,23 +830,26 @@ export function GeneratorPanel() {
       {/* The required path, stated once up front — everything else on
           this page is an optional enhancement. */}
       <p className="mb-8 border-l-2 border-accent/40 pl-3 text-xs leading-relaxed text-zinc-400">
-        Fast path: load data, fill product / offer / goal, then generate.
-        Competitor context and format review are optional.
+        Required: load data, then fill in product / offer / goal below —
+        everything else on this page is optional.
       </p>
 
       <div className="space-y-12">
-        {/* ---- Stage 01 · Data ---- */}
+        {/* ---- Stage 01 · Start here ---- */}
         <section>
           <StageHeader
             n="1"
-            title="Data"
+            title="Start here"
             done={!!file}
             status={file ? "Complete" : "Required"}
             statusTone={file ? "accent" : "muted"}
-            hint="Upload an Ads Manager export, or pull read-only data from Meta."
+            hint="Connect Meta, upload a CSV, or try the sample — pick one to begin."
           />
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-5">
+          {/* Three parallel entry paths, equal weight, one sentence each —
+              CSV keeps the "Recommended" badge, sample is framed as the
+              zero-setup option. Same handlers as before; layout only. */}
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
             {/* Method A: CSV export (the dropzone itself) */}
             <label
               htmlFor="csv-input"
@@ -860,7 +863,7 @@ export function GeneratorPanel() {
                 setDragging(false);
                 handleFiles(e.dataTransfer.files);
               }}
-              className={`${methodTile} group relative cursor-pointer justify-between gap-4 overflow-hidden lg:col-span-3 lg:min-h-48 focus-within:ring-2 focus-within:ring-accent/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
+              className={`${methodTile} group relative cursor-pointer justify-between gap-4 overflow-hidden lg:min-h-48 focus-within:ring-2 focus-within:ring-accent/60 focus-within:ring-offset-2 focus-within:ring-offset-carbon ${
                 dragging
                   ? "border-accent/60 bg-accent/[0.06]"
                   : "hover:border-white/[0.12] hover:bg-white/[0.05]"
@@ -913,20 +916,15 @@ export function GeneratorPanel() {
                   {dragging ? "Drop to load" : "Drop your Ads Manager export"}
                 </p>
                 <p className="mt-1 text-xs text-zinc-400">
-                  or click to browse · max 5MB
+                  Ad-level export, any column set — click to browse, max 5MB.
                 </p>
               </div>
-              <span className="relative text-[11px] text-zinc-400">
-                Ad-level · any column set
-              </span>
             </label>
 
             {/* The alternative: Meta as a real integration, not a
                 side button. Status lives in the card header (hidden
                 once connected — MetaConnect shows its own). */}
-            <div
-              className={`${methodTile} justify-between gap-4 lg:col-span-2 lg:min-h-48`}
-            >
+            <div className={`${methodTile} justify-between gap-4 lg:min-h-48`}>
               <div className="flex items-center justify-between gap-2">
                 <MethodLabel>
                   <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.04]">
@@ -950,35 +948,42 @@ export function GeneratorPanel() {
               </div>
               <MetaConnect />
             </div>
-          </div>
 
-          {/* Demo-first path: a cold visitor can see a full debrief
-              before uploading anything. Framed (not a bare text link) so
-              it reads as a real option, but kept understated so CSV
-              upload stays the recommended route. */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-3">
-            <span className="flex items-center gap-2 text-xs text-zinc-400">
-              <FlaskIcon className="h-4 w-4 shrink-0 text-accent-soft" />
-              <span>
-                <span className="font-medium text-zinc-200">New here?</span> See
-                a full debrief on 14 synthetic ads — no upload needed.
-              </span>
-            </span>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <button
-                type="button"
-                onClick={loadSample}
-                className={`cursor-pointer ${btnSecondary}`}
-              >
-                Load the sample dataset
-              </button>
-              <button
-                type="button"
-                onClick={downloadSample}
-                className="cursor-pointer rounded-sm text-xs font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              >
-                Download sample CSV
-              </button>
+            {/* Method C: the sample dataset — zero setup, a full debrief
+                to look at before committing to real data. Same
+                loadSample/downloadSample handlers as before. */}
+            <div
+              className={`${methodTile} justify-between gap-4 lg:min-h-48`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <MethodLabel>
+                  <FlaskIcon className="h-3.5 w-3.5 text-accent-soft" />
+                  Sample data
+                </MethodLabel>
+                <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+                  No setup
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-zinc-400">
+                See a full debrief on 14 synthetic ads — one click, nothing
+                to upload.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={loadSample}
+                  className={`w-full cursor-pointer ${btnSecondary}`}
+                >
+                  Load sample data
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadSample}
+                  className="cursor-pointer self-start rounded-sm text-xs font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  Download sample CSV
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1223,8 +1228,14 @@ export function GeneratorPanel() {
               />
             </div>
             <div className="sm:col-span-2">
-              <label htmlFor="creativeNotes" className={fieldLabel}>
-                Creative / brand constraints
+              <label
+                htmlFor="creativeNotes"
+                className="flex items-baseline gap-2"
+              >
+                <span className={fieldLabel}>Creative / brand constraints</span>
+                <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
+                  Optional
+                </span>
               </label>
               <textarea
                 id="creativeNotes"
@@ -1235,8 +1246,8 @@ export function GeneratorPanel() {
                 className={`mt-1.5 resize-none ${inputBase}`}
               />
               <p className="mt-1.5 text-xs text-zinc-400">
-                Optional — when provided, these carry into the creative briefs
-                as guardrails. Doesn&apos;t affect scoring or ranking.
+                Carries into creative briefs as guardrails — doesn&apos;t
+                affect scoring or ranking.
               </p>
             </div>
           </div>
@@ -1255,105 +1266,112 @@ export function GeneratorPanel() {
                 Optional competitor context
               </h3>
               <p className="text-xs text-zinc-400">
-                Use this only if competitor hooks, offers, pages, or market
-                patterns would help explain what to test next — directional
-                context only, and it never changes your performance numbers.
+                Sharpens test suggestions with competitor patterns — never
+                changes your performance numbers.
               </p>
             </div>
 
             {/* Market signal builder: guided chips → the same notes
                 field. Selection is UI state only until the user clicks
-                "Add selected signals to notes". */}
-            <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] p-4">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <p className={fieldLabel}>Market signal builder</p>
-                <p className="text-xs text-zinc-400">
-                  Optional — select the patterns you notice. Debrief turns
-                  them into structured notes for better creative test
-                  suggestions.
-                </p>
-              </div>
-              <p className="mt-1 text-xs text-zinc-400">
-                Short on time? Skip this — Debrief will still generate from
-                your ad data.
-              </p>
-
-              <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
-                Examples:
-                {SIGNAL_PRESETS.map((preset) => (
-                  <button
-                    key={preset.key}
-                    type="button"
-                    onClick={() => applyPreset(preset.chips)}
-                    className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </p>
-
-              <div className="mt-3 space-y-3">
-                {SIGNAL_BUILDER_GROUPS.map((group) => (
-                  <div key={group.key}>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-                      {group.label}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {group.chips.map((chip) => {
-                        const active = selectedSignals.has(chip);
-                        return (
-                          <button
-                            key={chip}
-                            type="button"
-                            aria-pressed={active}
-                            onClick={() => toggleSignal(chip)}
-                            className={`cursor-pointer rounded-full border px-2.5 py-1 text-[11px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                              active
-                                ? "border-accent bg-accent/15 font-semibold text-accent-soft"
-                                : "border-white/10 font-medium text-zinc-400 hover:border-white/20 hover:text-zinc-200"
-                            }`}
-                          >
-                            {chip}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <button
-                  type="button"
-                  onClick={addSelectedSignals}
-                  className={`min-w-[12rem] cursor-pointer ${btnSecondary}`}
-                >
-                  {builderState === "done" ? (
-                    <span className="flex items-center gap-1.5 motion-safe:animate-settle">
-                      <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                      Added to notes
-                    </span>
-                  ) : (
-                    `Add selected signals to notes${selectedSignals.size > 0 ? ` (${selectedSignals.size})` : ""}`
-                  )}
-                </button>
+                "Add selected signals to notes". Collapsed by default —
+                same card-details idiom as "Review creative formats" below
+                — and auto-opens once something is selected so a returning
+                user doesn't lose sight of their picks. */}
+            <details
+              open={selectedSignals.size > 0}
+              className="group mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] open:border-white/[0.09]"
+            >
+              <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+                <span className="text-sm font-semibold tracking-tight text-zinc-100">
+                  Market signal builder
+                </span>
+                <span className="text-xs text-zinc-400">
+                  Optional — turn what you notice into structured notes.
+                </span>
                 {selectedSignals.size > 0 && (
+                  <span className="ml-auto font-mono text-[11px] tabular-nums text-accent-soft">
+                    {selectedSignals.size} selected
+                  </span>
+                )}
+              </summary>
+              <div className="border-t border-white/[0.06] px-4 pb-4 pt-3">
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
+                  Examples:
+                  {SIGNAL_PRESETS.map((preset) => (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      onClick={() => applyPreset(preset.chips)}
+                      className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </p>
+
+                <div className="mt-3 space-y-3">
+                  {SIGNAL_BUILDER_GROUPS.map((group) => (
+                    <div key={group.key}>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                        {group.label}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {group.chips.map((chip) => {
+                          const active = selectedSignals.has(chip);
+                          return (
+                            <button
+                              key={chip}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => toggleSignal(chip)}
+                              className={`cursor-pointer rounded-full border px-2.5 py-1 text-[11px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                                active
+                                  ? "border-accent bg-accent/15 font-semibold text-accent-soft"
+                                  : "border-white/10 font-medium text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                              }`}
+                            >
+                              {chip}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
                   <button
                     type="button"
-                    onClick={clearSelectedSignals}
-                    className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    onClick={addSelectedSignals}
+                    className={`min-w-[12rem] cursor-pointer ${btnSecondary}`}
                   >
-                    <XIcon className="h-3 w-3" />
-                    Clear selected signals
+                    {builderState === "done" ? (
+                      <span className="flex items-center gap-1.5 motion-safe:animate-settle">
+                        <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                        Added to notes
+                      </span>
+                    ) : (
+                      `Add selected signals to notes${selectedSignals.size > 0 ? ` (${selectedSignals.size})` : ""}`
+                    )}
                   </button>
-                )}
-                {builderState === "empty" && (
-                  <p aria-live="polite" className="text-xs text-amber-300">
-                    Select at least one signal first.
-                  </p>
-                )}
+                  {selectedSignals.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearSelectedSignals}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    >
+                      <XIcon className="h-3 w-3" />
+                      Clear selected signals
+                    </button>
+                  )}
+                  {builderState === "empty" && (
+                    <p aria-live="polite" className="text-xs text-amber-300">
+                      Select at least one signal first.
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            </details>
 
             <div className="mt-4">
               <div className="flex items-center justify-between gap-3">
@@ -2111,9 +2129,8 @@ export function GeneratorPanel() {
           />
           {/* What happens next — one compact line, shown once. */}
           <p className="mt-2 max-w-2xl text-xs leading-relaxed text-zinc-400">
-            Next: Debrief will use your performance data, optional market
-            context, and any confirmed formats to generate the buyer memo,
-            client report, next tests, and creative briefs.
+            Generates a buyer memo, client report, next tests, and creative
+            briefs from what you loaded above.
           </p>
           <div className="mt-4 flex flex-col gap-4 rounded-xl border border-white/[0.07] bg-white/[0.04] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>

@@ -33,6 +33,36 @@ export default function GeneratorPage() {
             </Link>
             .
           </p>
+
+          {/* One short line on why this isn't just a ChatGPT prompt —
+              no state, no interaction, just positioning. */}
+          <p className="mt-3 max-w-lg text-xs leading-relaxed text-zinc-400">
+            AI can generate an analysis. Debrief structures the full workflow
+            from Meta Ads data to a consistent buyer memo, client report,
+            next tests, and creative briefs.
+          </p>
+
+          {/* Compact, non-interactive overview of the flow below —
+              purely a mental model, not a second state machine. The
+              generator's own numbered stages remain the source of truth
+              for what's actually done. */}
+          <ol className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs font-medium text-zinc-400">
+            {["Add data", "Add optional context", "Generate debrief"].map(
+              (step, i, arr) => (
+                <li key={step} className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/15 font-mono text-[10px] font-semibold text-zinc-300">
+                    {i + 1}
+                  </span>
+                  <span>{step}</span>
+                  {i < arr.length - 1 && (
+                    <span aria-hidden="true" className="text-zinc-600">
+                      →
+                    </span>
+                  )}
+                </li>
+              )
+            )}
+          </ol>
         </div>
       </header>
 
