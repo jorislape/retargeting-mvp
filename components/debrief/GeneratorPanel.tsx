@@ -55,6 +55,7 @@ import {
 import {
   btnPrimary,
   btnSecondary,
+  btnSecondaryMd,
   fieldLabel,
   inputBase,
 } from "@/components/ui/theme";
@@ -829,12 +830,16 @@ export function GeneratorPanel() {
 
       {/* The required path, stated once up front — everything else on
           this page is an optional enhancement. */}
-      <p className="mb-8 border-l-2 border-accent/40 pl-3 text-xs leading-relaxed text-zinc-400">
+      <p className="mb-10 border-l-2 border-accent/40 pl-3 text-xs leading-relaxed text-zinc-400">
         Required: load data, then fill in product / offer / goal below —
         everything else on this page is optional.
       </p>
 
-      <div className="space-y-12">
+      {/* space-y-14 is the one shared rhythm between stages — larger
+          than any spacing used within a stage, so a stage boundary
+          always reads as a bigger jump than a stage's own internal
+          spacing. */}
+      <div className="space-y-14">
         {/* ---- Stage 01 · Start here ---- */}
         <section>
           <StageHeader
@@ -972,7 +977,7 @@ export function GeneratorPanel() {
                 <button
                   type="button"
                   onClick={loadSample}
-                  className={`w-full cursor-pointer ${btnSecondary}`}
+                  className={`w-full cursor-pointer ${btnSecondaryMd}`}
                 >
                   Load sample into generator
                 </button>
@@ -1041,7 +1046,10 @@ export function GeneratorPanel() {
             </div>
           )}
 
-          <div className="mt-4 space-y-1">
+          {/* Grouped tight to the cards above (help content is CSV-
+              specific), not floating as its own section — the bigger
+              gap belongs after this block, before Stage 2. */}
+          <div className="mt-3 space-y-1.5">
             <details className="group border-l border-white/10 pl-3 open:border-accent/40">
               <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-400 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
                 How to export from Meta Ads Manager

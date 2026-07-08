@@ -36,7 +36,7 @@ export default function GeneratorPage() {
 
           {/* One short line on why this isn't just a ChatGPT prompt —
               no state, no interaction, just positioning. */}
-          <p className="mt-3 max-w-lg text-xs leading-relaxed text-zinc-400">
+          <p className="mt-5 max-w-lg text-xs leading-relaxed text-zinc-400">
             AI can generate an analysis. Debrief structures the full workflow
             from Meta Ads data to a consistent buyer memo, client report,
             next tests, and creative briefs.
@@ -46,7 +46,7 @@ export default function GeneratorPage() {
               purely a mental model, not a second state machine. The
               generator's own numbered stages remain the source of truth
               for what's actually done. */}
-          <ol className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs font-medium text-zinc-400">
+          <ol className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs font-medium text-zinc-400">
             {["Add Meta Ads data", "Add optional context", "Get the decision"].map(
               (step, i, arr) => (
                 <li key={step} className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export default function GeneratorPage() {
         </div>
       </header>
 
-      <div className="animate-rise mt-8" style={{ animationDelay: "90ms" }}>
+      <div className="animate-rise mt-10" style={{ animationDelay: "90ms" }}>
         <GeneratorPanel />
       </div>
     </div>
