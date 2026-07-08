@@ -47,7 +47,7 @@ export default function GeneratorPage() {
               generator's own numbered stages remain the source of truth
               for what's actually done. */}
           <ol className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs font-medium text-zinc-400">
-            {["Add data", "Add optional context", "Generate debrief"].map(
+            {["Add Meta Ads data", "Add optional context", "Get the decision"].map(
               (step, i, arr) => (
                 <li key={step} className="flex items-center gap-2">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/15 font-mono text-[10px] font-semibold text-zinc-300">

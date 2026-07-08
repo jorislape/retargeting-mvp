@@ -898,7 +898,7 @@ export function GeneratorPanel() {
                   CSV export
                 </MethodLabel>
                 <span className="rounded-full border border-accent/25 bg-accent/[0.08] px-2 py-0.5 text-[10px] font-medium text-accent-soft">
-                  Recommended
+                  Recommended for exports
                 </span>
               </div>
               <div className="relative py-2 text-center lg:py-3">
@@ -974,7 +974,7 @@ export function GeneratorPanel() {
                   onClick={loadSample}
                   className={`w-full cursor-pointer ${btnSecondary}`}
                 >
-                  Load sample data
+                  Load sample into generator
                 </button>
                 <button
                   type="button"
@@ -1212,248 +1212,299 @@ export function GeneratorPanel() {
                 className={`mt-1.5 ${inputBase}`}
               />
             </div>
-            <div>
-              <label htmlFor="targetCpa" className={fieldLabel}>
-                Target CPA
-              </label>
-              <input
-                id="targetCpa"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={fields.targetCpa}
-                onChange={(e) => updateFields({ targetCpa: e.target.value })}
-                placeholder="25"
-                className={`mt-1.5 ${inputBase}`}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label
-                htmlFor="creativeNotes"
-                className="flex items-baseline gap-2"
-              >
-                <span className={fieldLabel}>Creative / brand constraints</span>
-                <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
-                  Optional
-                </span>
-              </label>
-              <textarea
-                id="creativeNotes"
-                rows={2}
-                value={fields.creativeNotes}
-                onChange={(e) => updateFields({ creativeNotes: e.target.value })}
-                placeholder="e.g. brand tone, country restrictions, segment limits, claims to avoid, required offer language"
-                className={`mt-1.5 resize-none ${inputBase}`}
-              />
-              <p className="mt-1.5 text-xs text-zinc-400">
-                Carries into creative briefs as guardrails — doesn&apos;t
-                affect scoring or ranking.
-              </p>
-            </div>
           </div>
-          <p className="mt-3 text-xs text-zinc-400">
-            * Required — a target CPA sharpens the spend gate.
-          </p>
+          <p className="mt-3 text-xs text-zinc-400">* Required.</p>
 
-          {/* ONE combined market/competitor context area: notes,
-              competitor sources, the one-time page fetch, Structure
-              notes, and Use as market notes all live here. The intro
-              line carries the shared caveat so it isn't repeated under
-              every field. */}
-          <div className="mt-8 border-t border-white/[0.06] pt-6">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h3 className="text-[13px] font-semibold tracking-tight text-zinc-200">
-                Optional competitor context
-              </h3>
+          {/* Optional refinements stay out of the required path: collapsed
+              by default, auto-opened when either field already has content
+              (a returning session, or a sample load that prefills creative
+              notes). React re-applies `open` only when the computed value
+              changes, so a manual toggle wins between renders. Values are
+              preserved either way — collapsing only hides the inputs. */}
+          <details
+            open={
+              fields.targetCpa.trim() !== "" ||
+              fields.creativeNotes.trim() !== ""
+            }
+            className="group mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] open:border-white/[0.09]"
+          >
+            <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+              <span className="text-sm font-semibold tracking-tight text-zinc-100">
+                Refine analysis
+              </span>
+              <span className="text-xs text-zinc-400">Optional</span>
+            </summary>
+            <div className="border-t border-white/[0.06] px-4 pb-4 pt-3">
               <p className="text-xs text-zinc-400">
-                Sharpens test suggestions with competitor patterns — never
-                changes your performance numbers.
+                Add targets or brand constraints only when they matter for
+                this debrief.
               </p>
-            </div>
-
-            {/* Market signal builder: guided chips → the same notes
-                field. Selection is UI state only until the user clicks
-                "Add selected signals to notes". Collapsed by default —
-                same card-details idiom as "Review creative formats" below
-                — and auto-opens once something is selected so a returning
-                user doesn't lose sight of their picks. */}
-            <details
-              open={selectedSignals.size > 0}
-              className="group mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] open:border-white/[0.09]"
-            >
-              <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
-                <span className="text-sm font-semibold tracking-tight text-zinc-100">
-                  Market signal builder
-                </span>
-                <span className="text-xs text-zinc-400">
-                  Optional — turn what you notice into structured notes.
-                </span>
-                {selectedSignals.size > 0 && (
-                  <span className="ml-auto font-mono text-[11px] tabular-nums text-accent-soft">
-                    {selectedSignals.size} selected
-                  </span>
-                )}
-              </summary>
-              <div className="border-t border-white/[0.06] px-4 pb-4 pt-3">
-                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
-                  Examples:
-                  {SIGNAL_PRESETS.map((preset) => (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      onClick={() => applyPreset(preset.chips)}
-                      className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </p>
-
-                <div className="mt-3 space-y-3">
-                  {SIGNAL_BUILDER_GROUPS.map((group) => (
-                    <div key={group.key}>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-                        {group.label}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {group.chips.map((chip) => {
-                          const active = selectedSignals.has(chip);
-                          return (
-                            <button
-                              key={chip}
-                              type="button"
-                              aria-pressed={active}
-                              onClick={() => toggleSignal(chip)}
-                              className={`cursor-pointer rounded-full border px-2.5 py-1 text-[11px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                                active
-                                  ? "border-accent bg-accent/15 font-semibold text-accent-soft"
-                                  : "border-white/10 font-medium text-zinc-400 hover:border-white/20 hover:text-zinc-200"
-                              }`}
-                            >
-                              {chip}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+              <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                <div>
+                  <label htmlFor="targetCpa" className={fieldLabel}>
+                    Target CPA
+                  </label>
+                  <input
+                    id="targetCpa"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    value={fields.targetCpa}
+                    onChange={(e) =>
+                      updateFields({ targetCpa: e.target.value })
+                    }
+                    placeholder="25"
+                    className={`mt-1.5 ${inputBase}`}
+                  />
+                  <p className="mt-1.5 text-xs text-zinc-400">
+                    Sharpens the spend gate when set.
+                  </p>
                 </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="creativeNotes" className={fieldLabel}>
+                    Creative / brand constraints
+                  </label>
+                  <textarea
+                    id="creativeNotes"
+                    rows={2}
+                    value={fields.creativeNotes}
+                    onChange={(e) =>
+                      updateFields({ creativeNotes: e.target.value })
+                    }
+                    placeholder="e.g. brand tone, country restrictions, segment limits, claims to avoid, required offer language"
+                    className={`mt-1.5 resize-none ${inputBase}`}
+                  />
+                  <p className="mt-1.5 text-xs text-zinc-400">
+                    Carries into creative briefs as guardrails — doesn&apos;t
+                    affect scoring or ranking.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </details>
 
-                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/* ONE consolidated, collapsed-by-default competitor/market
+              area. The parent gate keeps all of this out of the
+              first-time path; inside, three lettered sub-steps (A notes →
+              B one-time page read → C manual watchlist) make the sequence
+              obvious rather than presenting the mechanisms as equal peers.
+              Everything here only ever becomes text in the market-notes
+              field and never changes performance numbers. Auto-opens when
+              any input already holds content (returning session / sample);
+              React re-applies `open` only when the computed value changes,
+              so a manual toggle wins between renders and entered values
+              are always preserved when collapsed. */}
+          <details
+            open={
+              fields.marketContext.trim() !== "" ||
+              selectedSignals.size > 0 ||
+              competitorSources.length > 0 ||
+              watchlist.length > 0
+            }
+            className="group mt-8 rounded-xl border border-white/[0.07] bg-white/[0.04] open:border-white/[0.09]"
+          >
+            <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+              <span className="text-sm font-semibold tracking-tight text-zinc-100">
+                Competitor &amp; market context
+              </span>
+              <span className="text-xs text-zinc-400">Optional</span>
+            </summary>
+            <div className="border-t border-white/[0.06] px-4 pb-5 pt-4">
+              <p className="text-xs leading-relaxed text-zinc-400">
+                Add directional context only when it helps explain what to
+                test next. It never changes performance metrics.
+              </p>
+
+              {/* A · Add or structure notes */}
+              <p className="mt-5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-300">
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-5 items-center justify-center rounded-md border border-white/12 font-mono text-[10px] text-accent-soft"
+                >
+                  A
+                </span>
+                Add or structure notes
+              </p>
+
+              <div className="mt-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="marketContext" className={fieldLabel}>
+                    Market / competitor notes
+                  </label>
                   <button
                     type="button"
-                    onClick={addSelectedSignals}
-                    className={`min-w-[12rem] cursor-pointer ${btnSecondary}`}
+                    onClick={structureNotes}
+                    title="Use after adding rough notes or competitor sources."
+                    className={`min-w-[8rem] cursor-pointer ${btnSecondary}`}
                   >
-                    {builderState === "done" ? (
+                    {noteState === "done" ? (
                       <span className="flex items-center gap-1.5 motion-safe:animate-settle">
                         <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                        Added to notes
+                        Structured
                       </span>
                     ) : (
-                      `Add selected signals to notes${selectedSignals.size > 0 ? ` (${selectedSignals.size})` : ""}`
+                      "Structure notes"
                     )}
                   </button>
-                  {selectedSignals.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={clearSelectedSignals}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                    >
-                      <XIcon className="h-3 w-3" />
-                      Clear selected signals
-                    </button>
-                  )}
-                  {builderState === "empty" && (
-                    <p aria-live="polite" className="text-xs text-amber-300">
-                      Select at least one signal first.
-                    </p>
-                  )}
                 </div>
-              </div>
-            </details>
-
-            <div className="mt-4">
-              <div className="flex items-center justify-between gap-3">
-                <label htmlFor="marketContext" className={fieldLabel}>
-                  Market / competitor notes
-                </label>
-                <button
-                  type="button"
-                  onClick={structureNotes}
-                  title="Use after adding rough notes or competitor sources."
-                  className={`min-w-[8rem] cursor-pointer ${btnSecondary}`}
-                >
-                  {noteState === "done" ? (
-                    <span className="flex items-center gap-1.5 motion-safe:animate-settle">
-                      <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                      Structured
-                    </span>
-                  ) : (
-                    "Structure notes"
-                  )}
-                </button>
-              </div>
-              <textarea
-                id="marketContext"
-                rows={5}
-                value={fields.marketContext}
-                onChange={(e) => {
-                  updateFields({ marketContext: e.target.value });
-                  if (noteState !== "idle") setNoteState("idle");
-                }}
-                placeholder={`Example:
+                <textarea
+                  id="marketContext"
+                  rows={5}
+                  value={fields.marketContext}
+                  onChange={(e) => {
+                    updateFields({ marketContext: e.target.value });
+                    if (noteState !== "idle") setNoteState("idle");
+                  }}
+                  placeholder={`Example:
 - Competitor A is running founder-led videos around trust
 - Competitor B repeats bundle offers and first-order discounts
 - Several ads lead with problem-first hooks
 - Ads Library links:
   https://www.facebook.com/ads/library/...`}
-                className={`mt-1.5 resize-none ${inputBase}`}
-              />
-              {/* One helper slot, three states (no layout shift):
-                  the "nothing to structure" notice wins, then the local
-                  deterministic quality meter once anything is typed,
-                  else the default helper text. */}
-              <p
-                aria-live="polite"
-                className={`mt-1.5 text-xs leading-relaxed ${
-                  noteState === "empty" || marketQuality?.level === "weak"
-                    ? "text-amber-300"
-                    : marketQuality?.level === "strong"
-                      ? "font-medium text-accent-soft"
-                      : marketQuality
-                        ? "text-zinc-300"
-                        : "text-zinc-400"
-                }`}
-              >
-                {noteState === "empty"
-                  ? "Add competitor notes or links first."
-                  : marketQuality
-                    ? `Market context: ${marketQuality.summary}`
-                    : "Market context: Optional — add notes, selected signals, competitor sources, or watchlist signals to improve creative test suggestions."}
-              </p>
-            </div>
+                  className={`mt-1.5 resize-none ${inputBase}`}
+                />
+                {/* One helper slot, three states (no layout shift):
+                    the "nothing to structure" notice wins, then the local
+                    deterministic quality meter once anything is typed,
+                    else the default helper text. */}
+                <p
+                  aria-live="polite"
+                  className={`mt-1.5 text-xs leading-relaxed ${
+                    noteState === "empty" || marketQuality?.level === "weak"
+                      ? "text-amber-300"
+                      : marketQuality?.level === "strong"
+                        ? "font-medium text-accent-soft"
+                        : marketQuality
+                          ? "text-zinc-300"
+                          : "text-zinc-400"
+                  }`}
+                >
+                  {noteState === "empty"
+                    ? "Add competitor notes or links first."
+                    : marketQuality
+                      ? `Market context: ${marketQuality.summary}`
+                      : "Market context: Optional — add notes, selected signals, competitor sources, or watchlist signals to improve creative test suggestions."}
+                </p>
+              </div>
 
-            {/* Advanced tools stay out of the first-time path: collapsed
-                by default, auto-expanded when sources or watchlist
-                items already exist (React re-applies `open` only when
-                the computed value changes, so a manual toggle wins
-                between renders). */}
-            <details
-              open={competitorSources.length > 0 || watchlist.length > 0}
-              className="group mt-6 border-l border-white/10 pl-3 open:border-accent/40"
-            >
-              <summary className="cursor-pointer list-none py-0.5 text-xs font-medium text-zinc-400 transition hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
-                Advanced competitor context — one-off sources &amp; a local
-                watchlist
-              </summary>
+              {/* Market signal builder: guided chips → the same notes
+                  field. Selection is UI state only until the user clicks
+                  "Add selected signals to notes". Collapsed by default,
+                  auto-opens once something is selected so a returning user
+                  doesn't lose sight of their picks. */}
+              <details
+                open={selectedSignals.size > 0}
+                className="group mt-3 rounded-lg border border-white/[0.05] bg-white/[0.02] open:border-white/[0.09]"
+              >
+                <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+                  <span className="text-[13px] font-semibold tracking-tight text-zinc-100">
+                    Market signal builder
+                  </span>
+                  <span className="text-xs text-zinc-400">
+                    Optional — turn what you notice into structured notes.
+                  </span>
+                  {selectedSignals.size > 0 && (
+                    <span className="ml-auto font-mono text-[11px] tabular-nums text-accent-soft">
+                      {selectedSignals.size} selected
+                    </span>
+                  )}
+                </summary>
+                <div className="border-t border-white/[0.06] px-4 pb-4 pt-3">
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
+                    Examples:
+                    {SIGNAL_PRESETS.map((preset) => (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        onClick={() => applyPreset(preset.chips)}
+                        className="cursor-pointer rounded-sm font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </p>
+
+                  <div className="mt-3 space-y-3">
+                    {SIGNAL_BUILDER_GROUPS.map((group) => (
+                      <div key={group.key}>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                          {group.label}
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {group.chips.map((chip) => {
+                            const active = selectedSignals.has(chip);
+                            return (
+                              <button
+                                key={chip}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => toggleSignal(chip)}
+                                className={`cursor-pointer rounded-full border px-2.5 py-1 text-[11px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                                  active
+                                    ? "border-accent bg-accent/15 font-semibold text-accent-soft"
+                                    : "border-white/10 font-medium text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                                }`}
+                              >
+                                {chip}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <button
+                      type="button"
+                      onClick={addSelectedSignals}
+                      className={`min-w-[12rem] cursor-pointer ${btnSecondary}`}
+                    >
+                      {builderState === "done" ? (
+                        <span className="flex items-center gap-1.5 motion-safe:animate-settle">
+                          <CheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                          Added to notes
+                        </span>
+                      ) : (
+                        `Add selected signals to notes${selectedSignals.size > 0 ? ` (${selectedSignals.size})` : ""}`
+                      )}
+                    </button>
+                    {selectedSignals.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearSelectedSignals}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                      >
+                        <XIcon className="h-3 w-3" />
+                        Clear selected signals
+                      </button>
+                    )}
+                    {builderState === "empty" && (
+                      <p aria-live="polite" className="text-xs text-amber-300">
+                        Select at least one signal first.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </details>
+
+              {/* B · Read a competitor page once */}
+              <p className="mt-6 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-300">
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-5 items-center justify-center rounded-md border border-white/12 font-mono text-[10px] text-accent-soft"
+                >
+                  B
+                </span>
+                Read a competitor page once
+              </p>
 
             {/* Competitor sources: structured input that only ever
                 becomes text in the notes field above. A landing-page
                 URL can be fetched ONCE via the explicit "Fetch page
                 signals" button — never automatically, never
                 monitored. */}
-            <div className="mt-4">
+            <div className="mt-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className={fieldLabel}>Competitor sources</p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1639,12 +1690,23 @@ export function GeneratorPanel() {
               </p>
             </div>
 
+              {/* C · Track selected competitors manually */}
+              <p className="mt-6 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-300">
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-5 items-center justify-center rounded-md border border-white/12 font-mono text-[10px] text-accent-soft"
+                >
+                  C
+                </span>
+                Track selected competitors manually
+              </p>
+
             {/* Competitor watchlist: up to 5 pages saved in THIS
                 browser (localStorage; session memory if unavailable),
                 refreshed only by explicit clicks through the same
                 guarded fetch route. Signals reach the report only via
                 "Add refreshed signals to market notes". */}
-            <div className="mt-6">
+            <div className="mt-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className={fieldLabel}>Competitor watchlist</p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1959,8 +2021,8 @@ export function GeneratorPanel() {
                 to market notes.
               </p>
             </div>
-            </details>
-          </div>
+            </div>
+          </details>
         </section>
 
         {/* ---- Stage 03 · Verify ---- */}

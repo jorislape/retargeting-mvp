@@ -57,16 +57,16 @@ const BENEFITS = [
 
 const STEPS: { title: string; text: string }[] = [
   {
-    title: "Load your Meta Ads data",
-    text: "Upload an ad-level CSV export from Meta Ads Manager, or connect Meta (read-only) and pull the same data. Debrief detects rows, columns, and KPI availability before running.",
+    title: "Add Meta Ads data",
+    text: "Connect Meta, upload a CSV, or explore sample data.",
   },
   {
-    title: "Add competitor context",
-    text: "Optional — add competitor pages, Ads Library examples, hooks, offers, or rough notes, and review creative formats. Context stays directional and never overrides your own data.",
+    title: "Add optional context",
+    text: "Add goals, constraints, and market signals only when useful.",
   },
   {
     title: "Get the decision",
-    text: "Buyer memo, client report, next tests, what not to do, confidence explanation, and optional creative briefs.",
+    text: "Get a buyer memo, client report, next tests, and creative briefs.",
   },
 ];
 
@@ -167,6 +167,13 @@ export default function HomePage() {
           Upload a CSV or pull data from Meta. Add market / competitor
           signals if useful. Get a buyer memo, client-ready report, next
           creative tests, and creative briefs. No login. No dashboard.
+        </p>
+        {/* Honest differentiation, secondary to the headline — stated
+            once on this page. */}
+        <p className="mx-auto mt-4 max-w-xl text-[13px] leading-relaxed text-zinc-400">
+          AI can generate an analysis. Debrief structures the full workflow
+          from Meta Ads data to a consistent buyer memo, client report, next
+          tests, and creative briefs.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:mt-6">
           <Link href="/generator" className={`btn-sheen ${btnPrimary}`}>

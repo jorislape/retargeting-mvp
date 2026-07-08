@@ -24,18 +24,18 @@ export const metadata = {
 const STEPS = [
   {
     icon: FileTextIcon,
-    title: "Load your ad data",
-    text: "Export ad-level performance from Meta Ads Manager and drop the CSV in — column names vary by export and Debrief resolves the common variants automatically. Or connect Meta (read-only) and pull the same ad-level data without an export.",
+    title: "Add Meta Ads data",
+    text: "Connect Meta, upload a CSV, or explore sample data. Column names vary by export and Debrief resolves the common variants automatically.",
   },
   {
     icon: SparklesIcon,
-    title: "Set KPI and context",
-    text: "Pick the metric that matters this period and add one line each of product, offer, and goal. Optional: competitor context (notes, sources, a one-time page read) as directional signal, and creative-format confirmations so the read doesn't rely on ad names alone.",
+    title: "Add optional context",
+    text: "Set your KPI, add goals, constraints, and market signals only when useful, and confirm creative formats so the read doesn't rely on ad names alone.",
   },
   {
     icon: FlaskIcon,
-    title: "Read the debrief",
-    text: "One analysis, two registers: a buyer memo and a client report — verdict first, then winners, kill list, patterns, next tests, and hand-off creative briefs. Copy it or save it as a PDF.",
+    title: "Get the decision",
+    text: "Get a buyer memo, client report, next tests, and creative briefs — verdict first. Copy it or save it as a PDF.",
   },
 ];
 
