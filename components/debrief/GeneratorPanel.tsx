@@ -42,6 +42,8 @@ import {
 import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
 import { MetaConnect } from "@/components/debrief/MetaConnect";
+import { MonitoringErrorBoundary } from "@/components/monitoring/MonitoringErrorBoundary";
+import { MonitoringSection } from "@/components/monitoring/MonitoringSection";
 import {
   AlertTriangleIcon,
   ArrowIcon,
@@ -1685,7 +1687,8 @@ export function GeneratorPanel() {
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-400">
                 &ldquo;Fetch page signals&rdquo; reads the public page once,
-                when you click — no monitoring, no storage, no Ads Library
+                when you click — nothing is stored on our servers and the
+                fetch is never repeated automatically, no Ads Library
                 fetching, and no competitor-performance inference.
               </p>
             </div>
@@ -2015,12 +2018,34 @@ export function GeneratorPanel() {
                   : "Local watchlist for later — keep a few competitor pages in this browser and manually refresh them when needed."}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                Stored locally in this browser only — Debrief does not save
-                it on a server. No background monitoring, no Ads Library
-                fetching, and nothing is sent to the report until you add it
-                to market notes.
+                The watchlist is stored locally in this browser only — Debrief
+                does not save it on a server, and nothing is sent to the
+                report until you add it to market notes. It never refreshes
+                by itself; the separate weekly-monitoring beta below is the
+                only thing that checks pages on a schedule, and only for
+                URLs you explicitly add to it.
               </p>
             </div>
+
+              {/* D · Optional server-side monitoring beta. The ONLY
+                  core→monitoring touchpoint is this mount: flag off ⇒
+                  the section renders nothing; any monitoring failure ⇒
+                  the boundary's inline card. Deleting the beta =
+                  removing this block + the two imports. */}
+              <p className="mt-6 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-300">
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-5 items-center justify-center rounded-md border border-white/12 font-mono text-[10px] text-accent-soft"
+                >
+                  D
+                </span>
+                Monitor weekly (beta)
+              </p>
+              <div className="mt-3">
+                <MonitoringErrorBoundary>
+                  <MonitoringSection />
+                </MonitoringErrorBoundary>
+              </div>
             </div>
           </details>
         </section>

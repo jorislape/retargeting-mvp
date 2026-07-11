@@ -39,10 +39,12 @@ signup, no setup; the optional Meta data source needs `META_APP_ID` and
    losers, and a templated memo is generated.
 4. Read, copy, or print the one-page debrief as a buyer memo or a
    client-ready report, with selected tests expandable into creative
-   briefs. Nothing is saved on our servers: refresh the page and the
-   CSV, context, and memo are gone. (The optional competitor watchlist
-   is the one thing kept anywhere, and it lives only in your browser's
-   localStorage.)
+   briefs. Your ads data is never saved on our servers: refresh the
+   page and the CSV, context, and memo are gone. Two optional
+   competitor features persist data: the watchlist (browser
+   localStorage only) and the flagged monitoring beta (competitor URLs
+   + extracted page signals server-side, under an anonymous cookie —
+   see the privacy page).
 
 There is exactly one path. No login, no dashboard, no history page —
 see `ARCHITECTURE.md` for the scope rules this was built under.

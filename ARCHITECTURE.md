@@ -53,6 +53,17 @@ nothing about that upload exists anywhere. Refreshing the browser tab
 clears the in-memory React state too. Don't add persistence to this
 route as a "small" addition — read the scope fence above first.
 
+The in-memory guarantee is scoped to ADS DATA. The one approved
+server-side store is the flag-gated Competitor Monitoring Beta
+(`modules/monitoring/`, `MONITORING_ENABLED` default off): user-entered
+competitor URLs, deterministic extracted page signals (never full page
+copies), and a pruned check-outcome history, keyed to a pseudonymous
+httpOnly-cookie workspace. It is isolated by rule and by test — core
+modules never import it, the DB client exists only inside it, and the
+whole core product runs with `DATABASE_URL` unset. Its own boundaries
+(weekly ceiling, no alerts, no evasion, no Ads Library) live in the
+CLAUDE.md fence.
+
 ## 4. Structure
 
 ```

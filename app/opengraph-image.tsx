@@ -83,7 +83,7 @@ export default function OgImage() {
           </div>
           <div style={{ display: "flex", fontSize: 28, color: "#a1a1aa" }}>
             Buyer memo · client report · next tests · creative briefs. No
-            login, nothing stored on our servers.
+            login, ads data never stored on our servers.
           </div>
         </div>
 

@@ -10,7 +10,7 @@ import {
 export const metadata = {
   title: "Privacy — Debrief",
   description:
-    "Your CSV is processed in memory for one request and never stored, cached, or logged.",
+    "Your CSV is processed in memory for one request and never stored, cached, or logged. The only data stored server-side belongs to the optional competitor-monitoring beta, and only if you enable it.",
 };
 
 const SECTIONS = [
@@ -20,11 +20,15 @@ const SECTIONS = [
   },
   {
     title: "What we collect",
-    body: "Nothing. No login, no tracking, no analytics. The only data involved is the CSV you upload and the context you type, both used solely to render the debrief shown back to you in that same session.",
+    body: "No login, no tracking, no analytics. The CSV you upload and the context you type are used solely to render the debrief in that same session and are never stored. If you enable the competitor-monitoring beta, Debrief sets ONE functional cookie: a random anonymous workspace ID (httpOnly, no personal data, not usable for tracking across sites). It exists so your monitored pages can be shown back to you. Clearing your cookies permanently disconnects this browser from that monitoring history — there is no account, so it cannot be recovered.",
   },
   {
     title: "Competitor watchlist (optional)",
-    body: "If you use the competitor watchlist, its entries — competitor names, page URLs, your notes, and the public-page signal summaries you fetch — are saved in your own browser's localStorage, never on a server. Pages are read only when you click refresh; there is no background monitoring. Clearing the watchlist or your browser data removes it completely. Your CSV, reports, and Meta token are never saved this way.",
+    body: "If you use the competitor watchlist, its entries — competitor names, page URLs, your notes, and the public-page signal summaries you fetch — are saved in your own browser's localStorage, never on a server. Pages are read only when you click refresh; there is no background monitoring. Clearing the watchlist or your browser data removes it completely. Your CSV, reports, and Meta token are never saved this way. The watchlist is separate from the monitoring beta: importing a watchlist entry into monitoring copies the URL to the server; the watchlist itself stays in your browser.",
+  },
+  {
+    title: "Competitor monitoring beta (optional)",
+    body: "If you enable weekly monitoring for a competitor page, Debrief stores server-side: the page URL you entered, the deterministic signals extracted from that public page (headline, CTA, offer, claims — never a full page copy), and a short history of check outcomes. All of it is keyed to your anonymous workspace cookie, and none of it is ever connected to your ads data, which stays in-memory only. Scheduled checks run at most weekly; you can also retry a failed check manually. Pages that block us are recorded as blocked, never worked around. Removing a monitored page deletes it.",
   },
   {
     title: "Meta affiliation",
@@ -38,14 +42,16 @@ export default function PrivacyPage() {
       <header className="animate-rise">
         <p className={eyebrow}>Privacy</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-          <span className={gradientText}>Nothing stored.</span> By design,
-          not by policy.
+          <span className={gradientText}>Nothing stored</span> — except what
+          you ask us to. By design, not by policy.
         </h1>
         <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
-          The strongest privacy guarantee is architecture: this tool has no
-          database, no accounts, and no server-side storage to leak from.
-          The one thing kept anywhere is the optional competitor watchlist,
-          and it lives in your own browser.
+          The strongest privacy guarantee is architecture: no accounts, no
+          tracking, and your ads data is never stored server-side. Two
+          optional features keep data anywhere at all: the competitor
+          watchlist (in your own browser) and the competitor-monitoring beta
+          (competitor URLs and extracted page signals on our server, tied to
+          an anonymous cookie — never your ads data).
         </p>
       </header>
 

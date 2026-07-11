@@ -21,7 +21,7 @@ export default function MarketingLayout({
       <footer className="border-t border-white/[0.06]">
         <div className="mx-auto max-w-5xl px-5 py-5 text-xs leading-relaxed text-zinc-400 sm:px-8">
           Not affiliated with Meta Platforms, Inc. Your CSV is processed in
-          memory for this session only — nothing is stored server-side.
+          memory for this session only — your ads data is never stored server-side.
         </div>
       </footer>
     </div>

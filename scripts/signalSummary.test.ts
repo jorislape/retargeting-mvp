@@ -3,12 +3,12 @@
  * Pure helpers under Node (no imports of modules/competitor)
  */
 
-import type { CompetitorPageSignals } from "../modules/competitor/types";
+import type { CompetitorPageSignals } from "../modules/competitor/types.ts";
 import {
   summarizePageSignals,
   groupSignalChanges,
   formatCompetitorSignalNotes,
-} from "../modules/competitor/signalSummary";
+} from "../modules/competitor/signalSummary.ts";
 
 const assert = (condition: boolean, message: string) => {
   if (!condition) {

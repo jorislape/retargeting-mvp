@@ -65,9 +65,9 @@ export function Sidebar() {
       <div className="mt-auto border-t border-white/[0.06] p-4">
         <p className="flex items-start gap-2 text-[10px] leading-relaxed text-zinc-400">
           <ShieldIcon className="mt-0.5 h-3 w-3 shrink-0 text-zinc-400" />
-          In-memory only.
+          Ads data in-memory only.
           <br />
-          Nothing stored server-side.
+          Never stored server-side.
         </p>
       </div>
     </aside>
@@ -82,7 +82,7 @@ export function MobileTopBar() {
           <Wordmark />
         </Link>
         <span className="text-[10px] font-medium text-zinc-400">
-          Nothing stored server-side
+          Ads data never stored server-side
         </span>
       </div>
     </header>

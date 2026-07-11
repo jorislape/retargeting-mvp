@@ -22,7 +22,7 @@ import {
 export const metadata = {
   title: "Debrief — Your Meta Ads data, turned into a decision",
   description:
-    "Upload a CSV or pull data from Meta, add market / competitor signals if useful, and get a buyer memo, client-ready report, next creative tests, and creative briefs. No login, nothing stored on our servers.",
+    "Upload a CSV or pull data from Meta, add market / competitor signals if useful, and get a buyer memo, client-ready report, next creative tests, and creative briefs. No login. Your ads data is never stored on our servers.",
 };
 
 /* ------------------------------------------------------------------ */
@@ -72,8 +72,8 @@ const STEPS: { title: string; text: string }[] = [
 
 const TRUST = [
   "No login required",
-  "CSV processed in your session only — no database, nothing stored server-side",
-  "No monitoring or scraping — a competitor page is read once, only when you ask",
+  "CSV processed in your session only — your ads data is never stored server-side",
+  "Competitor pages are read only when you ask — a one-time fetch, or the optional weekly-monitoring beta you switch on yourself",
   "Ads are never launched or changed",
   "Meta connection optional and read-only (ads_read)",
 ];
@@ -195,7 +195,7 @@ export default function HomePage() {
           — see a full debrief before uploading anything.
         </p>
         <p className="mt-2.5 text-xs text-zinc-400">
-          No login · Nothing stored server-side · Optional read-only Meta connection
+          No login · Ads data never stored server-side · Optional read-only Meta connection
         </p>
 
         {/* Live proof: the engine sorting real-shaped rows, on loop.
@@ -295,8 +295,8 @@ export default function HomePage() {
                 ))}
               </ul>
               <p className="mt-auto pt-4 text-[13px] leading-relaxed text-zinc-400">
-                Rules, not a model — same input, same answer. There is no
-                database to leak from.
+                Rules, not a model — same input, same answer. Your ads data
+                never touches a database.
               </p>
             </div>
           </BlurFade>

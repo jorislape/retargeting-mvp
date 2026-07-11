@@ -30,20 +30,20 @@ export const metadata: Metadata = {
     template: "%s · Debrief",
   },
   description:
-    "Turn Meta Ads data into buyer memos, client-ready reports, next creative tests, and creative briefs. CSV upload or read-only Meta import — no login required, nothing stored on our servers.",
+    "Turn Meta Ads data into buyer memos, client-ready reports, next creative tests, and creative briefs. CSV upload or read-only Meta import — no login required, ads data never stored on our servers.",
   openGraph: {
     siteName: "Debrief",
     type: "website",
     url: "/",
     title: "Debrief — Your Meta Ads data, turned into a decision",
     description:
-      "Turn Meta Ads data into buyer memos, client-ready reports, next creative tests, and creative briefs — CSV upload or read-only Meta import. No login, nothing stored on our servers.",
+      "Turn Meta Ads data into buyer memos, client-ready reports, next creative tests, and creative briefs — CSV upload or read-only Meta import. No login, ads data never stored on our servers.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Debrief — Your Meta Ads data, turned into a decision",
     description:
-      "Turn Meta Ads data into buyer memos, client-ready reports, next creative tests, and creative briefs — CSV upload or read-only Meta import. No login, nothing stored on our servers.",
+      "Turn Meta Ads data into buyer memos, client-ready reports, next creative tests, and creative briefs — CSV upload or read-only Meta import. No login, ads data never stored on our servers.",
   },
 };
 
