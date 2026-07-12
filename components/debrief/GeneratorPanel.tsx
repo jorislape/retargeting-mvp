@@ -288,6 +288,22 @@ export function GeneratorPanel() {
      double click can't race a second fetch. */
   const watchInFlight = useRef<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  /* A failed "Generate debrief" is a real state change, but the button
+     that triggered it sits at the bottom of a page that can run pages
+     long (competitor/monitoring section expanded, etc.) while the
+     error banner renders at the very top of the form. Without this,
+     the error is silently invisible to anyone who doesn't manually
+     scroll up — scroll it into view and focus it so it's impossible
+     to miss. preventScroll on focus() avoids fighting the smooth
+     scroll already in flight. */
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      errorRef.current.focus({ preventScroll: true });
+    }
+  }, [error]);
 
   /* Non-blocking quality read on the notes — local parsing only. */
   const marketQuality = assessMarketNotes(fields.marketContext);
@@ -782,8 +798,10 @@ export function GeneratorPanel() {
     >
       {error && (
         <div
+          ref={errorRef}
           role="alert"
-          className="mb-8 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-4 py-3.5"
+          tabIndex={-1}
+          className="mb-8 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-4 py-3.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
         >
           <p className="flex items-center gap-2.5 text-[13px] font-semibold text-red-200">
             <AlertTriangleIcon className="h-4 w-4 shrink-0 text-red-400" />

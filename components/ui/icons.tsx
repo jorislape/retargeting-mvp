@@ -189,6 +189,16 @@ export function PrinterIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+export function DownloadIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M12 15V3" />
+    </Icon>
+  );
+}
+
 export function HomeIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <Icon className={`shrink-0 ${className}`}>

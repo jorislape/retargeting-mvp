@@ -131,16 +131,35 @@ export function MonitoringSection() {
 
   return (
     <div className="rounded-lg border border-white/[0.05] bg-white/[0.02] p-4">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <p className="text-[13px] font-semibold tracking-tight text-zinc-100">
-          {BETA_TITLE}
-        </p>
-        <span className={badgeAccent}>Beta</span>
-        <span className="text-xs text-zinc-400">{BETA_TAGLINE}</span>
-      </div>
+      {/* Collapsed by default: a compact heading + tagline + expand
+          affordance, NOT the full warning wall — opening the shared
+          competitor/market block for reasons A/B/C must never force a
+          read-through of beta terms nobody asked about. Auto-opens
+          (and stays open across renders, same `open={condition}`
+          pattern used elsewhere in GeneratorPanel) once the workspace
+          already has monitored competitors, so a returning user sees
+          their statuses with no extra click. Whether it opens on its
+          own or by a click, the FULL 5-line warning below always
+          renders before the URL input, every time — nothing here
+          shortcuts that disclosure, satisfying the fence requirement
+          that the warning is shown before enabling and on the section. */}
+      <details open={competitors.length > 0}>
+        <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+          <span className="text-[13px] font-semibold tracking-tight text-zinc-100">
+            {BETA_TITLE}
+          </span>
+          <span className={badgeAccent}>Beta</span>
+          <span className="text-xs text-zinc-400">{BETA_TAGLINE}</span>
+          {competitors.length === 0 && (
+            <span className="ml-auto shrink-0 text-xs font-medium text-accent-soft">
+              Set up →
+            </span>
+          )}
+        </summary>
 
-      {/* The beta warning stays visible — it IS the deal. */}
-      <ul className="mt-2.5 space-y-1 text-xs leading-relaxed text-zinc-400">
+        <div className="mt-3">
+      {/* The beta warning stays visible whenever this is open — it IS the deal. */}
+      <ul className="space-y-1 text-xs leading-relaxed text-zinc-400">
         {BETA_WARNING_LINES.map((line) => (
           <li key={line} className="flex gap-2">
             <span
@@ -335,6 +354,8 @@ export function MonitoringSection() {
           })}
         </div>
       )}
+        </div>
+      </details>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import type { Memo, MemoBrief, MemoTest, MemoWinnerLoserRow } from "@/modules/de
 import {
   CheckIcon,
   CopyIcon,
+  DownloadIcon,
   PrinterIcon,
   RefreshIcon,
 } from "@/components/ui/icons";
@@ -29,6 +30,17 @@ const CONFIDENCE_COLOR: Record<Memo["confidence"]["level"], string> = {
   medium: "text-amber-300",
   low: "text-red-400",
 };
+
+/** Filesystem-safe filename fragment — lowercase, ASCII, hyphenated,
+ *  never empty. Applied only to the product name; the rest of the
+ *  filename is a fixed, known-safe string. */
+function safeFilenamePart(text: string): string {
+  const cleaned = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return cleaned.slice(0, 60) || "debrief";
+}
 
 /* Numbered section head: accent numeral, title, hairline. */
 function SectionHead({
@@ -612,6 +624,22 @@ export function Report({
     }
   };
 
+  /* Same client-only Blob + <a download> pattern as downloadSample()
+     in GeneratorPanel.tsx — no server round-trip, nothing stored, the
+     file exists only in the browser that generated it. Exports the
+     currently active view, same content Copy would put on the
+     clipboard. */
+  const handleDownload = () => {
+    const text = memoToText(memo, view, view === "buyer" ? briefIdxs : []);
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeFilenamePart(memo.scope.product)}-${view}-debrief.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   /* Section numbering shifts because the client view drops Patterns
      and the market/avoid sections only exist when they have content. */
   const hasMarket = memo.marketSignal !== null;
@@ -675,6 +703,13 @@ export function Report({
               )}
               {copied ? "Copied" : "Copy"}
             </span>
+          </button>
+          <button
+            onClick={handleDownload}
+            className={`cursor-pointer ${btnSecondary}`}
+          >
+            <DownloadIcon className="h-3.5 w-3.5" />
+            Download
           </button>
           <button
             onClick={() => window.print()}
