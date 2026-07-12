@@ -21,8 +21,12 @@ export {
 } from "./watchlist";
 export {
   appendPageSignalsToNotes,
+  BENEFIT_TERMS,
+  detect,
   extractPageSignals,
   formatPageSignalsAsNotes,
+  POSITIONING_TERMS,
+  TRUST_TERMS,
 } from "./pageSignals";
 export {
   formatCompetitorSignalNotes,

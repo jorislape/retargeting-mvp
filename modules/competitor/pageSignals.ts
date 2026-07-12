@@ -50,7 +50,7 @@ const OFFER_PATTERNS: RegExp[] = [
   /\bsale\b/i,
 ];
 
-const POSITIONING_TERMS: { label: string; re: RegExp }[] = [
+export const POSITIONING_TERMS: { label: string; re: RegExp }[] = [
   { label: "science-backed", re: /science[\s-]?backed|backed by science|lab[\s-]tested/i },
   { label: "clinically tested", re: /clinically\s(?:tested|proven|studied)/i },
   { label: "dermatologist-endorsed", re: /dermatologist[\s-](?:tested|approved|recommended|developed)/i },
@@ -66,7 +66,7 @@ const POSITIONING_TERMS: { label: string; re: RegExp }[] = [
   { label: "personalized", re: /\bpersonali[sz]ed\b|\bcustomi[sz]ed\b|\btailored\b/i },
 ];
 
-const BENEFIT_TERMS: { label: string; re: RegExp }[] = [
+export const BENEFIT_TERMS: { label: string; re: RegExp }[] = [
   { label: "hydration", re: /\bhydrat|\bmoisturi[sz]/i },
   { label: "sensitive skin", re: /sensitive skin/i },
   { label: "acne / blemishes", re: /\bacne\b|\bblemish|\bbreakout/i },
@@ -83,7 +83,7 @@ const BENEFIT_TERMS: { label: string; re: RegExp }[] = [
   { label: "saves time", re: /save[s]? (?:you )?time|\btime[\s-]saving/i },
 ];
 
-const TRUST_TERMS: { label: string; re: RegExp }[] = [
+export const TRUST_TERMS: { label: string; re: RegExp }[] = [
   { label: "customer reviews / ratings", re: /\breviews?\b|\bratings?\b|\bstars?\b|★|\b[45](?:\.\d)?\s?\/\s?5\b/i },
   { label: "testimonials", re: /testimonial/i },
   { label: "dermatologist mention", re: /dermatologist/i },
@@ -95,7 +95,10 @@ const TRUST_TERMS: { label: string; re: RegExp }[] = [
   { label: "customer count", re: /\b[\d,.]+(?:k|m|\+|,000)\s?(?:\+\s?)?(?:happy\s)?(?:customers|members|users|sold)\b/i },
 ];
 
-function detect(terms: { label: string; re: RegExp }[], text: string): string[] {
+/** Exported so other pure text-interpretation modules (e.g.
+ *  modules/competitorDebrief) can reuse the same term tables against
+ *  their own text without duplicating the keyword judgment calls. */
+export function detect(terms: { label: string; re: RegExp }[], text: string): string[] {
   return terms
     .filter((t) => t.re.test(text))
     .map((t) => t.label)

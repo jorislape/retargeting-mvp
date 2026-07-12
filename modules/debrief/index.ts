@@ -7,12 +7,13 @@ export { generateMemo } from "./memo";
 export {
   assessMarketNotes,
   EMPTY_COMPETITOR_SOURCE,
+  extractMarketSignals,
   formatCompetitorSources,
   MAX_COMPETITOR_SOURCES,
   mergeCompetitorSourcesIntoNotes,
   structureMarketNotes,
 } from "./marketSignals";
-export type { CompetitorSource } from "./marketSignals";
+export type { CompetitorSource, MarketSignals } from "./marketSignals";
 export {
   formatSelectedSignals,
   SIGNAL_BUILDER_CAVEAT,

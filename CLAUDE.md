@@ -13,14 +13,21 @@ npm run dev          # dev server at localhost:3000
 npm run build        # production build
 npx tsc --noEmit     # typecheck
 npx eslint .         # lint
-npm run test:csv     # RFC 4180 escaping proof for the Meta virtual CSV (plain Node)
-npm run test:watchlist # watchlist sanitize/diff/format/append proofs (plain Node)
-npm run test:signals # signal-builder tables/format/append + quality-count proofs
+npm test             # every script test in one run (list below)
 ```
 
-The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm test` (`npm test` runs every script test: csv, watchlist, signals, signal-summary, and the monitoring suites). There is no other test runner; behavioral verification is manual against the dev server — `TESTING.md` is the checklist, and the sample dataset's expected numbers (spend gate ≈ $120.91, 11 judged / 3 set aside, per-KPI medians) are documented in `modules/debrief/sampleCsv.ts` for asserting against.
+The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm test`. There is no other test runner; behavioral verification is manual against the dev server — `TESTING.md` is the checklist, and the sample dataset's expected numbers (spend gate ≈ $120.91, 11 judged / 3 set aside, per-KPI medians) are documented in `modules/debrief/sampleCsv.ts` for asserting against. Every `scripts/*.test.ts` is a plain-Node script (no Jest/Vitest) — run one directly with `node scripts/<name>.test.ts`, or via its `npm run test:<name>` alias in `package.json`:
+
+- `test:csv`, `test:watchlist`, `test:signals`, `test:signal-summary` — the debrief/competitor engine proofs (RFC 4180 escaping, watchlist sanitize/diff/format/append, signal-builder tables, signal-summary interpretation).
+- `test:competitor-debrief` — Competitor Debrief V1 engine proofs: insufficient-evidence handling, category detection, no forbidden performance/spend claims outside the fixed caveat, and a source-scan asserting the engine imports no network/fetch code.
+- `test:monitoring-ssrf` — exhaustive SSRF validator matrix (private v4/v6 ranges, IPv4-mapped v6, redirect-hop re-validation, connect-time pinning contract) for `modules/competitor/guardedFetch.ts` + `ssrf.ts`.
+- `test:monitoring-differ`, `test:monitoring-scheduler`, `test:monitoring-status` — pure logic proofs for content-hashing/dedup, the failure-matrix/auto-pause state machine, and the outcome→label/next-check presentation helpers.
+- `test:monitoring-isolation` — import-graph check (nothing outside `modules/monitoring`, `app/api/monitoring`, `components/monitoring` may import monitoring code), confirms core routes work with `DATABASE_URL` unset, and enforces "no `<form>`, every `<button>` is `type=\"button\"`" inside `components/monitoring/*` (a nested `<form>` inside `GeneratorPanel`'s page-wide form caused a real production bug — native full-page reload on submit).
+- `test:monitoring-routes` — HTTP-level integration test that boots the real dev server twice (flag off / flag on with no DB) and asserts on live responses, since `next/server` has no plain-Node import path.
 
 No environment variables are required for the CSV-upload flow. The optional Meta data source needs `META_APP_ID` and `META_APP_SECRET`; the OAuth redirect URI is derived from the request origin per environment (`modules/meta/config.ts`), with `META_REDIRECT_URI` as an optional explicit override — see `.env.example`. `GET /api/meta/config` reports the resolved redirect URI (never the secret).
+
+The optional Competitor Monitoring Beta (flag default OFF — see the fence below) needs `MONITORING_ENABLED`, `DATABASE_URL` (a **fresh** Neon Postgres database — never point it at an existing/pre-pivot one), and `CRON_SECRET`; `MONITORING_MAX_ACTIVE_URLS` is optional (default 500). `npm run monitoring:generate` regenerates the Drizzle migration in `drizzle/` after a schema change; `npm run monitoring:migrate` applies it and **refuses to run** if the target database already contains unexpected tables. Full provisioning steps (Neon via the Vercel Marketplace, cron registration, rollback tiers): `docs/monitoring-setup.md`.
 
 ## Scope fence — read before adding anything
 
@@ -30,9 +37,11 @@ The CSV (and the generated memo) must never be written to a database, a file, a 
 
 **Meta data source (the one approved exception to "no auth"):** the generator can also connect a Meta account via OAuth (`modules/meta/`, `app/api/meta/*`, `MetaProvider`/`MetaConnect`) and pull ad-level insights as a "virtual CSV" that feeds the identical debrief pipeline. Its constraints are part of the fence: scope is read-only `ads_read` (never widen); the access token lives only in browser memory (`MetaProvider`) and is forwarded per-request via the Authorization header — never a cookie, never storage, never a query param, never a log (the only cookie in the flow is the short-lived OAuth CSRF nonce); insights pulls set `use_unified_attribution_setting=true` so numbers match Ads Manager; the OAuth bridge (`modules/meta/bridge.ts`) posts to an exact origin and `MetaProvider` verifies `event.origin` with strict equality — no wildcards; the Graph API version is pinned in `modules/meta/graph.ts` — check deprecation runway when bumping.
 
-**Market / competitor notes (manual input, plus ONE approved fetch):** the optional `marketContext` textarea is pasted text. No Ads Library scraping, no competitor watchlists, no monitoring, and never a claim about competitor spend or performance. The one approved network action is **Competitor Landing Page Fetch V1** (`modules/competitor/`, `POST /api/competitor/fetch-page`): a single user-triggered fetch of one public landing page per click of "Fetch page signals" on a competitor-source card. Its constraints are part of the fence: SSRF-guarded (http/https only, no credentials, standard ports, hostname blocklist, every DNS answer checked against private/reserved ranges, every redirect hop re-validated — see `modules/competitor/server.ts`), hard timeout + response-size cap, text/html only; Ads Library URLs are refused by policy with a "paste manually" message, never fetched; extraction is deterministic keyword work ("observed on page" wording only); the result is appended to that source's NOTES field for the user to review — it reaches the report only through the existing "Use as market notes" → `marketContext` path; nothing is stored, cached, or logged (no URLs, no page text). Never widen this into Ads Library reading; the ONLY approved recurring fetch is the flag-gated Monitoring Beta below, which has its own fence. **Competitor Watchlist V1** layers on top of this fetch, not around it: up to 5 competitor pages saved in localStorage (browser-only — see the exception above; session memory if unavailable), each refreshed ONLY by an explicit "Refresh signals"/"Refresh all" click through the same guarded route ("Refresh all" is sequential, one failure never stops the rest); the latest and previous signal snapshots enable a simple normalized-string diff ("Headline changed", "No meaningful change detected") shown in the UI and in the notes block; nothing reaches the report until the user clicks "Add refreshed signals to market notes" (append-only, dedupe on identical block, caveat line included). The watchlist itself has no schedules, no alerts, no background refresh — ever; the separate, flag-gated Monitoring Beta (below) is the only scheduled path, and it never touches the watchlist. Everything derived from it — the "Structure notes" button, the quality meter, the memo's Market signal section, market-flavored test/brief wording — is local, deterministic keyword matching (`modules/debrief/marketSignals.ts`), always marked "directional," and own account data stays the primary signal. An empty `marketContext` must leave the memo's content exactly as if the feature didn't exist (`marketSignal: null`, no market wording anywhere). The "Competitor sources" cards in the generator are the same rule wearing a form: manual fields (name / URL / Ads Library links / notes) that "Use as market notes" serializes into `marketContext` as plain text — append-only, restating only what the user typed, URLs never fetched or monitored. The engine and API never see competitor sources as a separate input.
+**Market / competitor notes (manual input, plus ONE approved fetch):** the optional `marketContext` textarea is pasted text — on its own, no network action, no schedule, never a claim about competitor spend or performance. (Two features layer network/persistence on top of it, each separately approved below: the one-time page fetch, and Competitor Watchlist V1. Neither implies Ads Library scraping, which stays refused everywhere in this product.) The one approved network action is **Competitor Landing Page Fetch V1** (`modules/competitor/`, `POST /api/competitor/fetch-page`): a single user-triggered fetch of one public landing page per click of "Fetch page signals" on a competitor-source card. Its constraints are part of the fence: SSRF-guarded (http/https only, no credentials, standard ports, hostname blocklist, every DNS answer checked against private/reserved ranges, every redirect hop re-validated — see `modules/competitor/server.ts`), hard timeout + response-size cap, text/html only; Ads Library URLs are refused by policy with a "paste manually" message, never fetched; extraction is deterministic keyword work ("observed on page" wording only); the result is appended to that source's NOTES field for the user to review — it reaches the report only through the existing "Use as market notes" → `marketContext` path; nothing is stored, cached, or logged (no URLs, no page text). Never widen this into Ads Library reading; the ONLY approved recurring fetch is the flag-gated Monitoring Beta below, which has its own fence. **Competitor Watchlist V1** layers on top of this fetch, not around it: up to 5 competitor pages saved in localStorage (browser-only — see the exception above; session memory if unavailable), each refreshed ONLY by an explicit "Refresh signals"/"Refresh all" click through the same guarded route ("Refresh all" is sequential, one failure never stops the rest); the latest and previous signal snapshots enable a simple normalized-string diff ("Headline changed", "No meaningful change detected") shown in the UI and in the notes block; nothing reaches the report until the user clicks "Add refreshed signals to market notes" (append-only, dedupe on identical block, caveat line included). The watchlist itself has no schedules, no alerts, no background refresh — ever; the separate, flag-gated Monitoring Beta (below) is the only scheduled path, and it never touches the watchlist. Everything derived from it — the "Structure notes" button, the quality meter, the memo's Market signal section, market-flavored test/brief wording — is local, deterministic keyword matching (`modules/debrief/marketSignals.ts`), always marked "directional," and own account data stays the primary signal. An empty `marketContext` must leave the memo's content exactly as if the feature didn't exist (`marketSignal: null`, no market wording anywhere). The "Competitor sources" cards in the generator are the same rule wearing a form: manual fields (name / URL / Ads Library links / notes) that "Use as market notes" serializes into `marketContext` as plain text — append-only, restating only what the user typed, URLs never fetched or monitored. The engine and API never see competitor sources as a separate input.
 
 **Competitor Monitoring Beta V1 (approved milestone — the ONLY server-side persistence, flag-default-OFF):** an optional beta behind `MONITORING_ENABLED` (unset/anything-but-true ⇒ routes return `{disabled:true}`, cron no-ops, UI renders nothing). What it may do — and ALL it may do: store up to 3 user-entered competitor page URLs per pseudonymous workspace (an httpOnly-cookie token whose SHA-256 is the DB key — see `modules/monitoring/workspace.ts`), re-check them AT MOST WEEKLY via one daily Vercel cron (`app/api/monitoring/cron`, `CRON_SECRET`, bounded batch) plus rate-limited manual retries, and keep extracted page signals (never full HTML) + a pruned outcome history in the five `modules/monitoring/db/schema.ts` tables. Hard boundaries that are part of this fence: **no alerts or notifications; no sub-weekly cadence; no Ads Library; no headless browsers, proxies, or anti-bot evasion (403/429/challenge ⇒ recorded as `blocked`, full stop); no competitor spend/traffic/performance inference; no expansion of what is stored (never ads data, never page copies).** Fetches go through the shared pinned pipeline (`modules/competitor/guardedFetch.ts` + `ssrf.ts`). Isolation is mandatory and test-enforced: ALL monitoring server code lives in `modules/monitoring/` + `app/api/monitoring/*` + `components/monitoring/*`; core modules NEVER import monitoring (the single UI mount in `GeneratorPanel` imports `components/monitoring` only); the DB client exists ONLY inside `modules/monitoring/db/client.ts` and the whole core product must run with `DATABASE_URL` unset. Failed checks never modify stored snapshots. Rollback tiers: flag off → remove cron from `vercel.json` → drop the tables (beta data loss is disclosed in the UI). Any expansion — alerts, more URLs, faster checks, new stored fields — is a NEW explicit milestone, not an amendment.
+
+**Competitor Debrief V1 (approved milestone — a second, CSV-free flow, `/competitor-debrief`):** a separate route from the performance debrief, sharing no state with `DebriefProvider`/`GeneratorPanel`. The user pastes a competitor name, a Meta Ads Library URL, an optional website URL, and free-text ad observations; `modules/competitorDebrief/engine.ts` turns that into a structured, directional read (recurring hooks, creative formats, offer patterns, positioning themes, what stands out, 3–5 next tests, what to monitor next) by reusing the existing keyword tables — `extractMarketSignals` (`modules/debrief/marketSignals.ts`) for hooks/formats/offers, and the exported `POSITIONING_TERMS`/`TRUST_TERMS`/`BENEFIT_TERMS`/`detect` from `modules/competitor/pageSignals.ts` — rather than a second interpretation system. Hard boundaries: **no fetching, ever, in this flow** — the Ads Library URL and website URL are validated for shape only and echoed back as source references; neither is passed to `guardedFetch`/`server.ts` or any network call (test-enforced by `scripts/competitorDebrief.test.ts`, which scans `engine.ts` for network imports). No spend/conversion/ROAS/performance/winning-ad claim is ever generated — every output field is keyword-table-derived, so this holds by construction; the one place those words legitimately appear is the fixed caveat that disclaims them. When nothing recognizable is pasted, `insufficientEvidence: true` is returned instead of invented categories or tests — mirrors the CSV engine's "metrics only — angle unknown" honesty rule. Stateless like `/api/debrief`: nothing about the request is stored, cached, or logged. This flow does not read or write the Competitor Watchlist or Monitoring Beta in any way — a future "monitor this competitor debrief" link between the two is a new explicit milestone, not an amendment.
 
 ## Architecture
 
@@ -98,12 +107,108 @@ modules/competitor/            # Competitor Landing Page Fetch V1 (one-time, use
                   # scripts/watchlist.test.ts runs it under plain Node
   index.ts        # client-safe surface (everything except server.ts)
 
+modules/competitorDebrief/     # Competitor Debrief V1 — a second, CSV-free flow (see fence above)
+  types.ts        # CompetitorDebriefInput/Output, CompetitorDebriefApiError (flat, matches
+                  # modules/competitor's own error shape rather than reusing debrief's)
+  engine.ts       # generateCompetitorDebrief(input) — templated, not an LLM call (same seam
+                  # pattern as modules/debrief/memo.ts). Zero network imports (test-enforced).
+                  # Reuses extractMarketSignals + the pageSignals.ts term tables rather than
+                  # a second keyword judgment system
+  index.ts        # public surface
+
 modules/meta/                  # optional OAuth data source ("virtual CSV")
   graph.ts        # server-only Graph client; version pin; token via Authorization header
   config.ts       # redirect-URI resolution (request-derived, env override) + validation
   bridge.ts       # OAuth popup bridge page (postMessage to exact origin)
   insightsToCsv.ts# serializes insights into Ads-Manager-shaped CSV text
   index.ts        # public surface
+
+modules/monitoring/            # Competitor Monitoring Beta V1 — see the fence above for
+                               # what it may/may not do. No barrel index.ts; import each
+                               # file directly (matches how the files import each other).
+  db/schema.ts    # the 5 Drizzle tables (workspaces, monitored_competitors, snapshots,
+                  # check_events, rate_events) + the check_outcome pg enum. Additive-only
+                  # migrations live in drizzle/, generated via `npm run monitoring:generate`
+  db/client.ts    # the ONLY place a DB client is instantiated in this codebase. getDb()
+                  # is lazy (importing the module does nothing) and throws a typed
+                  # MonitoringUnavailableError if DATABASE_URL is unset — routes catch
+                  # that and degrade instead of crashing. withTransaction() opens a
+                  # separate WebSocket Pool connection (the HTTP driver can't do
+                  # SELECT...FOR UPDATE) only for the race-free 3-per-workspace cap check
+  flag.ts         # monitoringEnabled() — true only for the exact env values "true"/"1";
+                  # every route checks this FIRST and returns {disabled:true} otherwise
+  workspace.ts    # the pseudonymous ownership model: mints a 256-bit token, stores only
+                  # SHA-256(token) as the workspace id (a leaked DB can't impersonate),
+                  # cookie is httpOnly/Secure/SameSite=Lax. A cookie whose row no longer
+                  # exists is NEVER re-adopted (would let a client plant a chosen token)
+                  # — a fresh token is minted instead. Minting only happens on a
+                  # mutating action (adding a competitor), never on a read, and is
+                  # IP-rate-limited. Dormancy (30d unseen) is computed at query time from
+                  # last_seen_at, not stored as a flag, so any visit auto-resumes
+                  # scheduling — contrast with per-competitor auto-pause, which is
+                  # manual-resume only
+  ratelimit.ts    # DB-backed sliding-window limits (serverless has no shared memory).
+                  # Keys are SHA-256(salt + raw value); the salt is derived from
+                  # CRON_SECRET, never a repo constant, so it's identical across
+                  # instances but not public
+  outcomes.ts     # the 12-value check_outcome vocabulary, OUTCOME_LABELS, and
+                  # isFailureOutcome()/isTransientAttempt() — pure, zero imports, so it's
+                  # the one monitoring module safe to import from a "use client" component
+  fetcher.ts      # the scheduled-check worker: runs the SAME pinned fetch pipeline as
+                  # the one-time competitor fetch (modules/competitor/guardedFetch.ts),
+                  # maps its outcome to the check_outcome enum. 403/429/challenge ->
+                  # `blocked`, never retried, never evaded
+  differ.ts       # canonical content-hash (whitespace/case/dedup-insensitive, so page
+                  # noise never triggers a false "changed") + meaningful-change diff,
+                  # reusing modules/competitor/watchlist.ts's diffPageSignals rather than
+                  # a second interpretation of the same signals
+  scheduler.ts    # PURE planning: weekly cadence + jitter, the failure-matrix state
+                  # machine (auto-pause after 4 consecutive failures), and
+                  # buildCompetitorUpdate() — whose failure-path return value physically
+                  # cannot contain last-success fields, so a failed check cannot touch
+                  # the retained snapshot by construction (test-enforced). SERVER-ONLY:
+                  # imports fetcher.ts -> guardedFetch.ts -> node:http/node:dns
+  service.ts      # applies the scheduler's plans against the DB: add (workspace-row-
+                  # locked transaction for the 3-per-workspace cap; global ceiling stays
+                  # approximate count-then-insert by design) / list / remove / retry
+                  # (rate-limited, longer cooldown after `blocked`) / resume /
+                  # processDueBatch (the cron's bounded, concurrency-capped batch —
+                  # one poisoned URL never aborts the rest; an unfinished batch is
+                  # harmless because next_check_at only advances per-row after its own
+                  # check persists)
+  http.ts         # route-layer glue: uniform {disabled:true}/{unavailable:true} bodies,
+                  # error mapping that never leaks internals
+
+components/monitoring/         # the ONLY sanctioned monitoring import into core — a
+                               # single mount in GeneratorPanel.tsx (`<MonitoringErrorBoundary><MonitoringSection /></MonitoringErrorBoundary>`)
+  MonitoringSection.tsx  # the whole client surface. Talks only to /api/monitoring/*.
+                         # Collapsed by default (a compact heading + tagline), auto-opens
+                         # via the same `open={condition}` idiom used elsewhere in
+                         # GeneratorPanel once the workspace already has competitors —
+                         # but the full warning list always renders before the URL input
+                         # on every expansion, satisfying "shown before enabling." NOT a
+                         # <form> — it's mounted inside the generator's own page-wide
+                         # form, so it uses plain onClick/onKeyDown (see
+                         # test:monitoring-isolation)
+  MonitoringErrorBoundary.tsx  # class component isolation fuse — any render/runtime
+                               # failure here becomes an inline card; the rest of the
+                               # generator is provably unaffected
+  copy.ts         # every monitoring string in one place, incl. the 5 beta-warning
+                  # bullets (disclosure — do not shorten or hide behind a click) and the
+                  # persistence/scheduling/ownership copy
+  status.ts       # client-safe presentation helpers: deriveMonitoringStatus() reduces
+                  # the 12 outcomes to 5 truthful states (Pending/Checked/Blocked/Failed/
+                  # Paused) built directly on outcomes.ts's isFailureOutcome so it can't
+                  # drift from the server's own classification; formatNextCheck() never
+                  # shows a precise time (checks run on the next DAILY cron pass, not at
+                  # an exact minute) — deliberately NOT in scheduler.ts, which is
+                  # server-only (see above)
+
+app/api/monitoring/{competitors,competitors/[id],competitors/[id]/retry,competitors/[id]/resume,cron}/route.ts
+                               # cron is GET/POST with constant-time CRON_SECRET
+                               # comparison; registered in vercel.json (daily). Every
+                               # route checks the flag first and degrades to
+                               # {unavailable:true} on any infra failure rather than 500
 
 app/api/debrief/route.ts       # the entire debrief backend — validate, parse, analyze,
                                # return. Every failure is a structured DebriefApiError
@@ -113,12 +218,14 @@ app/api/debrief/route.ts       # the entire debrief backend — validate, parse,
                                # ("export at ad level" guidance)
 app/api/meta/{login,callback,config,ad-accounts,insights}/route.ts
 app/api/competitor/fetch-page/route.ts  # one-time landing-page fetch (see scope fence)
+app/api/competitor-debrief/route.ts     # Competitor Debrief V1 backend — validates shape,
+                               # normalizes URLs (never fetches them), calls the engine
 
 app/(marketing)/               # home route only: conventional top-nav shell, no providers
   layout.tsx, page.tsx         # hero (frameless HeroProof demo), bento, KPI demo, CTAs
 app/(workspace)/               # app shell: sidebar (desktop) / tab bar (mobile)
   layout.tsx                   # DebriefProvider + MetaProvider live here (see below)
-  generator/, sample/, how-it-works/, privacy/
+  generator/, competitor-debrief/, sample/, how-it-works/, privacy/
 app/opengraph-image.tsx        # generated OG card (next/og); app/icon.svg = tab glyph
 
 components/marketing/
@@ -136,6 +243,12 @@ components/workspace/
   MetaProvider.tsx     # Meta connection state; token in memory only; strict-origin postMessage
   Nav.tsx              # sidebar (desktop) / top bar + bottom tabs (mobile); wordmark-only
                        # brand (components/ui/brand.tsx — glyph is for icon surfaces only)
+
+components/competitorDebrief/  # Competitor Debrief V1 UI — no relation to components/debrief
+  CompetitorDebriefPanel.tsx   # the one input section + one Generate action; local useState
+                               # only, no provider (unlike the CSV flow's DebriefProvider)
+  CompetitorDebriefResult.tsx  # renders the structured output; insufficient-evidence state
+                               # replaces the interpretation sections with an explicit note
 
 components/debrief/
   GeneratorPanel.tsx   # 4-stage workflow (Data / Context / Verify / Run): dropzone, sample
@@ -177,6 +290,7 @@ components/debrief/
 ### Layering rules
 
 - Routes stay thin; domain logic lives in `modules/`. Import from each module's `index.ts` only. The debrief engine never imports from `modules/meta` and never learns where a CSV came from.
+- `modules/competitor/guardedFetch.ts` is the ONE fetch pipeline shared by both network features — the one-time competitor-page fetch (`modules/competitor/server.ts`) and the monitoring beta's scheduled checks (`modules/monitoring/fetcher.ts`). SSRF validation (`ssrf.ts`) happens per redirect hop, and the resolved IPs are then pinned at the socket layer via a custom `node:http(s)` `lookup` (not undici — evaluated and rejected: not an installed/vendored dependency here) so a DNS answer that changes after validation can't redirect the connection. Changing timeout/redirect/size limits or the SSRF rules changes both features at once.
 - `modules/debrief/memo.ts`'s `generateMemo(analysis, context)` is deterministic template code, not an LLM call — documented as the seam for a future LLM-backed version (same `(AnalysisResult, DebriefContext)` in, same `Memo` shape out, so the route/UI wouldn't need to change). Do not add an actual AI call here unless explicitly asked; it's out of scope for this version.
 - The Buyer/Client report views are one memo, two renderings: `memo.ts` generates both registers (`tldr` + `clientSummary`, `killInstruction` + `clientInstruction`, `avoid.buyer` + `avoid.client`, `confidence.reasons` + `confidence.clientWhy`, `kpiExplainer`), and `Report.tsx`/`memoToText.ts` pick per view. Client copy must stay jargon-free — no "kill", "benchmark", or "spend gate"; client view shows top-3 performers only and never shows Patterns or creative briefs. Print/PDF and Copy follow the active view (and include briefs only while they're on screen).
 - Everything the memo asserts must trace to data: each next test carries `signals` (own numbers first, market notes suffixed "— directional", guardrails last) and a `brief` built from those same facts; "What not to do" bullets render only when their condition holds; confidence `reasons` derive from the exact conditions that set the level. Creative briefs contain structural direction only — never invented product claims, quotes, discounts, guarantees, or competitor facts.
@@ -194,7 +308,7 @@ components/debrief/
 
 ## Design constraints to preserve
 
-- No routes beyond `/` (home, in the `(marketing)` group), `/generator`, `/sample`, `/how-it-works`, `/privacy`. Don't add a history page, a second CSV's results, or anything account-shaped.
+- No routes beyond `/` (home, in the `(marketing)` group), `/generator`, `/competitor-debrief`, `/sample`, `/how-it-works`, `/privacy`. Don't add a history page, a second CSV's results, or anything account-shaped.
 - Meta CSV column names vary by export configuration (`columns.ts` handles this via normalized alias matching) — if a required column can't be found for the selected KPI, the API returns a clear, structured 400 (with KPI switch suggestions when other KPI columns exist) rather than guessing. The alias groups documented in the generator's "CSV requirements" helper must stay true to what `columns.ts` actually resolves.
 - `/sample` and the generator's "Load sample data" must stay on the same dataset AND context (`sampleCsv.ts`, including its `marketContext`) rendered by the real engine — the sample is a promise about what real data produces, not marketing copy. "Download sample CSV" serves that same `SAMPLE_CSV_TEXT` as a client-side blob.
 - A Meta pull that returns zero rows is a guidance state ("no ads found — try a longer range, upload a CSV, or use sample data"), never an error state.

@@ -8,12 +8,14 @@ import {
   HelpCircleIcon,
   HomeIcon,
   ShieldIcon,
+  SparklesIcon,
   ZapIcon,
 } from "@/components/ui/icons";
 
 const NAV = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/generator", label: "Generator", icon: ZapIcon },
+  { href: "/competitor-debrief", label: "Competitor debrief", icon: SparklesIcon },
   { href: "/sample", label: "Sample report", icon: FileTextIcon },
   { href: "/how-it-works", label: "How it works", icon: HelpCircleIcon },
   { href: "/privacy", label: "Privacy", icon: ShieldIcon },
@@ -97,7 +99,7 @@ export function MobileTabBar() {
       aria-label="Primary"
       className="print-hidden fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-carbon/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-6">
         {NAV.map((item) => {
           const active = isActive(pathname, item.href);
           return (
@@ -118,7 +120,13 @@ export function MobileTabBar() {
               <item.icon
                 className={`h-5 w-5 ${active ? "text-accent-soft" : ""}`}
               />
-              {item.label === "How it works" ? "Guide" : item.label === "Sample report" ? "Sample" : item.label}
+              {item.label === "How it works"
+                ? "Guide"
+                : item.label === "Sample report"
+                  ? "Sample"
+                  : item.label === "Competitor debrief"
+                    ? "Competitor"
+                    : item.label}
             </Link>
           );
         })}
