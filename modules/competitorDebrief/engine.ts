@@ -27,14 +27,37 @@ import type { CompetitorDebrief, CompetitorDebriefInput, CompetitorDebriefTest }
  * item from an array with several entries.
  */
 
-const CATEGORY_COUNT = 6; // hooks, formats, offers, positioning, trust, benefits
-
+/** Short, non-repetitive — the four things that matter: scope, no
+ *  performance inference, the Ads Library URL's status, and that
+ *  interpretation is not evidence. */
 export const COMPETITOR_DEBRIEF_CAVEAT = (competitorName: string): string =>
-  `This debrief is based only on what you pasted about ${competitorName} — it never infers spend, conversions, ROAS, performance, or winning ads. Observed evidence (hooks/formats/offers/positioning) and interpretation (what stands out, next tests) are kept separate above; interpretation is a directional recombination of what you pasted, never a new fact, and where evidence is thin that is stated explicitly rather than guessed. The Ads Library URL is a source reference only: it is not fetched, and this does not claim to have analyzed ${competitorName}'s full Ads Library.`;
+  `Based only on what you pasted about ${competitorName} — not a review of their Ads Library. No spend, conversion, or performance inference. The Ads Library URL is a reference only, never fetched. Interpretation above (what stands out, next tests) is directional, not evidence.`;
 
 function wordCount(text: string): number {
   const trimmed = text.trim();
   return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
+}
+
+/** Natural-language "A, B, and C" join — no Oxford-comma edge cases
+ *  left to chance for the 1/2/3+ item counts this ever sees. */
+function joinWithAnd(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+/** Names which evidence categories were actually found — never a word
+ *  count, which tells the user nothing about content. */
+function describeEvidenceCoverage(e: Evidence): string {
+  const present: string[] = [];
+  if (e.hooks.length > 0) present.push("recurring hooks");
+  if (e.formats.length > 0) present.push("creative formats");
+  if (e.offers.length > 0) present.push("offer patterns");
+  if (e.positioning.length > 0) present.push("positioning themes");
+  if (e.trust.length > 0) present.push("trust signals");
+  if (e.benefits.length > 0) present.push("benefit claims");
+  return joinWithAnd(present);
 }
 
 /* ------------------------------------------------------------------ */
@@ -340,7 +363,7 @@ export function generateCompetitorDebrief(
 
   const evidenceSummary = insufficientEvidence
     ? `Not enough was pasted to identify hooks, formats, offers, or positioning for ${competitorName || "this competitor"}.`
-    : `Based on ${words} word${words === 1 ? "" : "s"} of pasted observations for ${competitorName}, covering ${categoriesMatched} of ${CATEGORY_COUNT} tracked categories (hooks, formats, offers, positioning, trust signals, benefit claims). This reflects only what was pasted — not a review of the full Meta Ads Library.`;
+    : `Observed evidence for ${competitorName} includes ${describeEvidenceCoverage(evidence)}.`;
 
   const insufficientEvidenceNote = insufficientEvidence
     ? "Paste specific ad copy, hooks, offers, formats, or other observations from the Ads Library to get a meaningful debrief. Generic or empty notes can't be interpreted."

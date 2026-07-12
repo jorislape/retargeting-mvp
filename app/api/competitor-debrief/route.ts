@@ -90,6 +90,18 @@ export async function POST(request: NextRequest) {
       fix: "Shorten the competitor name.",
     });
   }
+  // A competitor name is never a URL — reject outright rather than let
+  // a misplaced/autofilled URL end up standing in for the name
+  // throughout the debrief (that exact bug shipped in an earlier
+  // preview: a deployment URL was pasted into this field and echoed
+  // back everywhere the name should appear).
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(competitorName.trim())) {
+    return fail(400, {
+      title: "That looks like a URL, not a name",
+      message: "The competitor name field can't be a web address.",
+      fix: 'Enter the competitor\'s name (e.g. "ColonBroom") and put URLs in the Ads Library / Website fields.',
+    });
+  }
 
   if (typeof adsLibraryUrl !== "string" || adsLibraryUrl.trim() === "") {
     return fail(400, {

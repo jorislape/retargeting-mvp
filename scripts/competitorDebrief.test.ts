@@ -74,9 +74,11 @@ const isObserved = (value: string): boolean =>
   assert.ok(d.positioningThemes.length > 0, "expected at least one positioning theme detected");
   assert.ok(d.nextTests.length >= 3 && d.nextTests.length <= 5);
   assert.ok(d.whatToMonitorNext.length > 0);
-  assert.match(d.evidenceSummary, /Based on \d+ words? of pasted observations/);
-  // Must disclaim full-library coverage, never affirmatively claim it.
-  assert.match(d.evidenceSummary, /not a review of the full Meta Ads Library/i);
+  // The evidence summary names which categories were found — never a
+  // word count, which tells the user nothing about content.
+  assert.doesNotMatch(d.evidenceSummary, /\bwords?\b/i);
+  assert.match(d.evidenceSummary, /Observed evidence for ColonBroom includes/);
+  assert.match(d.evidenceSummary, /recurring hooks/);
   for (const test of d.nextTests) {
     for (const key of ["hypothesis", "hookOrAngle", "format", "proofMechanism", "offerOrCta", "whatYoullLearn"]) {
       assert.equal(typeof (test as unknown as Record<string, string>)[key], "string");
@@ -184,12 +186,66 @@ const FORBIDDEN = /\b(ROAS|CPA|CPC|CTR|conversion rate|winning ad|spend of|impre
   for (const field of fieldsToCheck) {
     assert.doesNotMatch(field, FORBIDDEN, `forbidden performance claim in: "${field}"`);
   }
-  // The caveat itself is the one place spend/performance/ROAS are
-  // mentioned — deliberately, to disclaim them.
-  assert.match(d.caveat, /never infers spend, conversions, ROAS, performance/);
-  assert.match(d.caveat, /source reference only/);
-  assert.match(d.caveat, /not fetched/);
-  assert.match(d.caveat, /does not claim to have analyzed/);
+  // The caveat itself is the one place performance-adjacent words are
+  // mentioned — deliberately, to disclaim them. Short: the four
+  // required points only, no repetition.
+  assert.match(d.caveat, /based only on what you pasted/i);
+  assert.match(d.caveat, /no spend, conversion, or performance inference/i);
+  assert.match(d.caveat, /reference only/i);
+  assert.match(d.caveat, /never fetched/i);
+  assert.match(d.caveat, /directional, not evidence/i);
+  assert.ok(d.caveat.length < 320, `caveat should be short, got ${d.caveat.length} chars: "${d.caveat}"`);
+}
+
+/* ------------------- P0 regression: name is never a URL -------------------- */
+
+{
+  // The exact bug from preview QA: a deployment URL ended up standing
+  // in for the competitor name throughout the debrief. Prove the
+  // engine only ever echoes input.competitorName verbatim, never a
+  // URL, in every field that mentions the competitor by name.
+  const d = generateCompetitorDebrief({
+    competitorName: "ColonBroom",
+    adsLibraryUrl: "https://creative-debrief-git-some-branch-someuser.vercel.app",
+    websiteUrl: "https://creative-debrief-git-some-branch-someuser.vercel.app",
+    observations:
+      "UGC video with a founder-led hook, problem-first framing. 20% off first order. " +
+      "Clinically tested claims with customer reviews and a guarantee.",
+  });
+  assert.equal(d.competitorName, "ColonBroom");
+  const nameFields = [d.evidenceSummary, d.caveat, ...d.whatToMonitorNext, ...d.nextTests.map((t) => t.hypothesis)];
+  for (const field of nameFields) {
+    assert.doesNotMatch(field, /https?:\/\//i, `competitor-name-bearing field must never contain a URL: "${field}"`);
+    if (field.includes("ColonBroom") || field === d.caveat || field === d.evidenceSummary) {
+      assert.doesNotMatch(field, /vercel\.app|creative-debrief/i, `must never leak the deployment URL: "${field}"`);
+    }
+  }
+}
+
+/* --------------- route rejects a URL submitted as competitor name ---------- */
+
+{
+  const src = readFileSync(
+    new URL("../app/api/competitor-debrief/route.ts", import.meta.url),
+    "utf8"
+  );
+  assert.match(
+    src,
+    /\.test\(competitorName\.trim\(\)\)/,
+    "route must validate competitorName shape (reject URLs), not just presence"
+  );
+  assert.match(src, /looks like a URL/i, "route should explain the URL-as-name rejection to the user");
+}
+
+/* -------------- panel disables browser autofill on free-text fields -------- */
+
+{
+  const src = readFileSync(
+    new URL("../components/competitorDebrief/CompetitorDebriefPanel.tsx", import.meta.url),
+    "utf8"
+  );
+  const nameInputBlock = src.slice(src.indexOf('id="competitor-name"'), src.indexOf('id="competitor-name"') + 200);
+  assert.match(nameInputBlock, /autoComplete="off"/, "competitor-name input should disable browser autofill");
 }
 
 /* --------------------- engine never imports network/fetch code -------------- */

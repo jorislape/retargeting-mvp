@@ -93,6 +93,7 @@ export function CompetitorDebriefPanel() {
             <input
               id="competitor-name"
               type="text"
+              autoComplete="off"
               className={inputBase}
               placeholder="e.g. ColonBroom"
               value={form.competitorName}
@@ -107,6 +108,7 @@ export function CompetitorDebriefPanel() {
             <input
               id="ads-library-url"
               type="text"
+              autoComplete="off"
               className={inputBase}
               placeholder="https://www.facebook.com/ads/library/?..."
               value={form.adsLibraryUrl}
@@ -124,6 +126,7 @@ export function CompetitorDebriefPanel() {
             <input
               id="website-url"
               type="text"
+              autoComplete="off"
               className={inputBase}
               placeholder="https://example.com"
               value={form.websiteUrl}
