@@ -15,58 +15,286 @@ import type { CompetitorDebrief, CompetitorDebriefInput, CompetitorDebriefTest }
  * Honesty policy (mirrors the CSV engine's "metrics only — angle
  * unknown" rule): if nothing recognizable was pasted, the debrief says
  * so plainly instead of inventing hooks/formats/offers/tests.
+ *
+ * Synthesis: `whatStandsOut` and `nextTests` are built from a fixed
+ * rule table (SYNTHESIS_RULES) that recombines the SAME detected
+ * labels across categories — never new facts — into named patterns
+ * and structured tests. This is what keeps the output from being a
+ * flat echo of one category at a time while staying deterministic and
+ * traceable to what was actually pasted. Generic slot fill-ins
+ * (format/proof/offer, when a rule doesn't pin a specific one) rotate
+ * by test position so multiple tests don't all cite the same first
+ * item from an array with several entries.
  */
 
 const CATEGORY_COUNT = 6; // hooks, formats, offers, positioning, trust, benefits
 
 export const COMPETITOR_DEBRIEF_CAVEAT = (competitorName: string): string =>
-  `This debrief is based only on what you pasted about ${competitorName} — it never infers spend, conversions, ROAS, performance, or winning ads. Observed evidence and interpretation are kept separate above, and where evidence is thin that is stated explicitly rather than guessed. The Ads Library URL is a source reference only: it is not fetched, and this does not claim to have analyzed ${competitorName}'s full Ads Library.`;
+  `This debrief is based only on what you pasted about ${competitorName} — it never infers spend, conversions, ROAS, performance, or winning ads. Observed evidence (hooks/formats/offers/positioning) and interpretation (what stands out, next tests) are kept separate above; interpretation is a directional recombination of what you pasted, never a new fact, and where evidence is thin that is stated explicitly rather than guessed. The Ads Library URL is a source reference only: it is not fetched, and this does not claim to have analyzed ${competitorName}'s full Ads Library.`;
 
 function wordCount(text: string): number {
   const trimmed = text.trim();
   return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
 }
 
-function buildNextTests(
-  competitorName: string,
-  hooks: string[],
-  formats: string[],
-  offers: string[],
-  positioning: string[]
-): CompetitorDebriefTest[] {
-  const tests: CompetitorDebriefTest[] = [];
+/* ------------------------------------------------------------------ */
+/* Synthesis: named cross-category patterns/tensions + structured      */
+/* tests built from them. Every string here is assembled only from the */
+/* label vocabulary already produced by extractMarketSignals/detect —  */
+/* nothing is invented beyond what those pure keyword tables found.    */
+/* ------------------------------------------------------------------ */
 
-  if (hooks.length > 0) {
-    tests.push({
-      title: `Test a hook inspired by ${competitorName}'s observed pattern: ${hooks[0]}`,
-      rationale: `You noted ${competitorName} using ${hooks.join(", ")}. Testing a version in your own creative checks whether the angle resonates with your audience — not whether it worked for them.`,
-    });
+interface Evidence {
+  hooks: string[];
+  formats: string[];
+  offers: string[];
+  positioning: string[];
+  trust: string[];
+  benefits: string[];
+}
+
+const has = (list: string[], ...labels: string[]): boolean =>
+  labels.some((l) => list.includes(l));
+const first = (list: string[]): string | null => (list.length > 0 ? list[0] : null);
+/** Rotates through a list by test position instead of always returning
+ *  the first item, so parallel tests that share a fallback pool don't
+ *  all cite the same entry. */
+const rotate = (list: string[], index: number): string | null =>
+  list.length > 0 ? list[index % list.length] : null;
+
+const UNOBSERVED = {
+  hook: "No specific hook observed in what was pasted — choose your own angle to contrast against this evidence.",
+  format: "No specific format observed in what was pasted — pick a format that fits the hook.",
+  proof: "No proof mechanism observed in what was pasted — that's a real gap worth closing (reviews, guarantee, credential), not something to invent here.",
+  offer: "No specific offer observed in what was pasted — test against your own standard offer or CTA.",
+};
+
+const formatSlot = (e: Evidence, i = 0): string => rotate(e.formats, i) ?? UNOBSERVED.format;
+const proofSlot = (e: Evidence, i = 0): string => rotate(e.trust, i) ?? UNOBSERVED.proof;
+const offerSlot = (e: Evidence, i = 0): string => rotate(e.offers, i) ?? UNOBSERVED.offer;
+const hookSlot = (e: Evidence, i = 0): string =>
+  rotate(e.hooks, i) ?? rotate(e.positioning, i) ?? UNOBSERVED.hook;
+
+interface SynthesisRule {
+  id: string;
+  matches: (e: Evidence) => boolean;
+  /** One sentence naming the combined pattern or tension — this is
+   *  what fills `whatStandsOut`. */
+  pattern: (e: Evidence) => string;
+  hypothesis: (e: Evidence, name: string) => string;
+  hookOrAngle: (e: Evidence, index: number) => string;
+  format: (e: Evidence, index: number) => string;
+  proofMechanism: (e: Evidence, index: number) => string;
+  offerOrCta: (e: Evidence, index: number) => string;
+  whatYoullLearn: (e: Evidence, name: string) => string;
+}
+
+const SYNTHESIS_RULES: SynthesisRule[] = [
+  {
+    id: "problem-first-proof-guarantee",
+    matches: (e) =>
+      (has(e.hooks, "problem-first hooks") || has(e.positioning, "problem-first")) &&
+      has(e.trust, "customer reviews / ratings", "testimonials") &&
+      (has(e.trust, "guarantee / risk-reversal") || has(e.hooks, "guarantee / risk-reversal")),
+    pattern: () =>
+      "Problem-first messaging reinforced by social proof and risk reversal — the pain point is stated up front, then backed by reviews/testimonials and a guarantee to lower the barrier to a first purchase.",
+    hypothesis: (_e, name) =>
+      `Leading with the pain point before the product, then backing it with proof and a guarantee, may reduce hesitation more than a benefit-first opening — this is the combination ${name} appears to run, not evidence it converts for them.`,
+    hookOrAngle: () => "Problem-first opening: state the pain point before introducing the product",
+    format: formatSlot,
+    proofMechanism: (e, i) =>
+      rotate(e.trust.filter((t) => t === "customer reviews / ratings" || t === "testimonials"), i) ??
+      proofSlot(e, i),
+    offerOrCta: offerSlot,
+    whatYoullLearn: (_e, name) =>
+      `Whether the problem-first + proof + guarantee combination moves your audience — independent of whether it works for ${name}.`,
+  },
+  {
+    id: "routine-direct-response",
+    matches: (e) =>
+      has(e.positioning, "routine-based") &&
+      has(e.offers, "discounts", "limited-time offers", "first-order offers", "bundle offers"),
+    pattern: (e) =>
+      `Routine-based positioning combined with a direct-response offer (${first(e.offers.filter((o) => ["discounts", "limited-time offers", "first-order offers", "bundle offers"].includes(o))) ?? "a discount/urgency offer"}) — the product is framed as a daily habit, then pushed toward an immediate decision with a time- or price-based incentive.`,
+    hypothesis: (_e, name) =>
+      `Framing the product as a routine and then applying urgency/discount pressure may convert differently than either alone — worth isolating whether the routine framing or the offer is doing the work, rather than assuming ${name}'s pairing is optimal.`,
+    hookOrAngle: () => "Routine/ritual framing (position the product as a daily habit)",
+    format: formatSlot,
+    proofMechanism: proofSlot,
+    offerOrCta: (e, i) =>
+      rotate(
+        e.offers.filter((o) => ["discounts", "limited-time offers", "first-order offers", "bundle offers"].includes(o)),
+        i
+      ) ?? offerSlot(e, i),
+    whatYoullLearn: () =>
+      "Whether routine framing plus a direct-response offer outperforms either dimension tested alone.",
+  },
+  {
+    id: "natural-clinical-tension",
+    matches: (e) =>
+      has(e.positioning, "natural / clean") &&
+      (has(e.positioning, "clinically tested", "science-backed", "dermatologist-endorsed") ||
+        has(e.trust, "clinical claims", "dermatologist mention")),
+    pattern: () =>
+      "Trust-heavy health messaging balancing natural claims with clinical proof — 'natural' framing is paired with clinical/dermatologist validation, likely preempting a 'does natural actually work' objection.",
+    hypothesis: (_e, name) =>
+      `Pairing a "natural" claim with clinical/dermatologist backing may resolve doubt that either claim raises on its own — the tension between "natural" and "clinically proven" is worth testing explicitly rather than assuming it reads as reassuring the way it may for ${name}.`,
+    hookOrAngle: () => "Natural claim opening, immediately backed by clinical/dermatologist validation",
+    format: formatSlot,
+    proofMechanism: (e, i) =>
+      rotate(e.trust.filter((t) => t === "clinical claims" || t === "dermatologist mention"), i) ??
+      rotate(e.positioning.filter((p) => p === "clinically tested" || p === "science-backed" || p === "dermatologist-endorsed"), i) ??
+      proofSlot(e, i),
+    offerOrCta: offerSlot,
+    whatYoullLearn: () =>
+      "Whether stacking natural + clinical claims together reduces skepticism more than leading with either alone.",
+  },
+  {
+    id: "founder-ugc-authenticity",
+    matches: (e) =>
+      (has(e.positioning, "founder-led") || has(e.formats, "founder-led video")) &&
+      has(e.formats, "UGC / creator content", "testimonials"),
+    pattern: () =>
+      "Founder-led narrative reinforced by UGC/testimonial format — authenticity is carried in both the message (founder story) and the format (real customers/creators), not claimed by copy alone.",
+    hypothesis: (_e, name) =>
+      `Authenticity signaled through format (UGC/testimonial) as well as message (founder story) may build more trust than either alone — a structural pattern worth testing on its own terms, not because it worked for ${name}.`,
+    hookOrAngle: () => "Founder-led / personal-story angle",
+    format: (e, i) =>
+      rotate(e.formats.filter((f) => f === "UGC / creator content" || f === "testimonials" || f === "founder-led video"), i) ??
+      formatSlot(e, i),
+    proofMechanism: proofSlot,
+    offerOrCta: offerSlot,
+    whatYoullLearn: () =>
+      "Whether matching an authentic message to an authentic format outperforms a polished, non-founder-led version.",
+  },
+  {
+    id: "before-after-benefit-proof",
+    matches: (e) => has(e.hooks, "before/after framing") || (has(e.trust, "before/after") && e.benefits.length > 0),
+    pattern: (e) =>
+      e.benefits.length > 0
+        ? `Before/after framing paired with a specific benefit claim (${e.benefits.slice(0, 2).join(", ")}) — visual transformation proof is tied to a concrete, testable outcome rather than a vague promise.`
+        : "Before/after framing used as its own proof mechanism, without a specific benefit claim attached to it.",
+    hypothesis: (e, name) =>
+      e.benefits.length > 0
+        ? `Tying before/after proof to one named, specific outcome (${e.benefits[0]}) rather than a general transformation claim may set clearer expectations for your audience — worth testing against a vaguer before/after, independent of ${name}'s results.`
+        : `Before/after framing on its own, without a named benefit, is a testable proof format — try pairing it with a specific claim to see if specificity changes response, separate from ${name}'s performance.`,
+    hookOrAngle: () => "Before/after transformation framing",
+    format: (e, i) => rotate(e.formats.filter((f) => f === "carousels" || f === "video"), i) ?? formatSlot(e, i),
+    proofMechanism: () => "Before/after visual proof",
+    offerOrCta: offerSlot,
+    whatYoullLearn: () =>
+      "Whether tying the before/after proof to one specific, named outcome changes response versus a general transformation claim.",
+  },
+  {
+    id: "subscription-bundle-guarantee",
+    matches: (e) => has(e.offers, "subscription / trial offers", "bundle offers") && has(e.trust, "guarantee / risk-reversal"),
+    pattern: (e) =>
+      `Subscription/bundle offer (${first(e.offers.filter((o) => o === "subscription / trial offers" || o === "bundle offers")) ?? "recurring commitment"}) softened by a guarantee — a bigger up-front ask is offset with explicit risk reversal.`,
+    hypothesis: (_e, name) =>
+      `A bigger-commitment offer (subscription/bundle) paired with an explicit guarantee may lower hesitation more than the same offer without risk reversal — this is a structural test of the pairing, not a performance claim about ${name}.`,
+    hookOrAngle: hookSlot,
+    format: formatSlot,
+    proofMechanism: () => "Guarantee / risk-reversal",
+    offerOrCta: (e, i) =>
+      rotate(e.offers.filter((o) => o === "subscription / trial offers" || o === "bundle offers"), i) ?? offerSlot(e, i),
+    whatYoullLearn: () =>
+      "Whether the guarantee is doing meaningful work — test the same offer with and without explicit risk reversal.",
+  },
+  {
+    id: "trust-stacking-weak-hook",
+    matches: (e) => e.trust.length >= 3 && e.hooks.length === 0,
+    pattern: (e) =>
+      `Heavy trust stacking (${e.trust.slice(0, 3).join(", ")}) without a distinct hook detected — credibility appears to be doing more work than a unique angle.`,
+    hypothesis: (_e, name) =>
+      `${name}'s pasted ads lean on layered proof rather than a sharp hook — testing whether a stronger, more specific hook outperforms proof-heavy creative alone is a real open question, not something these observations answer.`,
+    hookOrAngle: () => "A sharper, more specific hook — not yet observed in what was pasted",
+    format: formatSlot,
+    proofMechanism: (e) => e.trust.slice(0, 2).join(" + "),
+    offerOrCta: offerSlot,
+    whatYoullLearn: () =>
+      "Whether adding a distinct hook on top of strong proof outperforms proof-heavy creative with a generic opening.",
+  },
+  {
+    id: "offer-led-no-proof",
+    matches: (e) => e.offers.length > 0 && e.trust.length === 0,
+    pattern: (e) =>
+      `Offer-led push (${first(e.offers) ?? "discount/urgency"}) with no proof mechanism detected in what was pasted — the ad drives toward a decision without visible reviews, guarantees, or clinical backing.`,
+    hypothesis: () =>
+      "Adding an explicit proof mechanism (reviews, guarantee, or a specific claim) to an offer-led ad may reduce the hesitation a bare discount doesn't address — this names a gap in the pasted evidence, not a fact about the competitor's full creative mix.",
+    hookOrAngle: hookSlot,
+    format: formatSlot,
+    proofMechanism: () => UNOBSERVED.proof,
+    offerOrCta: offerSlot,
+    whatYoullLearn: () =>
+      "Whether adding a proof mechanism to an offer-led ad changes response versus the offer alone.",
+  },
+];
+
+function fallbackTest(e: Evidence, competitorName: string): CompetitorDebriefTest {
+  const anchor = first(e.hooks) ?? first(e.positioning) ?? first(e.formats) ?? first(e.offers) ?? first(e.trust) ?? first(e.benefits);
+  return {
+    hypothesis: anchor
+      ? `A direct contrast to ${competitorName}'s observed "${anchor}" may perform differently for your audience than mirroring it — worth a controlled test either way, since these observations don't say which wins.`
+      : `With limited evidence detected, testing a clear differentiation from ${competitorName} is safer than guessing at a match.`,
+    hookOrAngle: hookSlot(e),
+    format: formatSlot(e),
+    proofMechanism: proofSlot(e),
+    offerOrCta: offerSlot(e),
+    whatYoullLearn: `Whether differentiating from ${competitorName} outperforms mirroring what you observed.`,
+  };
+}
+
+/** A second, more general combination test for when fewer than 3 named
+ *  rules match — still combines whatever's available across hook /
+ *  format / proof / offer into one hypothesis rather than one category
+ *  at a time. `index` rotates which array element is emphasized so a
+ *  second call doesn't just repeat the first. */
+function generalCombinationTest(e: Evidence, competitorName: string, index: number): CompetitorDebriefTest {
+  const hook = e.hooks[index] ?? e.positioning[index] ?? hookSlot(e, index);
+  const format = e.formats[index] ?? formatSlot(e, index);
+  const proof = e.trust[index] ?? proofSlot(e, index);
+  const offer = e.offers[index] ?? offerSlot(e, index);
+  const parts = [`"${hook}"`, `the "${format}" format`];
+  if (proof !== UNOBSERVED.proof) parts.push(`"${proof}" as proof`);
+  if (offer !== UNOBSERVED.offer) parts.push(`"${offer}" as the offer`);
+  return {
+    hypothesis: `Combining ${parts.join(", ")} may perform differently for your audience than testing any one of these in isolation — a combination worth isolating on its own, not a claim about ${competitorName}'s results.`,
+    hookOrAngle: hook,
+    format,
+    proofMechanism: proof,
+    offerOrCta: offer,
+    whatYoullLearn: "Whether this specific combination — not just one element of it — changes results for your audience.",
+  };
+}
+
+function buildSynthesis(
+  evidence: Evidence,
+  competitorName: string
+): { whatStandsOut: string[]; nextTests: CompetitorDebriefTest[] } {
+  const matchedRules = SYNTHESIS_RULES.filter((r) => r.matches(evidence));
+  const whatStandsOut = matchedRules.map((r) => r.pattern(evidence)).slice(0, 5);
+
+  const tests: CompetitorDebriefTest[] = matchedRules.slice(0, 4).map((r, i) => ({
+    hypothesis: r.hypothesis(evidence, competitorName),
+    hookOrAngle: r.hookOrAngle(evidence, i),
+    format: r.format(evidence, i),
+    proofMechanism: r.proofMechanism(evidence, i),
+    offerOrCta: r.offerOrCta(evidence, i),
+    whatYoullLearn: r.whatYoullLearn(evidence, competitorName),
+  }));
+
+  const seen = new Set(tests.map((t) => t.hypothesis));
+  let rotation = 0;
+  while (tests.length < 3 && rotation < 3) {
+    const candidate = generalCombinationTest(evidence, competitorName, rotation);
+    rotation++;
+    if (seen.has(candidate.hypothesis)) continue;
+    seen.add(candidate.hypothesis);
+    tests.push(candidate);
   }
-  if (formats.length > 0) {
-    tests.push({
-      title: `Test the ${formats[0]} format`,
-      rationale: `You noted ${competitorName} running ${formats.join(", ")}. If this isn't already in your creative mix, it's a low-cost format to test.`,
-    });
-  }
-  if (offers.length > 0) {
-    tests.push({
-      title: `Test an offer structure along the lines of ${offers[0]}`,
-      rationale: `${competitorName}'s observed offer pattern (${offers.join(", ")}) is a structural idea worth testing against your own margins and KPI — not evidence that it converts.`,
-    });
-  }
-  if (positioning.length > 0) {
-    tests.push({
-      title: `Test a positioning angle: ${positioning[0]}`,
-      rationale: `You noted ${competitorName} leaning on ${positioning.join(", ")} positioning. Testing a matching or contrasting angle in your own copy is a way to see how your audience reacts.`,
-    });
-  }
-  if (tests.length < 3) {
-    tests.push({
-      title: "Test a direct contrast to what you observed",
-      rationale: `With limited categories detected in what was pasted, the safest next step is a straightforward differentiation from ${competitorName} — a distinct hook, format, or offer instead of mirroring it.`,
-    });
-  }
-  return tests.slice(0, 5);
+  if (tests.length === 0) tests.push(fallbackTest(evidence, competitorName));
+
+  return { whatStandsOut, nextTests: tests.slice(0, 5) };
 }
 
 function buildWhatToMonitorNext(competitorName: string): string[] {
@@ -90,17 +318,22 @@ export function generateCompetitorDebrief(
   const trust = detect(TRUST_TERMS, observations);
   const benefits = detect(BENEFIT_TERMS, observations);
 
-  const whatStandsOut: string[] = [];
-  if (trust.length > 0) whatStandsOut.push(`Trust & proof signals noted: ${trust.join(", ")}.`);
-  if (benefits.length > 0) whatStandsOut.push(`Benefit claims noted: ${benefits.join(", ")}.`);
+  const evidence: Evidence = {
+    hooks: marketSignals.hooks,
+    formats: marketSignals.formats,
+    offers: marketSignals.offers,
+    positioning,
+    trust,
+    benefits,
+  };
 
   const categoriesMatched = [
-    marketSignals.hooks.length > 0,
-    marketSignals.formats.length > 0,
-    marketSignals.offers.length > 0,
-    positioning.length > 0,
-    trust.length > 0,
-    benefits.length > 0,
+    evidence.hooks.length > 0,
+    evidence.formats.length > 0,
+    evidence.offers.length > 0,
+    evidence.positioning.length > 0,
+    evidence.trust.length > 0,
+    evidence.benefits.length > 0,
   ].filter(Boolean).length;
 
   const insufficientEvidence = words === 0 || categoriesMatched === 0;
@@ -113,6 +346,10 @@ export function generateCompetitorDebrief(
     ? "Paste specific ad copy, hooks, offers, formats, or other observations from the Ads Library to get a meaningful debrief. Generic or empty notes can't be interpreted."
     : null;
 
+  const synthesis = insufficientEvidence
+    ? { whatStandsOut: [], nextTests: [] }
+    : buildSynthesis(evidence, competitorName);
+
   return {
     competitorName,
     sources: {
@@ -122,14 +359,12 @@ export function generateCompetitorDebrief(
     evidenceSummary,
     insufficientEvidence,
     insufficientEvidenceNote,
-    recurringHooks: insufficientEvidence ? [] : marketSignals.hooks,
-    creativeFormats: insufficientEvidence ? [] : marketSignals.formats,
-    offerPatterns: insufficientEvidence ? [] : marketSignals.offers,
-    positioningThemes: insufficientEvidence ? [] : positioning,
-    whatStandsOut: insufficientEvidence ? [] : whatStandsOut,
-    nextTests: insufficientEvidence
-      ? []
-      : buildNextTests(competitorName, marketSignals.hooks, marketSignals.formats, marketSignals.offers, positioning),
+    recurringHooks: insufficientEvidence ? [] : evidence.hooks,
+    creativeFormats: insufficientEvidence ? [] : evidence.formats,
+    offerPatterns: insufficientEvidence ? [] : evidence.offers,
+    positioningThemes: insufficientEvidence ? [] : evidence.positioning,
+    whatStandsOut: synthesis.whatStandsOut,
+    nextTests: synthesis.nextTests,
     whatToMonitorNext: insufficientEvidence ? [] : buildWhatToMonitorNext(competitorName),
     caveat: COMPETITOR_DEBRIEF_CAVEAT(competitorName || "this competitor"),
   };

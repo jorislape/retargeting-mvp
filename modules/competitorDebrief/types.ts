@@ -28,9 +28,17 @@ export interface CompetitorDebriefApiError {
   fix: string;
 }
 
+/** A structured, actionable test — every field is filled from the
+ *  detected evidence (or an honest "not observed" placeholder), never
+ *  invented. `hypothesis` is the synthesized combination being tested,
+ *  not a single echoed category. */
 export interface CompetitorDebriefTest {
-  title: string;
-  rationale: string;
+  hypothesis: string;
+  hookOrAngle: string;
+  format: string;
+  proofMechanism: string;
+  offerOrCta: string;
+  whatYoullLearn: string;
 }
 
 export interface CompetitorDebrief {
@@ -48,6 +56,10 @@ export interface CompetitorDebrief {
   creativeFormats: string[];
   offerPatterns: string[];
   positioningThemes: string[];
+  /** Synthesized cross-category patterns and tensions (e.g. "problem-
+   *  first messaging reinforced by social proof and risk reversal") —
+   *  directional interpretation built by recombining the categories
+   *  above, never a new fact. Empty when no combination was found. */
   whatStandsOut: string[];
   nextTests: CompetitorDebriefTest[];
   whatToMonitorNext: string[];
