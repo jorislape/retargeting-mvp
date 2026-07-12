@@ -84,6 +84,36 @@ for (const file of walk(join(ROOT, "components/monitoring"))) {
   }
 }
 
+// 2b. FORM-SAFETY regression (qa-monitoring bug): MonitoringSection is
+//     mounted inside GeneratorPanel's page-wide <form>. A nested
+//     <form> is invalid HTML with undefined submit routing and caused
+//     native full-page reloads on "Monitor weekly" in production.
+//     Therefore NO monitoring component may render a <form> element or
+//     a submit-typed button — every button must be explicitly
+//     type="button", and Enter is handled via onKeyDown.
+const stripComments = (src: string): string =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+for (const file of walk(join(ROOT, "components/monitoring"))) {
+  const rel = relative(ROOT, file);
+  const code = stripComments(readFileSync(file, "utf8"));
+  assert.ok(
+    !/<form[\s>]/.test(code),
+    `monitoring UI must not render <form> (nested-form reload bug): ${rel}`
+  );
+  assert.ok(
+    !/type=["']submit["']/.test(code),
+    `monitoring UI must not use submit-typed buttons: ${rel}`
+  );
+  const buttonTags = code.match(/<button[\s\S]*?>/g) ?? [];
+  for (const tag of buttonTags) {
+    assert.ok(
+      /type=["']button["']/.test(tag),
+      `every monitoring <button> needs explicit type="button": ${rel} -> ${tag.split("\n")[0]}`
+    );
+  }
+}
+
 // 3. Lazy DB client under an empty environment.
 delete process.env.DATABASE_URL;
 const client = await import("../modules/monitoring/db/client.ts");

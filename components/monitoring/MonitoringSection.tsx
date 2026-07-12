@@ -113,6 +113,14 @@ export function MonitoringSection() {
       })
     );
 
+  /** The add action for both the button click and the Enter key —
+   *  same guard as the old form's onSubmit. */
+  const submitUrl = () => {
+    if (url.trim() !== "" && busy === null) {
+      void addUrl(url.trim()).then(() => setUrl(""));
+    }
+  };
+
   /** One-way import: COPIES a saved watchlist URL into monitoring.
    *  The localStorage watchlist itself is never modified. */
   const importable = getWatchlistSnapshot().filter(
@@ -144,18 +152,18 @@ export function MonitoringSection() {
         ))}
       </ul>
 
-      {/* Add form (hidden at cap). Adding the FIRST page is what
-          creates the anonymous workspace + cookie. */}
+      {/* Add row (hidden at cap). Adding the FIRST page is what
+          creates the anonymous workspace + cookie.
+          NOT a <form>, deliberately: this section is mounted inside
+          GeneratorPanel's page-wide <form>, and a nested <form> is
+          invalid HTML with undefined submit routing — it caused native
+          full-page reloads on submit in production. No monitoring
+          component may render <form> or a submit-typed button
+          (regression-tested in scripts/monitoring-isolation.test.ts);
+          Enter is handled explicitly below so it adds the competitor
+          instead of falling through to the outer generator form. */}
       {!atCap && (
-        <form
-          className="mt-3 flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (url.trim() !== "" && busy === null) {
-              void addUrl(url.trim()).then(() => setUrl(""));
-            }
-          }}
-        >
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <label htmlFor="monitor-url" className="sr-only">
             Competitor page URL to monitor
           </label>
@@ -163,11 +171,18 @@ export function MonitoringSection() {
             id="monitor-url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault(); // never reach the outer form
+                submitUrl();
+              }
+            }}
             placeholder="https://competitor.com/landing"
             className={`min-w-0 flex-1 ${inputBase}`}
           />
           <button
-            type="submit"
+            type="button"
+            onClick={submitUrl}
             disabled={busy !== null || url.trim() === ""}
             className={`cursor-pointer ${btnSecondary}`}
           >
@@ -182,7 +197,7 @@ export function MonitoringSection() {
               Import from watchlist
             </button>
           )}
-        </form>
+        </div>
       )}
       {atCap && (
         <p className="mt-3 text-xs text-zinc-400">
