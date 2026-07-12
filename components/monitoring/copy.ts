@@ -24,3 +24,40 @@ export const UNAVAILABLE_MESSAGE =
 
 export const PAUSED_NOTE =
   "Paused after 4 failed weekly checks in a row. Resume to try again.";
+
+/* ---- Persistence / scheduling clarity (shown once ≥1 competitor exists) ---- */
+
+/** Feature-level confirmation — deliberately not a per-row badge; see
+ *  components/monitoring/status.ts for why "Active" can't be
+ *  distinguished from "Checked" using only the stored fields. */
+export const MONITORING_ACTIVE_LINE = "Weekly monitoring is active.";
+
+export const MONITORING_BACKGROUND_LINE =
+  "You can close Debrief — checks continue in the background.";
+
+/** Concise, NOT a duplicate of BETA_WARNING_LINES' cookie bullet
+ *  (which stays intact and unabridged before the URL input) — this is
+ *  a shorter reinforcement placed where the user is looking at their
+ *  actual monitored items, not the pre-submission warning list. */
+export const WORKSPACE_OWNERSHIP_LINE =
+  "This monitoring workspace is linked to this browser via a functional cookie — clearing cookies or switching browsers means it can't be recovered.";
+
+/** The generator/report vs. monitoring persistence contrast — stated
+ *  once, near the active-monitoring confirmation. */
+export const GENERATOR_VS_MONITORING_LINE =
+  "Generator reports live in this tab's memory and disappear on refresh. Monitoring here is different: it's stored server-side for this browser-linked workspace and keeps running after you close the tab.";
+
+/* ---- Empty state (0 competitors) ---- */
+
+export const EMPTY_STATE_EXPLANATION =
+  "Add a page below to start weekly monitoring: Debrief checks it server-side once a week, keeps running after you close this tab, and remembers it for this browser next time you visit.";
+
+/* ---- Scope helper near the URL input ---- */
+
+export const WEBSITE_ONLY_HELPER =
+  "Public website URLs only. Meta Ads Library links aren't supported here — paste those into the notes above instead.";
+
+/* ---- Retained-snapshot reassurance (shown per row after a failed check) ---- */
+
+export const retainedSnapshotNote = (lastSuccessAt: string): string =>
+  `Showing the last successful snapshot, from ${new Date(lastSuccessAt).toLocaleDateString()}.`;

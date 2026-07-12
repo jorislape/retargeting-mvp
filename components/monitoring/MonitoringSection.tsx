@@ -2,16 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CompetitorView } from "@/modules/monitoring/service";
-import { OUTCOME_LABELS } from "@/modules/monitoring/outcomes";
 import { getWatchlistSnapshot } from "@/modules/competitor";
 import { badgeAccent, badgeMuted, btnSecondary, inputBase } from "@/components/ui/theme";
 import { CheckIcon, XIcon } from "@/components/ui/icons";
+import { deriveMonitoringStatus, formatNextCheck } from "./status";
 import {
   BETA_TAGLINE,
   BETA_TITLE,
   BETA_WARNING_LINES,
+  EMPTY_STATE_EXPLANATION,
+  GENERATOR_VS_MONITORING_LINE,
+  MONITORING_ACTIVE_LINE,
+  MONITORING_BACKGROUND_LINE,
   PAUSED_NOTE,
+  retainedSnapshotNote,
   UNAVAILABLE_MESSAGE,
+  WEBSITE_ONLY_HELPER,
+  WORKSPACE_OWNERSHIP_LINE,
 } from "./copy";
 
 /**
@@ -171,6 +178,36 @@ export function MonitoringSection() {
         ))}
       </ul>
 
+      {/* Empty state explains what happens after adding a URL (no
+          competitors yet); once monitoring is actually running, the
+          same slot instead confirms it's active, runs in the
+          background, and explains workspace ownership — so a user
+          never has to infer either fact. */}
+      {competitors.length === 0 ? (
+        <p className="mt-3 text-xs leading-relaxed text-zinc-400">
+          {EMPTY_STATE_EXPLANATION}
+        </p>
+      ) : (
+        <div className="mt-3 space-y-1.5 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.04] p-3">
+          <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400">
+            <span
+              aria-hidden="true"
+              className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400"
+            />
+            {MONITORING_ACTIVE_LINE}
+          </p>
+          <p className="text-xs leading-relaxed text-zinc-300">
+            {MONITORING_BACKGROUND_LINE}
+          </p>
+          <p className="text-[11px] leading-relaxed text-zinc-400">
+            {WORKSPACE_OWNERSHIP_LINE}
+          </p>
+          <p className="text-[11px] leading-relaxed text-zinc-400">
+            {GENERATOR_VS_MONITORING_LINE}
+          </p>
+        </div>
+      )}
+
       {/* Add row (hidden at cap). Adding the FIRST page is what
           creates the anonymous workspace + cookie.
           NOT a <form>, deliberately: this section is mounted inside
@@ -182,40 +219,45 @@ export function MonitoringSection() {
           Enter is handled explicitly below so it adds the competitor
           instead of falling through to the outer generator form. */}
       {!atCap && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <label htmlFor="monitor-url" className="sr-only">
-            Competitor page URL to monitor
-          </label>
-          <input
-            id="monitor-url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault(); // never reach the outer form
-                submitUrl();
-              }
-            }}
-            placeholder="https://competitor.com/landing"
-            className={`min-w-0 flex-1 ${inputBase}`}
-          />
-          <button
-            type="button"
-            onClick={submitUrl}
-            disabled={busy !== null || url.trim() === ""}
-            className={`cursor-pointer ${btnSecondary}`}
-          >
-            {busy === "add" ? "Adding…" : "Monitor weekly"}
-          </button>
-          {importable.length > 0 && (
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="monitor-url" className="sr-only">
+              Competitor page URL to monitor
+            </label>
+            <input
+              id="monitor-url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault(); // never reach the outer form
+                  submitUrl();
+                }
+              }}
+              placeholder="https://competitor.com/landing"
+              className={`min-w-0 flex-1 ${inputBase}`}
+            />
             <button
               type="button"
-              onClick={() => setShowImport((v) => !v)}
-              className="cursor-pointer rounded-sm text-xs font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              onClick={submitUrl}
+              disabled={busy !== null || url.trim() === ""}
+              className={`cursor-pointer ${btnSecondary}`}
             >
-              Import from watchlist
+              {busy === "add" ? "Adding…" : "Monitor weekly"}
             </button>
-          )}
+            {importable.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowImport((v) => !v)}
+                className="cursor-pointer rounded-sm text-xs font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                Import from watchlist
+              </button>
+            )}
+          </div>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">
+            {WEBSITE_ONLY_HELPER}
+          </p>
         </div>
       )}
       {atCap && (
@@ -262,11 +304,8 @@ export function MonitoringSection() {
       {competitors.length > 0 && (
         <div className="mt-3 space-y-2.5">
           {competitors.map((c) => {
-            const status = c.paused
-              ? "Paused"
-              : c.lastOutcome === null
-                ? "First check pending (runs daily)"
-                : OUTCOME_LABELS[c.lastOutcome];
+            const status = deriveMonitoringStatus(c.paused, c.lastOutcome);
+            const retainedSnapshotAt = c.lastSuccessAt ?? c.latest?.fetchedAt ?? null;
             return (
               <div
                 key={c.id}
@@ -276,8 +315,8 @@ export function MonitoringSection() {
                   <p className="min-w-0 flex-1 truncate font-mono text-[12px] text-zinc-200">
                     {c.url}
                   </p>
-                  <span className={c.paused ? badgeMuted : badgeAccent}>
-                    {status}
+                  <span className={status.tone === "accent" ? badgeAccent : badgeMuted}>
+                    {status.label}
                   </span>
                   {c.meaningfulChange && (
                     <span className={badgeAccent}>Changed</span>
@@ -287,6 +326,23 @@ export function MonitoringSection() {
                   Last successful check: {fmtTime(c.lastSuccessAt)} · Last
                   attempt: {fmtTime(c.lastAttemptAt)}
                 </p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
+                  Next check: {formatNextCheck(c.nextCheckAt, new Date())}
+                </p>
+                {status.note && (
+                  <p
+                    className={`mt-1 text-[11px] leading-relaxed ${
+                      status.isFailure ? "text-amber-300" : "text-zinc-400"
+                    }`}
+                  >
+                    {status.note}
+                  </p>
+                )}
+                {status.isFailure && retainedSnapshotAt && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+                    {retainedSnapshotNote(retainedSnapshotAt)}
+                  </p>
+                )}
                 {c.paused && (
                   <p className="mt-1 text-[11px] leading-relaxed text-amber-300">
                     {PAUSED_NOTE}
