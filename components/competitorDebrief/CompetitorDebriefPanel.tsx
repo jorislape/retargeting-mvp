@@ -213,7 +213,7 @@ export function CompetitorDebriefPanel() {
               type="text"
               autoComplete="off"
               className={inputBase}
-              placeholder="e.g. ColonBroom"
+              placeholder="e.g. Competitor or brand name"
               value={core.competitorName}
               onChange={(e) => setCoreField("competitorName")(e.target.value)}
             />
@@ -262,19 +262,19 @@ export function CompetitorDebriefPanel() {
               rows={7}
               className={`${inputBase} resize-y`}
               placeholder={
-                "Paste multiple ads at once — separate them with a blank line, \"---\", or labels like \"Ad 1\" / \"Ad 2\".\n\ne.g.\nAd 1\nHook: I used to feel bloated every day...\nHeadline: Reset your gut in 30 days\nOffer: 20% off first order\nCTA: Shop Now\n\nAd 2\n..."
+                "Paste multiple ads at once — separate them with a blank line, \"---\", or labels like \"Ad 1\" / \"Ad 2\".\n\ne.g.\nAd 1\nHook: [attention-grabbing opening line]\nHeadline: [short benefit statement]\nOffer: 15% off first order\nCTA: Shop Now\n\nAd 2\n..."
               }
               value={bulkPasteText}
               onChange={(e) => setBulkPasteText(e.target.value)}
             />
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <p className="text-[11px] text-zinc-500">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="min-w-0 text-[11px] text-zinc-500">
                 Screenshot upload isn&rsquo;t available yet — paste the text
                 instead for now.
               </p>
               <button
                 type="button"
-                className={btnSecondary}
+                className={`${btnSecondary} shrink-0`}
                 disabled={bulkPasteText.trim() === ""}
                 onClick={handleParseAds}
               >
@@ -285,14 +285,14 @@ export function CompetitorDebriefPanel() {
 
           {blocks && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className={`${fieldLabel}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className={`${fieldLabel} min-w-0`}>
                   {blocks.length} ad{blocks.length === 1 ? "" : "s"} parsed —
                   review and edit before generating
                 </p>
                 <button
                   type="button"
-                  className="cursor-pointer text-[11px] font-medium text-accent-soft hover:underline"
+                  className="shrink-0 cursor-pointer text-[11px] font-medium text-accent-soft hover:underline"
                   onClick={addBlock}
                 >
                   + Add another
