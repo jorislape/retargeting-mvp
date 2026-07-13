@@ -12,8 +12,10 @@ const MAX_HEADLINE_CHARS = 140;
 const MAX_LIST_ITEMS = 6;
 
 /** CTA phrases worth reporting when a button/link (or the page text)
- *  carries them. */
-const CTA_PHRASES = [
+ *  carries them. Exported so other pure text-interpretation modules
+ *  (e.g. modules/competitorDebrief's bulk ad-example parser) can reuse
+ *  the same phrase list without a second judgment table. */
+export const CTA_PHRASES = [
   "shop now",
   "buy now",
   "get started",
@@ -37,7 +39,7 @@ const CTA_PHRASES = [
 ];
 
 /** Offer phrasing — matched text is restated, never embellished. */
-const OFFER_PATTERNS: RegExp[] = [
+export const OFFER_PATTERNS: RegExp[] = [
   /\b\d{1,2}%\s?off\b[^.!\n]{0,30}/i,
   /\bfree shipping\b/i,
   /\bfree (?:trial|sample|gift)\b/i,

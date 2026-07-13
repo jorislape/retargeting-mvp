@@ -361,9 +361,14 @@ export function generateCompetitorDebrief(
 
   const insufficientEvidence = words === 0 || categoriesMatched === 0;
 
+  const exampleCountLabel =
+    typeof input.exampleCount === "number" && input.exampleCount > 0
+      ? `Based on ${input.exampleCount} pasted ad example${input.exampleCount === 1 ? "" : "s"} for ${competitorName}. `
+      : "";
+
   const evidenceSummary = insufficientEvidence
     ? `Not enough was pasted to identify hooks, formats, offers, or positioning for ${competitorName || "this competitor"}.`
-    : `Observed evidence for ${competitorName} includes ${describeEvidenceCoverage(evidence)}.`;
+    : `${exampleCountLabel}Observed evidence for ${competitorName} includes ${describeEvidenceCoverage(evidence)}.`;
 
   const insufficientEvidenceNote = insufficientEvidence
     ? "Paste specific ad copy, hooks, offers, formats, or other observations from the Ads Library to get a meaningful debrief. Generic or empty notes can't be interpreted."

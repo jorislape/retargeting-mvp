@@ -6,3 +6,9 @@ export type {
   CompetitorDebriefResponse,
   CompetitorDebriefTest,
 } from "./types";
+export {
+  parseAdExample,
+  parseBulkAdExamples,
+  splitAdBlocks,
+  type ParsedAdExample,
+} from "./adParser";

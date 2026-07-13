@@ -142,6 +142,36 @@ const isObserved = (value: string): boolean =>
   );
 }
 
+/* ------------------- exampleCount: honest processed-count display ----------- */
+
+{
+  // The "Paste ads" flow reports how many ad blocks it split — the
+  // evidence summary must state that exact count, never a word count.
+  const withCount = generateCompetitorDebrief({
+    ...BASE_INPUT,
+    observations: "founder-led video, 20% off first order, ugc format",
+    exampleCount: 3,
+  });
+  assert.match(withCount.evidenceSummary, /Based on 3 pasted ad examples for ColonBroom\./);
+
+  const singular = generateCompetitorDebrief({
+    ...BASE_INPUT,
+    observations: "founder-led video, 20% off first order, ugc format",
+    exampleCount: 1,
+  });
+  assert.match(singular.evidenceSummary, /Based on 1 pasted ad example for ColonBroom\./);
+
+  // The manual "Advanced notes" fallback path omits exampleCount —
+  // summary must fall back to the plain category-coverage wording,
+  // never a fabricated or zero count.
+  const withoutCount = generateCompetitorDebrief({
+    ...BASE_INPUT,
+    observations: "founder-led video, 20% off first order, ugc format",
+  });
+  assert.doesNotMatch(withoutCount.evidenceSummary, /Based on \d+ pasted ad example/);
+  assert.match(withoutCount.evidenceSummary, /^Observed evidence for ColonBroom includes/);
+}
+
 /* --------------------------- sources are references only -------------------- */
 
 {

@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { competitorName, adsLibraryUrl, websiteUrl, observations } =
+  const { competitorName, adsLibraryUrl, websiteUrl, observations, exampleCount } =
     body as Record<string, unknown>;
 
   if (typeof competitorName !== "string" || competitorName.trim() === "") {
@@ -166,6 +166,10 @@ export async function POST(request: NextRequest) {
     adsLibraryUrl: normalizedAdsLibraryUrl,
     websiteUrl: normalizedWebsiteUrl,
     observations,
+    // Client-reported count from the "Paste ads" splitter — advisory
+    // only (it only changes the evidence summary's wording), so an
+    // absent or malformed value just falls back to no count shown.
+    exampleCount: typeof exampleCount === "number" && exampleCount > 0 ? exampleCount : undefined,
   });
 
   return ok({ ok: true, debrief });

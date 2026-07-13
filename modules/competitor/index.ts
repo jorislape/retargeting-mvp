@@ -22,9 +22,11 @@ export {
 export {
   appendPageSignalsToNotes,
   BENEFIT_TERMS,
+  CTA_PHRASES,
   detect,
   extractPageSignals,
   formatPageSignalsAsNotes,
+  OFFER_PATTERNS,
   POSITIONING_TERMS,
   TRUST_TERMS,
 } from "./pageSignals";

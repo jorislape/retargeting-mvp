@@ -1,49 +1,167 @@
 "use client";
 
 import { useState } from "react";
-import type { CompetitorDebrief, CompetitorDebriefApiError } from "@/modules/competitorDebrief";
-import { btnPrimary, card, fieldLabel, inputBase } from "@/components/ui/theme";
+import type {
+  CompetitorDebrief,
+  CompetitorDebriefApiError,
+  ParsedAdExample,
+} from "@/modules/competitorDebrief";
+import { parseAdExample, parseBulkAdExamples } from "@/modules/competitorDebrief";
+import { btnPrimary, btnSecondary, card, cardNested, fieldLabel, inputBase } from "@/components/ui/theme";
 import { AlertTriangleIcon, SparklesIcon } from "@/components/ui/icons";
 import { CompetitorDebriefResult } from "./CompetitorDebriefResult";
 
 /**
- * Competitor Debrief V1 — a separate, CSV-free flow. One input section,
- * one generate action, no source cards / watchlist / monitoring
- * complexity from the CSV generator. See modules/competitorDebrief for
- * the engine and the truthfulness rules it enforces.
+ * Competitor Debrief V1 — a separate, CSV-free flow. Primary path is
+ * "Paste ads": bulk-paste multiple ad examples, review/edit the
+ * deterministically split-and-extracted evidence, then generate. The
+ * original single free-text field is preserved as a secondary,
+ * collapsed "Advanced manual notes" fallback — never removed, just no
+ * longer the first thing the user sees.
+ *
+ * Screenshot upload is intentionally NOT implemented here: this
+ * codebase has no image/OCR pipeline (checked — no such dependency or
+ * code exists), and adding one (e.g. a free/open-source library like
+ * Tesseract.js) is a real new-dependency decision that needs its own
+ * explicit approval rather than a stub or fake extraction.
  */
 
-interface FormState {
+interface AdBlock {
+  id: number;
+  parsed: ParsedAdExample;
+}
+
+let nextBlockId = 1;
+const makeBlock = (raw: string): AdBlock => ({ id: nextBlockId++, parsed: parseAdExample(raw) });
+
+function AdBlockCard({
+  block,
+  index,
+  onChange,
+  onRemove,
+}: {
+  block: AdBlock;
+  index: number;
+  onChange: (raw: string) => void;
+  onRemove: () => void;
+}) {
+  const { parsed } = block;
+  const chips: string[] = [
+    ...(parsed.headline ? [`Headline: ${parsed.headline}`] : []),
+    ...(parsed.cta ? [`CTA: ${parsed.cta}`] : []),
+    ...(parsed.offer ? [`Offer: ${parsed.offer}`] : []),
+    ...(parsed.format ? [`Format: ${parsed.format}`] : []),
+    ...(parsed.startDate ? [`Date: ${parsed.startDate}`] : []),
+    ...(parsed.landingPage ? [`Landing page: ${parsed.landingPage}`] : []),
+    ...parsed.detectedHooks.map((h) => `Hook: ${h}`),
+    ...parsed.detectedFormats.map((f) => `Format signal: ${f}`),
+    ...parsed.detectedOffers.map((o) => `Offer signal: ${o}`),
+    ...parsed.detectedPositioning.map((p) => `Positioning: ${p}`),
+    ...parsed.detectedTrust.map((t) => `Trust: ${t}`),
+  ];
+
+  return (
+    <div className={`${cardNested} min-w-0 p-3`}>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-white">Ad {index + 1}</p>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="cursor-pointer text-[11px] font-medium text-zinc-500 hover:text-red-300"
+        >
+          Remove
+        </button>
+      </div>
+      <textarea
+        rows={3}
+        className={`${inputBase} resize-y text-xs`}
+        value={parsed.raw}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {chips.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {chips.map((c) => (
+            <span
+              key={c}
+              className="min-w-0 max-w-full truncate rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-400"
+              title={c}
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface CoreFields {
   competitorName: string;
   adsLibraryUrl: string;
   websiteUrl: string;
-  observations: string;
 }
 
-const EMPTY_FORM: FormState = {
-  competitorName: "",
-  adsLibraryUrl: "",
-  websiteUrl: "",
-  observations: "",
-};
+const EMPTY_CORE: CoreFields = { competitorName: "", adsLibraryUrl: "", websiteUrl: "" };
 
 export function CompetitorDebriefPanel() {
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [core, setCore] = useState<CoreFields>(EMPTY_CORE);
+  const [bulkPasteText, setBulkPasteText] = useState("");
+  const [blocks, setBlocks] = useState<AdBlock[] | null>(null);
+  const [advancedNotes, setAdvancedNotes] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
   const [debrief, setDebrief] = useState<CompetitorDebrief | null>(null);
   const [error, setError] = useState<CompetitorDebriefApiError | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const set = (key: keyof FormState) => (value: string) =>
-    setForm((f) => ({ ...f, [key]: value }));
+  const setCoreField = (key: keyof CoreFields) => (value: string) =>
+    setCore((f) => ({ ...f, [key]: value }));
+
+  function handleParseAds() {
+    const parsed = parseBulkAdExamples(bulkPasteText);
+    setBlocks(parsed.map((p) => ({ id: nextBlockId++, parsed: p })));
+  }
+
+  function updateBlock(id: number, raw: string) {
+    setBlocks((prev) =>
+      (prev ?? []).map((b) => (b.id === id ? { id, parsed: parseAdExample(raw) } : b))
+    );
+  }
+
+  function removeBlock(id: number) {
+    setBlocks((prev) => (prev ?? []).filter((b) => b.id !== id));
+  }
+
+  function addBlock() {
+    setBlocks((prev) => [...(prev ?? []), makeBlock("")]);
+  }
+
+  const hasParsedAds = (blocks ?? []).some((b) => b.parsed.raw.trim() !== "");
+  const canGenerate =
+    core.competitorName.trim() !== "" &&
+    core.adsLibraryUrl.trim() !== "" &&
+    (hasParsedAds || advancedNotes.trim() !== "");
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     try {
+      const activeBlocks = (blocks ?? []).filter((b) => b.parsed.raw.trim() !== "");
+      const observations = [
+        activeBlocks.map((b) => b.parsed.raw.trim()).join("\n\n"),
+        advancedNotes.trim(),
+      ]
+        .filter((part) => part !== "")
+        .join("\n\n");
+
       const res = await fetch("/api/competitor-debrief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...core,
+          observations,
+          exampleCount: activeBlocks.length > 0 ? activeBlocks.length : undefined,
+        }),
       });
       const body = await res.json();
       if (!res.ok || !body.ok) {
@@ -78,11 +196,11 @@ export function CompetitorDebriefPanel() {
           <h2 className="text-sm font-semibold text-white">Competitor debrief</h2>
         </div>
         <p className="mb-5 text-xs leading-relaxed text-zinc-400">
-          Paste what you observed about a competitor&rsquo;s ads (e.g. from the
-          Meta Ads Library) and get a structured, directional read: recurring
-          hooks, formats, offers, and positioning. This never infers spend,
-          conversions, or performance, and it never fetches the Ads Library —
-          it only interprets what you paste.
+          Paste a competitor&rsquo;s ads (e.g. from the Meta Ads Library) and get
+          a structured, directional read: recurring hooks, formats, offers, and
+          positioning. This never infers spend, conversions, or performance,
+          and it never fetches the Ads Library — it only interprets what you
+          paste.
         </p>
 
         <div className="space-y-4">
@@ -96,8 +214,8 @@ export function CompetitorDebriefPanel() {
               autoComplete="off"
               className={inputBase}
               placeholder="e.g. ColonBroom"
-              value={form.competitorName}
-              onChange={(e) => set("competitorName")(e.target.value)}
+              value={core.competitorName}
+              onChange={(e) => setCoreField("competitorName")(e.target.value)}
             />
           </div>
 
@@ -111,11 +229,12 @@ export function CompetitorDebriefPanel() {
               autoComplete="off"
               className={inputBase}
               placeholder="https://www.facebook.com/ads/library/?..."
-              value={form.adsLibraryUrl}
-              onChange={(e) => set("adsLibraryUrl")(e.target.value)}
+              value={core.adsLibraryUrl}
+              onChange={(e) => setCoreField("adsLibraryUrl")(e.target.value)}
             />
             <p className="mt-1 text-[11px] text-zinc-500">
-              Kept as a source reference only — not fetched by this app.
+              Ads Library URLs are saved as references and are not fetched
+              automatically.
             </p>
           </div>
 
@@ -129,25 +248,93 @@ export function CompetitorDebriefPanel() {
               autoComplete="off"
               className={inputBase}
               placeholder="https://example.com"
-              value={form.websiteUrl}
-              onChange={(e) => set("websiteUrl")(e.target.value)}
+              value={core.websiteUrl}
+              onChange={(e) => setCoreField("websiteUrl")(e.target.value)}
             />
           </div>
 
           <div>
-            <label className={`${fieldLabel} mb-1.5 block`} htmlFor="observations">
-              Ad examples / observations
+            <label className={`${fieldLabel} mb-1.5 block`} htmlFor="bulk-paste">
+              Paste ads
             </label>
             <textarea
-              id="observations"
+              id="bulk-paste"
               rows={7}
               className={`${inputBase} resize-y`}
               placeholder={
-                "Paste ad copy, hooks, formats, offers, CTAs, start dates, or general observations you noticed in the Ads Library.\n\ne.g. \"UGC video with a founder-style hook: 'I used to feel bloated every day...'. Offer: 20% off first order + free shipping. CTA: Shop Now. Positioning leans on gut-health/clinical claims.\""
+                "Paste multiple ads at once — separate them with a blank line, \"---\", or labels like \"Ad 1\" / \"Ad 2\".\n\ne.g.\nAd 1\nHook: I used to feel bloated every day...\nHeadline: Reset your gut in 30 days\nOffer: 20% off first order\nCTA: Shop Now\n\nAd 2\n..."
               }
-              value={form.observations}
-              onChange={(e) => set("observations")(e.target.value)}
+              value={bulkPasteText}
+              onChange={(e) => setBulkPasteText(e.target.value)}
             />
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="text-[11px] text-zinc-500">
+                Screenshot upload isn&rsquo;t available yet — paste the text
+                instead for now.
+              </p>
+              <button
+                type="button"
+                className={btnSecondary}
+                disabled={bulkPasteText.trim() === ""}
+                onClick={handleParseAds}
+              >
+                Parse ads
+              </button>
+            </div>
+          </div>
+
+          {blocks && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className={`${fieldLabel}`}>
+                  {blocks.length} ad{blocks.length === 1 ? "" : "s"} parsed —
+                  review and edit before generating
+                </p>
+                <button
+                  type="button"
+                  className="cursor-pointer text-[11px] font-medium text-accent-soft hover:underline"
+                  onClick={addBlock}
+                >
+                  + Add another
+                </button>
+              </div>
+              <div className="space-y-2">
+                {blocks.map((b, i) => (
+                  <AdBlockCard
+                    key={b.id}
+                    block={b}
+                    index={i}
+                    onChange={(raw) => updateBlock(b.id, raw)}
+                    onRemove={() => removeBlock(b.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <button
+              type="button"
+              className="cursor-pointer text-xs font-medium text-zinc-400 hover:text-white"
+              onClick={() => setAdvancedOpen((v) => !v)}
+            >
+              {advancedOpen ? "Hide" : "Show"} advanced manual notes
+            </button>
+            {advancedOpen && (
+              <div className="mt-2">
+                <label className={`${fieldLabel} mb-1.5 block`} htmlFor="advanced-notes">
+                  Advanced manual notes <span className="text-zinc-600">(optional fallback — free text, not split into individual ads)</span>
+                </label>
+                <textarea
+                  id="advanced-notes"
+                  rows={4}
+                  className={`${inputBase} resize-y`}
+                  placeholder="General observations that don't fit a single ad — market notes, overall impressions, etc."
+                  value={advancedNotes}
+                  onChange={(e) => setAdvancedNotes(e.target.value)}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -155,7 +342,7 @@ export function CompetitorDebriefPanel() {
           <button
             type="button"
             className={btnPrimary}
-            disabled={loading || form.competitorName.trim() === "" || form.adsLibraryUrl.trim() === "" || form.observations.trim() === ""}
+            disabled={loading || !canGenerate}
             onClick={handleGenerate}
           >
             {loading ? "Generating…" : "Generate competitor debrief"}

@@ -20,6 +20,13 @@ export interface CompetitorDebriefInput {
    *  dates, or general observations. Everything this flow interprets
    *  comes from this field alone. */
   observations: string;
+  /** Number of individual ad examples the "Paste ads" flow split
+   *  `observations` into (modules/competitorDebrief/adParser.ts),
+   *  when that flow was used — lets the evidence summary state an
+   *  exact, honest count instead of vague language. Omitted (not 0)
+   *  when the free-text "Advanced manual notes" fallback was used
+   *  instead, since there's no ad-by-ad split to count there. */
+  exampleCount?: number;
 }
 
 export interface CompetitorDebriefApiError {
