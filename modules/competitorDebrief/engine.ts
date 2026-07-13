@@ -1,5 +1,11 @@
 import { extractMarketSignals } from "../debrief/marketSignals.ts";
 import { BENEFIT_TERMS, detect, POSITIONING_TERMS, TRUST_TERMS } from "../competitor/pageSignals.ts";
+import {
+  buildStrategicSummary,
+  buildStrategicTests,
+  detectStrategicPatterns,
+  EMPTY_STRATEGIC_PATTERNS,
+} from "./strategicPatterns.ts";
 import type { CompetitorDebrief, CompetitorDebriefInput, CompetitorDebriefTest } from "./types.ts";
 
 /**
@@ -378,6 +384,32 @@ export function generateCompetitorDebrief(
     ? { whatStandsOut: [], nextTests: [] }
     : buildSynthesis(evidence, competitorName);
 
+  // Strategic-pattern layer: needs at least 2 distinct pasted ad texts
+  // to ever call anything "recurring" — with fewer (or none, e.g. the
+  // "Advanced manual notes" fallback), every field stays empty rather
+  // than treating one example as a pattern.
+  const strategicPatterns = insufficientEvidence
+    ? EMPTY_STRATEGIC_PATTERNS
+    : detectStrategicPatterns(input.adTexts ?? []);
+  const strategicSummary = insufficientEvidence
+    ? null
+    : buildStrategicSummary(competitorName, strategicPatterns);
+  const strategicTests = insufficientEvidence
+    ? []
+    : buildStrategicTests(strategicPatterns, competitorName);
+
+  // Richer, pattern-specific tests (when the recurring evidence
+  // supports them) surface before the older single-category-combo
+  // tests, deduped by hypothesis, capped at 5 total as before.
+  const seenHypotheses = new Set<string>();
+  const nextTests = [...strategicTests, ...synthesis.nextTests]
+    .filter((t) => {
+      if (seenHypotheses.has(t.hypothesis)) return false;
+      seenHypotheses.add(t.hypothesis);
+      return true;
+    })
+    .slice(0, 5);
+
   return {
     competitorName,
     sources: {
@@ -392,7 +424,15 @@ export function generateCompetitorDebrief(
     offerPatterns: insufficientEvidence ? [] : evidence.offers,
     positioningThemes: insufficientEvidence ? [] : evidence.positioning,
     whatStandsOut: synthesis.whatStandsOut,
-    nextTests: synthesis.nextTests,
+    dominantNarrative: strategicPatterns.dominantNarrative,
+    problemFraming: strategicPatterns.problemFraming,
+    enemyOrAlternative: strategicPatterns.enemyOrAlternative,
+    desiredOutcome: strategicPatterns.desiredOutcome,
+    proofStrategy: strategicPatterns.proofStrategy,
+    offerCtaStrategy: strategicPatterns.offerCtaStrategy,
+    creativeStructure: strategicPatterns.creativeStructure,
+    strategicSummary,
+    nextTests,
     whatToMonitorNext: insufficientEvidence ? [] : buildWhatToMonitorNext(competitorName),
     caveat: COMPETITOR_DEBRIEF_CAVEAT(competitorName || "this competitor"),
   };

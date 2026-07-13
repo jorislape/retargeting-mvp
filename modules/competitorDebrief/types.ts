@@ -27,6 +27,14 @@ export interface CompetitorDebriefInput {
    *  when the free-text "Advanced manual notes" fallback was used
    *  instead, since there's no ad-by-ad split to count there. */
   exampleCount?: number;
+  /** The individual ad blocks' raw text (from the "Paste ads" review
+   *  step), when that flow was used — lets the strategic-pattern layer
+   *  (modules/competitorDebrief/strategicPatterns.ts) check for
+   *  RECURRENCE across distinct ads rather than treating one example
+   *  as a pattern. Needs at least 2 entries for any recurring-pattern
+   *  section to be non-empty; omitted or fewer than 2 entries means
+   *  those sections stay empty, same as insufficient evidence. */
+  adTexts?: string[];
 }
 
 export interface CompetitorDebriefApiError {
@@ -68,6 +76,23 @@ export interface CompetitorDebrief {
    *  directional interpretation built by recombining the categories
    *  above, never a new fact. Empty when no combination was found. */
   whatStandsOut: string[];
+  /** Recurring strategic-pattern sections — each entry only appears
+   *  when the underlying pattern recurs across at least 2 distinct
+   *  pasted ad examples (never from a single example, and never when
+   *  `adTexts` had fewer than 2 entries). All directional
+   *  interpretation, never a performance/spend/audience-response
+   *  claim. See modules/competitorDebrief/strategicPatterns.ts. */
+  dominantNarrative: string[];
+  problemFraming: string[];
+  enemyOrAlternative: string[];
+  desiredOutcome: string[];
+  proofStrategy: string[];
+  offerCtaStrategy: string[];
+  creativeStructure: string[];
+  /** One template sentence synthesizing mechanism + enemy + proof +
+   *  offer when at least 2 of those recurring patterns exist; null
+   *  when there isn't enough recurring evidence to support it. */
+  strategicSummary: string | null;
   nextTests: CompetitorDebriefTest[];
   whatToMonitorNext: string[];
   /** The fixed truthfulness disclaimer — always present, always the

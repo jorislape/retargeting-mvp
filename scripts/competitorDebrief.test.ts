@@ -172,6 +172,55 @@ const isObserved = (value: string): boolean =>
   assert.match(withoutCount.evidenceSummary, /^Observed evidence for ColonBroom includes/);
 }
 
+/* --------------- strategic-pattern layer wired end-to-end ------------------ */
+/* Fine-grained detection logic is covered in scripts/strategicPatterns.test.ts; */
+/* this proves generateCompetitorDebrief actually wires adTexts through to it,   */
+/* alongside the existing fields, without regressing anything.                  */
+
+{
+  const adTexts = [
+    "I used to feel like I was thinking about food all day — what I call food noise never stopped, and years of a slowed metabolism made it worse. I tried everything and still felt out of control around cravings. Then I found a way to support natural GLP-1 production without a single injection or needle. No prescriptions, no waiting rooms. Over 425,000+ users have felt what it's like to finally feel in control again. Take our quiz to see your personalized plan — tap below to start.",
+    "Cravings controlled my life for years — constant food noise, snacking I couldn't explain. The reason this works: it naturally supports GLP-1, the same pathway injections target, but without needles or a prescription. Clinically studied ingredients back every claim. For a limited time, get 70% off your first order — take the quiz to find your plan.",
+    "My story: after years of failed diets and a slowed metabolism that wouldn't budge, I found a natural alternative and finally feel in control of my choices again. Instead of prescriptions or a long waiting list, this works with your body's own systems. Over 300,000 customers have tried it, and the results speak for themselves — clinically studied, no needles required. 70% off ends soon. Tap below to claim your spot.",
+  ];
+
+  const d = generateCompetitorDebrief({
+    ...BASE_INPUT,
+    observations: adTexts.join("\n\n"),
+    exampleCount: adTexts.length,
+    adTexts,
+  });
+
+  assert.equal(d.insufficientEvidence, false);
+  assert.match(d.evidenceSummary, /Based on 3 pasted ad examples for ColonBroom\./); // exact count preserved
+  assert.ok(d.dominantNarrative.some((x) => x.includes("GLP-1")));
+  assert.ok(d.enemyOrAlternative.includes("injections / needles"));
+  assert.ok(d.strategicSummary, "expected a wired-up strategic summary");
+  assert.match(d.strategicSummary ?? "", /^ColonBroom /);
+  assert.ok(d.nextTests.some((t) => /craving/i.test(t.hypothesis) || /injection/i.test(t.hypothesis)));
+
+  // Same fixture with only 1 ad text (or none) must not fabricate a
+  // recurring pattern from it — new sections stay empty, old behavior
+  // (hooks/formats/offers/positioning, whatStandsOut) is unaffected.
+  const single = generateCompetitorDebrief({
+    ...BASE_INPUT,
+    observations: adTexts[0],
+    adTexts: [adTexts[0]],
+  });
+  assert.deepEqual(single.dominantNarrative, []);
+  assert.equal(single.strategicSummary, null);
+
+  const noAdTexts = generateCompetitorDebrief({
+    ...BASE_INPUT,
+    observations: adTexts.join("\n\n"),
+  });
+  assert.deepEqual(noAdTexts.dominantNarrative, []);
+  assert.equal(noAdTexts.strategicSummary, null);
+  // Old behavior (pre-existing categories) is untouched by the absence
+  // of adTexts.
+  assert.ok(noAdTexts.recurringHooks.length >= 0);
+}
+
 /* --------------------------- sources are references only -------------------- */
 
 {

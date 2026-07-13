@@ -79,6 +79,15 @@ function TestCard({ test }: { test: CompetitorDebriefTest }) {
   );
 }
 
+const hasStrategicPatterns = (debrief: CompetitorDebrief): boolean =>
+  debrief.dominantNarrative.length > 0 ||
+  debrief.problemFraming.length > 0 ||
+  debrief.enemyOrAlternative.length > 0 ||
+  debrief.desiredOutcome.length > 0 ||
+  debrief.proofStrategy.length > 0 ||
+  debrief.offerCtaStrategy.length > 0 ||
+  debrief.creativeStructure.length > 0;
+
 export function CompetitorDebriefResult({ debrief }: { debrief: CompetitorDebrief }) {
   return (
     <div className={`${card} min-w-0 space-y-6 p-5 sm:p-6`}>
@@ -113,6 +122,34 @@ export function CompetitorDebriefResult({ debrief }: { debrief: CompetitorDebrie
               <Section title="Positioning themes" items={debrief.positioningThemes} />
             </div>
           </div>
+
+          {hasStrategicPatterns(debrief) && (
+            <div className="min-w-0 space-y-2">
+              <p className={eyebrow}>Strategic patterns — directional interpretation</p>
+              <p className="text-[11px] leading-relaxed text-zinc-500">
+                Only patterns observed repeatedly across the pasted examples —
+                never from a single example.
+              </p>
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <Section title="Dominant narrative / mechanism" items={debrief.dominantNarrative} />
+                <Section title="Problem framing" items={debrief.problemFraming} />
+                <Section title="Enemy / alternative rejected" items={debrief.enemyOrAlternative} />
+                <Section title="Desired outcome" items={debrief.desiredOutcome} />
+                <Section title="Proof strategy" items={debrief.proofStrategy} />
+                <Section title="Offer & CTA strategy" items={debrief.offerCtaStrategy} />
+                <Section title="Creative structure" items={debrief.creativeStructure} />
+              </div>
+            </div>
+          )}
+
+          {debrief.strategicSummary && (
+            <div className="min-w-0 rounded-lg border border-accent/25 bg-accent/[0.06] p-4">
+              <p className="mb-1 text-xs font-semibold text-accent-soft">Strategic summary</p>
+              <p className="min-w-0 max-w-prose break-words text-xs leading-relaxed text-zinc-200">
+                {debrief.strategicSummary}
+              </p>
+            </div>
+          )}
 
           {debrief.whatStandsOut.length > 0 && (
             <div className="min-w-0 space-y-2">

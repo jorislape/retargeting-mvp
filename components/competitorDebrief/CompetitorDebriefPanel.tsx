@@ -161,6 +161,11 @@ export function CompetitorDebriefPanel() {
           ...core,
           observations,
           exampleCount: activeBlocks.length > 0 ? activeBlocks.length : undefined,
+          // The individual ad texts let the engine check for patterns
+          // that RECUR across distinct ads rather than treating one
+          // example as a pattern — see modules/competitorDebrief/
+          // strategicPatterns.ts.
+          adTexts: activeBlocks.length > 0 ? activeBlocks.map((b) => b.parsed.raw.trim()) : undefined,
         }),
       });
       const body = await res.json();

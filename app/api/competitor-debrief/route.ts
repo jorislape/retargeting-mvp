@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { competitorName, adsLibraryUrl, websiteUrl, observations, exampleCount } =
+  const { competitorName, adsLibraryUrl, websiteUrl, observations, exampleCount, adTexts } =
     body as Record<string, unknown>;
 
   if (typeof competitorName !== "string" || competitorName.trim() === "") {
@@ -161,6 +161,15 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Advisory only, like exampleCount: a malformed or oversized value
+  // just falls back to no per-ad recurrence analysis rather than
+  // failing the whole request — the rest of the debrief still works
+  // off `observations` either way.
+  const MAX_AD_TEXTS = 50;
+  const normalizedAdTexts = Array.isArray(adTexts)
+    ? adTexts.filter((t): t is string => typeof t === "string" && t.trim() !== "").slice(0, MAX_AD_TEXTS)
+    : undefined;
+
   const debrief = generateCompetitorDebrief({
     competitorName,
     adsLibraryUrl: normalizedAdsLibraryUrl,
@@ -170,6 +179,7 @@ export async function POST(request: NextRequest) {
     // only (it only changes the evidence summary's wording), so an
     // absent or malformed value just falls back to no count shown.
     exampleCount: typeof exampleCount === "number" && exampleCount > 0 ? exampleCount : undefined,
+    adTexts: normalizedAdTexts,
   });
 
   return ok({ ok: true, debrief });
