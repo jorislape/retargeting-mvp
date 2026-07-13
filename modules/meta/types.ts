@@ -59,33 +59,10 @@ export const DATE_PRESET_LABELS: Record<DatePreset, string> = {
   last_365d: "Last 365 days",
 };
 
-/**
- * TEMPORARY — one-time ads_archive access diagnostic. Sanitized by
- * construction: it can only ever carry a count/field-name summary or
- * the exact Meta error shape, never ad content and never the access
- * token used to make the call. Gated server-side behind
- * ADS_ARCHIVE_DIAGNOSTIC_ENABLED (default off) in modules/meta/graph.ts
- * — remove this type and its one call site in app/api/meta/callback
- * once ads_archive access is confirmed or ruled out.
- */
-export interface AdsArchiveDiagnosticResult {
-  ok: boolean;
-  /** Present when ok=true. */
-  adCount?: number;
-  fields?: string[];
-  /** Present when ok=false — Meta's own error shape, verbatim. */
-  errorCode?: number | null;
-  errorSubcode?: number | null;
-  errorTitle?: string | null;
-  errorMessage?: string | null;
-}
-
 /** postMessage payload the OAuth bridge page sends to the opener. */
 export interface MetaOAuthMessage {
   type: "meta-oauth";
   ok: boolean;
   token?: string;
   error?: string;
-  /** TEMPORARY diagnostic-only field — see AdsArchiveDiagnosticResult. */
-  adsArchiveDiagnostic?: AdsArchiveDiagnosticResult;
 }

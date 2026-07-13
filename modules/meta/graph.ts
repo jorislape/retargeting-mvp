@@ -1,9 +1,4 @@
-import type {
-  AdInsightRow,
-  AdsArchiveDiagnosticResult,
-  DatePreset,
-  MetaAdAccount,
-} from "./types";
+import type { AdInsightRow, DatePreset, MetaAdAccount } from "./types";
 
 /**
  * Server-side Meta Graph API client for the read-only data source.
@@ -150,87 +145,6 @@ export async function exchangeCodeForToken(
     );
   }
   return body.access_token;
-}
-
-/* ---------------- TEMPORARY: ads_archive access diagnostic --------- */
-/* One-time, flag-gated check of whether the just-connected user token */
-/* can query the Ad Library API at all. Remove this whole block (plus  */
-/* its one call site in app/api/meta/callback/route.ts and the         */
-/* AdsArchiveDiagnosticResult type) once ads_archive access is         */
-/* confirmed or ruled out — this is not the ingestion feature itself.  */
-
-const ADS_ARCHIVE_DIAGNOSTIC_SEARCH_TERMS = "ColonBroom";
-const ADS_ARCHIVE_DIAGNOSTIC_COUNTRY = "US";
-const ADS_ARCHIVE_DIAGNOSTIC_LIMIT = 5;
-
-/** Off unless ADS_ARCHIVE_DIAGNOSTIC_ENABLED is exactly "true" or "1"
- *  — same convention as modules/monitoring/flag.ts. Default OFF means
- *  normal OAuth behavior (message shape, network calls) is completely
- *  unchanged unless someone deliberately flips this for this one test. */
-export function adsArchiveDiagnosticEnabled(): boolean {
-  const v = (process.env.ADS_ARCHIVE_DIAGNOSTIC_ENABLED ?? "").trim().toLowerCase();
-  return v === "true" || v === "1";
-}
-
-interface AdsArchiveErrorBody {
-  error?: {
-    message?: string;
-    code?: number;
-    error_subcode?: number;
-    error_user_title?: string;
-  };
-}
-
-/**
- * Calls ads_archive ONCE with a fixed, small, hardcoded query
- * (ColonBroom / US / limit 5) using the token that was just obtained —
- * never a stored or reused token. Returns only a sanitized summary:
- * ad count and field NAMES (never ad content) on success, or Meta's
- * exact error code/subcode/title/message on failure. The access token
- * itself is used solely as this fetch's Authorization header value —
- * it is never included in the returned object, never logged, and
- * nothing about this call is persisted anywhere.
- */
-export async function checkAdsArchiveAccess(
-  accessToken: string
-): Promise<AdsArchiveDiagnosticResult> {
-  const params = new URLSearchParams({
-    search_terms: ADS_ARCHIVE_DIAGNOSTIC_SEARCH_TERMS,
-    ad_reached_countries: JSON.stringify([ADS_ARCHIVE_DIAGNOSTIC_COUNTRY]),
-    limit: String(ADS_ARCHIVE_DIAGNOSTIC_LIMIT),
-  });
-  try {
-    const res = await fetch(`${GRAPH_BASE}/ads_archive?${params}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    });
-    const body = (await res.json().catch(() => ({}))) as {
-      data?: Record<string, unknown>[];
-    } & AdsArchiveErrorBody;
-
-    if (!res.ok || body.error) {
-      const err = body.error ?? {};
-      return {
-        ok: false,
-        errorCode: err.code ?? null,
-        errorSubcode: err.error_subcode ?? null,
-        errorTitle: err.error_user_title ?? null,
-        errorMessage: err.message ?? "Unknown error",
-      };
-    }
-
-    const data = Array.isArray(body.data) ? body.data : [];
-    const fields = [...new Set(data.flatMap((ad) => Object.keys(ad)))];
-    return { ok: true, adCount: data.length, fields };
-  } catch {
-    return {
-      ok: false,
-      errorCode: null,
-      errorSubcode: null,
-      errorTitle: null,
-      errorMessage: "Network error calling ads_archive.",
-    };
-  }
 }
 
 /* ---------------- Ad accounts ------------------------------------- */
