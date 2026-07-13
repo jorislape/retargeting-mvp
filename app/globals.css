@@ -313,14 +313,48 @@ body {
     color: #71717a !important;
   }
 
-  /* Center the document on paper. The screen shell offsets content
-     for the (print-hidden) sidebar — that offset is zeroed on the
-     wrapper (print:pl-0 in the workspace layout), and main then fills
-     the printable width symmetrically inside the @page margins. */
-  main {
-    padding: 0 !important;
-    margin: 0 auto !important;
+  html,
+  body {
+    width: 100% !important;
+    margin: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Safari has documented print bugs with flex layouts sizing
+     unpredictably once the page-constrained rendering pass kicks in —
+     removing flex for print sidesteps it entirely. Sidebar and the
+     mobile tab bar are already .print-hidden (display:none), so the
+     content shell becomes this container's only real child either
+     way. */
+  .workspace-shell {
+    display: block !important;
+  }
+
+  /* Deterministic backstop for the sidebar-offset padding — see the
+     comment in app/(workspace)/layout.tsx for why print:pl-0 alone
+     isn't reliable in Safari (same-specificity utility, cascade-order
+     dependent, and Safari's print pass can still consider the md:
+     breakpoint "active"). !important + a dedicated class wins
+     regardless of Tailwind's generated rule order or viewport quirks. */
+  .workspace-content-shell {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+  }
+
+  /* The explicit print page container: fills the @page-constrained
+     printable area, centered, with its own small symmetric gutter
+     beyond the physical page margin — a designed document's margin,
+     not just the printer's. box-sizing keeps that gutter from adding
+     to (and overflowing) the declared width. */
+  .report-print-page {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 180mm !important;
+    margin-inline: auto !important;
+    margin-block: 0 !important;
+    padding-inline: 4mm !important;
+    padding-block: 0 !important;
   }
 }

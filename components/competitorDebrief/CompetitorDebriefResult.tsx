@@ -195,11 +195,11 @@ export function CompetitorDebriefResult({
         <button
           type="button"
           onClick={() => window.print()}
-          title="For the cleanest export, turn off “Headers and footers” in the print dialog’s more settings."
+          title="Choose “Save as PDF” in the print dialog and disable browser headers and footers for the cleanest export."
           className={`cursor-pointer ${btnSecondary}`}
         >
           <PrinterIcon className="h-3.5 w-3.5" />
-          PDF
+          Save as PDF
         </button>
       </div>
 

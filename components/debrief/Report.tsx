@@ -751,15 +751,15 @@ export function Report({
             className={`cursor-pointer ${btnSecondary}`}
           >
             <DownloadIcon className="h-3.5 w-3.5" />
-            Download
+            Download text
           </button>
           <button
             onClick={() => window.print()}
-            title="For the cleanest export, turn off “Headers and footers” in the print dialog’s more settings."
+            title="Choose “Save as PDF” in the print dialog and disable browser headers and footers for the cleanest export."
             className={`cursor-pointer ${btnSecondary}`}
           >
             <PrinterIcon className="h-3.5 w-3.5" />
-            PDF
+            Save as PDF
           </button>
           {onNewDebrief && (
             <button onClick={onNewDebrief} className={`cursor-pointer ${btnPrimarySm}`}>

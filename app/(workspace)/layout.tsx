@@ -15,13 +15,19 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
     <DebriefProvider>
       <MetaProvider>
         {/* No bg here — the body provides the carbon canvas. */}
-        <div className="flex min-h-dvh text-zinc-100 antialiased">
+        <div className="workspace-shell flex min-h-dvh text-zinc-100 antialiased">
           <Sidebar />
-          {/* print:pl-0 — the sidebar is print-hidden, so its layout
-              offset must go too or the printed report sits off-center. */}
-          <div className="min-w-0 flex-1 md:pl-52 print:pl-0">
+          {/* print:pl-0 zeroes the sidebar offset on screen-narrow
+              print engines, but Safari's print layout can still treat
+              the md: breakpoint as active (it evaluates min-width
+              against the screen viewport, not the physical page), and
+              Tailwind gives md:pl-52/print:pl-0 equal specificity — so
+              which one wins isn't guaranteed. .workspace-content-shell
+              is the deterministic backstop in globals.css (!important,
+              not cascade-order-dependent). */}
+          <div className="workspace-content-shell min-w-0 flex-1 md:pl-52 print:pl-0">
             <MobileTopBar />
-            <main className="mx-auto max-w-4xl px-5 py-10 pb-24 sm:px-8 sm:py-14 md:pb-16">
+            <main className="report-print-page mx-auto max-w-4xl px-5 py-10 pb-24 sm:px-8 sm:py-14 md:pb-16">
               {children}
             </main>
             <footer className="print-hidden border-t border-white/[0.06] md:ml-0">
