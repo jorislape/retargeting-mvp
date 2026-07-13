@@ -112,6 +112,29 @@ export function MetaConnect() {
   /** Set when the pull succeeded but the currently-selected KPI has no
    *  data in the pulled rows — guidance toward a KPI that does. */
   const [kpiNote, setKpiNote] = useState<string | null>(null);
+  /** DEV-ONLY diagnostic: copy the in-memory token to the clipboard for
+   *  manual API testing (e.g. verifying Ad Library API access outside
+   *  this app). NODE_ENV is safe to gate on HERE specifically because
+   *  this is a client component — Next.js inlines the check at build
+   *  time and strips the branch from any `next build` output (which is
+   *  what every deployed environment runs, preview or production), so
+   *  this can only ever render under local `next dev`. The token never
+   *  leaves the browser or touches the server for this — see
+   *  MetaProvider's header comment for why that's the invariant to
+   *  keep. Remove this block once Ad Library API access is confirmed.
+   */
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const copyTokenForDevTesting = async () => {
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(token);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    } catch {
+      // Clipboard API unavailable (e.g. insecure context) — no-op; this
+      // is a throwaway dev aid, not a feature that needs a fallback.
+    }
+  };
 
   const selectedAccount =
     accounts.find((a) => a.id === accountId) ?? accounts[0] ?? null;
@@ -319,6 +342,21 @@ export function MetaConnect() {
       <p className="mt-2.5 border-t border-white/[0.07] pt-2 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-zinc-400">
         TOKEN IN MEMORY ONLY · GONE ON REFRESH
       </p>
+
+      {process.env.NODE_ENV !== "production" && (
+        <div className="mt-2 border-l-2 border-amber-400/70 bg-amber-400/[0.05] px-3 py-2">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-300">
+            Dev only
+          </p>
+          <button
+            type="button"
+            onClick={() => void copyTokenForDevTesting()}
+            className="mt-1 cursor-pointer text-xs font-medium text-amber-200 underline decoration-amber-400/40 underline-offset-2 hover:text-amber-100"
+          >
+            {tokenCopied ? "Copied to clipboard" : "Copy access token to clipboard"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
