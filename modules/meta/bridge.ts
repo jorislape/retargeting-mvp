@@ -33,7 +33,13 @@ function bridgeHtml(payload: MetaOAuthMessage, targetOrigin: string): string {
   if (window.opener) {
     window.opener.postMessage(${json}, ${origin});
   }
-  window.close();
+  // A brief delay before closing: postMessage is queued synchronously
+  // but delivered asynchronously in the opener's event loop. Closing
+  // immediately in the same tick has been observed (Safari especially)
+  // to tear the popup down before that delivery completes, silently
+  // dropping the message. This costs nothing on the happy path and
+  // only matters for that race.
+  window.setTimeout(function () { window.close(); }, 250);
 })();
 </script>
 </body>
