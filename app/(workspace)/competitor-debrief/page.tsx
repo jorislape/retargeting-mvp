@@ -10,7 +10,7 @@ export const metadata = {
 export default function CompetitorDebriefPage() {
   return (
     <div className="space-y-6">
-      <div>
+      <div className="print-hidden">
         <h1 className="text-2xl font-semibold text-white sm:text-3xl">
           Competitor <span className={gradientText}>debrief</span>
         </h1>

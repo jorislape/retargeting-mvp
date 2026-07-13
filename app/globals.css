@@ -179,9 +179,30 @@ body {
   margin: 14mm;
 }
 
+/* Opposite of .print-hidden: report-only chrome (the branded masthead
+   and disclaimer footer baked into the printed document itself, since
+   the on-screen nav/footer are .print-hidden and the browser's own
+   print header/footer isn't something this stylesheet can control —
+   see Report.tsx / CompetitorDebriefResult.tsx). Invisible on screen,
+   shown only when printing. */
+.print-only {
+  display: none;
+}
+
+/* Keeps one logical unit (a stat block, a test card, a summary
+   callout) from splitting across a page boundary — the difference
+   between a designed document and a webpage dumped to paper. Applied
+   selectively to the units worth protecting, not blanket-applied. */
+.print-avoid-break {
+  break-inside: avoid;
+}
+
 @media print {
   .print-hidden {
     display: none !important;
+  }
+  .print-only {
+    display: block !important;
   }
   body {
     background: #ffffff !important;

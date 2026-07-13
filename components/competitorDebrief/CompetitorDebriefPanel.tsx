@@ -111,6 +111,7 @@ export function CompetitorDebriefPanel() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [debrief, setDebrief] = useState<CompetitorDebrief | null>(null);
+  const [generatedAt, setGeneratedAt] = useState<number | null>(null);
   const [error, setError] = useState<CompetitorDebriefApiError | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -181,6 +182,7 @@ export function CompetitorDebriefPanel() {
         return;
       }
       setDebrief(body.debrief);
+      setGeneratedAt(Date.now());
     } catch {
       setError({
         title: "Connection issue",
@@ -195,7 +197,9 @@ export function CompetitorDebriefPanel() {
 
   return (
     <div className="space-y-6">
-      <div className={`${card} p-5 sm:p-6`}>
+      {/* The input form has no place in an exported PDF — only the
+          generated result (below) should print. */}
+      <div className={`print-hidden ${card} p-5 sm:p-6`}>
         <div className="mb-1 flex items-center gap-2">
           <SparklesIcon className="h-4 w-4 text-accent-soft" />
           <h2 className="text-sm font-semibold text-white">Competitor debrief</h2>
@@ -366,7 +370,7 @@ export function CompetitorDebriefPanel() {
         )}
       </div>
 
-      {debrief && <CompetitorDebriefResult debrief={debrief} />}
+      {debrief && <CompetitorDebriefResult debrief={debrief} generatedAt={generatedAt} />}
     </div>
   );
 }
