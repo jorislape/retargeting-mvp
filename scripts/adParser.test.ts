@@ -293,4 +293,64 @@ import {
   assert.equal(splitAdBlocks(text).length, 3);
 }
 
+/* ------------------------- parseMode routing regression ---------------------- */
+/* Fine-grained native-pipeline behavior is covered in                          */
+/* scripts/adsLibraryParser.test.ts; this proves the ROUTER in this file picks  */
+/* the right pipeline and tags parseMode correctly, and that mode-aware        */
+/* completeness branches as designed.                                          */
+
+{
+  // Explicit labels -> "labeled", unchanged completeness (4 core fields).
+  const p = parseAdExample("Headline: Reset your gut\nCTA: Shop Now\nOffer: 20% off\nFormat: UGC video");
+  assert.equal(p.parseMode, "labeled");
+  const c = computeAdCompleteness(p);
+  assert.equal(c.status, "complete");
+  assert.deepEqual(c.missingFields, []);
+}
+
+{
+  // Bullet-shaped, unlabeled text -> "native".
+  const p = parseAdExample("Hook line here.\n\n💚 Benefit one\n🦠 Benefit two\n\nShop Now");
+  assert.equal(p.parseMode, "native");
+}
+
+{
+  // Plain unlabeled prose with no bullets/CTA-line -> "plain" (the
+  // original unlabeled-fallback path, unchanged).
+  const p = parseAdExample("just some notes with nothing recognizable in them at all");
+  assert.equal(p.parseMode, "plain");
+}
+
+{
+  // Native/plain mode completeness is evidence-based, not the blunt
+  // Headline/CTA/Offer/Format checklist — the exact fix for the "Missing:
+  // Headline, CTA, Offer" complaint against genuinely rich, unlabeled
+  // Ads Library copy.
+  const p = parseAdExample(
+    "Bloated after every meal?\n\n🌿 Supports gut health\n💪 Reduces bloating\n✅ Clinically studied\n\nGet 20% off today.\n\nShop Now"
+  );
+  const c = computeAdCompleteness(p);
+  assert.equal(p.parseMode, "native");
+  assert.equal(c.status, "complete");
+  assert.deepEqual(c.missingFields, []);
+  assert.ok(c.detectedFields.includes("Hook"));
+  assert.ok(c.detectedFields.includes("Benefits"));
+  assert.ok(c.detectedFields.includes("Proof"));
+  assert.ok(c.detectedFields.includes("Offer"));
+  assert.ok(c.detectedFields.includes("Explicit CTA"));
+}
+
+{
+  // A thin, single-sentence plain-mode ad genuinely has little to show
+  // — completeness should say so honestly (not claim "complete"), but
+  // with the softer evidence-category wording, never "Missing: Headline,
+  // CTA, Offer, Format" for text that was never going to have those.
+  const p = parseAdExample("Since 2021, AG1 has been the morning ritual Hugh Jackman relies on to start his day.");
+  const c = computeAdCompleteness(p);
+  assert.equal(p.parseMode, "plain");
+  assert.equal(c.status, "partial");
+  assert.ok(c.missingFields.includes("Explicit CTA"));
+  assert.ok(!c.missingFields.includes("Headline"), "evidence-based checklist must not reuse the labeled-mode field names");
+}
+
 console.log("adParser: all assertions passed");

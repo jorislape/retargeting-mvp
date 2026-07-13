@@ -20,6 +20,8 @@ The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm test
 
 - `test:csv`, `test:watchlist`, `test:signals`, `test:signal-summary` — the debrief/competitor engine proofs (RFC 4180 escaping, watchlist sanitize/diff/format/append, signal-builder tables, signal-summary interpretation).
 - `test:competitor-debrief` — Competitor Debrief V1 engine proofs: insufficient-evidence handling, category detection, no forbidden performance/spend claims outside the fixed caveat, and a source-scan asserting the engine imports no network/fetch code.
+- `test:ad-parser` — the labeled/plain bulk ad-example parser (block splitting, per-field extraction, duplicate detection, mode-aware completeness).
+- `test:ads-library-parser` — the native (unlabeled) Ads Library copy pipeline: the `looksLikeAdsLibraryCopy` detection heuristic, hook/benefit/proof/offer/CTA extraction from real-world-shaped samples, disclaimer-paragraph exclusion, and that labeled input always wins routing even when bullets are also present.
 - `test:monitoring-ssrf` — exhaustive SSRF validator matrix (private v4/v6 ranges, IPv4-mapped v6, redirect-hop re-validation, connect-time pinning contract) for `modules/competitor/guardedFetch.ts` + `ssrf.ts`.
 - `test:monitoring-differ`, `test:monitoring-scheduler`, `test:monitoring-status` — pure logic proofs for content-hashing/dedup, the failure-matrix/auto-pause state machine, and the outcome→label/next-check presentation helpers.
 - `test:monitoring-isolation` — import-graph check (nothing outside `modules/monitoring`, `app/api/monitoring`, `components/monitoring` may import monitoring code), confirms core routes work with `DATABASE_URL` unset, and enforces "no `<form>`, every `<button>` is `type=\"button\"`" inside `components/monitoring/*` (a nested `<form>` inside `GeneratorPanel`'s page-wide form caused a real production bug — native full-page reload on submit).
@@ -110,6 +112,32 @@ modules/competitor/            # Competitor Landing Page Fetch V1 (one-time, use
 modules/competitorDebrief/     # Competitor Debrief V1 — a second, CSV-free flow (see fence above)
   types.ts        # CompetitorDebriefInput/Output, CompetitorDebriefApiError (flat, matches
                   # modules/competitor's own error shape rather than reusing debrief's)
+  adParser.ts     # "Paste ads" bulk splitting + per-ad field extraction. parseAdExample is a
+                  # ROUTER over two pipelines: explicit field labels ("Headline:"/"CTA:") always
+                  # win (mode "labeled", original logic, unchanged); otherwise text with the
+                  # STRUCTURAL shape of raw Meta Ads Library copy (emoji/checkmark bullets, a
+                  # bare CTA line) goes to adsLibraryParser.ts (mode "native"); anything else
+                  # falls back to this file's own unlabeled extraction (mode "plain", unchanged).
+                  # Also: duplicate detection (normalizeForDedupe/findDuplicateIndices/
+                  # dedupeAdTexts — whitespace/case-normalized exact match, never fuzzy, so a
+                  # pasted duplicate can't inflate strategicPatterns.ts's cross-ad recurrence
+                  # count), mode-aware completeness (computeAdCompleteness: the classic 4-field
+                  # Headline/CTA/Offer/Format checklist for "labeled" input; an evidence-based
+                  # Hook/Benefits/Proof/Offer/Explicit-CTA checklist for "native"/"plain", since
+                  # judging natural-language paste against labels it was never going to have was
+                  # the exact bug this pipeline exists to fix), and textForAnalysis (raw with any
+                  # ignoredDisclaimers paragraphs removed — what should actually be SENT to the
+                  # engine, since the engine re-scans whatever text it receives and would
+                  # otherwise treat a shared disclaimer footer as a "recurring" pattern)
+  adsLibraryParser.ts # The native pipeline: looksLikeAdsLibraryCopy (positive-signal-only
+                  # detection — emoji/checkmark bullet lists or a bare short CTA line on its own;
+                  # never "absence of labels" alone) + parseAdsLibraryExample (paragraph-split →
+                  # drop disclaimer/legal/footnote/copyright paragraphs (kept verbatim in
+                  # ignoredDisclaimers, never silently dropped) → infer hook/body from prose
+                  # paragraphs → classify bullet lines into offer/trust/benefit via the SAME
+                  # shared tables as everything else → same keyword-table scan over the
+                  # disclaimer-free text). No AI, no OCR — every field is still a verbatim quote,
+                  # a fixed regex match, or a keyword-table hit
   engine.ts       # generateCompetitorDebrief(input) — templated, not an LLM call (same seam
                   # pattern as modules/debrief/memo.ts). Zero network imports (test-enforced).
                   # Reuses extractMarketSignals + the pageSignals.ts term tables rather than

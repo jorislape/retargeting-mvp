@@ -14,7 +14,10 @@ export {
   parseAdExample,
   parseBulkAdExamples,
   splitAdBlocks,
+  textForAnalysis,
   type AdCompleteness,
   type AdCompletenessStatus,
+  type AdParseMode,
   type ParsedAdExample,
 } from "./adParser";
+export { looksLikeAdsLibraryCopy } from "./adsLibraryParser";

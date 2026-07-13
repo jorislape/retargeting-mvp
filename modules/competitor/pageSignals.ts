@@ -36,6 +36,19 @@ export const CTA_PHRASES = [
   "book a demo",
   "get the app",
   "take the quiz",
+  // Meta's own Ads Manager CTA button vocabulary — missing these meant
+  // pasted Ads Library copy (which usually carries the rendered button
+  // text as its own trailing line) never matched a known CTA at all.
+  "learn more",
+  "download",
+  "install now",
+  "get quote",
+  "contact us",
+  "book now",
+  "apply now",
+  "watch more",
+  "get offer",
+  "send message",
 ];
 
 /** Offer phrasing — matched text is restated, never embellished. */
@@ -50,6 +63,10 @@ export const OFFER_PATTERNS: RegExp[] = [
   /\bdiscount code\b/i,
   /\bstudent discount\b/i,
   /\bsale\b/i,
+  // Generic "FREE <thing>" — Ads Library copy commonly lists free gifts
+  // by product name ("FREE Travel Packs") rather than the narrower
+  // free (?:trial|sample|gift) phrasing above.
+  /\bfree\s+[a-z][\w+&-]*(?:\s+[a-z][\w+&-]*){0,4}/i,
 ];
 
 export const POSITIONING_TERMS: { label: string; re: RegExp }[] = [
@@ -95,6 +112,13 @@ export const TRUST_TERMS: { label: string; re: RegExp }[] = [
   { label: "press mentions", re: /as seen in|featured in|\bpress\b/i },
   { label: "before/after", re: /before[\s/&-]*after/i },
   { label: "customer count", re: /\b[\d,.]+(?:k|m|\+|,000)\s?(?:\+\s?)?(?:happy\s)?(?:customers|members|users|sold)\b/i },
+  {
+    label: "celebrity / influencer endorsement",
+    // "trusted by" excludes the generic "trusted by 50,000 customers"
+    // social-proof phrasing (already its own "customer count" term
+    // below) so this label stays specific to a named person/brand.
+    re: /\brelies on\b|\btrusted by\b(?!\s+(?:over\s+)?[\d,]+)|\bendorsed by\b|\bambassador\b|\bpartnered with\b/i,
+  },
 ];
 
 /** Exported so other pure text-interpretation modules (e.g.

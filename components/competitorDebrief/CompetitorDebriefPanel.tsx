@@ -9,11 +9,12 @@ import type {
 } from "@/modules/competitorDebrief";
 import {
   computeAdCompleteness,
-  dedupeAdTexts,
   findDuplicateIndices,
+  normalizeForDedupe,
   parseAdExample,
   parseBulkAdExamples,
   splitAdBlocks,
+  textForAnalysis,
 } from "@/modules/competitorDebrief";
 import { btnPrimary, btnSecondary, card, cardNested, fieldLabel, inputBase } from "@/components/ui/theme";
 import { AlertTriangleIcon, CopyIcon, SparklesIcon } from "@/components/ui/icons";
@@ -38,12 +39,42 @@ CTA:
 Offer:
 Format: `;
 
-const COMPLETENESS_COPY: Record<AdCompleteness["status"], { label: string; tone: "ok" | "warn" | "bad" }> = {
+/** Completeness copy for explicit-label input ("Headline:"/"CTA:" etc.)
+ *  — unchanged from before the native Ads Library pipeline existed. */
+const LABELED_COMPLETENESS_COPY: Record<AdCompleteness["status"], { label: string; tone: "ok" | "warn" | "bad" }> = {
   complete: { label: "Looks complete", tone: "ok" },
   partial: { label: "Missing", tone: "warn" },
   empty: { label: "No fields or signals detected", tone: "warn" },
   malformed: { label: "Too short to be usable ad content", tone: "bad" },
 };
+
+/** For unlabeled input ("native" Ads Library copy or "plain" free
+ *  text), the same 4-status model is rendered as an evidence checklist
+ *  instead of a blunt field list — a natural-language paste was never
+ *  going to have "Headline:"/"CTA:" labels, so judging it against them
+ *  was the exact complaint this pipeline exists to fix. Only "partial"
+ *  shows a Missing line at all — "only warn when genuinely little
+ *  information exists". */
+function describeEvidenceCompleteness(
+  parsed: ParsedAdExample,
+  completeness: AdCompleteness
+): { toneClass: string; lines: string[] } {
+  const banner = parsed.parseMode === "native" ? "Looks like native Ads Library copy" : null;
+
+  if (completeness.status === "malformed") {
+    return { toneClass: "text-red-300", lines: ["Too short to be usable ad content"] };
+  }
+  if (completeness.status === "empty") {
+    return { toneClass: "text-amber-300", lines: ["No fields or signals detected"] };
+  }
+
+  const detectedLine = `Detected: ${completeness.detectedFields.join(", ")}`;
+  const lines = [banner, detectedLine].filter((l): l is string => l !== null);
+  if (completeness.status === "partial" && completeness.missingFields.length > 0) {
+    lines.push(`Missing: ${completeness.missingFields.join(", ")}`);
+  }
+  return { toneClass: completeness.status === "complete" ? "text-emerald-400" : "text-amber-300", lines };
+}
 
 /**
  * Competitor Debrief V1 — a separate, CSV-free flow. Primary path is
@@ -86,27 +117,33 @@ function AdBlockCard({
 }) {
   const { parsed } = block;
   const chips: string[] = [
+    ...(parsed.hook ? [`Hook: ${parsed.hook}`] : []),
     ...(parsed.headline ? [`Headline: ${parsed.headline}`] : []),
+    ...(parsed.body ? [`Body: ${parsed.body}`] : []),
     ...(parsed.cta ? [`CTA: ${parsed.cta}`] : []),
     ...(parsed.offer ? [`Offer: ${parsed.offer}`] : []),
     ...(parsed.format ? [`Format: ${parsed.format}`] : []),
     ...(parsed.startDate ? [`Date: ${parsed.startDate}`] : []),
     ...(parsed.landingPage ? [`Landing page: ${parsed.landingPage}`] : []),
-    ...parsed.detectedHooks.map((h) => `Hook: ${h}`),
+    ...parsed.detectedHooks.map((h) => `Hook signal: ${h}`),
     ...parsed.detectedFormats.map((f) => `Format signal: ${f}`),
     ...parsed.detectedOffers.map((o) => `Offer signal: ${o}`),
     ...parsed.detectedPositioning.map((p) => `Positioning: ${p}`),
-    ...parsed.detectedTrust.map((t) => `Trust: ${t}`),
+    ...parsed.detectedTrust.map((t) => `Proof: ${t}`),
+    ...parsed.detectedBenefits.map((b) => `Benefit: ${b}`),
   ];
 
   const completeness = useMemo(() => computeAdCompleteness(parsed), [parsed]);
-  const completenessCopy = COMPLETENESS_COPY[completeness.status];
-  const toneClass =
-    completenessCopy.tone === "ok"
+  const isLabeled = parsed.parseMode === "labeled";
+  const labeledCopy = isLabeled ? LABELED_COMPLETENESS_COPY[completeness.status] : null;
+  const evidence = !isLabeled ? describeEvidenceCompleteness(parsed, completeness) : null;
+  const toneClass = labeledCopy
+    ? labeledCopy.tone === "ok"
       ? "text-emerald-400"
-      : completenessCopy.tone === "bad"
+      : labeledCopy.tone === "bad"
         ? "text-red-300"
-        : "text-amber-300";
+        : "text-amber-300"
+    : (evidence?.toneClass ?? "text-amber-300");
 
   return (
     <div className={`${cardNested} min-w-0 p-3`}>
@@ -129,13 +166,24 @@ function AdBlockCard({
       {parsed.raw.trim() !== "" && (
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
           <span className={toneClass}>
-            {completenessCopy.label}
-            {completeness.status === "partial" && `: ${completeness.missingFields.join(", ")}`}
+            {labeledCopy
+              ? `${labeledCopy.label}${completeness.status === "partial" ? `: ${completeness.missingFields.join(", ")}` : ""}`
+              : evidence?.lines.join(" · ")}
           </span>
           {duplicateOfIndex !== null && (
             <span className="flex items-center gap-1 text-amber-300">
               <AlertTriangleIcon className="h-3 w-3 shrink-0" />
               Duplicate of Ad {duplicateOfIndex + 1} — won&rsquo;t be double-counted
+            </span>
+          )}
+          {parsed.ignoredDisclaimers && parsed.ignoredDisclaimers.length > 0 && (
+            <span
+              className="text-zinc-500"
+              title={parsed.ignoredDisclaimers.join("\n\n")}
+            >
+              {parsed.ignoredDisclaimers.length === 1
+                ? "1 disclaimer line ignored"
+                : `${parsed.ignoredDisclaimers.length} disclaimer lines ignored`}
             </span>
           )}
         </div>
@@ -238,10 +286,23 @@ export function CompetitorDebriefPanel() {
     setError(null);
     try {
       const activeBlocks = (blocks ?? []).filter((b) => b.parsed.raw.trim() !== "");
-      // Deduped once, here, so a pasted duplicate can never be counted
-      // as a second, independent recurrence downstream (see
-      // dedupeAdTexts — first occurrence wins, order preserved).
-      const distinctAdTexts = dedupeAdTexts(activeBlocks.map((b) => b.parsed.raw));
+      // Deduped once, here (by raw text — the same key the duplicate-
+      // warning badges use), so a pasted duplicate can never be counted
+      // as a second, independent recurrence downstream. Each surviving
+      // block is then rendered through textForAnalysis, which strips
+      // any paragraphs the native parser flagged as disclaimers/legal
+      // boilerplate — otherwise that text would still reach the engine
+      // verbatim (it re-scans whatever it's sent) and could get counted
+      // as a "recurring" pattern shared only because every ad carries
+      // the same legal footer.
+      const seenRawKeys = new Set<string>();
+      const distinctAdTexts: string[] = [];
+      for (const b of activeBlocks) {
+        const key = normalizeForDedupe(b.parsed.raw);
+        if (seenRawKeys.has(key)) continue;
+        seenRawKeys.add(key);
+        distinctAdTexts.push(textForAnalysis(b.parsed));
+      }
       const observations = [distinctAdTexts.join("\n\n"), advancedNotes.trim()]
         .filter((part) => part !== "")
         .join("\n\n");

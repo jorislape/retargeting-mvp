@@ -1,5 +1,6 @@
 import { CTA_PHRASES, detect, OFFER_PATTERNS, POSITIONING_TERMS, TRUST_TERMS, BENEFIT_TERMS } from "../competitor/pageSignals.ts";
 import { extractMarketSignals } from "../debrief/marketSignals.ts";
+import { looksLikeAdsLibraryCopy, parseAdsLibraryExample } from "./adsLibraryParser.ts";
 
 /**
  * Bulk ad-example parsing — splits one pasted blob into multiple ad
@@ -16,20 +17,39 @@ import { extractMarketSignals } from "../debrief/marketSignals.ts";
  * stays absent. `raw` always preserves the original block text
  * untouched, so nothing extracted is ever the only record of what was
  * pasted.
+ *
+ * Two pipelines, one entry point (`parseAdExample`): explicit field
+ * labels ("Headline:"/"CTA:"/etc.) always win and take the original,
+ * unchanged path below (`parseMode: "labeled"`). Absent that, text with
+ * the STRUCTURAL shape of raw Meta Ads Library copy (emoji/checkmark
+ * bullet lists, a bare CTA button line) is routed to the native
+ * pipeline (adsLibraryParser.ts, `parseMode: "native"`) — real users
+ * paste this shape far more often than the labeled one. Anything else
+ * (plain unstructured notes) falls back to this file's own unlabeled
+ * extraction, unchanged (`parseMode: "plain"`).
  */
+
+export type AdParseMode = "labeled" | "native" | "plain";
 
 export interface ParsedAdExample {
   /** The original pasted block, verbatim. */
   raw: string;
-  /** Explicit "Hook:" / "Primary text:" label value, when present. */
+  /** Which pipeline produced this result — drives mode-aware
+   *  completeness copy in computeAdCompleteness/the review UI. */
+  parseMode: AdParseMode;
+  /** Explicit "Hook:" / "Primary text:" label value, when present; or
+   *  (native mode only) the inferred opening paragraph. */
   hook?: string;
-  /** Explicit "Headline:" / "Title:" label value, when present. */
+  /** Explicit "Headline:" / "Title:" label value, when present. Never
+   *  inferred in any mode — there's no reliable structural signal that
+   *  distinguishes a headline from a hook without a label. */
   headline?: string;
   /** Explicit "CTA:" label, or a matched CTA phrase found in the text. */
   cta?: string;
   /** Explicit "Offer:" label, or a matched offer phrase found in the text. */
   offer?: string;
-  /** Explicit "Format:" label, when present. */
+  /** Explicit "Format:" label, when present. Never inferred — see
+   *  `detectedFormats` for structural/keyword-based format hints. */
   format?: string;
   /** Explicit "Start date:"/"Date:" label, or a date-like pattern found
    *  in the text. */
@@ -37,6 +57,13 @@ export interface ParsedAdExample {
   /** Explicit "Landing page:"/"URL:" label, or the first URL found in
    *  the text — reference only, never fetched. */
   landingPage?: string;
+  /** Native mode only: prose paragraphs after the hook, excluding
+   *  bullets/CTA/disclaimers. */
+  body?: string;
+  /** Native mode only: disclaimer/legal/footnote paragraphs excluded
+   *  from extraction — kept here (verbatim) so nothing is silently
+   *  dropped without being shown, even though it never becomes evidence. */
+  ignoredDisclaimers?: string[];
   /** Keyword-detected themes — same tables as the single-paste flow. */
   detectedHooks: string[];
   detectedFormats: string[];
@@ -107,12 +134,17 @@ const DATE_RE =
   /\b\d{4}-\d{2}-\d{2}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b/i;
 const URL_RE = /\bhttps?:\/\/[^\s)]+/i;
 
-/** Parses one ad block into structured fields. Labels win when
- *  present; otherwise falls back to a verbatim pattern match (CTA
- *  phrase, offer phrase, date, URL) — never a guess. */
-export function parseAdExample(raw: string): ParsedAdExample {
-  const trimmed = raw.trim();
+function hasExplicitLabels(trimmed: string): boolean {
+  return LABELED_FIELD_PATTERNS.some(({ re }) => re.test(trimmed));
+}
 
+/** The original single-pipeline logic: labels win when present
+ *  (`mode: "labeled"`); otherwise a verbatim pattern match (CTA phrase,
+ *  offer phrase, date, URL) and the shared keyword tables (`mode:
+ *  "plain"`) — never a guess. Unchanged behavior from before the native
+ *  Ads Library pipeline existed; `parseAdExample` below only decides
+ *  WHICH mode a block reaches this function under. */
+function parseStructuredAdExample(trimmed: string, mode: "labeled" | "plain"): ParsedAdExample {
   const labeled: Partial<Record<string, string>> = {};
   for (const { key, re } of LABELED_FIELD_PATTERNS) {
     const m = trimmed.match(re);
@@ -144,6 +176,7 @@ export function parseAdExample(raw: string): ParsedAdExample {
 
   return {
     raw: trimmed,
+    parseMode: mode,
     ...(labeled.hook && { hook: labeled.hook }),
     ...(labeled.headline && { headline: labeled.headline }),
     ...(cta && { cta }),
@@ -160,10 +193,50 @@ export function parseAdExample(raw: string): ParsedAdExample {
   };
 }
 
+/** Parses one ad block into structured fields. Routes to whichever
+ *  pipeline fits the input (see the module doc comment above) — the
+ *  caller never has to know which one ran; `parsed.parseMode` records
+ *  it for the completeness UI. */
+export function parseAdExample(raw: string): ParsedAdExample {
+  const trimmed = raw.trim();
+  if (hasExplicitLabels(trimmed)) {
+    return parseStructuredAdExample(trimmed, "labeled");
+  }
+  if (looksLikeAdsLibraryCopy(trimmed)) {
+    return parseAdsLibraryExample(trimmed);
+  }
+  return parseStructuredAdExample(trimmed, "plain");
+}
+
 /** Splits and parses bulk pasted ad text in one call — the primary
  *  entry point for the "Paste ads" flow. */
 export function parseBulkAdExamples(text: string): ParsedAdExample[] {
   return splitAdBlocks(text).map(parseAdExample);
+}
+
+/**
+ * The text that should reach the API/engine for this ad — `raw` with
+ * any `ignoredDisclaimers` paragraphs removed. This exists because the
+ * engine (modules/competitorDebrief/engine.ts, out of scope for this
+ * parsing work) re-scans whatever text it's SENT for recurring
+ * patterns; disclaimer stripping only in the review UI wouldn't stop
+ * boilerplate ("results may vary", FDA disclaimers) from still reaching
+ * the recurrence engine verbatim and potentially being counted as a
+ * "recurring" pattern across ads that all happen to share the same
+ * legal footer. `raw` itself is never modified — this is a separate,
+ * derived value computed only at submit time. A no-op (returns `raw`
+ * unchanged) for "labeled"/"plain" mode, since disclaimer detection
+ * only runs in the native pipeline.
+ */
+export function textForAnalysis(parsed: ParsedAdExample): string {
+  if (!parsed.ignoredDisclaimers || parsed.ignoredDisclaimers.length === 0) {
+    return parsed.raw;
+  }
+  let cleaned = parsed.raw;
+  for (const disclaimer of parsed.ignoredDisclaimers) {
+    cleaned = cleaned.split(disclaimer).join("");
+  }
+  return cleaned.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /* ------------------------------------------------------------------ */
@@ -225,13 +298,21 @@ export type AdCompletenessStatus = "complete" | "partial" | "empty" | "malformed
 
 export interface AdCompleteness {
   status: AdCompletenessStatus;
-  /** Subset of the four core structured fields that weren't detected —
-   *  hook/startDate/landingPage are excluded because they're routinely
-   *  and legitimately absent (metadata, not creative signal). */
+  /** Evidence categories that WERE found — empty for "labeled" mode
+   *  (its UI never showed a "Detected" line; the data just isn't
+   *  computed as usefully there, see computeLabeledCompleteness). */
+  detectedFields: string[];
+  /** Evidence categories that weren't found. For "labeled" mode this is
+   *  the classic 4-core-field check (Headline/CTA/Offer/Format,
+   *  unchanged from before this file had a native pipeline). For
+   *  "native"/"plain" mode this is a softer, evidence-based checklist
+   *  (Hook/Benefits/Proof/Offer/Explicit CTA) — explicit labels were
+   *  never the point of a natural-language paste, so judging one
+   *  against "Missing: Headline, CTA, Offer" was actively misleading. */
   missingFields: string[];
   /** Total keyword-detected theme hits (hooks/formats/offers/
    *  positioning/trust/benefits combined) — a secondary richness signal
-   *  alongside the four core fields. */
+   *  alongside the core fields. */
   signalCount: number;
 }
 
@@ -247,30 +328,86 @@ const CORE_FIELDS: { key: keyof Pick<ParsedAdExample, "headline" | "cta" | "offe
  *  stray blank line or a fragment left over from a bad split. */
 const MALFORMED_MAX_WORDS = 4;
 
-/** Reads back the fields `parseAdExample` already extracted to give an
- *  honest, non-blocking completeness read — never a new extraction
- *  pass, never a reason to block generation on its own. */
-export function computeAdCompleteness(parsed: ParsedAdExample): AdCompleteness {
-  const missingFields = CORE_FIELDS.filter(({ key }) => !parsed[key]).map(({ label }) => label);
-  const signalCount =
+function totalSignalCount(parsed: ParsedAdExample): number {
+  return (
     parsed.detectedHooks.length +
     parsed.detectedFormats.length +
     parsed.detectedOffers.length +
     parsed.detectedPositioning.length +
     parsed.detectedTrust.length +
-    parsed.detectedBenefits.length;
+    parsed.detectedBenefits.length
+  );
+}
+
+/** Original completeness logic, unchanged: explicit-label input is
+ *  judged against the 4 core labeled fields — a user who typed
+ *  "Headline:"/"CTA:" etc. and left some blank genuinely IS missing
+ *  those fields, so the blunt checklist stays correct here. */
+function computeLabeledCompleteness(parsed: ParsedAdExample): AdCompleteness {
+  const missingFields = CORE_FIELDS.filter(({ key }) => !parsed[key]).map(({ label }) => label);
+  const detectedFields = CORE_FIELDS.filter(({ key }) => parsed[key]).map(({ label }) => label);
+  const signalCount = totalSignalCount(parsed);
 
   const wordCount = parsed.raw.trim().split(/\s+/).filter(Boolean).length;
   const hasAnySignal = missingFields.length < CORE_FIELDS.length || signalCount > 0;
 
   if (wordCount <= MALFORMED_MAX_WORDS && !hasAnySignal) {
-    return { status: "malformed", missingFields, signalCount };
+    return { status: "malformed", detectedFields, missingFields, signalCount };
   }
   if (missingFields.length === 0) {
-    return { status: "complete", missingFields, signalCount };
+    return { status: "complete", detectedFields, missingFields, signalCount };
   }
   if (hasAnySignal) {
-    return { status: "partial", missingFields, signalCount };
+    return { status: "partial", detectedFields, missingFields, signalCount };
   }
-  return { status: "empty", missingFields, signalCount };
+  return { status: "empty", detectedFields, missingFields, signalCount };
+}
+
+/** Evidence-based checklist for unlabeled input ("native" Ads Library
+ *  copy or "plain" free text) — judges what the ad actually
+ *  communicates rather than which labels the user typed, since typing
+ *  labels was never the expectation for either mode. "Explicit CTA" is
+ *  deliberately softer than "CTA": a bare CTA phrase found via keyword
+ *  fallback still counts as `cta` being set, so this only comes up
+ *  missing when truly nothing button-like was found anywhere. */
+const EVIDENCE_CATEGORIES: { label: string; present: (p: ParsedAdExample) => boolean }[] = [
+  { label: "Hook", present: (p) => Boolean(p.hook) || p.detectedHooks.length > 0 },
+  { label: "Benefits", present: (p) => p.detectedBenefits.length > 0 },
+  { label: "Proof", present: (p) => p.detectedTrust.length > 0 },
+  { label: "Offer", present: (p) => Boolean(p.offer) || p.detectedOffers.length > 0 },
+  { label: "Explicit CTA", present: (p) => Boolean(p.cta) },
+];
+
+/** Only warns (shows a "Missing" list) when genuinely little
+ *  information exists — 3+ of the 5 categories present is treated as
+ *  "complete" with no missing list at all, since demanding every
+ *  category from a short ad is its own kind of false warning. */
+function computeEvidenceCompleteness(parsed: ParsedAdExample): AdCompleteness {
+  const detectedFields = EVIDENCE_CATEGORIES.filter((c) => c.present(parsed)).map((c) => c.label);
+  const missingFields = EVIDENCE_CATEGORIES.filter((c) => !c.present(parsed)).map((c) => c.label);
+  const signalCount = totalSignalCount(parsed);
+
+  const wordCount = parsed.raw.trim().split(/\s+/).filter(Boolean).length;
+
+  if (wordCount <= MALFORMED_MAX_WORDS && detectedFields.length === 0) {
+    return { status: "malformed", detectedFields, missingFields, signalCount };
+  }
+  if (detectedFields.length >= 3) {
+    return { status: "complete", detectedFields, missingFields: [], signalCount };
+  }
+  if (detectedFields.length >= 1) {
+    return { status: "partial", detectedFields, missingFields, signalCount };
+  }
+  return { status: "empty", detectedFields, missingFields, signalCount };
+}
+
+/** Reads back the fields `parseAdExample` already extracted to give an
+ *  honest, non-blocking completeness read — never a new extraction
+ *  pass, never a reason to block generation on its own. Mode-aware: see
+ *  computeLabeledCompleteness vs. computeEvidenceCompleteness. */
+export function computeAdCompleteness(parsed: ParsedAdExample): AdCompleteness {
+  if (parsed.parseMode === "labeled") {
+    return computeLabeledCompleteness(parsed);
+  }
+  return computeEvidenceCompleteness(parsed);
 }
