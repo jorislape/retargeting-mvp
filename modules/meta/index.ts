@@ -6,7 +6,9 @@
  * types and constants re-exported here.
  */
 export {
+  adsArchiveDiagnosticEnabled,
   bearerToken,
+  checkAdsArchiveAccess,
   exchangeCodeForToken,
   fetchAdAccounts,
   fetchAdInsights,
@@ -29,6 +31,7 @@ export {
   DATE_PRESETS,
   DATE_PRESET_LABELS,
   type AdInsightRow,
+  type AdsArchiveDiagnosticResult,
   type DatePreset,
   type MetaAdAccount,
   type MetaOAuthMessage,

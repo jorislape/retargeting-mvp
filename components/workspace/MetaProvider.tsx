@@ -125,6 +125,15 @@ export function MetaProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // TEMPORARY: surfaces the sanitized ads_archive diagnostic
+      // (modules/meta/graph.ts's checkAdsArchiveAccess) for manual
+      // inspection. Only present when ADS_ARCHIVE_DIAGNOSTIC_ENABLED is
+      // on server-side (default off) — never contains the token.
+      // Remove alongside that flag once access is confirmed/ruled out.
+      if (message.adsArchiveDiagnostic) {
+        console.log("meta: ads_archive diagnostic", message.adsArchiveDiagnostic);
+      }
+
       try {
         const res = await fetch("/api/meta/ad-accounts", {
           headers: { Authorization: `Bearer ${message.token}` },

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  adsArchiveDiagnosticEnabled,
   bridgeResponse,
+  checkAdsArchiveAccess,
   exchangeCodeForToken,
   GraphApiError,
   resolveMetaConfig,
@@ -21,6 +23,17 @@ import {
  * resolveMetaConfig — same env override, same request-origin
  * derivation (the browser lands on the same origin it started from) —
  * so they always agree.
+ *
+ * TEMPORARY: when ADS_ARCHIVE_DIAGNOSTIC_ENABLED is on (default off),
+ * this route makes ONE extra, read-only ads_archive call with the
+ * token it just obtained, purely to check whether that token can
+ * query the Ad Library API at all. The token is used only as that
+ * call's Authorization header — never logged, persisted, or included
+ * in the postMessage payload. Only a sanitized pass/fail summary
+ * (modules/meta/graph.ts's checkAdsArchiveAccess) travels back to the
+ * opener. Remove this block (and the diagnostic function it calls)
+ * once ads_archive access is confirmed or ruled out — this is not the
+ * ingestion feature itself.
  */
 
 export const dynamic = "force-dynamic";
@@ -66,7 +79,18 @@ export async function GET(request: NextRequest) {
       config.appSecret,
       config.redirectUri
     );
-    return bridgeResponse({ type: "meta-oauth", ok: true, token }, appOrigin);
+
+    // TEMPORARY diagnostic — see the file header comment. Off by
+    // default; when off this is a single boolean check, no extra
+    // network call, no change to the message payload shape.
+    const adsArchiveDiagnostic = adsArchiveDiagnosticEnabled()
+      ? await checkAdsArchiveAccess(token)
+      : undefined;
+
+    return bridgeResponse(
+      { type: "meta-oauth", ok: true, token, adsArchiveDiagnostic },
+      appOrigin
+    );
   } catch (error) {
     const message =
       error instanceof GraphApiError
