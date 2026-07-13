@@ -176,7 +176,11 @@ body {
  * meaning survive.
  */
 @page {
-  margin: 14mm;
+  /* Slightly tighter than the original 14mm: more usable A4 area
+     without feeling cramped, and less of the "excessive blank space"
+     the on-screen scroll-first spacing tends to leave on a fixed
+     page. */
+  margin: 12mm;
 }
 
 /* Opposite of .print-hidden: report-only chrome (the branded masthead
@@ -195,6 +199,12 @@ body {
    selectively to the units worth protecting, not blanket-applied. */
 .print-avoid-break {
   break-inside: avoid;
+}
+
+/* Keeps a heading from being stranded alone at the bottom of a page
+   with its content pushed to the next one. */
+.print-heading {
+  break-after: avoid;
 }
 
 @media print {
@@ -234,6 +244,75 @@ body {
   body .print-neutral {
     border-left-color: #a1a1aa !important;
   }
+
+  /* A THIRD print-safe color, alongside win/loss: a darker, more
+     saturated version of the on-screen icy cyan accent. The on-screen
+     value (#38bdf8) is too light to read once a grayscale printer
+     desaturates it — this reads as a clear teal in color and a
+     visible mid-gray in black-and-white, used sparingly for section
+     labels and key values, never as a fill. */
+  body .print-accent {
+    color: #0e7490 !important;
+  }
+  body .print-accent-border {
+    border-color: #0e7490 !important;
+  }
+
+  /* Label/value emphasis inside summary and strategic sections: the
+     label stays small and quiet, the extracted value is what the eye
+     should land on. Markup-only distinction — no report text changes. */
+  body .print-kv-label {
+    color: #52525b !important;
+    font-weight: 600 !important;
+  }
+  body .print-kv-value {
+    color: #18181b !important;
+    font-weight: 600 !important;
+  }
+
+  /* One consistent section-title treatment across both reports:
+     small caps, print-accent ink, a thin accent rule underneath —
+     visual hierarchy that doesn't depend on background fills (which
+     the flatten rule above removes). */
+  .print-section-label {
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase;
+    padding-bottom: 3px;
+    border-bottom-width: 1.5px !important;
+  }
+  body .print-section-label {
+    color: #0e7490 !important;
+    border-bottom-color: #0e7490 !important;
+  }
+
+  /* A compact, bordered callout for the print-only executive summary
+     — reads as a single scannable block rather than another card in
+     the stack. */
+  .print-exec-summary {
+    border-width: 1.5px !important;
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+  body .print-exec-summary {
+    border-color: #0e7490 !important;
+  }
+
+  /* One quiet, consistent footer treatment for both reports — applied
+     directly to the footer text elements (not a wrapper) since a
+     child's own font-size always wins over an ancestor's, important
+     or not. Smaller and more muted than any other text on the page,
+     since its job is to be present, not prominent. Border/spacing
+     stay on the existing Tailwind utility classes already in place. */
+  .print-footer {
+    font-size: 9px !important;
+    line-height: 1.5 !important;
+  }
+  body .print-footer {
+    color: #71717a !important;
+  }
+
   /* Center the document on paper. The screen shell offsets content
      for the (print-hidden) sidebar — that offset is zeroed on the
      wrapper (print:pl-0 in the workspace layout), and main then fills

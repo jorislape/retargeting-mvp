@@ -54,8 +54,8 @@ function SectionHead({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-baseline gap-3 border-b border-white/10 pb-2.5">
-      <span className="font-mono text-[11px] font-semibold text-accent-soft">
+    <div className="print-heading flex items-baseline gap-3 border-b border-white/10 pb-2.5">
+      <span className="print-accent font-mono text-[11px] font-semibold text-accent-soft">
         {n}
       </span>
       <h2 className="text-[13px] font-semibold tracking-tight text-zinc-200">
@@ -63,6 +63,47 @@ function SectionHead({
       </h2>
       <span className="flex-1" />
       {right}
+    </div>
+  );
+}
+
+/** Print-only executive summary: a handful of short, labeled lines
+ *  built ONLY from fields the memo already computed (never a new
+ *  interpretation) — the verdict, the main action, the top
+ *  recommended test, and the confidence level. A line is omitted
+ *  whenever its source field is empty; the whole block is omitted
+ *  when nothing qualifies. Print-only because the on-screen report
+ *  already shows all of this in the sections below — this exists so
+ *  a printed/exported page 1 is scannable in under 20 seconds. */
+function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
+  const client = view === "client";
+  const candidates: { label: string; value: string | undefined }[] = [
+    { label: "Verdict", value: (client ? memo.clientSummary : memo.tldr)[0] },
+    {
+      label: client ? "Main action" : "Kill / reduce",
+      value: client ? memo.losers.clientInstruction : memo.losers.killInstruction,
+    },
+    { label: "Top recommended test", value: memo.nextTests[0]?.test },
+    { label: "Confidence", value: memo.confidence.level },
+  ];
+  const lines = candidates.filter(
+    (l): l is { label: string; value: string } => Boolean(l.value)
+  );
+  if (lines.length === 0) return null;
+
+  return (
+    <div className="print-only print-exec-summary print-avoid-break mt-6 border border-white/10 p-3">
+      <p className="print-section-label mb-1.5 text-[9px] font-bold uppercase tracking-[0.08em]">
+        Executive summary
+      </p>
+      <div className="space-y-1">
+        {lines.map((line) => (
+          <p key={line.label} className="flex gap-1.5 text-xs leading-relaxed text-zinc-400">
+            <span className="print-kv-label font-medium text-zinc-300">{line.label}: </span>
+            <span className="print-kv-value min-w-0 break-words">{line.value}</span>
+          </p>
+        ))}
+      </div>
     </div>
   );
 }
@@ -252,11 +293,11 @@ function ClientStatCards({ memo }: { memo: Memo }) {
           key={card.label}
           className="break-inside-avoid flex flex-col rounded-xl border border-white/[0.06] bg-white/[0.03] p-4"
         >
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          <p className="print-kv-label text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             {card.label}
           </p>
           <p
-            className={`mt-1.5 break-words font-mono font-semibold tabular-nums ${
+            className={`print-kv-value mt-1.5 break-words font-mono font-semibold tabular-nums ${
               card.tone ?? "text-zinc-50"
             } ${
               card.value.length > 12
@@ -443,27 +484,27 @@ function TestRow({
         </div>
         <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
           <div>
-            <dt className="inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Why{" "}
             </dt>
-            <dd className="inline">{c(test.why)}</dd>
+            <dd className="print-kv-value inline">{c(test.why)}</dd>
           </div>
           <div>
-            <dt className="inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "How " : "Setup "}
             </dt>
-            <dd className="inline">{c(test.setup)}</dd>
+            <dd className="print-kv-value inline">{c(test.setup)}</dd>
           </div>
           <div>
-            <dt className="inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "Success = " : "Win = "}
             </dt>
-            <dd className="inline">{c(test.winningLooksLike)}</dd>
+            <dd className="print-kv-value inline">{c(test.winningLooksLike)}</dd>
           </div>
         </dl>
         {/* The receipts: which signals produced this recommendation. */}
         {test.signals.length > 0 && (
-          <div className="mt-3 border-l border-white/10 pl-3">
+          <div className="print-accent-border mt-3 border-l border-white/10 pl-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "Why it's worth testing" : "Signals used"}
             </p>
@@ -493,7 +534,7 @@ function TestRow({
    only reveals it. Prints as part of the report when visible. */
 function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
   const label = (text: string) => (
-    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+    <p className="print-kv-label text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
       {text}
     </p>
   );
@@ -516,7 +557,7 @@ function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
 
   return (
     <article className="print-avoid-break rounded-xl border border-white/[0.08] p-5">
-      <p className="font-mono text-[11px] font-semibold text-accent-soft">
+      <p className="print-accent font-mono text-[11px] font-semibold text-accent-soft">
         Brief · T{index + 1}
       </p>
       <h3 className="mt-1.5 text-[15px] font-semibold tracking-tight text-zinc-50">
@@ -733,9 +774,16 @@ export function Report({
         {/* Print-only brand line — the on-screen sidebar wordmark is
             .print-hidden, so the printed document needs its own,
             otherwise the exported PDF carries no indication of what
-            produced it. */}
-        <div className="print-only mb-3">
+            produced it. Report type, account name, and generation date
+            already render just below via the existing (print-visible)
+            masthead — this adds only what's missing: a one-line
+            subtitle, kept compact rather than a separate cover page. */}
+        <div className="print-only mb-1">
           <Wordmark className="text-sm" />
+          <p className="text-[10px] leading-relaxed text-zinc-500">
+            Deterministic Meta Ads creative performance analysis —{" "}
+            {client ? "client report" : "buyer memo"}.
+          </p>
         </div>
 
         {/* ---- Masthead ---- */}
@@ -804,7 +852,7 @@ export function Report({
                     and may wrap as a last resort — they must never spill
                     into the neighboring stat, on screen or in print. */}
                 <p
-                  className={`flex min-h-6 items-end break-words font-mono font-semibold tabular-nums text-zinc-50 ${
+                  className={`print-kv-value flex min-h-6 items-end break-words font-mono font-semibold tabular-nums text-zinc-50 ${
                     value.length > 12
                       ? "text-[15px] leading-tight"
                       : value.length > 8
@@ -814,7 +862,7 @@ export function Report({
                 >
                   {value}
                 </p>
-                <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
+                <p className="print-kv-label mt-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
                   {label}
                 </p>
               </div>
@@ -822,6 +870,8 @@ export function Report({
           </div>
           )}
         </header>
+
+        <ExecutiveSummary memo={memo} view={view} />
 
         {/* ---- 01 · Verdict / Summary ---- */}
         <section className="animate-rise mt-12" style={stagger(2)}>
@@ -1176,7 +1226,7 @@ export function Report({
         {/* Sign-off */}
         <footer className="mt-14">
           <div aria-hidden="true" className="h-px bg-white/[0.08]" />
-          <p className="mt-4 text-xs text-zinc-400">
+          <p className="print-footer mt-4 text-xs text-zinc-400">
             Deterministic scoring — every number above comes from your CSV, not
             a model.
           </p>
@@ -1184,8 +1234,10 @@ export function Report({
               disclaimer is .print-hidden, so the exported document
               needs its own — repeated here rather than assumed from
               page 1, since a multi-page PDF may be handed off apart
-              from this app. */}
-          <p className="print-only mt-2 text-[10px] leading-relaxed text-zinc-500">
+              from this app. Same .print-footer treatment as the line
+              above (and as Competitor Debrief's own footer) so both
+              reports read as one consistent, quiet sign-off style. */}
+          <p className="print-only print-footer mt-2 leading-relaxed text-zinc-500">
             Not affiliated with Meta Platforms, Inc. Generated by Debrief
             {generatedAt ? ` on ${new Date(generatedAt).toLocaleString()}` : ""}.
           </p>

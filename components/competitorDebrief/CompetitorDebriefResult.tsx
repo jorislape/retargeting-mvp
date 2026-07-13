@@ -3,16 +3,22 @@ import { btnSecondary, card, cardNested, eyebrow } from "@/components/ui/theme";
 import { AlertTriangleIcon, ArrowIcon, PrinterIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/ui/brand";
 
+/** Section-title treatment shared on screen (`eyebrow`) and in print
+ *  (`.print-section-label` — small caps, print-accent ink, a thin
+ *  accent rule; see app/globals.css). Combining both keeps on-screen
+ *  appearance byte-identical while giving print its own hierarchy. */
+const sectionLabel = `${eyebrow} print-section-label print-heading`;
+
 function Section({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
     <div className={`${cardNested} print-avoid-break min-w-0 p-4`}>
-      <p className="mb-2 text-xs font-semibold text-white">{title}</p>
+      <p className="print-kv-label mb-2 text-xs font-semibold text-white">{title}</p>
       <ul className="space-y-1.5 text-xs leading-relaxed text-zinc-300">
         {items.map((item) => (
           <li key={item} className="flex gap-1.5">
             <span className="shrink-0 text-zinc-600">–</span>
-            <span className="min-w-0 max-w-prose break-words">{item}</span>
+            <span className="print-kv-value min-w-0 max-w-prose break-words">{item}</span>
           </li>
         ))}
       </ul>
@@ -44,38 +50,76 @@ function SourceLink({ label, url }: { label: string; url: string }) {
   );
 }
 
-/** One "→ value" scan line — the building block of a TestCard group. */
-function TestLine({ value }: { value: string }) {
+/** One "→ label: value" scan line — the building block of a TestCard
+ *  group. Label and value are separate nodes (markup only, no text
+ *  rewrite) so print CSS can quiet the label and bolden the value —
+ *  see .print-kv-label / .print-kv-value in app/globals.css. */
+function TestLine({ label, value }: { label?: string; value: string }) {
   return (
     <p className="flex min-w-0 gap-1.5 text-xs leading-relaxed text-zinc-400">
       <span className="shrink-0 text-zinc-600">→</span>
-      <span className="min-w-0 max-w-prose break-words">{value}</span>
+      <span className="min-w-0 max-w-prose break-words">
+        {label ? (
+          <>
+            <span className="print-kv-label font-medium text-zinc-300">{label}: </span>
+            <span className="print-kv-value">{value}</span>
+          </>
+        ) : (
+          value
+        )}
+      </span>
     </p>
   );
+}
+
+interface TestLineSpec {
+  label?: string;
+  value: string;
 }
 
 /** A labeled group of scan lines within a test card — "Hypothesis",
  *  "Test", "Why", "Learn". Groups the 6 required fields (hypothesis,
  *  hook/angle, format, proof mechanism, offer/CTA, what you'll learn)
  *  into 4 scannable blocks without dropping any of them. */
-function TestGroup({ label, lines }: { label: string; lines: string[] }) {
+function TestGroup({ label, lines }: { label: string; lines: TestLineSpec[] }) {
   return (
     <div className="space-y-1">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">{label}</p>
-      {lines.map((line) => (
-        <TestLine key={line} value={line} />
+      <p className="print-section-label text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+        {label}
+      </p>
+      {lines.map((line, i) => (
+        <TestLine key={i} label={line.label} value={line.value} />
       ))}
     </div>
   );
 }
 
-function TestCard({ test }: { test: CompetitorDebriefTest }) {
+function TestCard({ test, index }: { test: CompetitorDebriefTest; index: number }) {
   return (
     <div className={`${cardNested} print-avoid-break min-w-0 space-y-3 p-4`}>
-      <TestGroup label="Hypothesis" lines={[test.hypothesis]} />
-      <TestGroup label="Test" lines={[`Hook / angle: ${test.hookOrAngle}`, `Format: ${test.format}`]} />
-      <TestGroup label="Why" lines={[`Proof mechanism: ${test.proofMechanism}`, `Offer / CTA: ${test.offerOrCta}`]} />
-      <TestGroup label="Learn" lines={[test.whatYoullLearn]} />
+      {/* Print-only "Test N" heading — a quick scan anchor. On screen
+          the surrounding numbered section already establishes this is
+          a list of tests, so this stays print-only rather than adding
+          a second, redundant number on screen. */}
+      <p className="print-only print-accent text-[10px] font-bold uppercase tracking-[0.08em]">
+        Test {index + 1}
+      </p>
+      <TestGroup label="Hypothesis" lines={[{ value: test.hypothesis }]} />
+      <TestGroup
+        label="Test"
+        lines={[
+          { label: "Hook / angle", value: test.hookOrAngle },
+          { label: "Format", value: test.format },
+        ]}
+      />
+      <TestGroup
+        label="Why"
+        lines={[
+          { label: "Proof mechanism", value: test.proofMechanism },
+          { label: "Offer / CTA", value: test.offerOrCta },
+        ]}
+      />
+      <TestGroup label="Learn" lines={[{ value: test.whatYoullLearn }]} />
     </div>
   );
 }
@@ -89,6 +133,39 @@ const hasStrategicPatterns = (debrief: CompetitorDebrief): boolean =>
   debrief.offerCtaStrategy.length > 0 ||
   debrief.creativeStructure.length > 0;
 
+/** The print-only executive summary: five short, labeled lines built
+ *  ONLY from fields the engine already produced (never a new
+ *  interpretation). A line is omitted whenever its source field is
+ *  empty; the whole block is omitted when nothing qualifies — matches
+ *  the same honesty rule the rest of this report already follows. */
+function ExecutiveSummary({ debrief }: { debrief: CompetitorDebrief }) {
+  const candidates: { label: string; value: string | undefined }[] = [
+    { label: "Dominant mechanism", value: debrief.dominantNarrative[0] },
+    { label: "Rejected alternative", value: debrief.enemyOrAlternative[0] },
+    { label: "Primary proof strategy", value: debrief.proofStrategy[0] },
+    { label: "Offer / CTA", value: debrief.offerCtaStrategy[0] },
+    { label: "First recommended test", value: debrief.nextTests[0]?.hookOrAngle },
+  ];
+  const lines: TestLineSpec[] = candidates
+    .filter((l) => Boolean(l.value))
+    .map((l) => ({ label: l.label, value: l.value as string }));
+
+  if (lines.length === 0) return null;
+
+  return (
+    <div className="print-only print-exec-summary print-avoid-break border border-white/10 p-3">
+      <p className="print-section-label mb-1.5 text-[9px] font-bold uppercase tracking-[0.08em]">
+        Executive summary
+      </p>
+      <div className="space-y-1">
+        {lines.map((line) => (
+          <TestLine key={line.label} label={line.label} value={line.value} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function CompetitorDebriefResult({
   debrief,
   generatedAt = null,
@@ -98,11 +175,20 @@ export function CompetitorDebriefResult({
 }) {
   return (
     <div className={`${card} min-w-0 space-y-6 p-5 sm:p-6`}>
-      {/* Print-only brand line, mirroring Report.tsx — the exported
-          PDF needs its own mark since the on-screen sidebar wordmark
-          is .print-hidden. */}
+      {/* Print-only masthead: brand + report type + subtitle. The
+          competitor name and generation date follow immediately below
+          in the existing header block (already print-visible), so
+          this stays compact rather than duplicating a full cover
+          page. */}
       <div className="print-only mb-1">
         <Wordmark className="text-sm" />
+        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          Competitor Debrief
+        </p>
+        <p className="text-[10px] leading-relaxed text-zinc-500">
+          Directional read of pasted competitor ad examples — evidence and
+          interpretation kept separate throughout.
+        </p>
       </div>
 
       <div className="print-hidden flex items-center justify-end">
@@ -120,8 +206,7 @@ export function CompetitorDebriefResult({
       <div className="min-w-0 space-y-1.5">
         <p className={`${eyebrow} min-w-0 break-words`}>{debrief.competitorName}</p>
         <p className="print-only text-[11px] text-zinc-500">
-          Competitor debrief
-          {generatedAt ? ` — Generated ${new Date(generatedAt).toLocaleString()}` : ""}
+          {generatedAt ? `Generated ${new Date(generatedAt).toLocaleString()}` : ""}
         </p>
         <SourceLink label="Meta Ads Library" url={debrief.sources.adsLibraryUrl} />
         {debrief.sources.websiteUrl && (
@@ -129,9 +214,11 @@ export function CompetitorDebriefResult({
         )}
       </div>
 
+      {!debrief.insufficientEvidence && <ExecutiveSummary debrief={debrief} />}
+
       <div className={`${cardNested} min-w-0 p-4`}>
-        <p className="mb-1 text-xs font-semibold text-white">Evidence summary</p>
-        <p className="min-w-0 max-w-prose break-words text-xs leading-relaxed text-zinc-300">
+        <p className="print-kv-label mb-1 text-xs font-semibold text-white">Evidence summary</p>
+        <p className="print-kv-value min-w-0 max-w-prose break-words text-xs leading-relaxed text-zinc-300">
           {debrief.evidenceSummary}
         </p>
       </div>
@@ -144,7 +231,7 @@ export function CompetitorDebriefResult({
       ) : (
         <>
           <div className="min-w-0 space-y-2">
-            <p className={eyebrow}>Observed evidence</p>
+            <p className={sectionLabel}>Observed evidence</p>
             <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               <Section title="Recurring hooks" items={debrief.recurringHooks} />
               <Section title="Creative formats" items={debrief.creativeFormats} />
@@ -155,7 +242,7 @@ export function CompetitorDebriefResult({
 
           {hasStrategicPatterns(debrief) && (
             <div className="min-w-0 space-y-2">
-              <p className={eyebrow}>Strategic patterns — directional interpretation</p>
+              <p className={sectionLabel}>Strategic patterns — directional interpretation</p>
               <p className="text-[11px] leading-relaxed text-zinc-500">
                 Only patterns observed repeatedly across the pasted examples —
                 never from a single example.
@@ -173,9 +260,11 @@ export function CompetitorDebriefResult({
           )}
 
           {debrief.strategicSummary && (
-            <div className="min-w-0 rounded-lg border border-accent/25 bg-accent/[0.06] p-4">
-              <p className="mb-1 text-xs font-semibold text-accent-soft">Strategic summary</p>
-              <p className="min-w-0 max-w-prose break-words text-xs leading-relaxed text-zinc-200">
+            <div className="print-avoid-break min-w-0 rounded-lg border border-accent/25 bg-accent/[0.06] p-4">
+              <p className="print-kv-label mb-1 text-xs font-semibold text-accent-soft">
+                Strategic summary
+              </p>
+              <p className="print-kv-value min-w-0 max-w-prose break-words text-xs leading-relaxed text-zinc-200">
                 {debrief.strategicSummary}
               </p>
             </div>
@@ -183,13 +272,13 @@ export function CompetitorDebriefResult({
 
           {debrief.whatStandsOut.length > 0 && (
             <div className="min-w-0 space-y-2">
-              <p className={eyebrow}>What stands out — directional interpretation</p>
-              <div className={`${cardNested} min-w-0 p-4`}>
+              <p className={sectionLabel}>What stands out — directional interpretation</p>
+              <div className={`${cardNested} print-avoid-break min-w-0 p-4`}>
                 <ul className="space-y-2 text-xs leading-relaxed text-zinc-300">
                   {debrief.whatStandsOut.map((item) => (
                     <li key={item} className="flex gap-1.5">
                       <span className="shrink-0 text-zinc-600">–</span>
-                      <span className="min-w-0 max-w-prose break-words">{item}</span>
+                      <span className="print-kv-value min-w-0 max-w-prose break-words">{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -199,10 +288,10 @@ export function CompetitorDebriefResult({
 
           {debrief.nextTests.length > 0 && (
             <div className="min-w-0 space-y-2">
-              <p className={eyebrow}>Next creative tests — directional interpretation</p>
+              <p className={sectionLabel}>Next creative tests — directional interpretation</p>
               <div className="space-y-3">
-                {debrief.nextTests.map((test) => (
-                  <TestCard key={test.hypothesis} test={test} />
+                {debrief.nextTests.map((test, i) => (
+                  <TestCard key={test.hypothesis} test={test} index={i} />
                 ))}
               </div>
             </div>
@@ -212,16 +301,17 @@ export function CompetitorDebriefResult({
         </>
       )}
 
-      <p className="min-w-0 max-w-prose break-words border-t border-white/[0.06] pt-4 text-[11px] leading-relaxed text-zinc-500">
-        {debrief.caveat}
-      </p>
-
-      {/* Print-only: repeats the essentials in case this page is
-          handed off apart from the on-screen app. */}
-      <p className="print-only text-[10px] leading-relaxed text-zinc-500">
-        Not affiliated with Meta Platforms, Inc. Generated by Debrief
-        {generatedAt ? ` on ${new Date(generatedAt).toLocaleString()}` : ""}.
-      </p>
+      <div className="min-w-0 space-y-1 border-t border-white/[0.06] pt-4">
+        <p className="print-footer min-w-0 max-w-prose break-words text-[11px] leading-relaxed text-zinc-500">
+          {debrief.caveat}
+        </p>
+        {/* Print-only: repeats the essentials in case this page is
+            handed off apart from the on-screen app. */}
+        <p className="print-only print-footer min-w-0 leading-relaxed text-zinc-500">
+          Not affiliated with Meta Platforms, Inc. Generated by Debrief
+          {generatedAt ? ` on ${new Date(generatedAt).toLocaleString()}` : ""}.
+        </p>
+      </div>
     </div>
   );
 }
