@@ -7,8 +7,14 @@ export type {
   CompetitorDebriefTest,
 } from "./types";
 export {
+  computeAdCompleteness,
+  dedupeAdTexts,
+  findDuplicateIndices,
+  normalizeForDedupe,
   parseAdExample,
   parseBulkAdExamples,
   splitAdBlocks,
+  type AdCompleteness,
+  type AdCompletenessStatus,
   type ParsedAdExample,
 } from "./adParser";

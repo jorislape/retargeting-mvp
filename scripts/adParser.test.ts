@@ -9,6 +9,10 @@
  */
 import assert from "node:assert/strict";
 import {
+  computeAdCompleteness,
+  dedupeAdTexts,
+  findDuplicateIndices,
+  normalizeForDedupe,
   parseAdExample,
   parseBulkAdExamples,
   splitAdBlocks,
@@ -140,6 +144,153 @@ import {
   assert.equal(bulk[1].landingPage, "https://colonbroom.com/reviews");
   assert.ok(bulk[1].detectedPositioning.includes("clinically tested"));
   assert.ok(bulk[2].detectedOffers.some((o) => o.includes("subscription")));
+}
+
+/* -------------------------- normalizeForDedupe ------------------------------ */
+
+{
+  assert.equal(normalizeForDedupe("Shop Now!"), "shop now!");
+  assert.equal(normalizeForDedupe("  Shop   Now!  "), "shop now!");
+  assert.equal(
+    normalizeForDedupe("Line one\nLine two"),
+    normalizeForDedupe("line one\n\n  line two")
+  );
+}
+
+/* ------------------------------ dedupeAdTexts ------------------------------- */
+
+{
+  // Exact duplicate — second occurrence dropped.
+  const texts = ["20% off first order, shop now", "20% off first order, shop now"];
+  assert.deepEqual(dedupeAdTexts(texts), ["20% off first order, shop now"]);
+}
+
+{
+  // Whitespace/case-normalized duplicate still collapses, but the FIRST
+  // occurrence's original casing/spacing is preserved verbatim.
+  const texts = ["Shop Now — 20% off", "  shop now —   20% off  "];
+  assert.deepEqual(dedupeAdTexts(texts), ["Shop Now — 20% off"]);
+}
+
+{
+  // Near-but-legitimately-different ads (one word differs) must NOT be
+  // collapsed — exact-after-normalization only, never fuzzy.
+  const texts = ["20% off first order, shop now", "30% off first order, shop now"];
+  assert.deepEqual(dedupeAdTexts(texts), texts);
+}
+
+{
+  // Blank/whitespace-only entries are dropped, never treated as
+  // duplicates of each other.
+  assert.deepEqual(dedupeAdTexts(["", "   ", "real ad text here"]), ["real ad text here"]);
+}
+
+{
+  // Three ads, middle one a duplicate of the first — order preserved,
+  // only the repeat is removed.
+  const texts = ["Ad A text", "Ad B text", "ad a text"];
+  assert.deepEqual(dedupeAdTexts(texts), ["Ad A text", "Ad B text"]);
+}
+
+/* --------------------------- findDuplicateIndices ---------------------------- */
+
+{
+  const indices = findDuplicateIndices(["Ad A text", "Ad B text", "ad a text", "Ad C text"]);
+  assert.deepEqual(indices, [null, null, 0, null]);
+}
+
+{
+  // Near-but-legit different ads never flagged as duplicates.
+  const indices = findDuplicateIndices([
+    "20% off first order, shop now",
+    "30% off first order, shop now",
+  ]);
+  assert.deepEqual(indices, [null, null]);
+}
+
+{
+  // Blank entries are never duplicates of each other.
+  const indices = findDuplicateIndices(["", "", "real text", ""]);
+  assert.deepEqual(indices, [null, null, null, null]);
+}
+
+{
+  // A chain of three identical texts: only the later two point back to
+  // the FIRST occurrence, not to each other.
+  const indices = findDuplicateIndices(["Same text", "Same text", "Same text"]);
+  assert.deepEqual(indices, [null, 0, 0]);
+}
+
+/* --------------------------- computeAdCompleteness --------------------------- */
+
+{
+  // All four core fields labeled explicitly.
+  const parsed = parseAdExample(
+    "Headline: Reset your gut\nCTA: Shop Now\nOffer: 20% off\nFormat: UGC video"
+  );
+  const completeness = computeAdCompleteness(parsed);
+  assert.equal(completeness.status, "complete");
+  assert.deepEqual(completeness.missingFields, []);
+}
+
+{
+  // Some core fields present, others missing — non-blocking "partial"
+  // with an honest missing-fields list.
+  const parsed = parseAdExample("Headline: Reset your gut\nCTA: Shop Now");
+  const completeness = computeAdCompleteness(parsed);
+  assert.equal(completeness.status, "partial");
+  assert.deepEqual(completeness.missingFields, ["Offer", "Format"]);
+}
+
+{
+  // No labeled fields, but long enough real text with keyword-detected
+  // signals — still "partial", not "empty" or "malformed".
+  const parsed = parseAdExample(
+    "Founder-led UGC video with a problem-first hook about bloating, clinically tested claims, and customer reviews shown throughout."
+  );
+  const completeness = computeAdCompleteness(parsed);
+  assert.equal(completeness.status, "partial");
+  assert.ok(completeness.signalCount > 0);
+}
+
+{
+  // Longer text, but nothing recognizable at all — "empty", distinct
+  // from "malformed" (which is reserved for very short fragments).
+  const parsed = parseAdExample(
+    "just some general notes about this competitor that don't map to any tracked category at all"
+  );
+  const completeness = computeAdCompleteness(parsed);
+  assert.equal(completeness.status, "empty");
+  assert.equal(completeness.signalCount, 0);
+}
+
+{
+  // Very short fragment with nothing detected — flagged distinctly as
+  // "malformed" (likely a bad split or stray line), not just "empty".
+  const parsed = parseAdExample("hmm ok");
+  const completeness = computeAdCompleteness(parsed);
+  assert.equal(completeness.status, "malformed");
+}
+
+{
+  // A short fragment that DOES carry a real signal (e.g. just a CTA
+  // phrase) must not be misclassified as malformed — length alone never
+  // overrides genuine detected content.
+  const parsed = parseAdExample("shop now");
+  const completeness = computeAdCompleteness(parsed);
+  assert.notEqual(completeness.status, "malformed");
+}
+
+/* ------------------------- live ad-count preview basis ---------------------- */
+
+{
+  // The panel's live "≈N ads detected" preview (before "Parse ads" is
+  // clicked) is computed as splitAdBlocks(text).length — proving this
+  // matches parseBulkAdExamples' own count keeps the preview and the
+  // actual review step from ever disagreeing.
+  const text = "Ad 1\nFirst ad text.\n\nAd 2\nSecond ad text.\n\nAd 3\nThird ad text.";
+  assert.equal(splitAdBlocks(text).length, parseBulkAdExamples(text).length);
+  assert.equal(splitAdBlocks(text).length, 3);
 }
 
 console.log("adParser: all assertions passed");

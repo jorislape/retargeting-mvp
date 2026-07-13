@@ -1,15 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type {
+  AdCompleteness,
   CompetitorDebrief,
   CompetitorDebriefApiError,
   ParsedAdExample,
 } from "@/modules/competitorDebrief";
-import { parseAdExample, parseBulkAdExamples } from "@/modules/competitorDebrief";
+import {
+  computeAdCompleteness,
+  dedupeAdTexts,
+  findDuplicateIndices,
+  parseAdExample,
+  parseBulkAdExamples,
+  splitAdBlocks,
+} from "@/modules/competitorDebrief";
 import { btnPrimary, btnSecondary, card, cardNested, fieldLabel, inputBase } from "@/components/ui/theme";
-import { AlertTriangleIcon, SparklesIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, CopyIcon, SparklesIcon } from "@/components/ui/icons";
 import { CompetitorDebriefResult } from "./CompetitorDebriefResult";
+
+/** Fill-in-the-blank shape the parser reads most reliably (explicit
+ *  labels win over keyword-fallback detection) — offered as a one-click
+ *  copy so users aren't guessing at a format from the placeholder text
+ *  alone. Two slots, not one, since the value here is showing the
+ *  between-ads separator too. */
+const PASTE_TEMPLATE = `Ad 1
+Headline:
+Hook:
+CTA:
+Offer:
+Format:
+
+Ad 2
+Headline:
+Hook:
+CTA:
+Offer:
+Format: `;
+
+const COMPLETENESS_COPY: Record<AdCompleteness["status"], { label: string; tone: "ok" | "warn" | "bad" }> = {
+  complete: { label: "Looks complete", tone: "ok" },
+  partial: { label: "Missing", tone: "warn" },
+  empty: { label: "No fields or signals detected", tone: "warn" },
+  malformed: { label: "Too short to be usable ad content", tone: "bad" },
+};
 
 /**
  * Competitor Debrief V1 — a separate, CSV-free flow. Primary path is
@@ -37,11 +71,16 @@ const makeBlock = (raw: string): AdBlock => ({ id: nextBlockId++, parsed: parseA
 function AdBlockCard({
   block,
   index,
+  duplicateOfIndex,
   onChange,
   onRemove,
 }: {
   block: AdBlock;
   index: number;
+  /** Index of the earlier block this one duplicates, or null if it's
+   *  unique so far — see findDuplicateIndices. Warn only: never blocks
+   *  editing or generation. */
+  duplicateOfIndex: number | null;
   onChange: (raw: string) => void;
   onRemove: () => void;
 }) {
@@ -59,6 +98,15 @@ function AdBlockCard({
     ...parsed.detectedPositioning.map((p) => `Positioning: ${p}`),
     ...parsed.detectedTrust.map((t) => `Trust: ${t}`),
   ];
+
+  const completeness = useMemo(() => computeAdCompleteness(parsed), [parsed]);
+  const completenessCopy = COMPLETENESS_COPY[completeness.status];
+  const toneClass =
+    completenessCopy.tone === "ok"
+      ? "text-emerald-400"
+      : completenessCopy.tone === "bad"
+        ? "text-red-300"
+        : "text-amber-300";
 
   return (
     <div className={`${cardNested} min-w-0 p-3`}>
@@ -78,6 +126,20 @@ function AdBlockCard({
         value={parsed.raw}
         onChange={(e) => onChange(e.target.value)}
       />
+      {parsed.raw.trim() !== "" && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+          <span className={toneClass}>
+            {completenessCopy.label}
+            {completeness.status === "partial" && `: ${completeness.missingFields.join(", ")}`}
+          </span>
+          {duplicateOfIndex !== null && (
+            <span className="flex items-center gap-1 text-amber-300">
+              <AlertTriangleIcon className="h-3 w-3 shrink-0" />
+              Duplicate of Ad {duplicateOfIndex + 1} — won&rsquo;t be double-counted
+            </span>
+          )}
+        </div>
+      )}
       {chips.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {chips.map((c) => (
@@ -114,6 +176,18 @@ export function CompetitorDebriefPanel() {
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
   const [error, setError] = useState<CompetitorDebriefApiError | null>(null);
   const [loading, setLoading] = useState(false);
+  const [templateCopied, setTemplateCopied] = useState(false);
+
+  async function handleCopyTemplate() {
+    try {
+      await navigator.clipboard.writeText(PASTE_TEMPLATE);
+      setTemplateCopied(true);
+      setTimeout(() => setTemplateCopied(false), 2000);
+    } catch {
+      // Clipboard access can be denied by the browser — the template is
+      // still visible inline, so there's nothing further to do here.
+    }
+  }
 
   const setCoreField = (key: keyof CoreFields) => (value: string) =>
     setCore((f) => ({ ...f, [key]: value }));
@@ -143,15 +217,32 @@ export function CompetitorDebriefPanel() {
     core.adsLibraryUrl.trim() !== "" &&
     (hasParsedAds || advancedNotes.trim() !== "");
 
+  // Duplicate flags are recomputed from the current blocks on every
+  // render (cheap string comparisons) so editing a block's text always
+  // re-evaluates duplicate status live, not just at parse time.
+  const duplicateIndices = useMemo(
+    () => findDuplicateIndices((blocks ?? []).map((b) => b.parsed.raw)),
+    [blocks]
+  );
+
+  // Live "about to submit" count while typing, before "Parse ads" is
+  // clicked — the manual click still drives the actual review step
+  // below; this is only a preview.
+  const liveAdCount = useMemo(
+    () => (bulkPasteText.trim() === "" ? 0 : splitAdBlocks(bulkPasteText).length),
+    [bulkPasteText]
+  );
+
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     try {
       const activeBlocks = (blocks ?? []).filter((b) => b.parsed.raw.trim() !== "");
-      const observations = [
-        activeBlocks.map((b) => b.parsed.raw.trim()).join("\n\n"),
-        advancedNotes.trim(),
-      ]
+      // Deduped once, here, so a pasted duplicate can never be counted
+      // as a second, independent recurrence downstream (see
+      // dedupeAdTexts — first occurrence wins, order preserved).
+      const distinctAdTexts = dedupeAdTexts(activeBlocks.map((b) => b.parsed.raw));
+      const observations = [distinctAdTexts.join("\n\n"), advancedNotes.trim()]
         .filter((part) => part !== "")
         .join("\n\n");
 
@@ -161,12 +252,13 @@ export function CompetitorDebriefPanel() {
         body: JSON.stringify({
           ...core,
           observations,
-          exampleCount: activeBlocks.length > 0 ? activeBlocks.length : undefined,
+          exampleCount: distinctAdTexts.length > 0 ? distinctAdTexts.length : undefined,
           // The individual ad texts let the engine check for patterns
           // that RECUR across distinct ads rather than treating one
           // example as a pattern — see modules/competitorDebrief/
-          // strategicPatterns.ts.
-          adTexts: activeBlocks.length > 0 ? activeBlocks.map((b) => b.parsed.raw.trim()) : undefined,
+          // strategicPatterns.ts. Deduped, so a duplicate paste can't
+          // inflate a recurrence count.
+          adTexts: distinctAdTexts.length > 0 ? distinctAdTexts : undefined,
         }),
       });
       const body = await res.json();
@@ -263,9 +355,19 @@ export function CompetitorDebriefPanel() {
           </div>
 
           <div>
-            <label className={`${fieldLabel} mb-1.5 block`} htmlFor="bulk-paste">
-              Paste ads
-            </label>
+            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+              <label className={fieldLabel} htmlFor="bulk-paste">
+                Paste ads
+              </label>
+              <button
+                type="button"
+                className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] font-medium text-accent-soft hover:underline"
+                onClick={handleCopyTemplate}
+              >
+                <CopyIcon className="h-3 w-3" />
+                {templateCopied ? "Copied!" : "Copy label template"}
+              </button>
+            </div>
             <textarea
               id="bulk-paste"
               rows={7}
@@ -278,8 +380,9 @@ export function CompetitorDebriefPanel() {
             />
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <p className="min-w-0 text-[11px] text-zinc-500">
-                Screenshot upload isn&rsquo;t available yet — paste the text
-                instead for now.
+                {liveAdCount > 0
+                  ? `≈${liveAdCount} ad${liveAdCount === 1 ? "" : "s"} detected — click Parse ads to review`
+                  : "Screenshot upload isn’t available yet — paste the text instead for now."}
               </p>
               <button
                 type="button"
@@ -313,6 +416,7 @@ export function CompetitorDebriefPanel() {
                     key={b.id}
                     block={b}
                     index={i}
+                    duplicateOfIndex={duplicateIndices[i]}
                     onChange={(raw) => updateBlock(b.id, raw)}
                     onRemove={() => removeBlock(b.id)}
                   />

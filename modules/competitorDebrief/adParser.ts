@@ -165,3 +165,112 @@ export function parseAdExample(raw: string): ParsedAdExample {
 export function parseBulkAdExamples(text: string): ParsedAdExample[] {
   return splitAdBlocks(text).map(parseAdExample);
 }
+
+/* ------------------------------------------------------------------ */
+/* Duplicate detection + per-ad completeness — review-step affordances */
+/* only. Nothing here changes what parseAdExample extracts; it reads   */
+/* the same fields back to warn the user, non-blocking, before they    */
+/* generate.                                                           */
+/* ------------------------------------------------------------------ */
+
+/** The dedupe key: whitespace/case-normalized exact match — same
+ *  "normalized-string" approach the watchlist feature already uses for
+ *  page-signal diffing (modules/competitor/watchlist.ts). Deliberately
+ *  NOT fuzzy/similarity-based: two ads differing by even one real word
+ *  (a different offer, a different headline) must never collapse into
+ *  one, so only whitespace/case noise is normalized away. */
+export function normalizeForDedupe(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** For each raw ad text, the index of the FIRST earlier entry with the
+ *  same normalized text, or null if this entry is unique so far (the
+ *  first occurrence of a repeated text is also null — only later
+ *  repeats point back). Blank entries never count as duplicates of
+ *  each other. Pure and order-preserving so it can drive both a UI
+ *  warning ("Duplicate of Ad N") and payload deduplication from the
+ *  same source of truth. */
+export function findDuplicateIndices(rawTexts: string[]): (number | null)[] {
+  const firstSeenAt = new Map<string, number>();
+  return rawTexts.map((raw, i) => {
+    const key = normalizeForDedupe(raw);
+    if (key === "") return null;
+    const earlier = firstSeenAt.get(key);
+    if (earlier !== undefined) return earlier;
+    firstSeenAt.set(key, i);
+    return null;
+  });
+}
+
+/** Distinct ad texts only (first occurrence wins, order preserved) —
+ *  the smallest safe boundary for recurrence correctness: this is what
+ *  must feed `adTexts`/`exampleCount` so a pasted duplicate can never
+ *  be counted as a second, independent recurrence of a pattern. Blank
+ *  entries are dropped, not treated as duplicates of each other. */
+export function dedupeAdTexts(rawTexts: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of rawTexts) {
+    const trimmed = raw.trim();
+    if (trimmed === "") continue;
+    const key = normalizeForDedupe(trimmed);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+export type AdCompletenessStatus = "complete" | "partial" | "empty" | "malformed";
+
+export interface AdCompleteness {
+  status: AdCompletenessStatus;
+  /** Subset of the four core structured fields that weren't detected —
+   *  hook/startDate/landingPage are excluded because they're routinely
+   *  and legitimately absent (metadata, not creative signal). */
+  missingFields: string[];
+  /** Total keyword-detected theme hits (hooks/formats/offers/
+   *  positioning/trust/benefits combined) — a secondary richness signal
+   *  alongside the four core fields. */
+  signalCount: number;
+}
+
+const CORE_FIELDS: { key: keyof Pick<ParsedAdExample, "headline" | "cta" | "offer" | "format">; label: string }[] = [
+  { key: "headline", label: "Headline" },
+  { key: "cta", label: "CTA" },
+  { key: "offer", label: "Offer" },
+  { key: "format", label: "Format" },
+];
+
+/** Below this word count, an ad with zero detected fields/signals is
+ *  flagged as likely-unusable rather than merely incomplete — e.g. a
+ *  stray blank line or a fragment left over from a bad split. */
+const MALFORMED_MAX_WORDS = 4;
+
+/** Reads back the fields `parseAdExample` already extracted to give an
+ *  honest, non-blocking completeness read — never a new extraction
+ *  pass, never a reason to block generation on its own. */
+export function computeAdCompleteness(parsed: ParsedAdExample): AdCompleteness {
+  const missingFields = CORE_FIELDS.filter(({ key }) => !parsed[key]).map(({ label }) => label);
+  const signalCount =
+    parsed.detectedHooks.length +
+    parsed.detectedFormats.length +
+    parsed.detectedOffers.length +
+    parsed.detectedPositioning.length +
+    parsed.detectedTrust.length +
+    parsed.detectedBenefits.length;
+
+  const wordCount = parsed.raw.trim().split(/\s+/).filter(Boolean).length;
+  const hasAnySignal = missingFields.length < CORE_FIELDS.length || signalCount > 0;
+
+  if (wordCount <= MALFORMED_MAX_WORDS && !hasAnySignal) {
+    return { status: "malformed", missingFields, signalCount };
+  }
+  if (missingFields.length === 0) {
+    return { status: "complete", missingFields, signalCount };
+  }
+  if (hasAnySignal) {
+    return { status: "partial", missingFields, signalCount };
+  }
+  return { status: "empty", missingFields, signalCount };
+}
