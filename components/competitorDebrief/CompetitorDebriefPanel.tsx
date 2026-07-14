@@ -141,6 +141,7 @@ function AdBlockCard({
     ...(parsed.format ? [`Format: ${parsed.format}`] : []),
     ...(parsed.startDate ? [`Date: ${parsed.startDate}`] : []),
     ...(parsed.landingPage ? [`Landing page: ${parsed.landingPage}`] : []),
+    ...(parsed.story ?? []).map((s) => `Story: ${s}`),
     ...parsed.detectedHooks.map((h) => `Hook signal: ${h}`),
     ...parsed.detectedFormats.map((f) => `Format signal: ${f}`),
     ...parsed.detectedOffers.map((o) => `Offer signal: ${o}`),

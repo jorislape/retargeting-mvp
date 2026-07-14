@@ -107,16 +107,29 @@ const HUEL_AD =
 }
 
 {
-  // A long, genuinely multi-paragraph essay-shaped paste (well past the
-  // "minimal" bounds) should NOT be forced into a two-slot hook/body
-  // split — conservative on purpose, per the brief. It still falls
-  // through to the existing "plain" fallback (keyword tables over the
-  // whole text), unchanged.
-  const longProse = Array.from(
+  // A genuinely long-form multi-paragraph AD (well within realistic
+  // AG1/Huel/ColonBroom-style testimonial length) DOES qualify — being
+  // long is not, on its own, evidence that a block isn't ad copy. See
+  // the full long-form story-ad tests further down for the richer
+  // extraction this then enables.
+  const longFormAd = Array.from(
     { length: 8 },
     (_, i) => `This is paragraph number ${i + 1} of a much longer piece of pasted text that keeps going on and on.`
   ).join("\n\n");
-  assert.equal(looksLikeAdsLibraryCopy(longProse), false);
+  assert.equal(looksLikeAdsLibraryCopy(longFormAd), true);
+}
+
+{
+  // An EXCESSIVELY long paste (well past realistic ad-copy length —
+  // more like an accidentally-pasted document) should NOT be forced
+  // into a hook/body/story split — conservative on purpose. It still
+  // falls through to the existing "plain" fallback (keyword tables
+  // over the whole text), unchanged.
+  const excessivelyLongProse = Array.from(
+    { length: 40 },
+    (_, i) => `This is paragraph number ${i + 1} of a much longer piece of pasted text that keeps going on and on.`
+  ).join("\n\n");
+  assert.equal(looksLikeAdsLibraryCopy(excessivelyLongProse), false);
 }
 
 /* -------------------------------- AG1 sample --------------------------------- */
@@ -277,6 +290,149 @@ Book a Demo`;
   assert.equal(p.parseMode, "labeled");
   assert.equal(p.headline, "Reset your gut");
   assert.equal(p.cta, "Shop Now");
+}
+
+/* ========================================================================= */
+/* Structure-aware prose parsing — long-form story/testimonial ads           */
+/* (AG1/Huel/ColonBroom-style) that were mostly "missing" before because     */
+/* nothing beyond bullets/whole-text keyword scans looked at prose content.  */
+/* ========================================================================= */
+
+/* ------------------------- long-form story + timeline ad ---------------------- */
+
+const HUEL_STYLE_STORY_AD = `Since 2021, AG1 has been the morning ritual Hugh Jackman relies on to start his day.
+
+I used to feel exhausted by 2pm every single day, no matter how much coffee I drank. I tried everything — supplements, different diets, more sleep — and nothing really worked. Then I found a complete daily nutrition routine that finally gave me consistent energy without the crash.
+
+Week 1: I noticed I wasn't reaching for a second coffee anymore.
+Week 2: My digestion felt noticeably better and I had less bloating.
+Week 3: My energy stayed steady all afternoon instead of crashing.
+Week 4: I'd built a habit I actually looked forward to every morning.
+
+Backed by a 30-day money-back guarantee and clinically studied ingredients, with real customer reviews from over 200,000 people who made the switch.
+
+Shop Now`;
+
+{
+  const p = parseAdExample(HUEL_STYLE_STORY_AD);
+  assert.equal(p.parseMode, "native");
+  assert.match(p.hook ?? "", /Hugh Jackman relies on/);
+  assert.equal(p.cta, "Shop Now");
+
+  // Timeline entries captured as story, not ignored.
+  assert.ok(p.story, "expected story to be populated for a testimonial/timeline ad");
+  assert.ok(p.story?.some((s) => /^Week 1/.test(s)));
+  assert.ok(p.story?.some((s) => /^Week 2/.test(s)));
+  assert.ok(p.story?.some((s) => /^Week 3/.test(s)));
+  assert.ok(p.story?.some((s) => /^Week 4/.test(s)));
+  // The first-person narrative opening is also captured as story, not
+  // silently folded away.
+  assert.ok(p.story?.some((s) => /I used to feel exhausted/i.test(s)));
+
+  // Proof/trust extracted from unlabeled prose, both as category labels
+  // and as verbatim supporting quotes.
+  assert.ok(p.detectedTrust.includes("guarantee / risk-reversal"));
+  assert.ok(p.detectedTrust.includes("clinical claims"));
+  assert.ok(p.detectedTrust.includes("customer reviews / ratings"));
+  assert.ok(p.detectedTrust.includes("celebrity / influencer endorsement"));
+  assert.ok(
+    p.detectedTrust.some((t) => /money-back guarantee/i.test(t)),
+    "expected a verbatim proof sentence, not just the category label"
+  );
+
+  // Positioning extracted from prose too.
+  assert.ok(p.detectedPositioning.includes("routine-based"));
+
+  // Substantially richer completeness than "missing" — this is the
+  // acceptance criterion in one assertion.
+  const c = computeAdCompleteness(p);
+  assert.equal(c.status, "complete");
+  assert.ok(c.detectedFields.includes("Story"));
+  assert.ok(c.detectedFields.length >= 4, `expected several evidence categories, got: ${c.detectedFields.join(", ")}`);
+}
+
+/* --------------------- offer/proof extracted from bare prose ------------------ */
+/* No bullets, no explicit CTA line — everything must come from ordinary        */
+/* sentences.                                                                    */
+
+const COLONBROOM_PROSE_AD = `Bloated after every meal? I felt exactly like this for years and nothing seemed to help.
+
+I started taking one scoop every morning and within days my digestion felt lighter and less uncomfortable. My energy improved too, which I honestly didn't expect.
+
+Get 20% off your first order this week only. Clinically studied ingredients, backed by thousands of five-star reviews.`;
+
+{
+  const p = parseAdsLibraryExample(COLONBROOM_PROSE_AD);
+  assert.match(p.hook ?? "", /Bloated after every meal/);
+  // The offer is a plain sentence, not a bullet or a labeled field —
+  // it must still be extracted, verbatim.
+  assert.match(p.offer ?? "", /20% off your first order/);
+  assert.ok(p.detectedTrust.includes("clinical claims"));
+  assert.ok(p.detectedTrust.includes("customer reviews / ratings"));
+  // Ordinary narrative sentences (no keyword-table hit) are captured
+  // as story, not dropped.
+  assert.ok(p.story?.some((s) => /digestion felt lighter/i.test(s)));
+
+  const c = computeAdCompleteness(p);
+  assert.equal(c.status, "complete");
+  assert.ok(c.detectedFields.includes("Offer"));
+}
+
+/* ------------------------------ emoji-heavy prose ------------------------------ */
+/* Inline emoji within flowing sentences (not just leading bullet markers) must  */
+/* never crash the parser or corrupt extraction.                                 */
+
+const EMOJI_HEAVY_AD = `I feel 💪 amazing now and my skin ✨ looks incredible after just two weeks of using this daily.
+
+Honestly this changed my life 🔥🔥🔥 and my energy is through the roof ⚡ every single day, clinically tested and dermatologist-approved.
+
+Shop Now 🎉`;
+
+{
+  const p = parseAdExample(EMOJI_HEAVY_AD);
+  assert.equal(p.parseMode, "native");
+  assert.match(p.hook ?? "", /I feel 💪 amazing now/);
+  // The keyword hit still resolves correctly even with emoji woven
+  // through the same sentence.
+  assert.ok(p.detectedPositioning.includes("dermatologist-endorsed") || p.detectedPositioning.includes("clinically tested"));
+  // No crash, no mangled/empty raw text.
+  assert.equal(p.raw, EMOJI_HEAVY_AD.trim());
+}
+
+/* --------------- prose-derived evidence never invents a category -------------- */
+/* An ordinary sentence that hits NO keyword table and isn't in a recognized     */
+/* story paragraph must stay uncaptured — never defaulted into a fabricated      */
+/* benefit/trust/offer, unlike bullets (which are discrete claims by            */
+/* construction and so DO get a safe default bucket).                            */
+
+{
+  const plainFactualAd = `Our new product line launches next month across all regions.
+
+The packaging was redesigned this year to reduce plastic waste by a small amount.
+
+Learn More`;
+  const p = parseAdsLibraryExample(plainFactualAd);
+  assert.deepEqual(p.detectedBenefits, []);
+  assert.deepEqual(p.detectedTrust, []);
+  assert.equal(p.offer, undefined);
+  // Neither paragraph is first-person/testimonial-shaped or a timeline
+  // entry, so nothing gets swept into `story` either — honest "missing"
+  // over a fabricated narrative label.
+  assert.equal(p.story, undefined);
+}
+
+/* ------------------- structured (bulleted) parsing is unaffected -------------- */
+/* Regression: the existing AG1 bulleted-example behavior from before this       */
+/* change must stay byte-identical.                                              */
+
+{
+  const p = parseAdsLibraryExample(AG1_AD);
+  assert.equal(p.cta, "Learn More");
+  assert.match(p.offer ?? "", /FREE Travel Packs/);
+  assert.ok(p.detectedBenefits.some((b) => /upgraded probiotics/i.test(b)));
+  // No story field forced onto a pure bullet-list ad with no
+  // first-person/timeline content in its hook paragraph.
+  assert.equal(p.story, undefined);
 }
 
 console.log("adsLibraryParser: all assertions passed");

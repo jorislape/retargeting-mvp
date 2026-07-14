@@ -124,21 +124,37 @@ modules/competitorDebrief/     # Competitor Debrief V1 — a second, CSV-free fl
                   # pasted duplicate can't inflate strategicPatterns.ts's cross-ad recurrence
                   # count), mode-aware completeness (computeAdCompleteness: the classic 4-field
                   # Headline/CTA/Offer/Format checklist for "labeled" input; an evidence-based
-                  # Hook/Benefits/Proof/Offer/Explicit-CTA checklist for "native"/"plain", since
+                  # Hook/Story/Benefits/Proof/Offer/Explicit-CTA checklist for "native"/"plain", since
                   # judging natural-language paste against labels it was never going to have was
                   # the exact bug this pipeline exists to fix), and textForAnalysis (raw with any
                   # ignoredDisclaimers paragraphs removed — what should actually be SENT to the
                   # engine, since the engine re-scans whatever text it receives and would
                   # otherwise treat a shared disclaimer footer as a "recurring" pattern)
-  adsLibraryParser.ts # The native pipeline: looksLikeAdsLibraryCopy (positive-signal-only
-                  # detection — emoji/checkmark bullet lists or a bare short CTA line on its own;
-                  # never "absence of labels" alone) + parseAdsLibraryExample (paragraph-split →
-                  # drop disclaimer/legal/footnote/copyright paragraphs (kept verbatim in
-                  # ignoredDisclaimers, never silently dropped) → infer hook/body from prose
-                  # paragraphs → classify bullet lines into offer/trust/benefit via the SAME
-                  # shared tables as everything else → same keyword-table scan over the
+  adsLibraryParser.ts # The native pipeline — structure-aware, not format-aware: real long-form
+                  # story/testimonial ads (AG1/Huel/ColonBroom-style — an opening line, several
+                  # testimonial paragraphs, sometimes a "Week 1... Week 4..." timeline) are just
+                  # as "Ads Library shaped" as a short bulleted one, so looksLikeAdsLibraryCopy
+                  # (positive-signal-only detection — emoji/checkmark bullet lists, a bare short
+                  # CTA line on its own, or 2+ genuine prose paragraphs within generous length
+                  # bounds; never "absence of labels" alone, never gated on length beyond
+                  # excluding an accidental multi-thousand-word document paste) + parseAdsLibraryExample
+                  # (paragraph-split → drop disclaimer/legal/footnote/copyright paragraphs (kept
+                  # verbatim in ignoredDisclaimers, never silently dropped) → infer hook/body from
+                  # prose paragraphs → classify bullet LINES into offer/trust/benefit, and (the
+                  # generalization of that same idea to unbulleted prose) classify prose UNITS
+                  # (lines where line breaks already exist, else sentences) the same way against
+                  # the SAME shared tables — offer/trust/benefit/positioning verbatim quotes
+                  # extracted from ordinary sentences whenever they're explicitly present, never a
+                  # "everything is a benefit" default the way bullets get (a bullet list is
+                  # discrete claims by construction; a prose sentence isn't, so an unmatched one
+                  # stays uncaptured) → story/narrative recognition: first-person testimonial
+                  # paragraphs ("I used to...", "My journey...", "Since 2020...") and "Week N"/
+                  # "Day N"/"Month N" timeline entries become verbatim `story` evidence instead of
+                  # being ignored or silently folded into `body` → same keyword-table scan over the
                   # disclaimer-free text). No AI, no OCR — every field is still a verbatim quote,
-                  # a fixed regex match, or a keyword-table hit
+                  # a fixed regex match, or a keyword-table hit; "missing" is always preferred over
+                  # a guess, which is why unmatched prose sentences outside a recognized story
+                  # paragraph stay uncaptured rather than defaulting to some category
   engine.ts       # generateCompetitorDebrief(input) — templated, not an LLM call (same seam
                   # pattern as modules/debrief/memo.ts). Zero network imports (test-enforced).
                   # Reuses extractMarketSignals + the pageSignals.ts term tables rather than

@@ -60,6 +60,19 @@ export interface ParsedAdExample {
   /** Native mode only: prose paragraphs after the hook, excluding
    *  bullets/CTA/disclaimers. */
   body?: string;
+  /** Native mode only: verbatim narrative/testimonial units (lines or
+   *  sentences) — a recognized first-person story opening ("I used
+   *  to...", "My journey...", "Since 2020..."), a "Week N"/"Day N"/
+   *  "Month N" timeline entry, or any other sentence within a
+   *  recognized story paragraph that didn't hit a more specific
+   *  offer/trust/benefit/positioning table. Long-form testimonial ads
+   *  (AG1/Huel/ColonBroom-style) previously left most fields "missing"
+   *  because nothing captured this content at all; this is what makes
+   *  it visible as genuine supporting evidence instead of being
+   *  silently folded into (or truncated out of) `body`. Every entry is
+   *  a verbatim quote — never a summary or inference beyond "this text
+   *  reads as narrative". */
+  story?: string[];
   /** Native mode only: disclaimer/legal/footnote paragraphs excluded
    *  from extraction — kept here (verbatim) so nothing is silently
    *  dropped without being shown, even though it never becomes evidence. */
@@ -372,6 +385,7 @@ function computeLabeledCompleteness(parsed: ParsedAdExample): AdCompleteness {
  *  missing when truly nothing button-like was found anywhere. */
 const EVIDENCE_CATEGORIES: { label: string; present: (p: ParsedAdExample) => boolean }[] = [
   { label: "Hook", present: (p) => Boolean(p.hook) || p.detectedHooks.length > 0 },
+  { label: "Story", present: (p) => (p.story?.length ?? 0) > 0 },
   { label: "Benefits", present: (p) => p.detectedBenefits.length > 0 },
   { label: "Proof", present: (p) => p.detectedTrust.length > 0 },
   { label: "Offer", present: (p) => Boolean(p.offer) || p.detectedOffers.length > 0 },
