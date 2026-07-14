@@ -374,4 +374,34 @@ const FORBIDDEN = /\b(ROAS|CPA|CPC|CTR|conversion rate|winning ad|spend of|impre
   assert.match(src, /truncate/, "the short link label should be defensively truncated too");
 }
 
+/* ----- internal-learning effects are visibly obvious, not just present in data ---- */
+/* Regression for: the feature worked end-to-end but was reported as producing       */
+/* "almost no visible UX difference" — a real, correct adjustment was easy to miss.  */
+
+{
+  const src = readFileSync(
+    new URL("../components/competitorDebrief/CompetitorDebriefResult.tsx", import.meta.url),
+    "utf8"
+  );
+  // A data-derived (never invented) affected-test count must be shown
+  // prominently in the "Internal learnings considered" section, not
+  // just a badge buried inside individual test cards several sections
+  // down.
+  assert.match(
+    src,
+    /nextTests\.filter\(\(t\)\s*=>\s*t\.internalLearningNote\)\.length/,
+    "affected-test count must be derived from the same internalLearningNote field the tests already carry — never a separate, possibly-drifting count"
+  );
+  assert.match(src, /adjusted using these learnings/i);
+  // Honesty requirement: when NO test was affected, the report must
+  // say so explicitly rather than silently showing nothing — the
+  // exact ambiguity ("did this do anything or not?") that prompted
+  // this investigation.
+  assert.match(src, /None of the recommended tests below matched/i);
+  // The per-test badge must carry an icon (not just colored text) —
+  // the earlier low-opacity, icon-less badge was the reported UX gap.
+  assert.match(src, /INTERNAL_LEARNING_NOTE_STYLE/);
+  assert.match(src, /<Icon className=/);
+}
+
 console.log("competitorDebrief: all assertions passed");

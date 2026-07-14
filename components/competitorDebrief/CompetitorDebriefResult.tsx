@@ -1,6 +1,6 @@
 import type { CompetitorDebrief, CompetitorDebriefTest, LearningOutcome } from "@/modules/competitorDebrief";
 import { btnSecondary, card, cardNested, eyebrow } from "@/components/ui/theme";
-import { AlertTriangleIcon, ArrowIcon, PrinterIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, ArrowIcon, CheckIcon, PrinterIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/ui/brand";
 
 /** Mirrors CompetitorDebriefPanel's LEARNING_OUTCOME_COPY — kept as a
@@ -14,10 +14,21 @@ const LEARNING_OUTCOME_COPY: Record<LearningOutcome, { label: string; className:
   unknown: { label: "Unrecognized", className: "border-white/10 bg-white/[0.03] text-zinc-500" },
 };
 
-const INTERNAL_LEARNING_NOTE_CLASS: Record<string, string> = {
-  "builds-on": "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-300",
-  adjusted: "border-amber-500/25 bg-amber-500/[0.06] text-amber-300",
-  "avoids-failed": "border-amber-500/25 bg-amber-500/[0.06] text-amber-300",
+/** Deliberately more saturated than this app's usual quiet 3-6% fills
+ *  (see components/ui/theme.ts) — a real, correct internal-learning
+ *  adjustment was easy to miss at the default low-opacity treatment
+ *  (reported as "the report looks almost identical" even when the
+ *  data was genuinely different underneath). Still within the app's
+ *  emerald/amber vocabulary — win/validated = emerald, changed/warned
+ *  = amber — just louder specifically here, since this box's entire
+ *  job is to be noticed while scrolling past several other cards. */
+const INTERNAL_LEARNING_NOTE_STYLE: Record<
+  string,
+  { className: string; Icon: typeof CheckIcon }
+> = {
+  "builds-on": { className: "border-emerald-500/40 bg-emerald-500/[0.12] text-emerald-300", Icon: CheckIcon },
+  adjusted: { className: "border-amber-500/40 bg-amber-500/[0.12] text-amber-300", Icon: AlertTriangleIcon },
+  "avoids-failed": { className: "border-amber-500/40 bg-amber-500/[0.12] text-amber-300", Icon: AlertTriangleIcon },
 };
 
 /** Section-title treatment shared on screen (`eyebrow`) and in print
@@ -121,16 +132,21 @@ function TestCard({ test, index }: { test: CompetitorDebriefTest; index: number 
       <p className="print-only print-accent text-[10px] font-bold uppercase tracking-[0.08em]">
         Test {index + 1}
       </p>
-      {test.internalLearningNote && (
-        <div
-          className={`min-w-0 rounded-lg border p-2 text-[11px] leading-relaxed ${INTERNAL_LEARNING_NOTE_CLASS[test.internalLearningNote.kind]}`}
-        >
-          <p className="font-semibold">{test.internalLearningNote.label}</p>
-          <p className="mt-0.5 min-w-0 max-w-prose break-words opacity-90">
-            {test.internalLearningNote.explanation}
-          </p>
-        </div>
-      )}
+      {test.internalLearningNote &&
+        (() => {
+          const { className, Icon } = INTERNAL_LEARNING_NOTE_STYLE[test.internalLearningNote.kind];
+          return (
+            <div className={`flex min-w-0 items-start gap-2 rounded-lg border p-2.5 text-[11px] leading-relaxed ${className}`}>
+              <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="font-semibold">{test.internalLearningNote.label}</p>
+                <p className="mt-0.5 min-w-0 max-w-prose break-words opacity-90">
+                  {test.internalLearningNote.explanation}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
       <TestGroup label="Hypothesis" lines={[{ value: test.hypothesis }]} />
       <TestGroup
         label="Test"
@@ -158,6 +174,14 @@ function TestCard({ test, index }: { test: CompetitorDebriefTest; index: number 
  *  is null otherwise) — never a forced empty section. */
 function InternalLearningsConsidered({ debrief }: { debrief: CompetitorDebrief }) {
   if (!debrief.internalLearnings || debrief.internalLearnings.items.length === 0) return null;
+
+  // Data-derived only — a count of a field the engine already set on
+  // each test, never a new claim. Exists because a real, correct
+  // adjustment was easy to miss when the only signal was a small badge
+  // buried inside a test card several sections down — this puts the
+  // headline number where it can't be missed.
+  const affectedCount = debrief.nextTests.filter((t) => t.internalLearningNote).length;
+
   return (
     <div className="min-w-0 space-y-2">
       <p className={sectionLabel}>Internal learnings considered</p>
@@ -165,6 +189,19 @@ function InternalLearningsConsidered({ debrief }: { debrief: CompetitorDebrief }
         Your team&rsquo;s own pasted context — used only to adjust which tests are
         recommended below, never to infer performance beyond what you entered.
       </p>
+      {affectedCount > 0 ? (
+        <p className="print-avoid-break min-w-0 rounded-lg border border-accent/30 bg-accent/[0.08] px-3 py-2 text-xs font-semibold text-accent-soft">
+          {affectedCount} of {debrief.nextTests.length} recommended test{debrief.nextTests.length === 1 ? "" : "s"} below{" "}
+          {affectedCount === 1 ? "was" : "were"} adjusted using these learnings — look for the highlighted note on
+          each affected test card.
+        </p>
+      ) : (
+        <p className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+          None of the recommended tests below matched these learnings closely enough to adjust — they&rsquo;re shown
+          exactly as they would be without this context, per the same conservative-matching rule that keeps this
+          feature from over-claiming a connection that isn&rsquo;t really there.
+        </p>
+      )}
       <div className={`${cardNested} print-avoid-break min-w-0 space-y-1.5 p-4`}>
         {debrief.internalLearnings.items.map((learning, i) => {
           const copy = LEARNING_OUTCOME_COPY[learning.outcome];
