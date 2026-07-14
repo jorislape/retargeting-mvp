@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ShieldIcon } from "@/components/ui/icons";
 import {
   card,
@@ -47,12 +48,20 @@ export default function PrivacyPage() {
           you ask us to. By design, not by policy.
         </h1>
         <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
-          The strongest privacy guarantee is architecture: no accounts, no
-          tracking, and your ads data is never stored server-side. Two
-          optional features keep data anywhere at all: the competitor
-          watchlist (in your own browser) and the competitor-monitoring beta
-          (competitor URLs and extracted page signals on our server, tied to
-          an anonymous cookie — never your ads data).
+          No login required. Ads data is never stored server-side. We do not
+          store uploaded CSVs, raw pasted ads, ad names, spend figures, or
+          row-level performance data — on any tier. Two optional features
+          store other data, never your ads data: the competitor watchlist (in
+          your own browser) and the competitor-monitoring beta (competitor
+          URLs and extracted page signals on our server, tied to an anonymous
+          cookie). More on how we think about security:{" "}
+          <Link
+            href="/security"
+            className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-4 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
+          >
+            /security
+          </Link>
+          .
         </p>
       </header>
 
