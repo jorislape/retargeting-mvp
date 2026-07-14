@@ -13,7 +13,7 @@
  */
 import assert from "node:assert/strict";
 import { looksLikeAdsLibraryCopy, parseAdsLibraryExample } from "../modules/competitorDebrief/adsLibraryParser.ts";
-import { parseAdExample, textForAnalysis } from "../modules/competitorDebrief/adParser.ts";
+import { computeAdCompleteness, parseAdExample, textForAnalysis } from "../modules/competitorDebrief/adParser.ts";
 
 /* ---------------------------- detection heuristic ---------------------------- */
 
@@ -47,6 +47,76 @@ import { parseAdExample, textForAnalysis } from "../modules/competitorDebrief/ad
   assert.equal(looksLikeAdsLibraryCopy("Shop Now"), false);
   assert.equal(looksLikeAdsLibraryCopy(""), false);
   assert.equal(looksLikeAdsLibraryCopy("   "), false);
+}
+
+/* ------------------------- minimal hook + body prose -------------------------- */
+/* Two short, unlabeled prose paragraphs — no bullets, no CTA line — is its own   */
+/* structural signal: a minimal "hook line, then a body paragraph" ad. Without    */
+/* this, ads like the Huel example below fell through to the single-paragraph    */
+/* "plain" fallback (which never infers hook/body at all) and showed "No fields   */
+/* or signals detected" even though the copy was genuinely usable.               */
+
+const HUEL_AD =
+  "Millions of meals served.\n\n" +
+  "Join people replacing unhealthy convenience food with a complete, balanced meal in " +
+  "minutes — no prep, no mess, just real nutrition on your schedule, backed by a 30-day guarantee.";
+
+{
+  assert.equal(looksLikeAdsLibraryCopy(HUEL_AD), true);
+  const p = parseAdsLibraryExample(HUEL_AD);
+  assert.equal(p.parseMode, "native");
+  assert.equal(p.hook, "Millions of meals served.");
+  assert.match(p.body ?? "", /Join people replacing unhealthy convenience food/);
+  // Existing trust table still fires over the body — no new vocabulary,
+  // just applying the same detect() call this pipeline already made.
+  assert.ok(p.detectedTrust.includes("guarantee / risk-reversal"));
+
+  // The completeness UI must never say "No fields or signals detected"
+  // for this — Hook + Proof is already real, non-empty evidence.
+  const c = computeAdCompleteness(p);
+  assert.notEqual(c.status, "empty");
+  assert.ok(c.detectedFields.includes("Hook"));
+  assert.ok(c.detectedFields.includes("Proof"));
+}
+
+{
+  // Three+ short prose paragraphs still work — hook is paragraph 1, body
+  // is every paragraph after it joined, nothing silently dropped.
+  const threePara =
+    "Stop guessing what to cook tonight.\n\n" +
+    "Every box comes with pre-portioned ingredients and a simple recipe card.\n\n" +
+    "Cancel or skip any week, no commitment required.";
+  const p = parseAdsLibraryExample(threePara);
+  assert.equal(p.hook, "Stop guessing what to cook tonight.");
+  assert.match(p.body ?? "", /pre-portioned ingredients/);
+  assert.match(p.body ?? "", /Cancel or skip any week/);
+}
+
+{
+  // Two short JUNK fragments must NOT qualify just because they happen
+  // to be two blank-line-separated "paragraphs" — the total-word floor
+  // exists specifically to keep this conservative. Falls through to
+  // "plain" mode and (correctly) reads as malformed/empty, not a false
+  // "Hook" credit.
+  assert.equal(looksLikeAdsLibraryCopy("asdf jkl.\n\nqwer tyui."), false);
+  const p = parseAdExample("asdf jkl.\n\nqwer tyui.");
+  assert.equal(p.parseMode, "plain");
+  assert.equal(p.hook, undefined);
+  const c = computeAdCompleteness(p);
+  assert.equal(c.status, "malformed");
+}
+
+{
+  // A long, genuinely multi-paragraph essay-shaped paste (well past the
+  // "minimal" bounds) should NOT be forced into a two-slot hook/body
+  // split — conservative on purpose, per the brief. It still falls
+  // through to the existing "plain" fallback (keyword tables over the
+  // whole text), unchanged.
+  const longProse = Array.from(
+    { length: 8 },
+    (_, i) => `This is paragraph number ${i + 1} of a much longer piece of pasted text that keeps going on and on.`
+  ).join("\n\n");
+  assert.equal(looksLikeAdsLibraryCopy(longProse), false);
 }
 
 /* -------------------------------- AG1 sample --------------------------------- */

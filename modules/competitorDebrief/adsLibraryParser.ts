@@ -56,11 +56,60 @@ function isBareCtaLine(line: string): boolean {
   return CTA_PHRASES.some((p) => cleaned === p);
 }
 
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/* Bounds for the "minimal prose ad" fallback signal below — deliberately
+ * tight so it only catches genuinely short hook+body copy, never a
+ * longer multi-paragraph paste (already served by the bullet/CTA-line
+ * signal or the "plain" fallback) and never a couple of short junk
+ * fragments (the MIN floor rules those out; see looksLikeMinimalProseAd). */
+const MINIMAL_PARAGRAPH_MIN_WORDS = 2;
+const MINIMAL_PARAGRAPH_MAX_WORDS = 40;
+const MINIMAL_TOTAL_MIN_WORDS = 8;
+const MINIMAL_TOTAL_MAX_WORDS = 120;
+
+/**
+ * Second, narrower structural signal: two or more short prose
+ * paragraphs, no bullets, no bare CTA line — a minimal "hook line, then
+ * a body paragraph" ad ("Millions of meals served.\n\nJoin people
+ * replacing unhealthy convenience food..."). The primary bullet/CTA-line
+ * signal above never fires for this shape (nothing's bulleted, no
+ * button line), so without this check such ads fell through to the
+ * single-paragraph "plain" fallback and lost the hook/body split
+ * entirely — even though it's exactly as unlabeled as the bulleted
+ * case. Every paragraph must be non-bulleted and within the per-
+ * paragraph word bounds, AND the total word count must clear a small
+ * floor (MINIMAL_TOTAL_MIN_WORDS) — two two-word fragments ("asdf jkl."
+ * / "qwer tyui.") must NOT qualify just because they happen to split
+ * into two "paragraphs"; a real hook + body pair is always well past
+ * that floor.
+ */
+function looksLikeMinimalProseAd(trimmed: string): boolean {
+  const paragraphs = splitParagraphs(trimmed);
+  if (paragraphs.length < 2) return false;
+
+  const total = wordCount(trimmed);
+  if (total < MINIMAL_TOTAL_MIN_WORDS || total > MINIMAL_TOTAL_MAX_WORDS) return false;
+
+  return paragraphs.every((paragraph) => {
+    const lines = paragraph
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l !== "");
+    if (lines.some(isBulletLine)) return false;
+    const words = wordCount(paragraph);
+    return words >= MINIMAL_PARAGRAPH_MIN_WORDS && words <= MINIMAL_PARAGRAPH_MAX_WORDS;
+  });
+}
+
 /**
  * Detection heuristic: does this pasted block have the STRUCTURAL shape
- * of raw Meta Ads Library copy — an emoji/checkmark bullet list, or a
- * short bare CTA line on its own (the rendered button text) — rather
- * than plain prose? Deliberately narrow and positive-signal-only (never
+ * of raw Meta Ads Library copy — an emoji/checkmark bullet list, a
+ * short bare CTA line on its own (the rendered button text), or a
+ * minimal short hook+body pair — rather than one undifferentiated
+ * block of prose? Deliberately narrow and positive-signal-only (never
  * "absence of labels" alone) so a short free-text note doesn't get
  * mis-routed here. Has no opinion on explicit field labels — the
  * caller (adParser.ts's parseAdExample router) checks those FIRST and
@@ -73,9 +122,11 @@ export function looksLikeAdsLibraryCopy(raw: string): boolean {
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l !== "");
-  if (lines.length < 2) return false;
-  if (lines.filter(isBulletLine).length >= 2) return true;
-  return isBareCtaLine(lines[lines.length - 1]);
+  if (lines.length >= 2) {
+    if (lines.filter(isBulletLine).length >= 2) return true;
+    if (isBareCtaLine(lines[lines.length - 1])) return true;
+  }
+  return looksLikeMinimalProseAd(trimmed);
 }
 
 /* ------------------------------- disclaimers -------------------------------- */
