@@ -100,9 +100,11 @@ import {
 }
 
 {
-  // Honesty: nothing recognizable in the text → every optional field
-  // stays absent, nothing invented.
-  const parsed = parseAdExample("just some notes with nothing recognizable in them at all");
+  // True honesty case: below the short-ad word floor, so this stays in
+  // "plain" mode (not native) — every optional field stays absent,
+  // nothing invented.
+  const parsed = parseAdExample("nothing recognizable here");
+  assert.equal(parsed.parseMode, "plain");
   assert.equal(parsed.hook, undefined);
   assert.equal(parsed.headline, undefined);
   assert.equal(parsed.cta, undefined);
@@ -112,6 +114,27 @@ import {
   assert.equal(parsed.landingPage, undefined);
   assert.deepEqual(parsed.detectedHooks, []);
   assert.deepEqual(parsed.detectedFormats, []);
+  assert.deepEqual(parsed.detectedOffers, []);
+  assert.deepEqual(parsed.detectedPositioning, []);
+  assert.deepEqual(parsed.detectedTrust, []);
+  assert.deepEqual(parsed.detectedBenefits, []);
+}
+
+{
+  // Short-ad-shaped honesty case: a one-line block within the short-ad
+  // word range now routes to "native" and gets the new first-sentence-
+  // defaults-to-hook treatment (a verbatim quote of what was pasted,
+  // never invented text) — but everything else STILL stays honestly
+  // absent, since nothing else in it is recognizable.
+  const parsed = parseAdExample("just some notes with nothing recognizable in them at all");
+  assert.equal(parsed.parseMode, "native");
+  assert.equal(parsed.hook, "just some notes with nothing recognizable in them at all");
+  assert.equal(parsed.headline, undefined);
+  assert.equal(parsed.cta, undefined);
+  assert.equal(parsed.offer, undefined);
+  assert.equal(parsed.format, undefined);
+  assert.equal(parsed.startDate, undefined);
+  assert.equal(parsed.landingPage, undefined);
   assert.deepEqual(parsed.detectedOffers, []);
   assert.deepEqual(parsed.detectedPositioning, []);
   assert.deepEqual(parsed.detectedTrust, []);
@@ -256,10 +279,18 @@ import {
 
 {
   // Longer text, but nothing recognizable at all — "empty", distinct
-  // from "malformed" (which is reserved for very short fragments).
+  // from "malformed" (which is reserved for very short fragments). Long
+  // enough (past the short-ad word ceiling, and a single undivided
+  // paragraph so the multi-paragraph signal doesn't apply either) that
+  // it stays in "plain" mode rather than getting the short-native-ad
+  // first-sentence-defaults-to-hook treatment.
   const parsed = parseAdExample(
-    "just some general notes about this competitor that don't map to any tracked category at all"
+    "just some general notes about this competitor that don't map to any tracked category at all, " +
+      "written as one long undivided paragraph with no particular structure, no bullets, no clear offer " +
+      "or call to action, nothing that reads as a headline or a hook, just a plain block of unrelated " +
+      "commentary that happens to run past a reasonable length for a short one or two line ad unit"
   );
+  assert.equal(parsed.parseMode, "plain");
   const completeness = computeAdCompleteness(parsed);
   assert.equal(completeness.status, "empty");
   assert.equal(completeness.signalCount, 0);
@@ -316,10 +347,19 @@ import {
 }
 
 {
-  // Plain unlabeled prose with no bullets/CTA-line -> "plain" (the
-  // original unlabeled-fallback path, unchanged).
-  const p = parseAdExample("just some notes with nothing recognizable in them at all");
+  // Plain unlabeled prose with no bullets/CTA-line, below the short-ad
+  // word floor -> "plain" (the original unlabeled-fallback path,
+  // unchanged).
+  const p = parseAdExample("nothing recognizable here");
   assert.equal(p.parseMode, "plain");
+}
+
+{
+  // A short (1-2 line), ad-plausible-length block with no bullets/CTA-
+  // line/labels -> "native" now, not "plain" — a short punchy sentence
+  // is a complete ad unit on its own, not a lesser one.
+  const p = parseAdExample("just some notes with nothing recognizable in them at all");
+  assert.equal(p.parseMode, "native");
 }
 
 {
@@ -342,14 +382,18 @@ import {
 }
 
 {
-  // A thin, single-sentence plain-mode ad genuinely has little to show
-  // — completeness should say so honestly (not claim "complete"), but
-  // with the softer evidence-category wording, never "Missing: Headline,
-  // CTA, Offer, Format" for text that was never going to have those.
+  // A thin, single-sentence short native ad genuinely has little to
+  // show beyond its default hook and one proof signal — completeness
+  // should say so honestly (not claim "complete"), but with the softer
+  // evidence-category wording, never "Missing: Headline, CTA, Offer,
+  // Format" for text that was never going to have those.
   const p = parseAdExample("Since 2021, AG1 has been the morning ritual Hugh Jackman relies on to start his day.");
   const c = computeAdCompleteness(p);
-  assert.equal(p.parseMode, "plain");
+  assert.equal(p.parseMode, "native");
+  assert.equal(p.hook, "Since 2021, AG1 has been the morning ritual Hugh Jackman relies on to start his day.");
   assert.equal(c.status, "partial");
+  assert.ok(c.detectedFields.includes("Hook"));
+  assert.ok(c.detectedFields.includes("Proof"));
   assert.ok(c.missingFields.includes("Explicit CTA"));
   assert.ok(!c.missingFields.includes("Headline"), "evidence-based checklist must not reuse the labeled-mode field names");
 }

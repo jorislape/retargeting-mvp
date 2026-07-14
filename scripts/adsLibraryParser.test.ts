@@ -34,19 +34,25 @@ import { computeAdCompleteness, parseAdExample, textForAnalysis } from "../modul
 }
 
 {
-  // Plain single-sentence prose — no bullets, no bare CTA line — must
-  // NOT be misrouted into the native pipeline. This is deliberate: a
-  // celebrity-endorsement one-liner has no hook/body split to make, so
-  // it's better served by the existing keyword-table fallback.
+  // A short (1-2 line), ad-plausible-length single sentence — no
+  // bullets, no bare CTA line — DOES count as a complete short ad unit.
+  // A single punchy sentence is exactly how a lot of real Ads Library
+  // copy reads (a celebrity-endorsement one-liner is a legitimate,
+  // complete ad, not a lesser one); see the extraction tests further
+  // down for the hook/positioning/trust inference this then enables.
   assert.equal(
     looksLikeAdsLibraryCopy("Since 2021, AG1 has been the morning ritual Hugh Jackman relies on to start his day."),
-    false
+    true
   );
   // A single line alone, even if it happens to BE a CTA phrase, isn't
-  // "structure" — nothing to split it from.
+  // "structure" — nothing to split it from, and it's too short (below
+  // the short-ad word floor) to be a complete unit on its own.
   assert.equal(looksLikeAdsLibraryCopy("Shop Now"), false);
   assert.equal(looksLikeAdsLibraryCopy(""), false);
   assert.equal(looksLikeAdsLibraryCopy("   "), false);
+  // Still correctly excludes two short junk fragments split across two
+  // lines/paragraphs — the word floor has real margin above this case.
+  assert.equal(looksLikeAdsLibraryCopy("asdf jkl.\n\nqwer tyui."), false);
 }
 
 /* ------------------------- minimal hook + body prose -------------------------- */
@@ -433,6 +439,120 @@ Learn More`;
   // No story field forced onto a pure bullet-list ad with no
   // first-person/timeline content in its hook paragraph.
   assert.equal(p.story, undefined);
+}
+
+/* ========================================================================= */
+/* Short native ads — one or two lines treated as complete ad units, with    */
+/* first-sentence-defaults-to-hook, positioning/benefit inference from short */
+/* unlabeled phrases, and disclaimer-only short blocks never getting a hook. */
+/* ========================================================================= */
+
+/* --------------------------- default hook, short ad --------------------------- */
+
+{
+  // A single punchy sentence is a complete short ad unit — the first
+  // sentence defaults to the hook even with nothing else recognizable.
+  const p = parseAdsLibraryExample("Millions of people start their day with this daily ritual.");
+  assert.equal(p.hook, "Millions of people start their day with this daily ritual.");
+}
+
+{
+  // A bare CTA line as the LAST line of the SAME paragraph (no blank
+  // line before it — a very common real paste shape for a short ad)
+  // must be extracted as the CTA, never left polluting the hook text.
+  const p = parseAdsLibraryExample("Feel lighter and more energized every single day.\nShop Now");
+  assert.equal(p.hook, "Feel lighter and more energized every single day.");
+  assert.equal(p.cta, "Shop Now");
+}
+
+/* ----------------- disclaimer-only short block: no hook default --------------- */
+
+{
+  // "Strong evidence it's only legal/disclaimer text" — the first-
+  // sentence-defaults-to-hook rule must NOT apply here.
+  const p = parseAdsLibraryExample("This statement has not been evaluated by the Food and Drug Administration.");
+  assert.equal(p.hook, undefined);
+  const c = computeAdCompleteness(p);
+  assert.equal(c.status, "empty");
+}
+
+/* --------------------- positioning inferred from short phrases ---------------- */
+
+{
+  // "daily foundational nutrition" hits no existing POSITIONING_TERMS
+  // keyword — it's inferred purely from being a short, non-personal,
+  // non-CTA, non-outcome-shaped fragment within a short ad.
+  const p = parseAdsLibraryExample("AG1 Next Gen is your daily foundational nutrition.\nMorning ritual, clinically tested.");
+  assert.ok(
+    p.detectedPositioning.some((x) => /daily foundational nutrition/i.test(x)),
+    `expected the positioning fallback to capture the tagline, got: ${JSON.stringify(p.detectedPositioning)}`
+  );
+  // The second line's "ritual"/"clinically tested" still resolve via
+  // the EXISTING keyword tables, unaffected by the new fallback.
+  assert.ok(p.detectedPositioning.includes("routine-based"));
+  assert.ok(p.detectedTrust.includes("clinical claims"));
+}
+
+/* ----------------------- benefits inferred from outcome phrasing -------------- */
+
+{
+  // "keep you supported" / "feel lighter" / "sleep better" — none of
+  // these hit BENEFIT_TERMS (skincare-oriented), but all read as a
+  // short, positive outcome statement.
+  const p = parseAdsLibraryExample(
+    "Our daily blend is designed to keep you supported all day.\nMany users feel lighter within days and sleep better at night."
+  );
+  assert.ok(p.detectedBenefits.some((b) => /keep you supported/i.test(b)));
+  assert.ok(p.detectedBenefits.some((b) => /feel lighter/i.test(b) && /sleep better/i.test(b)));
+}
+
+{
+  // A NEGATIVE outcome statement ("feel exhausted") must never be
+  // mislabeled as a benefit just because it shares the "feel + word"
+  // shape — conservative by construction: stays uncaptured rather than
+  // wrong.
+  const p = parseAdsLibraryExample("Most people feel exhausted by midday and struggle to stay focused without help.");
+  assert.deepEqual(p.detectedBenefits, []);
+  // It must ALSO not leak into the positioning fallback as a
+  // consolation prize — an outcome-shaped fragment stays uncaptured
+  // regardless of sentiment, never guessed into the wrong bucket.
+  assert.deepEqual(p.detectedPositioning, []);
+  // The sentence is still honestly the hook, though — nothing about
+  // rejecting the benefit/positioning guess removes the verbatim quote
+  // from view.
+  assert.match(p.hook ?? "", /feel exhausted/i);
+}
+
+/* -------- positioning fallback stays OFF for longer (non-short) native ads ---- */
+
+{
+  // The SAME short, tagline-shaped fragment ("Our daily essential.")
+  // embedded as a trailing sentence within a genuinely long, multi-
+  // paragraph story ad must NOT trigger the positioning fallback — that
+  // fallback is deliberately scoped to short ads only; a longer ad's
+  // leftover sentence is far more likely to be ordinary narrative than
+  // a tagline, and the existing conservative "no default bucket for
+  // prose" rule (proven in the earlier "prose-derived evidence never
+  // invents a category" test) must stay intact.
+  const longAdWithTaglineSentence =
+    "I used to struggle with low energy every single afternoon and nothing seemed to help long term, " +
+    "no matter how much coffee I drank or how early I went to bed the night before.\n\n" +
+    "I tried every trick in the book before finally finding something that actually worked for my body " +
+    "and my schedule, something I could stick with every single morning without it feeling like a chore.\n\n" +
+    "Our daily essential.\n\n" +
+    "Shop Now";
+  // Sanity: confirm this fixture is genuinely NOT short-ad-shaped
+  // (comfortably past the short-ad word ceiling), so the test is
+  // actually exercising the "longer ad" code path it claims to.
+  assert.ok(
+    longAdWithTaglineSentence.trim().split(/\s+/).filter(Boolean).length > 60,
+    "fixture must exceed the short-ad word ceiling for this test to be meaningful"
+  );
+  const p = parseAdsLibraryExample(longAdWithTaglineSentence);
+  assert.ok(
+    !p.detectedPositioning.some((x) => /our daily essential/i.test(x)),
+    "positioning fallback must not fire for a fragment inside a longer, non-short ad"
+  );
 }
 
 console.log("adsLibraryParser: all assertions passed");

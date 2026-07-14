@@ -133,11 +133,12 @@ modules/competitorDebrief/     # Competitor Debrief V1 — a second, CSV-free fl
   adsLibraryParser.ts # The native pipeline — structure-aware, not format-aware: real long-form
                   # story/testimonial ads (AG1/Huel/ColonBroom-style — an opening line, several
                   # testimonial paragraphs, sometimes a "Week 1... Week 4..." timeline) are just
-                  # as "Ads Library shaped" as a short bulleted one, so looksLikeAdsLibraryCopy
-                  # (positive-signal-only detection — emoji/checkmark bullet lists, a bare short
-                  # CTA line on its own, or 2+ genuine prose paragraphs within generous length
-                  # bounds; never "absence of labels" alone, never gated on length beyond
-                  # excluding an accidental multi-thousand-word document paste) + parseAdsLibraryExample
+                  # as "Ads Library shaped" as a short bulleted one, AND a single punchy one/two-
+                  # line sentence is a complete ad unit too (looksLikeShortNativeAd) — not gated
+                  # on length in EITHER direction. looksLikeAdsLibraryCopy's four signals: emoji/
+                  # checkmark bullet lists, a bare short CTA line on its own, 2+ genuine prose
+                  # paragraphs within generous length bounds, or 1-2 short lines within a narrower
+                  # word range (never "absence of labels" alone) + parseAdsLibraryExample
                   # (paragraph-split → drop disclaimer/legal/footnote/copyright paragraphs (kept
                   # verbatim in ignoredDisclaimers, never silently dropped) → infer hook/body from
                   # prose paragraphs → classify bullet LINES into offer/trust/benefit, and (the
@@ -150,9 +151,21 @@ modules/competitorDebrief/     # Competitor Debrief V1 — a second, CSV-free fl
                   # stays uncaptured) → story/narrative recognition: first-person testimonial
                   # paragraphs ("I used to...", "My journey...", "Since 2020...") and "Week N"/
                   # "Day N"/"Month N" timeline entries become verbatim `story` evidence instead of
-                  # being ignored or silently folded into `body` → same keyword-table scan over the
-                  # disclaimer-free text). No AI, no OCR — every field is still a verbatim quote,
-                  # a fixed regex match, or a keyword-table hit; "missing" is always preferred over
+                  # being ignored or silently folded into `body`; the FIRST prose paragraph always
+                  # defaults to `hook` unless it's disclaimer-shaped (isDisclaimerParagraph already
+                  # excludes it, so no separate carve-out was needed) → for a SHORT ad specifically
+                  # (isShortAd, computed from the disclaimer-free text), two more narrow, additive
+                  # fallbacks: a curated positive-outcome pattern ("keep you supported"/"feel
+                  # lighter"/"sleep better" — deliberately excludes negative/ambiguous outcomes like
+                  # "feel exhausted", which stay honestly uncaptured rather than mislabeled) becomes
+                  # a benefit even with no BENEFIT_TERMS keyword hit, and a short non-personal,
+                  # non-CTA, non-outcome-shaped fragment ("daily foundational nutrition") becomes
+                  # positioning by elimination — both OFF by default for longer/multi-paragraph ads,
+                  # where the existing conservative "no default bucket for prose" rule stays intact
+                  # → same keyword-table scan over the disclaimer-free text). No AI, no OCR — every
+                  # field is still a verbatim quote, a fixed regex match, or a keyword-table hit
+                  # (or, for the two short-ad fallbacks, a narrow structural/lexical pattern with a
+                  # curated word list — never open-ended); "missing" is always preferred over
                   # a guess, which is why unmatched prose sentences outside a recognized story
                   # paragraph stay uncaptured rather than defaulting to some category
   engine.ts       # generateCompetitorDebrief(input) — templated, not an LLM call (same seam
