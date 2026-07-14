@@ -24,9 +24,94 @@ import {
   processPageDump,
   selectRepresentatives,
   stripChromeLines,
+  stripLeadingHeader,
 } from "../modules/competitorDebrief/pageDump.ts";
 import { computeAdCompleteness, parseAdExample } from "../modules/competitorDebrief/adParser.ts";
 import type { AdCompleteness } from "../modules/competitorDebrief/adParser.ts";
+
+/* ============================ Stage A0: stripLeadingHeader ============================== */
+
+{
+  // Each curated header pattern individually.
+  assert.equal(stripLeadingHeader("Meta Ads Library").headerLinesRemoved, 1);
+  assert.equal(stripLeadingHeader("Ads Library").headerLinesRemoved, 1);
+  assert.equal(stripLeadingHeader("Results: ~14,000").headerLinesRemoved, 1);
+  assert.equal(stripLeadingHeader("Results ~14,000").headerLinesRemoved, 1);
+  assert.equal(stripLeadingHeader("14,000 results").headerLinesRemoved, 1);
+  assert.equal(stripLeadingHeader("Filters").headerLinesRemoved, 1);
+  assert.equal(stripLeadingHeader("Search").headerLinesRemoved, 1);
+  assert.equal(stripLeadingHeader("Search by keyword or advertiser").headerLinesRemoved, 1);
+  assert.equal(stripLeadingHeader("Ad category").headerLinesRemoved, 1);
+}
+
+{
+  // The realistic shape: page title, then the page/profile name (an
+  // unrecognized bare "label" line sandwiched between two recognized
+  // header anchors), then the results count and filter bar, all with
+  // no blank lines — exactly how a real copy-paste reads. Everything
+  // through "Search" is preamble; the first real ad line survives.
+  const dump = ["Meta Ads Library", "Nike", "Results: ~14,000", "Filters", "Search", "Just do it. New drops weekly.", "Shop Now"].join("\n");
+  const result = stripLeadingHeader(dump);
+  assert.equal(result.headerLinesRemoved, 5, "Meta Ads Library, Nike, Results, Filters, Search");
+  assert.equal(result.cleaned.trim(), "Just do it. New drops weekly.\nShop Now");
+  assert.ok(!result.cleaned.includes("Nike"));
+  assert.ok(!result.cleaned.includes("Meta Ads Library"));
+  assert.ok(!result.cleaned.includes("Results"));
+}
+
+{
+  // Negative control: a dump that does NOT open with any recognized
+  // header pattern is returned completely untouched — this must never
+  // fire based on position alone, only on recognized content.
+  const dump = "Struggling with dry skin? Our balm fixes that fast.\nShop Now\n\nNew to skincare? Start simple.\nLearn More";
+  const result = stripLeadingHeader(dump);
+  assert.equal(result.headerLinesRemoved, 0);
+  assert.equal(result.cleaned, dump);
+}
+
+{
+  // A short ad hook that happens to come first, with NO header anchor
+  // anywhere before it, must never be mistaken for a page-name label —
+  // the "sawHeaderAnchor" gate means the label-sweep rule never
+  // activates without a real header match first.
+  const dump = "Free shipping today only\nShop Now";
+  const result = stripLeadingHeader(dump);
+  assert.equal(result.headerLinesRemoved, 0);
+  assert.equal(result.cleaned, dump);
+}
+
+{
+  // A real ad hook ending in sentence punctuation, immediately after a
+  // recognized header line, is NOT swept up as a label — the
+  // punctuation is what distinguishes a page/profile name ("Nike") from
+  // real ad copy ("Freedom. Try it today.").
+  const dump = "Meta Ads Library\nFreedom. Try it today.\nShop Now";
+  const result = stripLeadingHeader(dump);
+  assert.equal(result.headerLinesRemoved, 1, "only the Meta Ads Library line is header content");
+  assert.equal(result.cleaned.trim(), "Freedom. Try it today.\nShop Now");
+}
+
+{
+  // Consecutive-label safety cap: at most 2 unrecognized short label
+  // lines in a row are swept, even inside an active header run — a
+  // 3rd one in a row is treated as real content instead, bounding how
+  // much a misfire could ever eat.
+  const dump = ["Meta Ads Library", "Label One", "Label Two", "Label Three", "Shop Now"].join("\n");
+  const result = stripLeadingHeader(dump);
+  assert.equal(result.headerLinesRemoved, 3, "Meta Ads Library + 2 labels, capped");
+  assert.ok(result.cleaned.includes("Label Three"));
+}
+
+{
+  // Only ever scans from the very start — a header-shaped line
+  // appearing LATER in the document (e.g. inside a second ad's own
+  // chrome) is never touched by this function; that's stripChromeLines'
+  // job, run separately afterward in processPageDump.
+  const dump = "Struggling with dry skin? Our balm fixes that fast.\nShop Now\n\nFilters";
+  const result = stripLeadingHeader(dump);
+  assert.equal(result.headerLinesRemoved, 0);
+  assert.ok(result.cleaned.includes("Filters"));
+}
 
 /* ============================== Stage A: stripChromeLines ============================== */
 
@@ -462,13 +547,21 @@ function completenessFor(raw: string): AdCompleteness {
   const dump = [goodAd1, chromeOnlyFragment, strayFragment, goodAd2].join("\n\n");
 
   const result = processPageDump(dump);
-  // The chrome-only fragment reduces to nothing after stripping and is
-  // dropped before it ever becomes a candidate.
-  assert.equal(result.candidates.length, 3, "2 good ads + 1 stray malformed fragment, chrome-only fragment dropped entirely");
-  const malformed = result.candidates.filter((c) => c.completeness.status === "malformed");
-  assert.equal(malformed.length, 1);
-  assert.ok(!malformed[0].isRepresentative);
+  // The chrome-only fragment reduces to nothing after stripping and
+  // never reaches candidate status. The stray "..." fragment DOES reach
+  // boundary detection but is malformed (no hook/headline/CTA/offer/
+  // body) and, per the hardening pass, is filtered out before it can
+  // ever become a candidate too — a UI/junk fragment must never be
+  // presented to the user as something to review as an ad. Only the 2
+  // good ads remain.
+  assert.equal(result.candidates.length, 2, "only the 2 good ads become candidates — both fragments are filtered out");
+  assert.ok(result.candidates.every((c) => c.completeness.status !== "malformed" && c.completeness.status !== "empty"));
   assert.equal(result.candidates.filter((c) => c.isRepresentative).length, 2);
+  // Only the stray "..." fragment counts toward this warning — the
+  // chrome-only fragment reduced to an empty string and was dropped
+  // before ever reaching boundary detection, so it was never a segment
+  // to begin with.
+  assert.ok(result.warnings.some((w) => w.code === "non-ad-fragments-skipped" && w.message.includes("1 fragment")));
 }
 
 /* --- (f) no clear boundaries at all --- */
@@ -508,6 +601,75 @@ function completenessFor(raw: string): AdCompleteness {
   assert.equal(result.candidates.length, 12);
   assert.equal(result.candidates.filter((c) => c.isRepresentative).length, MAX_REPRESENTATIVES);
   assert.ok(result.warnings.some((w) => w.code === "capped-at-max"));
+}
+
+/* ================ regression: real Ads Library dump beginning with Meta UI ================ */
+/* Requirement: a live-tested real-world issue — the page-dump parser was treating leading    */
+/* Ads Library page chrome ("Meta Ads Library", the competitor page name, "Results: ~14,000") */
+/* as ad candidates. This fixture reproduces that exact shape: page title, page name, results  */
+/* count, filter/search bar, then two real ad cards, all with no blank lines (matching real     */
+/* DOM copy-paste behavior). Verified against the module's actual output before writing these   */
+/* assertions, not hand-traced.                                                                 */
+
+const REAL_ADS_LIBRARY_DUMP = [
+  "Meta Ads Library",
+  "Nike",
+  "Results: ~14,000",
+  "Filters",
+  "Search",
+  "Sponsored",
+  "Nike",
+  "Just do it. New drops are here — shop the latest collection before it sells out.",
+  "Shop Now",
+  "Sponsored",
+  "Nike",
+  "Train like a pro. Our newest running shoe is built for speed and comfort.",
+  "Shop Now",
+].join("\n");
+
+{
+  // Without a competitor name provided (the harder, more general case
+  // — relies solely on stripLeadingHeader's structural preamble skip,
+  // not the exact-match competitor-name rule).
+  const result = processPageDump(REAL_ADS_LIBRARY_DUMP);
+
+  const noneAreJustHeaderText = result.candidates.every((c) => {
+    const t = c.raw.trim();
+    return t !== "Meta Ads Library" && t !== "Nike" && !/^results?\s*:?\s*~?[\d,]+/i.test(t);
+  });
+  assert.ok(noneAreJustHeaderText, "no candidate is exactly the header text itself");
+  assert.ok(
+    !result.candidates.some((c) => c.raw.trim() === "Meta Ads Library"),
+    "Meta Ads Library must never become its own candidate"
+  );
+  assert.ok(
+    !result.candidates.some((c) => c.raw.trim() === "Nike"),
+    "the bare page name must never become its own candidate"
+  );
+  assert.ok(
+    !result.candidates.some((c) => /^results?\s*:?\s*~?[\d,]+/i.test(c.raw.trim())),
+    "the results count must never become its own candidate"
+  );
+  // The first candidate is the first real advertisement.
+  assert.ok(result.candidates.length > 0, "at least one real ad must be found");
+  assert.ok(
+    result.candidates[0].raw.includes("Just do it"),
+    "the first candidate must be the first real ad, not page chrome"
+  );
+  assert.ok(result.candidates[0].parsed.cta, "the first candidate must have a recognizable CTA");
+}
+
+{
+  // With the competitor name provided (the realistic, full-form usage
+  // — the form already requires a competitor name before "Generate"
+  // is enabled) — both ads come back completely clean, including the
+  // per-card page-name chrome the leading-header sweep alone can't
+  // reach on later cards.
+  const result = processPageDump(REAL_ADS_LIBRARY_DUMP, "Nike");
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.candidates[0].raw, "Just do it. New drops are here — shop the latest collection before it sells out.\nShop Now");
+  assert.equal(result.candidates[1].raw, "Train like a pro. Our newest running shoe is built for speed and comfort.\nShop Now");
+  assert.ok(result.candidates.every((c) => !c.raw.includes("Meta Ads Library") && c.raw.trim() !== "Nike"));
 }
 
 console.log("pageDump: all assertions passed");

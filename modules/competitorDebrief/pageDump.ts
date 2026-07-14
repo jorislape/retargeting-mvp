@@ -20,6 +20,15 @@ import { isBareCtaLine } from "./adsLibraryParser.ts";
  *
  * Pipeline (each stage is a separate, independently testable pure
  * function — no I/O, no randomness, no external calls):
+ *   A0. stripLeadingHeader — ignore everything before the first real ad
+ *                             card: the "Meta Ads Library" page title,
+ *                             results count, filter/search bar, and the
+ *                             page/profile name sandwiched among them.
+ *                             Only ever scans from the very start of the
+ *                             paste and stops at the first line that
+ *                             doesn't look like page header content — a
+ *                             dump that doesn't open with recognized
+ *                             header content is left untouched.
  *   A. stripChromeLines    — remove known Meta Ads Library UI chrome
  *                             (curated exact/near-exact patterns only;
  *                             never "repeats a lot, so strip it")
@@ -56,6 +65,17 @@ import { isBareCtaLine } from "./adsLibraryParser.ts";
  *                             bare boolean) surfaced in processPageDump's
  *                             result.
  *
+ * processPageDump's orchestration also enforces one hard rule after
+ * parsing: a segment with no hook, no headline, no CTA, no offer, and
+ * no other recognizable ad body (computeAdCompleteness's "malformed" or
+ * "empty" status — reused, not reimplemented) never becomes a
+ * PageDumpCandidate at all — a leftover UI/header fragment must never
+ * be presented to the user as something to review as an ad. The one
+ * exception: if EVERY segment would be filtered out, nothing is
+ * dropped — the user must never be left with a blank review state just
+ * because the only thing found was thin (this is what keeps the
+ * existing "no clear boundaries" single-block floor behavior intact).
+ *
  * Stage G (user review before generation) is NOT in this file — it's
  * the caller's job (CompetitorDebriefPanel.tsx) to render these
  * candidates, let the user include/exclude/edit them, and only then
@@ -63,6 +83,105 @@ import { isBareCtaLine } from "./adsLibraryParser.ts";
  * handleGenerate() payload construction the existing "Paste ads" flow
  * already uses. Nothing here ever auto-submits.
  */
+
+/* ------------------------------------------------------------------ */
+/* Stage A0: leading page-header removal                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Curated patterns for the page-level HEADER/preamble a raw Ads
+ * Library copy-paste carries before the first real ad card: the "Meta
+ * Ads Library" page title, the results count, and the filter/search
+ * bar. Distinct from CHROME_LINE_PATTERNS below (which repeats before
+ * EVERY ad card) — these appear ONCE, only at the very top of the
+ * page, which is exactly what stripLeadingHeader() below uses them
+ * for. Deliberately conservative and specific (not a bare "search" or
+ * "filter" keyword match anywhere in the text) — these only matter as
+ * anchors for the LEADING scan below, never applied mid-document.
+ */
+const HEADER_LINE_PATTERNS: RegExp[] = [
+  /^\s*meta\s+ads?\s+library\s*$/i,
+  /^\s*ads?\s+library\s*$/i,
+  // "Results: ~14,000" / "Results ~14,000" / "~14,000 results"
+  /^\s*results?\s*:?\s*~?[\d][\d,]*\s*(?:results?)?\s*$/i,
+  /^\s*~?[\d][\d,]*\s+results?\s*$/i,
+  /^\s*filters?\s*$/i,
+  /^\s*search\s*$/i,
+  /^\s*search\s+by\s+keyword\s+or\s+advertiser\b.*$/i,
+  /^\s*ad\s*category\s*$/i,
+];
+
+/** How many consecutive short, unrecognized "label" lines (e.g. the
+ *  page/profile name sandwiched between "Meta Ads Library" and
+ *  "Results: ...") can be swept into the preamble in a row before
+ *  requiring another real header-pattern match to continue — a small,
+ *  bounded safety net so a misfire can't eat an unbounded amount of
+ *  real ad content. */
+const MAX_CONSECUTIVE_PREAMBLE_LABELS = 2;
+const MAX_PREAMBLE_LABEL_WORDS = 6;
+
+export interface LeadingHeaderStripResult {
+  cleaned: string;
+  headerLinesRemoved: number;
+}
+
+/**
+ * "Before boundary detection, ignore everything before the first
+ * actual ad card." Walks lines from the very start ONLY — never
+ * touches anything after the first line that doesn't fit the page-
+ * header shape. A leading line is treated as header/preamble when it:
+ *   - is blank, or
+ *   - matches a curated HEADER_LINE_PATTERNS entry, or
+ *   - is a short (<=6 words), unpunctuated "label" line — e.g. the
+ *     page/profile name — but ONLY once at least one real header
+ *     pattern has already matched, and only up to
+ *     MAX_CONSECUTIVE_PREAMBLE_LABELS in a row.
+ * The moment a line doesn't fit, the preamble ends there — that line
+ * and everything after it proceeds to normal chrome-stripping and
+ * boundary detection completely unchanged. A dump that doesn't open
+ * with any recognized header pattern is returned untouched (0 lines
+ * removed) — this never scans or alters anything past the leading run.
+ */
+export function stripLeadingHeader(text: string): LeadingHeaderStripResult {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  let i = 0;
+  let removed = 0;
+  let sawHeaderAnchor = false;
+  let consecutiveLabels = 0;
+
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    if (trimmed === "") {
+      i++;
+      continue;
+    }
+
+    if (HEADER_LINE_PATTERNS.some((re) => re.test(trimmed))) {
+      sawHeaderAnchor = true;
+      consecutiveLabels = 0;
+      removed++;
+      i++;
+      continue;
+    }
+
+    const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+    const looksLikeLabel =
+      wordCount > 0 &&
+      wordCount <= MAX_PREAMBLE_LABEL_WORDS &&
+      !/[.!?]$/.test(trimmed) &&
+      !isBareCtaLine(trimmed);
+    if (sawHeaderAnchor && looksLikeLabel && consecutiveLabels < MAX_CONSECUTIVE_PREAMBLE_LABELS) {
+      consecutiveLabels++;
+      removed++;
+      i++;
+      continue;
+    }
+
+    break;
+  }
+
+  return { cleaned: lines.slice(i).join("\n"), headerLinesRemoved: removed };
+}
 
 /* ------------------------------------------------------------------ */
 /* Stage A: UI chrome filtering                                        */
@@ -433,7 +552,12 @@ export function selectRepresentatives(
 /* ------------------------------------------------------------------ */
 
 export interface PageDumpWarning {
-  code: "no-clear-boundaries" | "possible-variants-grouped" | "capped-at-max" | "chrome-removed";
+  code:
+    | "no-clear-boundaries"
+    | "possible-variants-grouped"
+    | "capped-at-max"
+    | "chrome-removed"
+    | "non-ad-fragments-skipped";
   message: string;
 }
 
@@ -465,14 +589,33 @@ export interface PageDumpResult {
  * it never changes boundary detection, grouping, or selection.
  */
 export function processPageDump(rawInput: string, competitorName?: string): PageDumpResult {
-  const { cleaned, removedLineCount } = stripChromeLines(rawInput, competitorName);
-  const segments = detectAdBoundaries(cleaned).filter((s) => s.raw.trim() !== "");
+  const { cleaned: withoutHeader, headerLinesRemoved } = stripLeadingHeader(rawInput);
+  const { cleaned, removedLineCount } = stripChromeLines(withoutHeader, competitorName);
+  const allSegments = detectAdBoundaries(cleaned).filter((s) => s.raw.trim() !== "");
+
+  const allParsed = allSegments.map((s) => parseAdExample(s.raw));
+  const allCompleteness = allParsed.map((p) => computeAdCompleteness(p));
+
+  // "Never create an AdBlock if: no hook, no headline, no CTA, no
+  // offer, no recognizable ad body" — a segment whose completeness
+  // status is "malformed" or "empty" (computeAdCompleteness's own
+  // categories for exactly this: zero detected evidence anywhere)
+  // never becomes a candidate. The one exception: if filtering would
+  // leave NOTHING at all, keep everything unfiltered instead — the
+  // user must never be left with a blank review state just because
+  // the only thing found (e.g. the Tier-3 "no boundaries" single
+  // block) happens to be thin.
+  const hasRecognizableContent = (c: AdCompleteness) => c.status !== "malformed" && c.status !== "empty";
+  const keepFlags = allCompleteness.map(hasRecognizableContent);
+  const useFilter = keepFlags.some(Boolean);
+
+  const segments = useFilter ? allSegments.filter((_, i) => keepFlags[i]) : allSegments;
+  const parsedList = useFilter ? allParsed.filter((_, i) => keepFlags[i]) : allParsed;
+  const completenessList = useFilter ? allCompleteness.filter((_, i) => keepFlags[i]) : allCompleteness;
+  const nonAdFragmentsSkipped = useFilter ? allSegments.length - segments.length : 0;
 
   const texts = segments.map((s) => s.raw);
   const { groupIdByIndex, groups } = groupPossibleVariants(texts);
-
-  const parsedList = texts.map((t) => parseAdExample(t));
-  const completenessList = parsedList.map((p) => computeAdCompleteness(p));
   const selection = selectRepresentatives(completenessList, groupIdByIndex);
 
   const candidates: PageDumpCandidate[] = segments.map((seg, i) => ({
@@ -510,12 +653,20 @@ export function processPageDump(rawInput: string, competitorName?: string): Page
     });
   }
 
-  if (removedLineCount > 0) {
+  if (nonAdFragmentsSkipped > 0) {
     warnings.push({
-      code: "chrome-removed",
-      message: `Removed ${removedLineCount} likely interface line${removedLineCount === 1 ? "" : "s"} (e.g. "Sponsored", "Active", "Library ID") before splitting into ads.`,
+      code: "non-ad-fragments-skipped",
+      message: `Skipped ${nonAdFragmentsSkipped} fragment${nonAdFragmentsSkipped === 1 ? "" : "s"} with no recognizable ad content (hook, headline, CTA, offer, or body) — likely leftover page interface text.`,
     });
   }
 
-  return { candidates, variantGroups: groups, chromeLinesRemoved: removedLineCount, warnings };
+  const totalChromeLinesRemoved = headerLinesRemoved + removedLineCount;
+  if (totalChromeLinesRemoved > 0) {
+    warnings.push({
+      code: "chrome-removed",
+      message: `Removed ${totalChromeLinesRemoved} likely interface line${totalChromeLinesRemoved === 1 ? "" : "s"} (e.g. "Meta Ads Library", "Sponsored", "Active", "Library ID") before splitting into ads.`,
+    });
+  }
+
+  return { candidates, variantGroups: groups, chromeLinesRemoved: totalChromeLinesRemoved, warnings };
 }
