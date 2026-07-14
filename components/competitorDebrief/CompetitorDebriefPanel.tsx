@@ -461,7 +461,7 @@ export function CompetitorDebriefPanel() {
 
   // "Return to the raw dump and reprocess it" — goes back to the
   // editable textarea without touching pageDumpText or the current
-  // blocks; re-clicking "Process page" replaces blocks fresh, same as
+  // blocks; re-clicking "Extract ads" replaces blocks fresh, same as
   // re-clicking "Parse ads" already does for the manual flow.
   function handleEditRawPageDump() {
     setPageDumpStats(null);
@@ -524,7 +524,7 @@ export function CompetitorDebriefPanel() {
 
   // Live "about to process" preview for the page-dump textarea —
   // mirrors liveAdCount above; the actual candidates only appear once
-  // "Process page" is clicked.
+  // "Extract ads" is clicked.
   const livePageDumpCharCount = pageDumpText.length;
 
   // Grouped rendering, block indexing, and the summary-bar live stats
@@ -699,7 +699,7 @@ export function CompetitorDebriefPanel() {
               {(
                 [
                   ["individual", "Paste individual ads"],
-                  ["pageDump", "Paste full Ads Library page"],
+                  ["pageDump", "Ads Library page"],
                 ] as const
               ).map(([mode, label]) => (
                 <button
@@ -763,7 +763,14 @@ export function CompetitorDebriefPanel() {
           )}
 
           {inputMode === "pageDump" && (
-            <div>
+            // A direct mt-* here overrides (not adds to) the parent's
+            // space-y-4 gap — Tailwind v4's space-y uses a zero-
+            // specificity :where() selector, so this value IS the full
+            // gap, not an addition on top of 1rem. mt-6 (1.5rem) nudges
+            // it slightly past the individual-mode section's default
+            // 1rem, since this section's denser content (an explainer
+            // paragraph plus the textarea) reads as tighter otherwise.
+            <div className="mt-6">
               {pageDumpStats === null ? (
                 <>
                   <label className={`${fieldLabel} mb-1.5 block`} htmlFor="page-dump-paste">
@@ -780,7 +787,7 @@ export function CompetitorDebriefPanel() {
                     id="page-dump-paste"
                     rows={9}
                     className={`${inputBase} resize-y`}
-                    placeholder="Paste the entire copied page here…"
+                    placeholder="Paste everything copied from Meta Ads Library…"
                     value={pageDumpText}
                     onChange={(e) => setPageDumpText(e.target.value)}
                   />
@@ -796,7 +803,7 @@ export function CompetitorDebriefPanel() {
                       disabled={pageDumpText.trim() === ""}
                       onClick={handleProcessPageDump}
                     >
-                      Process page
+                      Extract ads
                     </button>
                   </div>
                 </>
