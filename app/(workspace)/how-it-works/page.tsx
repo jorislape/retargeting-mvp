@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { DownloadSampleCsvButton } from "@/components/debrief/DownloadSampleCsvButton";
 import {
+  AlertTriangleIcon,
   ArrowIcon,
   FileTextIcon,
   FlaskIcon,
+  GaugeIcon,
   SparklesIcon,
 } from "@/components/ui/icons";
 import {
@@ -66,6 +69,13 @@ const RULES = [
     detail:
       "If there are no creative notes and no format signal in your ad names, the memo says \"metrics only — angle unknown\" instead of inventing a creative story.",
   },
+];
+
+const LIMITATIONS = [
+  "Competitor reads only cover what you paste in as text. An image-only ad with no caption or on-image copy pasted in gives the engine nothing to read.",
+  "The same applies to video-only ads — there's no video analysis. If the only signal is a script or on-screen text you transcribe yourself, paste that in.",
+  "Mixed-media meaning (what an image and its caption communicate together) isn't inferred — only the text you actually paste is considered.",
+  "There's no automatic Meta Ads Library fetching. Every competitor ad, URL, and note is something you paste in yourself.",
 ];
 
 export default function HowItWorksPage() {
@@ -139,6 +149,73 @@ export default function HowItWorksPage() {
           </Link>{" "}
           from example data — what you see there is exactly what your CSV
           produces.
+        </p>
+      </section>
+
+      {/* Check the math yourself */}
+      <section className={`animate-rise mt-12 ${card} p-5 sm:p-6`} style={{ animationDelay: "420ms" }}>
+        <h2 className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight text-white">
+          <span className={`h-7 w-7 shrink-0 ${iconChip}`}>
+            <FileTextIcon className="h-3.5 w-3.5" />
+          </span>
+          Check the math yourself
+        </h2>
+        <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-zinc-400">
+          Download the exact CSV behind the{" "}
+          <Link
+            href="/sample"
+            className="rounded-sm text-zinc-300 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60"
+          >
+            sample report
+          </Link>
+          . Compute the spend gate, the median, and the winner/loser split
+          yourself with the rules above, then compare against what the
+          sample report shows. It should match exactly — that&rsquo;s the
+          same check you can run on your own CSV once you upload it.
+        </p>
+        <DownloadSampleCsvButton className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-semibold text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60" />
+      </section>
+
+      {/* Current limitations */}
+      <section className="animate-rise mt-12" style={{ animationDelay: "480ms" }}>
+        <p className={eyebrow}>Current limitations</p>
+        <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
+          What this doesn&apos;t do yet
+        </h2>
+        <div className={`mt-4 ${card} divide-y divide-white/[0.06]`}>
+          {LIMITATIONS.map((limitation) => (
+            <div key={limitation} className="flex items-start gap-3 px-5 py-4">
+              <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              <p className="text-[13px] leading-relaxed text-zinc-400">
+                {limitation}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Roadmap honesty */}
+      <section className={`animate-rise mt-12 ${card} p-5 sm:p-6`} style={{ animationDelay: "540ms" }}>
+        <h2 className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight text-white">
+          <span className={`h-7 w-7 shrink-0 ${iconChip}`}>
+            <GaugeIcon className="h-3.5 w-3.5" />
+          </span>
+          Where this is going
+        </h2>
+        <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-zinc-400">
+          Today, Debrief is a deterministic decision-support system — fixed
+          rules, no model in the loop, nothing stored between visits. The
+          direction is a learning system: one that remembers the structured
+          learnings you record from each debrief and uses them to help
+          prioritize what to test next. That&rsquo;s not built yet, and
+          nothing about the current flow depends on it — this page and{" "}
+          <Link
+            href="/security"
+            className="rounded-sm text-zinc-300 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60"
+          >
+            /security
+          </Link>{" "}
+          will be updated before anything in that direction ships.
         </p>
       </section>
 
