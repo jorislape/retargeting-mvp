@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { competitorName, adsLibraryUrl, websiteUrl, observations, exampleCount, adTexts } =
+  const { competitorName, adsLibraryUrl, websiteUrl, observations, exampleCount, adTexts, internalLearningsText } =
     body as Record<string, unknown>;
 
   if (typeof competitorName !== "string" || competitorName.trim() === "") {
@@ -170,6 +170,14 @@ export async function POST(request: NextRequest) {
     ? adTexts.filter((t): t is string => typeof t === "string" && t.trim() !== "").slice(0, MAX_AD_TEXTS)
     : undefined;
 
+  // Internal Learnings MVP — optional, manual input only. Same
+  // advisory-only treatment as observations/adTexts: an oversized value
+  // is trimmed rather than failing the request, since this is a
+  // best-effort input that shouldn't be able to break the debrief.
+  const MAX_LEARNINGS_CHARS = 5_000;
+  const normalizedInternalLearningsText =
+    typeof internalLearningsText === "string" ? internalLearningsText.slice(0, MAX_LEARNINGS_CHARS) : undefined;
+
   const debrief = generateCompetitorDebrief({
     competitorName,
     adsLibraryUrl: normalizedAdsLibraryUrl,
@@ -180,6 +188,7 @@ export async function POST(request: NextRequest) {
     // absent or malformed value just falls back to no count shown.
     exampleCount: typeof exampleCount === "number" && exampleCount > 0 ? exampleCount : undefined,
     adTexts: normalizedAdTexts,
+    internalLearningsText: normalizedInternalLearningsText,
   });
 
   return ok({ ok: true, debrief });

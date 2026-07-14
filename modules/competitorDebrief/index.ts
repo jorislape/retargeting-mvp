@@ -21,3 +21,13 @@ export {
   type ParsedAdExample,
 } from "./adParser";
 export { looksLikeAdsLibraryCopy } from "./adsLibraryParser";
+export {
+  applyInternalLearnings,
+  parseInternalLearnings,
+  parseLearningLine,
+  termsOverlap,
+  type InternalLearningNote,
+  type InternalLearningsSummary,
+  type LearningOutcome,
+  type ParsedLearning,
+} from "./internalLearnings";

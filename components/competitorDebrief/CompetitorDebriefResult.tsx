@@ -1,7 +1,24 @@
-import type { CompetitorDebrief, CompetitorDebriefTest } from "@/modules/competitorDebrief";
+import type { CompetitorDebrief, CompetitorDebriefTest, LearningOutcome } from "@/modules/competitorDebrief";
 import { btnSecondary, card, cardNested, eyebrow } from "@/components/ui/theme";
 import { AlertTriangleIcon, ArrowIcon, PrinterIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/ui/brand";
+
+/** Mirrors CompetitorDebriefPanel's LEARNING_OUTCOME_COPY — kept as a
+ *  small local duplicate rather than a shared import since this is
+ *  purely a display-styling map (4 colors), not shared logic. */
+const LEARNING_OUTCOME_COPY: Record<LearningOutcome, { label: string; className: string }> = {
+  worked: { label: "Worked", className: "border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300" },
+  failed: { label: "Failed", className: "border-red-500/30 bg-red-500/[0.08] text-red-300" },
+  avoid: { label: "Avoid", className: "border-amber-500/30 bg-amber-500/[0.08] text-amber-300" },
+  learning: { label: "Learning", className: "border-accent/30 bg-accent/[0.08] text-accent-soft" },
+  unknown: { label: "Unrecognized", className: "border-white/10 bg-white/[0.03] text-zinc-500" },
+};
+
+const INTERNAL_LEARNING_NOTE_CLASS: Record<string, string> = {
+  "builds-on": "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-300",
+  adjusted: "border-amber-500/25 bg-amber-500/[0.06] text-amber-300",
+  "avoids-failed": "border-amber-500/25 bg-amber-500/[0.06] text-amber-300",
+};
 
 /** Section-title treatment shared on screen (`eyebrow`) and in print
  *  (`.print-section-label` — small caps, print-accent ink, a thin
@@ -104,6 +121,16 @@ function TestCard({ test, index }: { test: CompetitorDebriefTest; index: number 
       <p className="print-only print-accent text-[10px] font-bold uppercase tracking-[0.08em]">
         Test {index + 1}
       </p>
+      {test.internalLearningNote && (
+        <div
+          className={`min-w-0 rounded-lg border p-2 text-[11px] leading-relaxed ${INTERNAL_LEARNING_NOTE_CLASS[test.internalLearningNote.kind]}`}
+        >
+          <p className="font-semibold">{test.internalLearningNote.label}</p>
+          <p className="mt-0.5 min-w-0 max-w-prose break-words opacity-90">
+            {test.internalLearningNote.explanation}
+          </p>
+        </div>
+      )}
       <TestGroup label="Hypothesis" lines={[{ value: test.hypothesis }]} />
       <TestGroup
         label="Test"
@@ -120,6 +147,39 @@ function TestCard({ test, index }: { test: CompetitorDebriefTest; index: number 
         ]}
       />
       <TestGroup label="Learn" lines={[{ value: test.whatYoullLearn }]} />
+    </div>
+  );
+}
+
+/** Its own section, deliberately between competitor evidence and the
+ *  recommended tests — requirement: clearly separate competitor
+ *  evidence / internal learnings / recommended next move. Shown only
+ *  when the user actually pasted something (debrief.internalLearnings
+ *  is null otherwise) — never a forced empty section. */
+function InternalLearningsConsidered({ debrief }: { debrief: CompetitorDebrief }) {
+  if (!debrief.internalLearnings || debrief.internalLearnings.items.length === 0) return null;
+  return (
+    <div className="min-w-0 space-y-2">
+      <p className={sectionLabel}>Internal learnings considered</p>
+      <p className="text-[11px] leading-relaxed text-zinc-500">
+        Your team&rsquo;s own pasted context — used only to adjust which tests are
+        recommended below, never to infer performance beyond what you entered.
+      </p>
+      <div className={`${cardNested} print-avoid-break min-w-0 space-y-1.5 p-4`}>
+        {debrief.internalLearnings.items.map((learning, i) => {
+          const copy = LEARNING_OUTCOME_COPY[learning.outcome];
+          return (
+            <div key={i} className="flex min-w-0 items-start gap-2 text-xs">
+              <span
+                className={`shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium ${copy.className}`}
+              >
+                {copy.label}
+              </span>
+              <span className="min-w-0 max-w-prose break-words text-zinc-300">{learning.text}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -285,6 +345,8 @@ export function CompetitorDebriefResult({
               </div>
             </div>
           )}
+
+          <InternalLearningsConsidered debrief={debrief} />
 
           {debrief.nextTests.length > 0 && (
             <div className="min-w-0 space-y-2">

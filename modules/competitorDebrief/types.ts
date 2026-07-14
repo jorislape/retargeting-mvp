@@ -1,3 +1,5 @@
+import type { InternalLearningNote, InternalLearningsSummary } from "./internalLearnings.ts";
+
 /**
  * Competitor Debrief V1 — domain types.
  *
@@ -35,6 +37,12 @@ export interface CompetitorDebriefInput {
    *  section to be non-empty; omitted or fewer than 2 entries means
    *  those sections stay empty, same as insufficient evidence. */
   adTexts?: string[];
+  /** Internal Learnings MVP — raw pasted text, one learning per line
+   *  ("Worked: ...", "Failed: ...", "Avoid: ...", "Learning: ..."),
+   *  parsed and applied by modules/competitorDebrief/internalLearnings.ts.
+   *  Optional, manual input only — omitted or empty leaves the debrief
+   *  exactly as it was before this feature existed. */
+  internalLearningsText?: string;
 }
 
 export interface CompetitorDebriefApiError {
@@ -54,6 +62,10 @@ export interface CompetitorDebriefTest {
   proofMechanism: string;
   offerOrCta: string;
   whatYoullLearn: string;
+  /** Set only when an internal learning materially changed this test —
+   *  see modules/competitorDebrief/internalLearnings.ts. Never present
+   *  otherwise; the UI shows a badge + explanation only when this is set. */
+  internalLearningNote?: InternalLearningNote;
 }
 
 export interface CompetitorDebrief {
@@ -98,6 +110,10 @@ export interface CompetitorDebrief {
   /** The fixed truthfulness disclaimer — always present, always the
    *  same wording, appended once rather than re-derived per field. */
   caveat: string;
+  /** Internal Learnings MVP — the parsed, deduped learnings actually
+   *  used, or null when none were pasted (the UI section doesn't
+   *  render at all in that case). See internalLearnings.ts. */
+  internalLearnings: InternalLearningsSummary | null;
 }
 
 export type CompetitorDebriefResponse =

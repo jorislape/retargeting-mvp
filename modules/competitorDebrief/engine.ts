@@ -6,6 +6,7 @@ import {
   detectStrategicPatterns,
   EMPTY_STRATEGIC_PATTERNS,
 } from "./strategicPatterns.ts";
+import { applyInternalLearnings, parseInternalLearnings } from "./internalLearnings.ts";
 import type { CompetitorDebrief, CompetitorDebriefInput, CompetitorDebriefTest } from "./types.ts";
 
 /**
@@ -410,7 +411,7 @@ export function generateCompetitorDebrief(
     })
     .slice(0, 5);
 
-  return {
+  const baseDebrief: CompetitorDebrief = {
     competitorName,
     sources: {
       adsLibraryUrl: input.adsLibraryUrl.trim(),
@@ -435,5 +436,13 @@ export function generateCompetitorDebrief(
     nextTests,
     whatToMonitorNext: insufficientEvidence ? [] : buildWhatToMonitorNext(competitorName),
     caveat: COMPETITOR_DEBRIEF_CAVEAT(competitorName || "this competitor"),
+    internalLearnings: null,
   };
+
+  // Internal Learnings MVP: a pure post-processing pass over the
+  // already-complete debrief above — every synthesis/strategic-pattern
+  // rule already ran untouched. See internalLearnings.ts for why this
+  // stays a separate layer rather than a change to the rules above.
+  const learnings = parseInternalLearnings(input.internalLearningsText ?? "");
+  return applyInternalLearnings(baseDebrief, learnings);
 }

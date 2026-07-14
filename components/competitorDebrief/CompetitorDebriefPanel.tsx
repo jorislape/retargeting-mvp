@@ -5,6 +5,7 @@ import type {
   AdCompleteness,
   CompetitorDebrief,
   CompetitorDebriefApiError,
+  LearningOutcome,
   ParsedAdExample,
 } from "@/modules/competitorDebrief";
 import {
@@ -13,6 +14,7 @@ import {
   normalizeForDedupe,
   parseAdExample,
   parseBulkAdExamples,
+  parseInternalLearnings,
   splitAdBlocks,
   textForAnalysis,
 } from "@/modules/competitorDebrief";
@@ -75,6 +77,19 @@ function describeEvidenceCompleteness(
   }
   return { toneClass: completeness.status === "complete" ? "text-emerald-400" : "text-amber-300", lines };
 }
+
+/** Badge styling per parsed learning outcome — worked/failed/avoid get
+ *  the same win/loss-adjacent color language used elsewhere in this
+ *  app (emerald/red = validated/failed), "learning" gets the accent
+ *  color (general guidance, neither win nor loss), "unknown" stays
+ *  quiet zinc (shown for transparency, never actionable). */
+const LEARNING_OUTCOME_COPY: Record<LearningOutcome, { label: string; className: string }> = {
+  worked: { label: "Worked", className: "border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300" },
+  failed: { label: "Failed", className: "border-red-500/30 bg-red-500/[0.08] text-red-300" },
+  avoid: { label: "Avoid", className: "border-amber-500/30 bg-amber-500/[0.08] text-amber-300" },
+  learning: { label: "Learning", className: "border-accent/30 bg-accent/[0.08] text-accent-soft" },
+  unknown: { label: "Unrecognized", className: "border-white/10 bg-white/[0.03] text-zinc-500" },
+};
 
 /**
  * Competitor Debrief V1 — a separate, CSV-free flow. Primary path is
@@ -217,6 +232,7 @@ export function CompetitorDebriefPanel() {
   const [core, setCore] = useState<CoreFields>(EMPTY_CORE);
   const [bulkPasteText, setBulkPasteText] = useState("");
   const [blocks, setBlocks] = useState<AdBlock[] | null>(null);
+  const [internalLearningsText, setInternalLearningsText] = useState("");
   const [advancedNotes, setAdvancedNotes] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -281,6 +297,12 @@ export function CompetitorDebriefPanel() {
     [bulkPasteText]
   );
 
+  // Internal Learnings MVP: parsed live, purely for the review preview
+  // below the textarea — the textarea itself (not this derived list) is
+  // the editable source of truth, and the raw text is re-parsed
+  // server-side from scratch on submit (same pattern as `observations`).
+  const parsedLearnings = useMemo(() => parseInternalLearnings(internalLearningsText), [internalLearningsText]);
+
   async function handleGenerate() {
     setLoading(true);
     setError(null);
@@ -320,6 +342,7 @@ export function CompetitorDebriefPanel() {
           // strategicPatterns.ts. Deduped, so a duplicate paste can't
           // inflate a recurrence count.
           adTexts: distinctAdTexts.length > 0 ? distinctAdTexts : undefined,
+          internalLearningsText: internalLearningsText.trim() || undefined,
         }),
       });
       const body = await res.json();
@@ -485,6 +508,43 @@ export function CompetitorDebriefPanel() {
               </div>
             </div>
           )}
+
+          <div>
+            <label className={`${fieldLabel} mb-1.5 block`} htmlFor="internal-learnings">
+              Internal learnings <span className="text-zinc-600">(optional)</span>
+            </label>
+            <p className="mb-2 text-[11px] leading-relaxed text-zinc-500">
+              Add what your team has already tested, what worked, what failed, and
+              what should not be repeated.
+            </p>
+            <textarea
+              id="internal-learnings"
+              rows={4}
+              className={`${inputBase} resize-y text-xs`}
+              placeholder={
+                "One learning per line, e.g.\nWorked: UGC testimonial openings\nWorked: Quiz CTA\nFailed: Founder-led ads\nFailed: Generic discount hooks\nAvoid: Anti-injection angle — already saturated\nLearning: Short hooks outperform long explanations"
+              }
+              value={internalLearningsText}
+              onChange={(e) => setInternalLearningsText(e.target.value)}
+            />
+            {parsedLearnings.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {parsedLearnings.map((learning, i) => {
+                  const copy = LEARNING_OUTCOME_COPY[learning.outcome];
+                  return (
+                    <div key={i} className="flex min-w-0 items-start gap-2 text-[11px]">
+                      <span
+                        className={`shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium ${copy.className}`}
+                      >
+                        {copy.label}
+                      </span>
+                      <span className="min-w-0 break-words text-zinc-400">{learning.text}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div>
             <button
