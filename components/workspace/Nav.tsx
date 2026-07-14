@@ -21,6 +21,17 @@ const NAV = [
   { href: "/privacy", label: "Privacy", icon: ShieldIcon },
 ] as const;
 
+/* Desktop-sidebar-only secondary links: company/trust pages that don't
+   belong in the primary in-app nav (and can't join it without also
+   growing MobileTabBar's fixed 6-column grid). Reachable on mobile via
+   the workspace footer instead. */
+const SECONDARY_NAV = [
+  { href: "/pricing", label: "Pricing" },
+  { href: "/about", label: "About" },
+  { href: "/vs-chatgpt", label: "vs. ChatGPT" },
+  { href: "/security", label: "Security" },
+] as const;
+
 function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
@@ -58,6 +69,24 @@ export function Sidebar() {
                     : "text-zinc-500 group-hover:text-zinc-400"
                 }`}
               />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <nav aria-label="Secondary" className="mt-4 flex flex-col gap-0.5 border-t border-white/[0.06] px-3 pt-4">
+        {SECONDARY_NAV.map((item) => {
+          const active = isActive(pathname, item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                active ? "text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
               {item.label}
             </Link>
           );

@@ -26,6 +26,12 @@ export default function MarketingLayout({
             memory for this session only — your ads data is never stored server-side.
           </p>
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <Link href="/pricing" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
+              Pricing
+            </Link>
+            <Link href="/about" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
+              About
+            </Link>
             <Link href="/privacy" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
               Privacy
             </Link>
