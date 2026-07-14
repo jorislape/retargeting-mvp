@@ -21,7 +21,19 @@ export {
   type AdParseMode,
   type ParsedAdExample,
 } from "./adParser";
-export { looksLikeAdsLibraryCopy } from "./adsLibraryParser";
+export { isBareCtaLine, looksLikeAdsLibraryCopy } from "./adsLibraryParser";
+export {
+  groupPossibleVariants,
+  MAX_REPRESENTATIVES,
+  processPageDump,
+  selectRepresentatives,
+  stripChromeLines,
+  type BoundaryConfidence,
+  type PageDumpCandidate,
+  type PageDumpResult,
+  type PageDumpWarning,
+  type VariantGroup,
+} from "./pageDump";
 export {
   applyInternalLearnings,
   parseInternalLearnings,

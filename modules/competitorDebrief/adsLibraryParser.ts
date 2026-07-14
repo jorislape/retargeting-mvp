@@ -54,7 +54,12 @@ function stripBulletMarker(line: string): string {
   return line.replace(EMOJI_BULLET_RE, "").replace(MARKER_BULLET_RE, "").trim();
 }
 
-function isBareCtaLine(line: string): boolean {
+/** Exported for reuse by pageDump.ts's boundary-detection fallback (a
+ *  rendered CTA button line is a strong end-of-ad anchor in a raw,
+ *  unmarked multi-ad paste) — same reasoning as CTA_PHRASES itself
+ *  being exported from pageSignals.ts: one judgment table/function,
+ *  not a second copy. Behavior is unchanged; this only adds visibility. */
+export function isBareCtaLine(line: string): boolean {
   const cleaned = line.trim().toLowerCase().replace(/[.!]+$/, "");
   if (cleaned === "" || cleaned.split(/\s+/).length > CTA_LINE_MAX_WORDS) return false;
   return CTA_PHRASES.some((p) => cleaned === p);
