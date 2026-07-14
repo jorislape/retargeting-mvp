@@ -199,7 +199,7 @@ export default function HomePage() {
           — see a full debrief before uploading anything.
         </p>
         <p className="mt-2.5 text-xs text-zinc-400">
-          No login · Ads data never stored server-side · Optional read-only Meta connection
+          No login required. Ads data is never stored server-side. Optional read-only Meta connection.
         </p>
 
         {/* Live proof: the engine sorting real-shaped rows, on loop.

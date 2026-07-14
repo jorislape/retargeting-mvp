@@ -34,8 +34,8 @@ const TIERS = [
     description:
       "For agencies and in-house teams running this across multiple accounts. Scope isn't finalized — likely a saved-learnings workspace and shared account context.",
     points: [
-      "Structured learnings across accounts",
-      "Shared context between teammates",
+      "Planned: structured learnings across accounts",
+      "Planned: shared context between teammates",
       "Not built yet — no billing integration exists",
     ],
   },
