@@ -2,9 +2,10 @@ import { CompetitorDebriefPanel } from "@/components/competitorDebrief/Competito
 import { gradientText } from "@/components/ui/theme";
 
 export const metadata = {
-  title: "Competitor debrief — Debrief",
+  title: "Competitor debrief",
   description:
     "Paste what you observed about a competitor's ads and get a structured, directional read — no CSV required.",
+  alternates: { canonical: "/competitor-debrief" },
 };
 
 export default function CompetitorDebriefPage() {

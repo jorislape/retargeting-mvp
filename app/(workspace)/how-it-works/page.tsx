@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/theme";
 
 export const metadata = {
-  title: "How it works — Debrief",
+  title: "How it works",
   description:
     "Three steps, deterministic scoring — no black box between your CSV and the call.",
+  alternates: { canonical: "/how-it-works" },
 };
 
 const STEPS = [

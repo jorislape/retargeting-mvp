@@ -5,9 +5,12 @@ import { ArrowIcon } from "@/components/ui/icons";
 import { btnPrimarySm } from "@/components/ui/theme";
 
 export const metadata = {
-  title: "Sample report — Debrief",
+  // Root layout's "%s · Debrief" template supplies the brand suffix —
+  // no manual "— Debrief" here, or it doubles up.
+  title: "Sample report",
   description:
     "A fully rendered example of the debrief you get from your own Meta Ads CSV.",
+  alternates: { canonical: "/sample" },
 };
 
 /* Server component: the sample memo is computed by the real engine at

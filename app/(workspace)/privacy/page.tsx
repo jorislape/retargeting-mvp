@@ -8,9 +8,10 @@ import {
 } from "@/components/ui/theme";
 
 export const metadata = {
-  title: "Privacy — Debrief",
+  title: "Privacy",
   description:
     "Your CSV is processed in memory for one request and never stored, cached, or logged. The only data stored server-side belongs to the optional competitor-monitoring beta, and only if you enable it.",
+  alternates: { canonical: "/privacy" },
 };
 
 const SECTIONS = [

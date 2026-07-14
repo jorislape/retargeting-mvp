@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 /*
@@ -21,10 +22,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  /* Local/self-hosted fallback; Vercel infers the production URL. */
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
-  ),
+  /* See lib/site.ts — resolves to the real Vercel production domain
+     with no manual env var required, local dev only falls back to
+     localhost. */
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Debrief — Meta Ads creative debrief",
     template: "%s · Debrief",

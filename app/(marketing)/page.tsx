@@ -20,9 +20,13 @@ import {
 } from "@/components/ui/theme";
 
 export const metadata = {
-  title: "Debrief — Your Meta Ads data, turned into a decision",
+  // { absolute } bypasses the root layout's "%s · Debrief" template —
+  // this title already carries the brand, so template + this would
+  // double up to "...decision · Debrief".
+  title: { absolute: "Debrief — Your Meta Ads data, turned into a decision" },
   description:
     "Upload a CSV or pull data from Meta, add market / competitor signals if useful, and get a buyer memo, client-ready report, next creative tests, and creative briefs. No login. Your ads data is never stored on our servers.",
+  alternates: { canonical: "/" },
 };
 
 /* ------------------------------------------------------------------ */
