@@ -411,3 +411,29 @@ export function computeAdCompleteness(parsed: ParsedAdExample): AdCompleteness {
   }
   return computeEvidenceCompleteness(parsed);
 }
+
+/**
+ * How many of the given parsed ad blocks count as USABLE evidence —
+ * the single source of truth for "Generate" button eligibility, so it
+ * can never drift from what the completeness/duplicate UI already
+ * tells the user. A block counts only when its raw text is non-empty,
+ * its completeness status isn't "malformed" (a stray fragment left
+ * over from a bad split, or genuine junk — see computeAdCompleteness),
+ * and it isn't a normalized-text duplicate of an earlier counted
+ * block. Order-independent result (a count, not indices) since
+ * eligibility only cares "is there at least one", not which one.
+ */
+export function countUsableAds(parsedBlocks: ParsedAdExample[]): number {
+  const seen = new Set<string>();
+  let count = 0;
+  for (const parsed of parsedBlocks) {
+    const raw = parsed.raw.trim();
+    if (raw === "") continue;
+    if (computeAdCompleteness(parsed).status === "malformed") continue;
+    const key = normalizeForDedupe(raw);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    count++;
+  }
+  return count;
+}

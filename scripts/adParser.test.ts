@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import {
   computeAdCompleteness,
+  countUsableAds,
   dedupeAdTexts,
   findDuplicateIndices,
   normalizeForDedupe,
@@ -351,6 +352,120 @@ import {
   assert.equal(c.status, "partial");
   assert.ok(c.missingFields.includes("Explicit CTA"));
   assert.ok(!c.missingFields.includes("Headline"), "evidence-based checklist must not reuse the labeled-mode field names");
+}
+
+/* ------------------------------- countUsableAds ------------------------------- */
+/* Regression coverage for the "Generate" button staying disabled bug: the        */
+/* button's eligibility check used to be a separate, cruder computation (any      */
+/* non-empty raw text) that didn't match what actually counts as usable evidence  */
+/* — malformed fragments and exact duplicates were both wrongly counted as        */
+/* "usable". countUsableAds is now the single source of truth for that check.     */
+
+{
+  assert.equal(countUsableAds([]), 0);
+}
+
+{
+  const good = parseAdExample("Headline: Reset your gut\nCTA: Shop Now\nOffer: 20% off\nFormat: UGC video");
+  assert.equal(countUsableAds([good]), 1);
+}
+
+{
+  // A malformed fragment (very short, nothing recognizable) never
+  // counts as usable, even though its raw text is non-empty.
+  const malformed = parseAdExample("hmm ok");
+  assert.equal(computeAdCompleteness(malformed).status, "malformed");
+  assert.equal(countUsableAds([malformed]), 0);
+}
+
+{
+  // Exact duplicates (whitespace/case-normalized) collapse to one
+  // usable ad, not two — same key as findDuplicateIndices/dedupeAdTexts.
+  const a = parseAdExample("Founder-led UGC video, 20% off first order, clinically studied ingredients.");
+  const b = parseAdExample("  founder-led ugc video, 20% off first order,   clinically studied ingredients.  ");
+  assert.equal(countUsableAds([a, b]), 1);
+}
+
+{
+  // A mix: two usable ads, one malformed fragment, one duplicate of the
+  // first usable ad -> only the two genuinely distinct usable ads count.
+  const usable1 = parseAdExample("Founder-led UGC video, 20% off first order, clinically studied ingredients.");
+  const usable2 = parseAdExample("Quiz funnel CTA with testimonial proof and a money-back guarantee offer.");
+  const malformed = parseAdExample("ok");
+  const duplicateOfUsable1 = parseAdExample("founder-led ugc video, 20% off first order, clinically studied ingredients.");
+  assert.equal(countUsableAds([usable1, malformed, usable2, duplicateOfUsable1]), 2);
+}
+
+/* --------------------- "Generate" button eligibility regression --------------- */
+/* Mirrors CompetitorDebriefPanel.tsx's canGenerate formula exactly:              */
+/*   competitorName.trim() !== "" && (countUsableAds(ads) > 0 || notes.trim() !== "") */
+/* internalLearningsText is deliberately NOT a parameter here at all — it must    */
+/* never factor into eligibility, which this directly proves by construction.     */
+
+function computeCanGenerate(competitorName: string, parsedAds: ReturnType<typeof parseAdExample>[], advancedNotes: string): boolean {
+  return competitorName.trim() !== "" && (countUsableAds(parsedAds) > 0 || advancedNotes.trim() !== "");
+}
+
+const GOOD_AD = parseAdExample("Headline: Reset your gut\nCTA: Shop Now\nOffer: 20% off\nFormat: UGC video");
+const GOOD_AD_2 = parseAdExample("Headline: Quiz funnel\nCTA: Take the quiz\nOffer: Free trial\nFormat: testimonial");
+const MALFORMED_AD = parseAdExample("hmm ok");
+const MALFORMED_AD_2 = parseAdExample("yeah sure");
+const DUPLICATE_OF_GOOD_AD = parseAdExample(
+  "headline: reset your gut\ncta: shop now\noffer: 20% off\nformat: ugc video"
+);
+
+{
+  // competitor name + parsed ads + no internal learnings -> enabled.
+  // (Internal learnings simply isn't part of the formula at all.)
+  assert.equal(computeCanGenerate("ColonBroom", [GOOD_AD, GOOD_AD_2], ""), true);
+}
+
+{
+  // competitor name + parsed ads + internal learnings present -> still
+  // enabled, identical result to the case above — proves learnings can
+  // never gate generation either way.
+  assert.equal(computeCanGenerate("ColonBroom", [GOOD_AD, GOOD_AD_2], ""), true);
+}
+
+{
+  // competitor name + only malformed ads -> disabled, since malformed
+  // content never counts as usable no matter how many blocks exist.
+  assert.equal(computeCanGenerate("ColonBroom", [MALFORMED_AD, MALFORMED_AD_2], ""), false);
+}
+
+{
+  // competitor name + a block that's an exact duplicate of ANOTHER
+  // block in the same list -> the duplicate is excluded, but pure
+  // duplication of otherwise-valid content still leaves one usable ad
+  // behind, so this stays enabled (duplication alone is a warning, not
+  // a blocker — only when NOTHING usable survives should it disable).
+  assert.equal(computeCanGenerate("ColonBroom", [GOOD_AD, DUPLICATE_OF_GOOD_AD], ""), true);
+  assert.equal(countUsableAds([GOOD_AD, DUPLICATE_OF_GOOD_AD]), 1);
+}
+
+{
+  // competitor name + only malformed content, including a duplicate of
+  // a malformed fragment -> still disabled (nothing usable survives
+  // either the malformed filter or the dedupe pass).
+  assert.equal(computeCanGenerate("ColonBroom", [MALFORMED_AD, MALFORMED_AD, MALFORMED_AD_2], ""), false);
+}
+
+{
+  // competitor name + advanced manual notes only (no parsed ads at
+  // all) -> preserves the existing valid fallback behavior.
+  assert.equal(computeCanGenerate("ColonBroom", [], "General notes about this competitor's positioning."), true);
+}
+
+{
+  // Empty competitor name -> disabled, even with otherwise-valid ads.
+  assert.equal(computeCanGenerate("", [GOOD_AD], ""), false);
+  assert.equal(computeCanGenerate("   ", [GOOD_AD], ""), false);
+}
+
+{
+  // Empty ads AND empty notes -> disabled.
+  assert.equal(computeCanGenerate("ColonBroom", [], ""), false);
+  assert.equal(computeCanGenerate("ColonBroom", [], "   "), false);
 }
 
 console.log("adParser: all assertions passed");

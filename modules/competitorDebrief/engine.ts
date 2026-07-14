@@ -414,7 +414,7 @@ export function generateCompetitorDebrief(
   const baseDebrief: CompetitorDebrief = {
     competitorName,
     sources: {
-      adsLibraryUrl: input.adsLibraryUrl.trim(),
+      adsLibraryUrl: input.adsLibraryUrl?.trim() || null,
       websiteUrl: input.websiteUrl?.trim() || null,
     },
     evidenceSummary,

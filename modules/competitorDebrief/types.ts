@@ -13,8 +13,10 @@ import type { InternalLearningNote, InternalLearningsSummary } from "./internalL
 export interface CompetitorDebriefInput {
   competitorName: string;
   /** Reference only — never fetched. The Ads Library is not crawled by
-   *  this app in any version. */
-  adsLibraryUrl: string;
+   *  this app in any version. Optional: a competitor debrief can be
+   *  built from pasted ad copy alone, without a library URL on hand —
+   *  see the "Generate" button eligibility fix in CompetitorDebriefPanel. */
+  adsLibraryUrl?: string;
   /** Reference only — never fetched, unlike the separate one-time
    *  Competitor Landing Page Fetch feature (modules/competitor). */
   websiteUrl?: string;
@@ -71,7 +73,7 @@ export interface CompetitorDebriefTest {
 export interface CompetitorDebrief {
   competitorName: string;
   sources: {
-    adsLibraryUrl: string;
+    adsLibraryUrl: string | null;
     websiteUrl: string | null;
   };
   /** Plain description of the evidence actually provided — word count

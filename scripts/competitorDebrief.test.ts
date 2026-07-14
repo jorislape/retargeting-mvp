@@ -234,6 +234,21 @@ const isObserved = (value: string): boolean =>
   assert.doesNotMatch(serialized, /"fetched"/i);
 }
 
+/* --------- adsLibraryUrl is optional (regression: stuck-disabled-button fix) --- */
+/* A debrief must be fully generatable from pasted ad copy alone, without a       */
+/* Meta Ads Library URL on hand — this was the root cause of the "Generate"       */
+/* button staying disabled even with valid ads/name/website URL filled in.        */
+
+{
+  const d = generateCompetitorDebrief({
+    competitorName: BASE_INPUT.competitorName,
+    websiteUrl: BASE_INPUT.websiteUrl,
+    observations: "founder-led video, 20% off first order, ugc format",
+  });
+  assert.equal(d.sources.adsLibraryUrl, null);
+  assert.equal(d.insufficientEvidence, false);
+}
+
 /* -------------------- no forbidden performance/spend claims ------------------ */
 
 const FORBIDDEN = /\b(ROAS|CPA|CPC|CTR|conversion rate|winning ad|spend of|impressions|clicks)\b/i;

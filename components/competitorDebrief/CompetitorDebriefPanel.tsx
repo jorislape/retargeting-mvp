@@ -10,6 +10,7 @@ import type {
 } from "@/modules/competitorDebrief";
 import {
   computeAdCompleteness,
+  countUsableAds,
   findDuplicateIndices,
   normalizeForDedupe,
   parseAdExample,
@@ -275,11 +276,26 @@ export function CompetitorDebriefPanel() {
     setBlocks((prev) => [...(prev ?? []), makeBlock("")]);
   }
 
-  const hasParsedAds = (blocks ?? []).some((b) => b.parsed.raw.trim() !== "");
-  const canGenerate =
-    core.competitorName.trim() !== "" &&
-    core.adsLibraryUrl.trim() !== "" &&
-    (hasParsedAds || advancedNotes.trim() !== "");
+  // Single source of truth for "is there usable ad evidence" — shared
+  // with the actual submit payload's intent (malformed fragments and
+  // exact duplicates never count), so eligibility can't drift from
+  // what handleGenerate below actually does. This used to be a
+  // separate, cruder check (any non-empty raw text) that didn't
+  // account for malformed/duplicate-only content and — more visibly —
+  // hard-required the Meta Ads Library URL, which isn't actually
+  // needed to generate a debrief from pasted ad copy alone; that
+  // second issue is what left the button stuck disabled even with a
+  // competitor name, parsed ads, and a website URL filled in.
+  const usableAdCount = useMemo(() => countUsableAds((blocks ?? []).map((b) => b.parsed)), [blocks]);
+  const hasUsableNotes = advancedNotes.trim() !== "";
+  const canGenerate = core.competitorName.trim() !== "" && (usableAdCount > 0 || hasUsableNotes);
+
+  const disabledReason =
+    !loading && !canGenerate
+      ? core.competitorName.trim() === ""
+        ? "Add a competitor name to continue."
+        : "Paste at least one usable ad (or add advanced manual notes) to continue — malformed or duplicate-only content doesn't count."
+      : null;
 
   // Duplicate flags are recomputed from the current blocks on every
   // render (cheap string comparisons) so editing a block's text always
@@ -581,6 +597,7 @@ export function CompetitorDebriefPanel() {
           >
             {loading ? "Generating…" : "Generate competitor debrief"}
           </button>
+          {disabledReason && <p className="mt-2 text-[11px] text-zinc-500">{disabledReason}</p>}
         </div>
 
         {error && (

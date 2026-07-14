@@ -8,6 +8,7 @@ export type {
 } from "./types";
 export {
   computeAdCompleteness,
+  countUsableAds,
   dedupeAdTexts,
   findDuplicateIndices,
   normalizeForDedupe,

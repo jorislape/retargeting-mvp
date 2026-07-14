@@ -268,7 +268,9 @@ export function CompetitorDebriefResult({
         <p className="print-only text-[11px] text-zinc-500">
           {generatedAt ? `Generated ${new Date(generatedAt).toLocaleString()}` : ""}
         </p>
-        <SourceLink label="Meta Ads Library" url={debrief.sources.adsLibraryUrl} />
+        {debrief.sources.adsLibraryUrl && (
+          <SourceLink label="Meta Ads Library" url={debrief.sources.adsLibraryUrl} />
+        )}
         {debrief.sources.websiteUrl && (
           <SourceLink label="Website" url={debrief.sources.websiteUrl} />
         )}

@@ -103,27 +103,27 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (typeof adsLibraryUrl !== "string" || adsLibraryUrl.trim() === "") {
-    return fail(400, {
-      title: "Ads Library URL required",
-      message: "Paste the Meta Ads Library URL for this competitor.",
-      fix: "Find the competitor in the Meta Ads Library and paste the page URL.",
-    });
-  }
-  if (adsLibraryUrl.length > MAX_URL_CHARS) {
-    return fail(400, {
-      title: "Ads Library URL too long",
-      message: "That URL is too long to be valid.",
-      fix: "Paste the direct Ads Library page URL.",
-    });
-  }
-  const normalizedAdsLibraryUrl = normalizeUrl(adsLibraryUrl);
-  if (!normalizedAdsLibraryUrl) {
-    return fail(400, {
-      title: "Invalid Ads Library URL",
-      message: "That doesn't look like a valid web address.",
-      fix: "Paste a full URL, e.g. https://www.facebook.com/ads/library/?...",
-    });
+  // Optional, same treatment as websiteUrl below: a debrief can be
+  // built from pasted ad copy alone, without a library URL on hand —
+  // shape-validated only when the user actually provided one.
+  let normalizedAdsLibraryUrl: string | undefined;
+  if (typeof adsLibraryUrl === "string" && adsLibraryUrl.trim() !== "") {
+    if (adsLibraryUrl.length > MAX_URL_CHARS) {
+      return fail(400, {
+        title: "Ads Library URL too long",
+        message: "That URL is too long to be valid.",
+        fix: "Paste the direct Ads Library page URL.",
+      });
+    }
+    const normalized = normalizeUrl(adsLibraryUrl);
+    if (!normalized) {
+      return fail(400, {
+        title: "Invalid Ads Library URL",
+        message: "That doesn't look like a valid web address.",
+        fix: "Paste a full URL, e.g. https://www.facebook.com/ads/library/?..., or leave it blank.",
+      });
+    }
+    normalizedAdsLibraryUrl = normalized;
   }
 
   let normalizedWebsiteUrl: string | undefined;
