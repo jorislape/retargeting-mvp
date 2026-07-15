@@ -23,8 +23,7 @@ export const metadata = {
   alternates: { canonical: "/founding" },
 };
 
-const CALL_MAILTO =
-  "mailto:joris.adomas@gmail.com?subject=Debrief%20founding%20agency%20call";
+const CALENDLY_URL = "https://calendly.com/joris-adomas/30min";
 const EMAIL_MAILTO = "mailto:joris.adomas@gmail.com";
 
 const GET = [
@@ -92,7 +91,12 @@ export default function FoundingPage() {
           className="animate-rise mt-6 flex flex-wrap items-center gap-3"
           style={{ animationDelay: "60ms" }}
         >
-          <a href={CALL_MAILTO} className={btnPrimary}>
+          <a
+            href={CALENDLY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={btnPrimary}
+          >
             Book a short call
           </a>
           <a href={EMAIL_MAILTO} className={btnSecondaryMd}>
@@ -226,7 +230,12 @@ export default function FoundingPage() {
             <span className={gradientText}>fits your workflow.</span>
           </h2>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <a href={CALL_MAILTO} className={btnPrimary}>
+            <a
+              href={CALENDLY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={btnPrimary}
+            >
               Book a short call
             </a>
             <a href={EMAIL_MAILTO} className={btnSecondaryMd}>
@@ -234,7 +243,7 @@ export default function FoundingPage() {
             </a>
           </div>
           <p className="mx-auto mt-5 max-w-md text-xs leading-relaxed text-zinc-500">
-            No booking link yet — either button opens an email to{" "}
+            Book a short call via Calendly, or email me directly at{" "}
             <a
               href={EMAIL_MAILTO}
               className="rounded-sm underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-300 hover:decoration-zinc-400"
