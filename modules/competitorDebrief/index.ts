@@ -24,6 +24,7 @@ export {
 export { isBareCtaLine, looksLikeAdsLibraryCopy } from "./adsLibraryParser";
 export {
   groupPossibleVariants,
+  isDestinationPreviewFragment,
   MAX_REPRESENTATIVES,
   processPageDump,
   selectRepresentatives,

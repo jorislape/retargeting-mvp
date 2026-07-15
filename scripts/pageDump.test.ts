@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import {
   detectAdBoundaries,
   groupPossibleVariants,
+  isDestinationPreviewFragment,
   MAX_REPRESENTATIVES,
   processPageDump,
   selectRepresentatives,
@@ -410,6 +411,54 @@ function completenessFor(raw: string): AdCompleteness {
   assert.equal(tiedResult.isRepresentative[1], false);
 }
 
+/* ===================== isDestinationPreviewFragment (destination-preview cards) =========== */
+
+function parsedFor(raw: string) {
+  return parseAdExample(raw);
+}
+
+{
+  // Real destination-preview / link-preview cards — a bare domain
+  // line plus a short, evidence-free shell — must be recognized.
+  const cases = [
+    "NIKE.COM\nNike Pegasus 41\n$130.00\nShop Now",
+    "ITUNES.APPLE.COM\nNike: Shoes, Apparel & Stories\nGet the app that helps you train, eat, and sleep smarter.\nGET",
+    "NIKE.COM.BR\nTênis Nike Air Max\nR$ 799,90\nComprar agora",
+    "PLAY.GOOGLE.COM\nNike Run Club\nGet the app that tracks every run, rain or shine.\nInstall Now",
+    "https://www.nike.com/launch\nAir Force 1\n$110.00\nShop Now", // protocol + www + path variant
+    "NIKE.CO.UK\nAir Max 90\n£99.99\nShop Now", // 3-level-shaped TLD variant
+  ];
+  for (const raw of cases) {
+    assert.equal(
+      isDestinationPreviewFragment(raw, parsedFor(raw)),
+      true,
+      `must be recognized as a destination-preview fragment: ${JSON.stringify(raw)}`
+    );
+  }
+}
+
+{
+  // Negative controls — legitimate ad copy must never be misclassified.
+  const cases: [string, string][] = [
+    ["Run further, feel lighter. The all-new Pegasus is built for daily miles.\nShop Now", "real ad, no domain at all"],
+    ["Visit nike.com for the latest drops. Free shipping on orders over $50.\nShop Now", "domain mentioned mid-sentence, not its own bare line"],
+    ["New markdowns just dropped. Air Max 90 now $89.99, down from $130.\nShop Now", "legitimate priced offer, no domain"],
+    [
+      "nike.com\nBest running shoes of the year. Free shipping today, guaranteed fit or your money back.\nShop Now",
+      "starts with a bare domain BUT has genuine offer + guarantee evidence",
+    ],
+  ];
+  for (const [raw, label] of cases) {
+    assert.equal(isDestinationPreviewFragment(raw, parsedFor(raw)), false, `must NOT be excluded — ${label}`);
+  }
+}
+
+{
+  // Empty input never crashes.
+  assert.equal(isDestinationPreviewFragment("", parsedFor("")), false);
+  assert.equal(isDestinationPreviewFragment("   \n  ", parsedFor("   \n  ")), false);
+}
+
 /* ============================ processPageDump: acceptance scenarios ====================== */
 
 /* --- (a) 20 copied ads with repeated UI text, no blank lines anywhere --- */
@@ -670,6 +719,98 @@ const REAL_ADS_LIBRARY_DUMP = [
   assert.equal(result.candidates[0].raw, "Just do it. New drops are here — shop the latest collection before it sells out.\nShop Now");
   assert.equal(result.candidates[1].raw, "Train like a pro. Our newest running shoe is built for speed and comfort.\nShop Now");
   assert.ok(result.candidates.every((c) => !c.raw.includes("Meta Ads Library") && c.raw.trim() !== "Nike"));
+}
+
+/* ============ regression: destination-preview blocks (App Store / storefront cards) ======= */
+/* Requirement: a live-tested real-world issue — a full ad card immediately followed by its    */
+/* own link-preview card (domain, product title, price, or app-store description + button)     */
+/* was becoming a SECOND, standalone candidate, since the preview card's own trailing button    */
+/* text is itself a valid bare-CTA-line boundary anchor. Verified against the module's actual   */
+/* output before writing these assertions, not hand-traced. The destination-preview block must  */
+/* never be silently dropped — it's counted (destinationPreviewSkipped) and disclosed via a     */
+/* dedicated warning, distinct from chrome-removed and non-ad-fragments-skipped.                */
+
+{
+  // No blank line between the real ad and its link-preview card (dense
+  // real-world copy-paste shape).
+  const dump = [
+    "Sponsored",
+    "Nike",
+    "Run further, feel lighter. The all-new Pegasus is built for daily miles.",
+    "Shop Now",
+    "NIKE.COM",
+    "Nike Pegasus 41",
+    "$130.00",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump);
+  assert.equal(result.candidates.length, 1, "only the real ad remains; the link-preview card is not a standalone candidate");
+  assert.ok(result.candidates[0].raw.includes("Run further, feel lighter"));
+  assert.ok(!result.candidates.some((c) => c.raw.trim().startsWith("NIKE.COM")));
+  assert.equal(result.destinationPreviewSkipped, 1, "never silently dropped — counted");
+  assert.ok(
+    result.warnings.some(
+      (w) => w.code === "destination-preview-skipped" && w.message.includes("1 destination-preview block")
+    ),
+    "surfaced via a dedicated warning distinct from chrome-removed/non-ad-fragments-skipped"
+  );
+}
+
+{
+  // Same, but WITH a blank line separating the ad from its link-preview
+  // card — also a common real-world shape (Tier 1 boundary detection
+  // instead of the Tier 2 CTA-anchor fallback). Must behave identically.
+  const dump = [
+    "Sponsored",
+    "Nike",
+    "Run further, feel lighter. The all-new Pegasus is built for daily miles.",
+    "Shop Now",
+    "",
+    "NIKE.COM",
+    "Nike Pegasus 41",
+    "$130.00",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.destinationPreviewSkipped, 1);
+}
+
+{
+  // App Store link-preview card variant.
+  const dump = [
+    "Sponsored",
+    "Nike",
+    "Track every step. Set goals. Crush them. All in the Nike App.",
+    "Learn More",
+    "ITUNES.APPLE.COM",
+    "Nike: Shoes, Apparel & Stories",
+    "Get the app that helps you train, eat, and sleep smarter.",
+    "GET",
+  ].join("\n");
+  const result = processPageDump(dump, "Nike");
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].raw, "Track every step. Set goals. Crush them. All in the Nike App.\nLearn More");
+  assert.equal(result.destinationPreviewSkipped, 1);
+  assert.ok(result.warnings.some((w) => w.code === "destination-preview-skipped"));
+}
+
+{
+  // Negative control: a legitimate ad naturally mentioning nike.com
+  // mid-sentence must be completely unaffected — no false exclusion.
+  const dump = "Visit nike.com for the latest drops. Free shipping on orders over $50.\nShop Now";
+  const result = processPageDump(dump);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.destinationPreviewSkipped, 0);
+  assert.ok(result.candidates[0].raw.includes("nike.com"));
+}
+
+{
+  // Negative control: a legitimate priced offer must survive untouched.
+  const dump = "New markdowns just dropped. Air Max 90 now $89.99, down from $130.\nShop Now";
+  const result = processPageDump(dump);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.destinationPreviewSkipped, 0);
 }
 
 console.log("pageDump: all assertions passed");

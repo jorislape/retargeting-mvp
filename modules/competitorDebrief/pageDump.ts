@@ -65,16 +65,28 @@ import { isBareCtaLine } from "./adsLibraryParser.ts";
  *                             bare boolean) surfaced in processPageDump's
  *                             result.
  *
- * processPageDump's orchestration also enforces one hard rule after
- * parsing: a segment with no hook, no headline, no CTA, no offer, and
- * no other recognizable ad body (computeAdCompleteness's "malformed" or
- * "empty" status — reused, not reimplemented) never becomes a
- * PageDumpCandidate at all — a leftover UI/header fragment must never
- * be presented to the user as something to review as an ad. The one
- * exception: if EVERY segment would be filtered out, nothing is
- * dropped — the user must never be left with a blank review state just
- * because the only thing found was thin (this is what keeps the
- * existing "no clear boundaries" single-block floor behavior intact).
+ * processPageDump's orchestration also enforces two hard rules after
+ * parsing, each with its own dedicated counter and warning so a
+ * fragment is never silently discarded — a user must always be able to
+ * see why fewer candidates appeared than were present in the copied
+ * page:
+ *   - a segment with no hook, no headline, no CTA, no offer, and no
+ *     other recognizable ad body (computeAdCompleteness's "malformed"
+ *     or "empty" status — reused, not reimplemented) never becomes a
+ *     PageDumpCandidate — a leftover UI/header fragment must never be
+ *     presented as something to review as an ad
+ *     (nonAdFragmentsSkipped / "non-ad-fragments-skipped").
+ *   - a destination-preview / link-preview card attached to an ad (a
+ *     bare domain line plus a short, evidence-free product-title/price/
+ *     app-description shell — see isDestinationPreviewFragment below)
+ *     never becomes its own PageDumpCandidate either — it's metadata
+ *     ABOUT an ad's destination, not a second, independent ad
+ *     (destinationPreviewSkipped / "destination-preview-skipped").
+ * The one exception to both: if EVERY segment would be filtered out,
+ * nothing is dropped — the user must never be left with a blank review
+ * state just because the only thing found was thin (this is what keeps
+ * the existing "no clear boundaries" single-block floor behavior
+ * intact).
  *
  * Stage G (user review before generation) is NOT in this file — it's
  * the caller's job (CompetitorDebriefPanel.tsx) to render these
@@ -548,6 +560,69 @@ export function selectRepresentatives(
 }
 
 /* ------------------------------------------------------------------ */
+/* Destination-preview fragment detection                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A line that IS a domain (registrable domain, optional multi-level
+ * TLD like ".com.br", optional path) and nothing else — never a
+ * sentence that merely mentions one. Meta's own link-preview cards
+ * always render the destination domain as its own bare line (often
+ * upper-cased); real ad copy essentially never opens a line with
+ * nothing but a bare domain string.
+ */
+const BARE_DOMAIN_LINE_RE = /^\s*(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s]*)?\s*$/i;
+
+/** Generous cap on the remaining word count (segment minus the domain
+ *  line) — comfortably covers "Product Name / $130.00 / Shop Now" or a
+ *  short app-store description, while staying well below what a real
+ *  ad's hook+body would run. */
+const DESTINATION_PREVIEW_MAX_REMAINING_WORDS = 20;
+
+/**
+ * Recognizes a destination-preview / link-preview card — a bare domain
+ * line plus a short, evidence-free product-title/price/app-description
+ * shell — as metadata ATTACHED to an ad, not a second, independent ad.
+ * This exists because boundary detection (Stage B) can't distinguish
+ * "a new ad card started" from "this ad's own link-preview card
+ * started" — both look identical structurally (a bare-CTA-line ends
+ * the segment before it). Deliberately generic (no brand-specific
+ * domain list) and conservative:
+ *   - only fires when the segment's FIRST line is a bare domain — a
+ *     domain mentioned mid-sentence never matches;
+ *   - never fires if the segment has ANY genuine ad-copy evidence
+ *     (a detected benefit, trust signal, positioning claim, offer
+ *     PATTERN match, or story unit) elsewhere — reusing the already-
+ *     computed ParsedAdExample fields, not a second keyword pass;
+ *   - ignores the CTA/hook fields entirely on purpose: those are
+ *     exactly the weak, incidental signals that let these blocks slip
+ *     past computeAdCompleteness's malformed/empty check in the first
+ *     place (see the audit that led to this function).
+ */
+export function isDestinationPreviewFragment(raw: string, parsed: ParsedAdExample): boolean {
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "");
+  if (lines.length === 0) return false;
+
+  const firstLine = lines[0];
+  if (!BARE_DOMAIN_LINE_RE.test(firstLine)) return false;
+
+  const hasGenuineEvidence =
+    parsed.detectedBenefits.length > 0 ||
+    parsed.detectedTrust.length > 0 ||
+    parsed.detectedPositioning.length > 0 ||
+    parsed.detectedOffers.length > 0 ||
+    (parsed.story?.length ?? 0) > 0;
+  if (hasGenuineEvidence) return false;
+
+  const wordsOf = (s: string) => s.split(/\s+/).filter(Boolean).length;
+  const remainingWords = wordsOf(raw.trim()) - wordsOf(firstLine);
+  return remainingWords <= DESTINATION_PREVIEW_MAX_REMAINING_WORDS;
+}
+
+/* ------------------------------------------------------------------ */
 /* Orchestration + Stage F warnings                                    */
 /* ------------------------------------------------------------------ */
 
@@ -557,7 +632,8 @@ export interface PageDumpWarning {
     | "possible-variants-grouped"
     | "capped-at-max"
     | "chrome-removed"
-    | "non-ad-fragments-skipped";
+    | "non-ad-fragments-skipped"
+    | "destination-preview-skipped";
   message: string;
 }
 
@@ -579,6 +655,18 @@ export interface PageDumpResult {
   candidates: PageDumpCandidate[];
   variantGroups: VariantGroup[];
   chromeLinesRemoved: number;
+  /** Count of segments excluded for having no recognizable ad content
+   *  at all (computeAdCompleteness "malformed"/"empty") — a dedicated,
+   *  separate counter from destinationPreviewSkipped so the two
+   *  exclusion reasons are never conflated. */
+  nonAdFragmentsSkipped: number;
+  /** Count of segments excluded as a destination-preview / link-preview
+   *  card (a bare domain line plus a short, evidence-free shell)
+   *  attached to an ad rather than a standalone ad — see
+   *  isDestinationPreviewFragment. Always disclosed, never a silent
+   *  drop: a user must be able to see why fewer candidates appeared
+   *  than were present in the copied page. */
+  destinationPreviewSkipped: number;
   warnings: PageDumpWarning[];
 }
 
@@ -596,23 +684,38 @@ export function processPageDump(rawInput: string, competitorName?: string): Page
   const allParsed = allSegments.map((s) => parseAdExample(s.raw));
   const allCompleteness = allParsed.map((p) => computeAdCompleteness(p));
 
-  // "Never create an AdBlock if: no hook, no headline, no CTA, no
-  // offer, no recognizable ad body" — a segment whose completeness
-  // status is "malformed" or "empty" (computeAdCompleteness's own
-  // categories for exactly this: zero detected evidence anywhere)
-  // never becomes a candidate. The one exception: if filtering would
-  // leave NOTHING at all, keep everything unfiltered instead — the
-  // user must never be left with a blank review state just because
-  // the only thing found (e.g. the Tier-3 "no boundaries" single
-  // block) happens to be thin.
-  const hasRecognizableContent = (c: AdCompleteness) => c.status !== "malformed" && c.status !== "empty";
-  const keepFlags = allCompleteness.map(hasRecognizableContent);
+  // Two hard exclusion rules, checked in order so a segment is
+  // attributed to exactly ONE reason (never double-counted):
+  //   1. "Never create an AdBlock if: no hook, no headline, no CTA, no
+  //      offer, no recognizable ad body" — computeAdCompleteness's own
+  //      "malformed"/"empty" status.
+  //   2. A destination-preview / link-preview card attached to an ad
+  //      (see isDestinationPreviewFragment) — only checked for segments
+  //      that already cleared rule 1, since a malformed/empty segment
+  //      is already being excluded for a more fundamental reason.
+  // The one exception to both: if filtering would leave NOTHING at
+  // all, keep everything unfiltered instead — the user must never be
+  // left with a blank review state just because the only thing found
+  // (e.g. the Tier-3 "no boundaries" single block) happens to be thin.
+  type ExclusionReason = "non-ad-fragment" | "destination-preview" | null;
+  const exclusionReasons: ExclusionReason[] = allSegments.map((seg, i) => {
+    const completeness = allCompleteness[i];
+    if (completeness.status === "malformed" || completeness.status === "empty") return "non-ad-fragment";
+    if (isDestinationPreviewFragment(seg.raw, allParsed[i])) return "destination-preview";
+    return null;
+  });
+  const keepFlags = exclusionReasons.map((r) => r === null);
   const useFilter = keepFlags.some(Boolean);
 
   const segments = useFilter ? allSegments.filter((_, i) => keepFlags[i]) : allSegments;
   const parsedList = useFilter ? allParsed.filter((_, i) => keepFlags[i]) : allParsed;
   const completenessList = useFilter ? allCompleteness.filter((_, i) => keepFlags[i]) : allCompleteness;
-  const nonAdFragmentsSkipped = useFilter ? allSegments.length - segments.length : 0;
+  const nonAdFragmentsSkipped = useFilter
+    ? exclusionReasons.filter((r) => r === "non-ad-fragment").length
+    : 0;
+  const destinationPreviewSkipped = useFilter
+    ? exclusionReasons.filter((r) => r === "destination-preview").length
+    : 0;
 
   const texts = segments.map((s) => s.raw);
   const { groupIdByIndex, groups } = groupPossibleVariants(texts);
@@ -660,6 +763,13 @@ export function processPageDump(rawInput: string, competitorName?: string): Page
     });
   }
 
+  if (destinationPreviewSkipped > 0) {
+    warnings.push({
+      code: "destination-preview-skipped",
+      message: `Skipped ${destinationPreviewSkipped} destination-preview block${destinationPreviewSkipped === 1 ? "" : "s"} (e.g. an App Store or storefront link card) — attached to an ad rather than a standalone ad.`,
+    });
+  }
+
   const totalChromeLinesRemoved = headerLinesRemoved + removedLineCount;
   if (totalChromeLinesRemoved > 0) {
     warnings.push({
@@ -668,5 +778,12 @@ export function processPageDump(rawInput: string, competitorName?: string): Page
     });
   }
 
-  return { candidates, variantGroups: groups, chromeLinesRemoved: totalChromeLinesRemoved, warnings };
+  return {
+    candidates,
+    variantGroups: groups,
+    chromeLinesRemoved: totalChromeLinesRemoved,
+    nonAdFragmentsSkipped,
+    destinationPreviewSkipped,
+    warnings,
+  };
 }
