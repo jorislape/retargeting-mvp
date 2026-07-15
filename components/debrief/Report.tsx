@@ -794,7 +794,7 @@ export function Report({
             className={`cursor-pointer ${btnSecondary}`}
           >
             <DownloadIcon className="h-3.5 w-3.5" />
-            Download text
+            Export TXT
           </button>
           <button
             onClick={() => window.print()}
