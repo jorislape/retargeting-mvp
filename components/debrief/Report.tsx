@@ -8,10 +8,16 @@ import {
   DownloadIcon,
   PrinterIcon,
   RefreshIcon,
+  SlidersIcon,
 } from "@/components/ui/icons";
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { clientizeText, memoToText, type ReportView } from "./memoToText";
+import { computePerformanceSectionNumbers } from "@/components/report/reportNumbering";
+import { PERFORMANCE_CLIENT_MODE_HIDDEN, PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/report/reportSections";
+import { accentCssVars, getAccentById } from "@/components/report/reportCustomization";
+import { useReportCustomization } from "@/components/report/useReportCustomization";
+import { ReportCustomizationPanel } from "@/components/report/ReportCustomizationPanel";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -642,7 +648,19 @@ export function Report({
   generatedAt?: number | null;
   onNewDebrief?: () => void;
 }) {
-  const [view, setView] = useState<ReportView>("buyer");
+  /* White-label Report Customization V1A: one shared hook owns mode,
+     identity fields, accent, and section visibility — session-only,
+     same lifecycle as every other piece of state on this page. The
+     existing buyer/client register (`view`/`ReportView`, used
+     throughout this file and by memoToText.ts) is now DERIVED from
+     customization.mode rather than tracked separately — one source of
+     truth, translated at this single boundary so nothing downstream
+     needs to know customization exists. */
+  const customizationActions = useReportCustomization(PERFORMANCE_SECTION_IDS, PERFORMANCE_CLIENT_MODE_HIDDEN);
+  const { customization } = customizationActions;
+  const [panelOpen, setPanelOpen] = useState(false);
+  const view: ReportView = customization.mode === "client" ? "client" : "buyer";
+
   const [copied, setCopied] = useState(false);
   const [queued, setQueued] = useState<boolean[]>(() =>
     memo.nextTests.map(() => false)
@@ -652,6 +670,8 @@ export function Report({
      like everything else — snapshot of the selection at click time. */
   const [briefIdxs, setBriefIdxs] = useState<number[]>([]);
   const client = view === "client";
+  const accent = getAccentById(customization.accentId);
+  const displayTitle = customization.reportTitle.trim() || memo.scope.product;
 
   const handleCopy = async () => {
     try {
@@ -682,19 +702,42 @@ export function Report({
     URL.revokeObjectURL(url);
   };
 
-  /* Section numbering shifts because the client view drops Patterns
-     and the market/avoid sections only exist when they have content. */
+  /* Section numbering: one running counter over the visible subset, in
+     fixed order (see components/report/reportNumbering.ts) — replaces
+     the old hardcoded-literal + secNum()/marketShift/avoidShift
+     scheme, which only ever accounted for two conditionally-visible
+     sections and couldn't generalize to independently toggleable
+     ones. "market" and "whatNotToDo" stay exactly as before: visible
+     only when the memo has that data, never part of the customization
+     toggle surface (see reportSections.ts) — they're still passed in
+     because they still occupy a numbered slot and must still shift
+     the numbers after them. "patterns" keeps its existing buyer-view-
+     only gate (`!client`) ANDed with the user's own toggle — hiding
+     Patterns by hand behaves exactly like the view-gate already did:
+     it disappears and every later number closes the gap. */
   const hasMarket = memo.marketSignal !== null;
   const avoidBullets = client ? memo.avoid.client : memo.avoid.buyer;
-  const secNum = (buyerN: number, clientN: number) =>
-    String(client ? clientN : buyerN).padStart(2, "0");
-  const marketShift = hasMarket ? 1 : 0;
-  const avoidShift = avoidBullets.length > 0 ? 1 : 0;
+  const sections = customization.sections;
+  const sectionNumbers = computePerformanceSectionNumbers({
+    verdict: sections.verdict,
+    winners: sections.winners,
+    underperformers: sections.underperformers,
+    market: hasMarket,
+    patterns: sections.patterns && !client,
+    nextTests: sections.nextTests,
+    whatNotToDo: avoidBullets.length > 0,
+    confidence: sections.confidence,
+  });
 
+  /* Stagger index always equals a visible section's own number + 1
+     (toolbar=0, masthead=1, then each numbered section in order) —
+     proven true for every existing case, so it's derived from the
+     same numbers rather than tracked as a second, parallel scheme. */
+  const staggerFor = (n: string | null) => (n === null ? 0 : Number(n) + 1);
   const stagger = (i: number) => ({ animationDelay: `${i * 80}ms` });
 
   return (
-    <div>
+    <div style={accentCssVars(accent) as React.CSSProperties}>
       {/* ---- Toolbar: view tabs + actions. Never prints. ---- */}
       <div
         className="print-hidden animate-rise flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-white/10"
@@ -711,7 +754,7 @@ export function Report({
               key={value}
               type="button"
               aria-pressed={view === value}
-              onClick={() => setView(value)}
+              onClick={() => customizationActions.setMode(value === "client" ? "client" : "internal")}
               className={`relative cursor-pointer pb-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                 view === value
                   ? "text-zinc-100"
@@ -759,7 +802,18 @@ export function Report({
             className={`cursor-pointer ${btnSecondary}`}
           >
             <PrinterIcon className="h-3.5 w-3.5" />
-            Save as PDF
+            Print / Save PDF
+          </button>
+          {/* Customization only ever appears once a report already
+              exists — this button lives here, inside Report itself,
+              never in the generator form. */}
+          <button
+            type="button"
+            onClick={() => setPanelOpen(true)}
+            className={`cursor-pointer ${btnSecondary}`}
+          >
+            <SlidersIcon className="h-3.5 w-3.5" />
+            Customize report
           </button>
           {onNewDebrief && (
             <button onClick={onNewDebrief} className={`cursor-pointer ${btnPrimarySm}`}>
@@ -788,14 +842,39 @@ export function Report({
 
         {/* ---- Masthead ---- */}
         <header className="animate-rise mt-10" style={stagger(1)}>
-          <div aria-hidden="true" className="mb-4 h-1 w-10 rounded-full bg-accent" />
+          <div className="flex items-start justify-between gap-4">
+            <div aria-hidden="true" className="mb-4 h-1 w-10 rounded-full bg-accent" />
+            {customization.agencyLogo && (
+              // eslint-disable-next-line @next/next/no-img-element -- blob: object URL, no next/image loader applies
+              <img
+                src={customization.agencyLogo.url}
+                alt={customization.agencyName ? `${customization.agencyName} logo` : "Agency logo"}
+                className="print-logo h-8 w-auto max-w-[140px] shrink-0 object-contain sm:h-10"
+              />
+            )}
+          </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-soft">
             {variant === "sample" ? "Sample · " : ""}
             {client ? "Performance report" : "Creative debrief"}
           </p>
           <h1 className="mt-3 text-[32px] font-semibold leading-tight tracking-tight text-zinc-50 sm:text-4xl">
-            {memo.scope.product}
+            {displayTitle}
           </h1>
+          {(customization.agencyName || customization.clientName) && (
+            <p className="mt-1.5 text-[13px] text-zinc-400">
+              {customization.agencyName && (
+                <>
+                  Prepared by <span className="font-medium text-zinc-300">{customization.agencyName}</span>
+                </>
+              )}
+              {customization.agencyName && customization.clientName && " · "}
+              {customization.clientName && (
+                <>
+                  for <span className="font-medium text-zinc-300">{customization.clientName}</span>
+                </>
+              )}
+            </p>
+          )}
 
           {/* Meta line: mono facts separated by hairline rules. */}
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 font-mono text-[11px] tabular-nums text-zinc-400">
@@ -810,11 +889,13 @@ export function Report({
             )}
             <span aria-hidden="true" className="h-3 w-px bg-white/15" />
             <span>
-              {variant === "sample"
-                ? "Example dataset — no upload required"
-                : generatedAt
-                  ? `Generated ${new Date(generatedAt).toLocaleString()}`
-                  : "Generated this session"}
+              {customization.dateOverride
+                ? new Date(`${customization.dateOverride}T00:00:00`).toLocaleDateString()
+                : variant === "sample"
+                  ? "Example dataset — no upload required"
+                  : generatedAt
+                    ? `Generated ${new Date(generatedAt).toLocaleString()}`
+                    : "Generated this session"}
             </span>
           </div>
           {client && (
@@ -871,11 +952,12 @@ export function Report({
           )}
         </header>
 
-        <ExecutiveSummary memo={memo} view={view} />
+        {sections.executiveSummary && <ExecutiveSummary memo={memo} view={view} />}
 
-        {/* ---- 01 · Verdict / Summary ---- */}
-        <section className="animate-rise mt-12" style={stagger(2)}>
-          <SectionHead n="01" title={client ? "Summary" : "The verdict"} />
+        {/* ---- Verdict / Summary ---- */}
+        {sections.verdict && (
+        <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.verdict))}>
+          <SectionHead n={sectionNumbers.verdict!} title={client ? "Summary" : "The verdict"} />
           {client ? (
             <>
               {/* "What this means" — the clientSummary lines made
@@ -926,10 +1008,12 @@ export function Report({
             </div>
           )}
         </section>
+        )}
 
-        {/* ---- 02 · Winners / What worked ---- */}
-        <section className="animate-rise mt-12" style={stagger(3)}>
-          <SectionHead n="02" title={client ? "What worked" : "Winners"} />
+        {/* ---- Winners / What worked ---- */}
+        {sections.winners && (
+        <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.winners))}>
+          <SectionHead n={sectionNumbers.winners!} title={client ? "What worked" : "Winners"} />
           <div className="mt-4">
             {memo.winners.length === 0 ? (
               <p className="border-l-2 border-white/15 py-1 pl-4 text-sm leading-relaxed text-zinc-400">
@@ -944,11 +1028,13 @@ export function Report({
             )}
           </div>
         </section>
+        )}
 
-        {/* ---- 03 · Losers / What underperformed ---- */}
-        <section className="animate-rise mt-12" style={stagger(4)}>
+        {/* ---- Losers / What underperformed ---- */}
+        {sections.underperformers && (
+        <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.underperformers))}>
           <SectionHead
-            n="03"
+            n={sectionNumbers.underperformers!}
             title={client ? "What underperformed" : "Losers / kill list"}
           />
           <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-300">
@@ -971,12 +1057,15 @@ export function Report({
               : memo.losers.setAsideNote}
           </p>
         </section>
+        )}
 
-        {/* ---- Market signal / context (only when provided) ---- */}
+        {/* ---- Market signal / context (only when provided; not part
+            of the customization toggle surface — data-driven exactly
+            as before) ---- */}
         {memo.marketSignal && (
-          <section className="animate-rise mt-12" style={stagger(5)}>
+          <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.market))}>
             <SectionHead
-              n="04"
+              n={sectionNumbers.market!}
               title={client ? "Market context" : "Market signal"}
             />
             <ul className="mt-4 space-y-2">
@@ -998,13 +1087,13 @@ export function Report({
           </section>
         )}
 
-        {/* ---- Patterns (buyer only) ---- */}
-        {!client && (
+        {/* ---- Patterns (buyer only, and only when its toggle is on) ---- */}
+        {sections.patterns && !client && (
           <section
             className="animate-rise mt-12"
-            style={stagger(5 + marketShift)}
+            style={stagger(staggerFor(sectionNumbers.patterns))}
           >
-            <SectionHead n={secNum(4 + marketShift, 0)} title="Patterns" />
+            <SectionHead n={sectionNumbers.patterns!} title="Patterns" />
             <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2">
               {(
                 [
@@ -1034,13 +1123,18 @@ export function Report({
           </section>
         )}
 
-        {/* ---- Next tests: the run-list ledger ---- */}
+        {/* ---- Next tests: the run-list ledger. Creative briefs live
+            nested inside, never as their own numbered section — hiding
+            Next tests hides the nested briefs block too, regardless of
+            the Creative briefs toggle's own state, simply because
+            nothing inside an unrendered section can render. ---- */}
+        {sections.nextTests && (
         <section
           className="animate-rise mt-12"
-          style={stagger((client ? 5 : 6) + marketShift)}
+          style={stagger(staggerFor(sectionNumbers.nextTests))}
         >
           <SectionHead
-            n={secNum(5 + marketShift, 4 + marketShift)}
+            n={sectionNumbers.nextTests!}
             title={client ? "What we'll test next" : "Next tests — run list"}
             right={
               !client ? (
@@ -1084,8 +1178,14 @@ export function Report({
           )}
 
           {/* Creative briefs: queue a test, turn it into a hand-off
-              brief. Buyer view only; session-only like everything. */}
-          {!client && (
+              brief. Buyer view only; session-only like everything.
+              Gated on sections.creativeBriefs too — never a numbered
+              section of its own (see the note above the section open),
+              so hiding it never touches numbering. Both the "Generate"
+              affordance and any already-generated briefs hide together
+              — showing a button whose output is permanently hidden
+              would be confusing. */}
+          {!client && sections.creativeBriefs && (
             <div className="print-hidden flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.08] pt-4">
               <button
                 type="button"
@@ -1108,7 +1208,7 @@ export function Report({
             </div>
           )}
 
-          {!client && briefIdxs.length > 0 && (
+          {!client && sections.creativeBriefs && briefIdxs.length > 0 && (
             <div className="mt-8">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 Creative briefs
@@ -1128,15 +1228,18 @@ export function Report({
             </div>
           )}
         </section>
+        )}
 
-        {/* ---- What not to do (only when the data supports bullets) ---- */}
+        {/* ---- What not to do (only when the data supports bullets; not
+            part of the customization toggle surface — data-driven
+            exactly as before) ---- */}
         {avoidBullets.length > 0 && (
           <section
             className="animate-rise mt-12"
-            style={stagger((client ? 6 : 7) + marketShift)}
+            style={stagger(staggerFor(sectionNumbers.whatNotToDo))}
           >
             <SectionHead
-              n={secNum(6 + marketShift, 5 + marketShift)}
+              n={sectionNumbers.whatNotToDo!}
               title={client ? "What we're avoiding" : "What not to do"}
             />
             <ul className="mt-4 space-y-2">
@@ -1153,12 +1256,13 @@ export function Report({
         )}
 
         {/* ---- Confidence ---- */}
+        {sections.confidence && (
         <section
           className="animate-rise mt-10"
-          style={stagger((client ? 6 : 7) + marketShift + avoidShift)}
+          style={stagger(staggerFor(sectionNumbers.confidence))}
         >
           <SectionHead
-            n={secNum(6 + marketShift + avoidShift, 5 + marketShift + avoidShift)}
+            n={sectionNumbers.confidence!}
             title={client ? "Confidence & data used" : "Confidence & missing data"}
             right={
               <span
@@ -1222,14 +1326,20 @@ export function Report({
             </div>
           )}
         </section>
+        )}
 
-        {/* Sign-off */}
+        {/* Sign-off. The optional editorial line below is what
+            sections.signOff controls; the Meta disclaimer and
+            "Generated with Debrief" line further down are MANDATORY —
+            never hidden by any customization toggle. */}
         <footer className="mt-14">
           <div aria-hidden="true" className="h-px bg-white/[0.08]" />
-          <p className="print-footer mt-4 text-xs text-zinc-400">
-            Deterministic scoring — every number above comes from your CSV, not
-            a model.
-          </p>
+          {sections.signOff && (
+            <p className="print-footer mt-4 text-xs text-zinc-400">
+              Deterministic scoring — every number above comes from your CSV, not
+              a model.
+            </p>
+          )}
           {/* Print-only: the on-screen site footer carrying this
               disclaimer is .print-hidden, so the exported document
               needs its own — repeated here rather than assumed from
@@ -1243,6 +1353,14 @@ export function Report({
           </p>
         </footer>
       </article>
+
+      <ReportCustomizationPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        actions={customizationActions}
+        sections={PERFORMANCE_SECTIONS}
+        defaultTitlePlaceholder={memo.scope.product}
+      />
     </div>
   );
 }

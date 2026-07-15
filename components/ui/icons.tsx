@@ -216,3 +216,18 @@ export function GaugeIcon({ className = "h-4 w-4" }: { className?: string }) {
     </Icon>
   );
 }
+
+/** Three horizontal sliders — used only by the report customization
+ *  drawer's trigger button. */
+export function SlidersIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={`shrink-0 ${className}`}>
+      <line x1="4" x2="20" y1="6" y2="6" />
+      <circle cx="9" cy="6" r="2" fill="currentColor" stroke="none" />
+      <line x1="4" x2="20" y1="12" y2="12" />
+      <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
+      <line x1="4" x2="20" y1="18" y2="18" />
+      <circle cx="11" cy="18" r="2" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}

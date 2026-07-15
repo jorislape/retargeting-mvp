@@ -1,7 +1,16 @@
+import { useState } from "react";
 import type { CompetitorDebrief, CompetitorDebriefTest, LearningOutcome } from "@/modules/competitorDebrief";
 import { btnSecondary, card, cardNested, eyebrow } from "@/components/ui/theme";
-import { AlertTriangleIcon, ArrowIcon, CheckIcon, PrinterIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, ArrowIcon, CheckIcon, PrinterIcon, SlidersIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/ui/brand";
+import {
+  COMPETITOR_CLIENT_MODE_HIDDEN,
+  COMPETITOR_SECTIONS,
+  COMPETITOR_SECTION_IDS,
+} from "@/components/report/reportSections";
+import { accentCssVars, getAccentById } from "@/components/report/reportCustomization";
+import { useReportCustomization } from "@/components/report/useReportCustomization";
+import { ReportCustomizationPanel } from "@/components/report/ReportCustomizationPanel";
 
 /** Mirrors CompetitorDebriefPanel's LEARNING_OUTCOME_COPY — kept as a
  *  small local duplicate rather than a shared import since this is
@@ -270,8 +279,15 @@ export function CompetitorDebriefResult({
   debrief: CompetitorDebrief;
   generatedAt?: number | null;
 }) {
+  const customizationActions = useReportCustomization(COMPETITOR_SECTION_IDS, COMPETITOR_CLIENT_MODE_HIDDEN);
+  const { customization } = customizationActions;
+  const [panelOpen, setPanelOpen] = useState(false);
+  const accent = getAccentById(customization.accentId);
+  const displayTitle = customization.reportTitle.trim() || debrief.competitorName;
+  const sections = customization.sections;
+
   return (
-    <div className={`${card} min-w-0 space-y-6 p-5 sm:p-6`}>
+    <div style={accentCssVars(accent) as React.CSSProperties} className={`${card} min-w-0 space-y-6 p-5 sm:p-6`}>
       {/* Print-only masthead: brand + report type + subtitle. The
           competitor name and generation date follow immediately below
           in the existing header block (already print-visible), so
@@ -288,7 +304,18 @@ export function CompetitorDebriefResult({
         </p>
       </div>
 
-      <div className="print-hidden flex items-center justify-end">
+      <div className="print-hidden flex items-center justify-end gap-2">
+        {/* Customization only ever appears once a report already exists —
+            this button lives here, inside the result itself, never in the
+            input panel. */}
+        <button
+          type="button"
+          onClick={() => setPanelOpen(true)}
+          className={`cursor-pointer ${btnSecondary}`}
+        >
+          <SlidersIcon className="h-3.5 w-3.5" />
+          Customize report
+        </button>
         <button
           type="button"
           onClick={() => window.print()}
@@ -296,24 +323,57 @@ export function CompetitorDebriefResult({
           className={`cursor-pointer ${btnSecondary}`}
         >
           <PrinterIcon className="h-3.5 w-3.5" />
-          Save as PDF
+          Print / Save PDF
         </button>
       </div>
 
       <div className="min-w-0 space-y-1.5">
-        <p className={`${eyebrow} min-w-0 break-words`}>{debrief.competitorName}</p>
-        <p className="print-only text-[11px] text-zinc-500">
-          {generatedAt ? `Generated ${new Date(generatedAt).toLocaleString()}` : ""}
-        </p>
-        {debrief.sources.adsLibraryUrl && (
-          <SourceLink label="Meta Ads Library" url={debrief.sources.adsLibraryUrl} />
+        <div className="flex items-start justify-between gap-4">
+          <p className={`${eyebrow} min-w-0 break-words`}>{displayTitle}</p>
+          {customization.agencyLogo && (
+            // eslint-disable-next-line @next/next/no-img-element -- blob: object URL, no next/image loader applies
+            <img
+              src={customization.agencyLogo.url}
+              alt={customization.agencyName ? `${customization.agencyName} logo` : "Agency logo"}
+              className="print-logo h-7 w-auto max-w-[120px] shrink-0 object-contain"
+            />
+          )}
+        </div>
+        {(customization.agencyName || customization.clientName) && (
+          <p className="text-[11px] text-zinc-400">
+            {customization.agencyName && (
+              <>
+                Prepared by <span className="font-medium text-zinc-300">{customization.agencyName}</span>
+              </>
+            )}
+            {customization.agencyName && customization.clientName && " · "}
+            {customization.clientName && (
+              <>
+                for <span className="font-medium text-zinc-300">{customization.clientName}</span>
+              </>
+            )}
+          </p>
         )}
-        {debrief.sources.websiteUrl && (
-          <SourceLink label="Website" url={debrief.sources.websiteUrl} />
+        <p className="print-only text-[11px] text-zinc-500">
+          {customization.dateOverride
+            ? new Date(`${customization.dateOverride}T00:00:00`).toLocaleDateString()
+            : generatedAt
+              ? `Generated ${new Date(generatedAt).toLocaleString()}`
+              : ""}
+        </p>
+        {sections.sources && (
+          <>
+            {debrief.sources.adsLibraryUrl && (
+              <SourceLink label="Meta Ads Library" url={debrief.sources.adsLibraryUrl} />
+            )}
+            {debrief.sources.websiteUrl && (
+              <SourceLink label="Website" url={debrief.sources.websiteUrl} />
+            )}
+          </>
         )}
       </div>
 
-      {!debrief.insufficientEvidence && <ExecutiveSummary debrief={debrief} />}
+      {!debrief.insufficientEvidence && sections.executiveSummary && <ExecutiveSummary debrief={debrief} />}
 
       <div className={`${cardNested} min-w-0 p-4`}>
         <p className="print-kv-label mb-1 text-xs font-semibold text-white">Evidence summary</p>
@@ -329,17 +389,19 @@ export function CompetitorDebriefResult({
         </div>
       ) : (
         <>
-          <div className="min-w-0 space-y-2">
-            <p className={sectionLabel}>Observed evidence</p>
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-              <Section title="Recurring hooks" items={debrief.recurringHooks} />
-              <Section title="Creative formats" items={debrief.creativeFormats} />
-              <Section title="Offer patterns" items={debrief.offerPatterns} />
-              <Section title="Positioning themes" items={debrief.positioningThemes} />
+          {sections.observedEvidence && (
+            <div className="min-w-0 space-y-2">
+              <p className={sectionLabel}>Observed evidence</p>
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <Section title="Recurring hooks" items={debrief.recurringHooks} />
+                <Section title="Creative formats" items={debrief.creativeFormats} />
+                <Section title="Offer patterns" items={debrief.offerPatterns} />
+                <Section title="Positioning themes" items={debrief.positioningThemes} />
+              </div>
             </div>
-          </div>
+          )}
 
-          {hasStrategicPatterns(debrief) && (
+          {sections.strategicPatterns && hasStrategicPatterns(debrief) && (
             <div className="min-w-0 space-y-2">
               <p className={sectionLabel}>Strategic patterns — directional interpretation</p>
               <p className="text-[11px] leading-relaxed text-zinc-500">
@@ -358,7 +420,7 @@ export function CompetitorDebriefResult({
             </div>
           )}
 
-          {debrief.strategicSummary && (
+          {sections.strategicSummary && debrief.strategicSummary && (
             <div className="print-avoid-break min-w-0 rounded-lg border border-accent/25 bg-accent/[0.06] p-4">
               <p className="print-kv-label mb-1 text-xs font-semibold text-accent-soft">
                 Strategic summary
@@ -369,7 +431,7 @@ export function CompetitorDebriefResult({
             </div>
           )}
 
-          {debrief.whatStandsOut.length > 0 && (
+          {sections.whatStandsOut && debrief.whatStandsOut.length > 0 && (
             <div className="min-w-0 space-y-2">
               <p className={sectionLabel}>What stands out — directional interpretation</p>
               <div className={`${cardNested} print-avoid-break min-w-0 p-4`}>
@@ -385,9 +447,9 @@ export function CompetitorDebriefResult({
             </div>
           )}
 
-          <InternalLearningsConsidered debrief={debrief} />
+          {sections.internalLearnings && <InternalLearningsConsidered debrief={debrief} />}
 
-          {debrief.nextTests.length > 0 && (
+          {sections.nextTests && debrief.nextTests.length > 0 && (
             <div className="min-w-0 space-y-2">
               <p className={sectionLabel}>Next creative tests — directional interpretation</p>
               <div className="space-y-3">
@@ -398,14 +460,19 @@ export function CompetitorDebriefResult({
             </div>
           )}
 
-          <Section title="What to monitor next" items={debrief.whatToMonitorNext} />
+          {sections.whatToMonitor && <Section title="What to monitor next" items={debrief.whatToMonitorNext} />}
         </>
       )}
 
       <div className="min-w-0 space-y-1 border-t border-white/[0.06] pt-4">
-        <p className="print-footer min-w-0 max-w-prose break-words text-[11px] leading-relaxed text-zinc-500">
-          {debrief.caveat}
-        </p>
+        {/* sections.footer gates only this editorial caveat line — the
+            Meta non-affiliation disclaimer just below is mandatory and
+            never gated by any toggle (see the scope fence). */}
+        {sections.footer && (
+          <p className="print-footer min-w-0 max-w-prose break-words text-[11px] leading-relaxed text-zinc-500">
+            {debrief.caveat}
+          </p>
+        )}
         {/* Print-only: repeats the essentials in case this page is
             handed off apart from the on-screen app. */}
         <p className="print-only print-footer min-w-0 leading-relaxed text-zinc-500">
@@ -413,6 +480,14 @@ export function CompetitorDebriefResult({
           {generatedAt ? ` on ${new Date(generatedAt).toLocaleString()}` : ""}.
         </p>
       </div>
+
+      <ReportCustomizationPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        actions={customizationActions}
+        sections={COMPETITOR_SECTIONS}
+        defaultTitlePlaceholder={debrief.competitorName}
+      />
     </div>
   );
 }

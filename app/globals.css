@@ -252,10 +252,10 @@ body {
      visible mid-gray in black-and-white, used sparingly for section
      labels and key values, never as a fill. */
   body .print-accent {
-    color: #0e7490 !important;
+    color: var(--report-accent-print, #0e7490) !important;
   }
   body .print-accent-border {
-    border-color: #0e7490 !important;
+    border-color: var(--report-accent-print, #0e7490) !important;
   }
 
   /* Label/value emphasis inside summary and strategic sections: the
@@ -283,8 +283,8 @@ body {
     border-bottom-width: 1.5px !important;
   }
   body .print-section-label {
-    color: #0e7490 !important;
-    border-bottom-color: #0e7490 !important;
+    color: var(--report-accent-print, #0e7490) !important;
+    border-bottom-color: var(--report-accent-print, #0e7490) !important;
   }
 
   /* A compact, bordered callout for the print-only executive summary
@@ -296,7 +296,7 @@ body {
     padding: 10px 14px;
   }
   body .print-exec-summary {
-    border-color: #0e7490 !important;
+    border-color: var(--report-accent-print, #0e7490) !important;
   }
 
   /* One quiet, consistent footer treatment for both reports — applied
@@ -318,6 +318,23 @@ body {
     width: 100% !important;
     margin: 0 !important;
     overflow-x: hidden !important;
+  }
+
+  /* Agency logo (White-label Report Customization V1A): the masthead
+     row sizes it with Tailwind height, max-width, and object-contain
+     utilities on screen, but this codebase has already hit real
+     Safari print bugs where flex-row sizing goes unpredictable once
+     the page-constrained print pass kicks in (see .workspace-shell
+     below) — reasserting the same constraints explicitly here, at
+     print-media specificity, means the logo can't get stretched or
+     blow out the row even if a browser's print layout pass
+     miscomputes the flex sizing. */
+  .print-logo {
+    max-height: 32px !important;
+    width: auto !important;
+    max-width: 140px !important;
+    object-fit: contain !important;
+    flex-shrink: 0 !important;
   }
 
   /* Safari has documented print bugs with flex layouts sizing
