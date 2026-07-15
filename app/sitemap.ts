@@ -19,6 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/vs-chatgpt", priority: 0.6 },
     { path: "/sample", priority: 0.6 },
     { path: "/pricing", priority: 0.5 },
+    { path: "/founding", priority: 0.5 },
     { path: "/about", priority: 0.4 },
     { path: "/privacy", priority: 0.3 },
     { path: "/security", priority: 0.3 },

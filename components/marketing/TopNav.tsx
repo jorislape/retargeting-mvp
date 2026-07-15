@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/sample", label: "Sample report" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/vs-chatgpt", label: "vs. ChatGPT" },
+  { href: "/founding", label: "Founding" },
   { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "About" },
 ] as const;

@@ -27,6 +27,7 @@ const NAV = [
    the workspace footer instead. */
 const SECONDARY_NAV = [
   { href: "/pricing", label: "Pricing" },
+  { href: "/founding", label: "Founding" },
   { href: "/about", label: "About" },
   { href: "/vs-chatgpt", label: "vs. ChatGPT" },
   { href: "/security", label: "Security" },
