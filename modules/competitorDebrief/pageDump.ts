@@ -135,6 +135,15 @@ const MAX_PREAMBLE_LABEL_WORDS = 6;
 export interface LeadingHeaderStripResult {
   cleaned: string;
   headerLinesRemoved: number;
+  /** Competitor Input Trust V2: the last short "label" line swept as
+   *  part of the leading preamble — the deterministic best guess at a
+   *  page/profile name for a paste that opens on a single advertiser's
+   *  profile view (as opposed to per-card "Sponsored" chrome, captured
+   *  separately in stripChromeLines below). null when no such label
+   *  line was swept. This does not change WHICH lines count as
+   *  preamble — only records the one already-recognized as a label,
+   *  never a new heuristic. */
+  leadingPageName: string | null;
 }
 
 /**
@@ -160,6 +169,7 @@ export function stripLeadingHeader(text: string): LeadingHeaderStripResult {
   let removed = 0;
   let sawHeaderAnchor = false;
   let consecutiveLabels = 0;
+  let leadingPageName: string | null = null;
 
   while (i < lines.length) {
     const trimmed = lines[i].trim();
@@ -185,6 +195,7 @@ export function stripLeadingHeader(text: string): LeadingHeaderStripResult {
     if (sawHeaderAnchor && looksLikeLabel && consecutiveLabels < MAX_CONSECUTIVE_PREAMBLE_LABELS) {
       consecutiveLabels++;
       removed++;
+      leadingPageName = trimmed;
       i++;
       continue;
     }
@@ -192,7 +203,7 @@ export function stripLeadingHeader(text: string): LeadingHeaderStripResult {
     break;
   }
 
-  return { cleaned: lines.slice(i).join("\n"), headerLinesRemoved: removed };
+  return { cleaned: lines.slice(i).join("\n"), headerLinesRemoved: removed, leadingPageName };
 }
 
 /* ------------------------------------------------------------------ */
@@ -219,12 +230,11 @@ const CHROME_LINE_PATTERNS: { label: string; re: RegExp }[] = [
   // "I started running on empty stomachs" can never match — the Meta
   // chrome phrase is always followed by a date, never a description.
   { label: "started running on", re: /^\s*started\s+running\s+on\s+[A-Za-z]+\.?\s+\d{1,2},?\s+\d{4}\b.*$/i },
-  { label: "bare sponsored line", re: /^\s*sponsored\s*$/i },
-  // "Sponsored · Page Name" / "Sponsored - Page Name" — a distinctive,
-  // literal UI construct no real ad copy would write as body text;
-  // anchored on the word "Sponsored" plus a separator, never on
-  // guessing the page name itself.
-  { label: "sponsored + page name", re: /^\s*sponsored\s*(?:[·•|]|-{1,2})\s*\S.*$/i },
+  // NOTE: bare "Sponsored" and "Sponsored · Page Name" are NOT in this
+  // generic list — Competitor Input Trust V2 handles both with
+  // dedicated logic in stripChromeLines below, since (unlike every
+  // other chrome pattern here) they carry advertiser-attribution
+  // evidence that must be captured, not just deleted.
   { label: "see ad details", re: /^\s*see\s+ad\s+details\s*$/i },
   { label: "see summary details", re: /^\s*see\s+summary\s+details\s*$/i },
   { label: "why am I seeing this ad", re: /^\s*why\s+am\s+i\s+seeing\s+this\s+ad\??\s*$/i },
@@ -241,6 +251,34 @@ export interface ChromeStripResult {
   removedLineCount: number;
 }
 
+/* ------------------------------------------------------------------ */
+/* Competitor Input Trust V2: advertiser/page-name marker              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Internal-only sentinel used to smuggle a captured page name THROUGH
+ * boundary detection (Stage B), which otherwise only ever sees plain
+ * ad-copy lines. "§" is deliberately never a valid piece of Ads
+ * Library chrome or real ad copy, so a marker line can never collide
+ * with pasted text; it's stripped back out (see extractPageNameMarker)
+ * before parseAdExample or any user-facing rendering ever sees it —
+ * this is internal plumbing, not a new visible format.
+ */
+const PAGE_NAME_MARKER_PREFIX = "§PAGE_NAME:";
+const PAGE_NAME_MARKER_SUFFIX = "§";
+const PAGE_NAME_MARKER_LINE_RE = /^§PAGE_NAME:(.*)§$/;
+
+function makePageNameMarker(name: string): string {
+  return `${PAGE_NAME_MARKER_PREFIX}${name.trim()}${PAGE_NAME_MARKER_SUFFIX}`;
+}
+
+// "Sponsored · Page Name" / "Sponsored - Page Name" — a distinctive,
+// literal UI construct no real ad copy would write as body text;
+// anchored on the word "Sponsored" plus a separator. Capturing group
+// isolates the name itself so it can be preserved instead of deleted.
+const SPONSORED_PAGE_NAME_RE = /^\s*sponsored\s*(?:[·•|]|-{1,2})\s*(\S.*?)\s*$/i;
+const BARE_SPONSORED_RE = /^\s*sponsored\s*$/i;
+
 /**
  * Strips known chrome lines. `competitorName`, when provided,
  * additionally strips a line ONLY when it is an exact (whitespace/case
@@ -248,6 +286,22 @@ export interface ChromeStripResult {
  * a partial/substring match, never based on how often it repeats. Blank
  * lines are always preserved (they still matter for Stage B's reused
  * blank-line-run tier).
+ *
+ * Competitor Input Trust V2: the two per-card "this is whose ad it is"
+ * shapes are no longer silently deleted — they're replaced with an
+ * internal marker (see above) so processPageDump can attach the
+ * captured name to whichever candidate follows:
+ *   - "Sponsored · Page Name" (one line) — name captured directly.
+ *   - bare "Sponsored" immediately followed by a short, unpunctuated,
+ *     non-CTA, non-chrome label line (the real shape this repo's own
+ *     Ads Library regression fixture uses: "Sponsored" / "Nike" on two
+ *     separate lines) — reuses the EXACT label-shape heuristic
+ *     stripLeadingHeader already uses, not a new pattern. If nothing
+ *     label-shaped follows, only the bare "Sponsored" line is removed,
+ *     exactly as before.
+ * Every other chrome pattern (Library ID, Active/Inactive, Platforms,
+ * etc.) is still a plain, unrecovered delete — none of them carry
+ * attribution evidence.
  */
 export function stripChromeLines(text: string, competitorName?: string): ChromeStripResult {
   const normalizedCompetitorName =
@@ -256,24 +310,149 @@ export function stripChromeLines(text: string, competitorName?: string): ChromeS
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const kept: string[] = [];
   let removedLineCount = 0;
+  let i = 0;
 
-  for (const line of lines) {
+  while (i < lines.length) {
+    const line = lines[i];
     const trimmed = line.trim();
+
     if (trimmed === "") {
       kept.push(line);
+      i++;
       continue;
     }
+
+    const sponsoredNameMatch = SPONSORED_PAGE_NAME_RE.exec(trimmed);
+    if (sponsoredNameMatch) {
+      removedLineCount++;
+      kept.push(makePageNameMarker(sponsoredNameMatch[1]));
+      i++;
+      continue;
+    }
+
+    if (BARE_SPONSORED_RE.test(trimmed)) {
+      const nextTrimmed = i + 1 < lines.length ? lines[i + 1].trim() : "";
+      const nextWordCount = nextTrimmed.split(/\s+/).filter(Boolean).length;
+      const nextLooksLikeLabel =
+        nextTrimmed !== "" &&
+        nextWordCount > 0 &&
+        nextWordCount <= MAX_PREAMBLE_LABEL_WORDS &&
+        !/[.!?]$/.test(nextTrimmed) &&
+        !isBareCtaLine(nextTrimmed) &&
+        !CHROME_LINE_PATTERNS.some(({ re }) => re.test(nextTrimmed));
+      if (nextLooksLikeLabel) {
+        removedLineCount += 2;
+        kept.push(makePageNameMarker(nextTrimmed));
+        i += 2;
+        continue;
+      }
+      // Bare "Sponsored" always gets removed, whether or not anything
+      // label-shaped follows it.
+      removedLineCount++;
+      i++;
+      continue;
+    }
+
     const isKnownChrome = CHROME_LINE_PATTERNS.some(({ re }) => re.test(trimmed));
     const isExactCompetitorNameLine =
       normalizedCompetitorName !== null && normalizeForDedupe(trimmed) === normalizedCompetitorName;
     if (isKnownChrome || isExactCompetitorNameLine) {
       removedLineCount++;
+      i++;
       continue;
     }
     kept.push(line);
+    i++;
   }
 
   return { cleaned: kept.join("\n"), removedLineCount };
+}
+
+/**
+ * Pulls any internal advertiser/page-name marker(s) out of a boundary-
+ * cut segment's raw text, returning marker-free text plus the resolved
+ * page name. A segment normally carries at most one marker; it can
+ * carry more only when boundary detection under-split two differently-
+ * attributed cards into one segment — if the markers found disagree
+ * (compared via normalizeForDedupe, the same helper used everywhere
+ * else in this module), attribution is treated as unknown rather than
+ * guessing which one is right. Markers that all agree resolve to that
+ * one name. Never touches parseAdExample, completeness, or grouping —
+ * this always runs first so nothing downstream ever sees a marker.
+ */
+export function extractPageNameMarker(raw: string): { raw: string; pageName: string | null } {
+  const lines = raw.split("\n");
+  const kept: string[] = [];
+  const found: string[] = [];
+  for (const line of lines) {
+    const match = PAGE_NAME_MARKER_LINE_RE.exec(line.trim());
+    if (match) {
+      found.push(match[1]);
+    } else {
+      kept.push(line);
+    }
+  }
+  if (found.length === 0) return { raw, pageName: null };
+  const normalizedSet = new Set(found.map((n) => normalizeForDedupe(n)));
+  const pageName = normalizedSet.size === 1 ? found[0] : null;
+  return { raw: kept.join("\n").trim(), pageName };
+}
+
+/* ------------------------------------------------------------------ */
+/* Competitor Input Trust V2 Checkpoint 2/3: attribution classification */
+/* ------------------------------------------------------------------ */
+
+export type AdvertiserAttribution = "match" | "mismatch" | "unknown";
+
+/**
+ * Checkpoint 3: splits a user-typed "Also known as / alternate Page
+ * names" field into a plain list — comma-separated, trimmed, empty
+ * entries dropped. No dedup, no normalization here (that happens at
+ * comparison time in classifyAdvertiserAttribution, via
+ * normalizeForDedupe, the same helper this module already uses
+ * everywhere else) — this function only parses the raw text shape.
+ */
+export function parseAliases(aliasesText: string): string[] {
+  return aliasesText
+    .split(",")
+    .map((a) => a.trim())
+    .filter((a) => a !== "");
+}
+
+/**
+ * Deterministic attribution classification, Ads Library page mode
+ * only — reuses normalizeForDedupe exactly as Checkpoint 1 did for
+ * pageName/grouping comparisons, the same helper this module already
+ * uses everywhere else. No fuzzy matching, no punctuation stripping,
+ * no substring matching, no semantic similarity.
+ *
+ *   match    — pageName is non-null AND its normalized form equals the
+ *              normalized competitorName OR any normalized alias.
+ *   mismatch — pageName is non-null AND its normalized form matches
+ *              neither the normalized competitorName nor any alias.
+ *   unknown  — pageName is null (attribution impossible), OR neither
+ *              competitorName nor any alias has been given yet
+ *              (nothing to compare against) — never reported as
+ *              "mismatch" just because the form hasn't been filled in.
+ *
+ * Aliases only ever WIDEN the match set (a name that used to mismatch
+ * can become a match once a matching alias is added) — they can never
+ * turn an existing match into a mismatch, since competitorName itself
+ * is always still one of the accepted names.
+ */
+export function classifyAdvertiserAttribution(
+  pageName: string | null,
+  competitorName?: string,
+  aliases?: string[]
+): AdvertiserAttribution {
+  if (pageName === null) return "unknown";
+  const acceptedNames = [competitorName, ...(aliases ?? [])].filter(
+    (n): n is string => n !== undefined && n.trim() !== ""
+  );
+  if (acceptedNames.length === 0) return "unknown";
+  const normalizedPageName = normalizeForDedupe(pageName);
+  const normalizedAccepted = acceptedNames.map((n) => normalizeForDedupe(n));
+  return normalizedAccepted.includes(normalizedPageName) ? "match" : "mismatch";
 }
 
 /* ------------------------------------------------------------------ */
@@ -426,17 +605,36 @@ export interface VariantGroupingResult {
  * clustering, unlike Stage C's exact match, which stays authoritative.
  * Never deletes anything — every member of every group remains an
  * individually addressable candidate for the caller.
+ *
+ * Competitor Input Trust V2: `pageNames`, when provided, is a HARD gate
+ * checked before any text-similarity comparison — two candidates are
+ * never unioned (exact OR near-duplicate) when both have a non-null
+ * captured pageName and those names differ (normalizeForDedupe-
+ * compared, the same helper this module already uses everywhere else —
+ * no second normalization system). Brand identity, once captured,
+ * overrules text similarity; near-identical copy from two different
+ * advertisers must never be presented as "the same ad." A null
+ * pageName (attribution unknown) never blocks grouping by itself —
+ * only a genuine, known mismatch does. Omitting `pageNames` entirely
+ * preserves the exact pre-V2 behavior.
  */
-export function groupPossibleVariants(texts: string[]): VariantGroupingResult {
+export function groupPossibleVariants(texts: string[], pageNames?: (string | null)[]): VariantGroupingResult {
   const n = texts.length;
   const uf = new UnionFind(n);
   const tokenLists = texts.map(tokenize);
   const bigramSets = tokenLists.map(bigramSet);
+  const normalizedPageName = (i: number): string | null => {
+    const name = pageNames?.[i];
+    return name && name.trim() !== "" ? normalizeForDedupe(name) : null;
+  };
 
   for (let i = 0; i < n; i++) {
     if (texts[i].trim() === "") continue;
     for (let j = i + 1; j < n; j++) {
       if (texts[j].trim() === "") continue;
+      const pageNameI = normalizedPageName(i);
+      const pageNameJ = normalizedPageName(j);
+      if (pageNameI !== null && pageNameJ !== null && pageNameI !== pageNameJ) continue;
       const isExact = normalizeForDedupe(texts[i]) === normalizeForDedupe(texts[j]);
       const isNear =
         !isExact &&
@@ -519,13 +717,28 @@ export interface RepresentativeSelection {
  * candidates exist, all of them are selected (mirrors the existing
  * "if only two ads qualify, you see two" rule used elsewhere in this
  * codebase).
+ *
+ * Competitor Input Trust V2 Checkpoint 2: `attribution`, when
+ * provided, is an additional eligibility gate ON TOP OF the existing
+ * malformed check — a candidate whose attribution is "mismatch" or
+ * "unknown" can NEVER become a pool member or a group's representative,
+ * no matter how complete or rich its content is. This is deliberately
+ * a gate, not a ranking factor: within the eligible ("match") set, the
+ * existing completeness/richness ranking is completely unchanged. A
+ * variant group with no eligible member contributes nothing to the
+ * pool — every one of its members simply stays unselected, which is
+ * how a genuine zero-match state is reached rather than worked around.
+ * Omitting `attribution` preserves the exact pre-Checkpoint-2 behavior.
  */
 export function selectRepresentatives(
   completenessList: AdCompleteness[],
-  groupIdByIndex: (number | null)[]
+  groupIdByIndex: (number | null)[],
+  attribution?: AdvertiserAttribution[]
 ): RepresentativeSelection {
   const n = completenessList.length;
   const isRepresentative = new Array(n).fill(false);
+  const isEligible = (i: number) =>
+    completenessList[i].status !== "malformed" && (attribution === undefined || attribution[i] === "match");
 
   const groupBestIndex = new Map<number, number>();
   const pool: number[] = [];
@@ -533,10 +746,10 @@ export function selectRepresentatives(
   for (let i = 0; i < n; i++) {
     const groupId = groupIdByIndex[i];
     if (groupId === null) {
-      if (completenessList[i].status !== "malformed") pool.push(i);
+      if (isEligible(i)) pool.push(i);
       continue;
     }
-    if (completenessList[i].status === "malformed") continue;
+    if (!isEligible(i)) continue;
     const currentBest = groupBestIndex.get(groupId);
     if (
       currentBest === undefined ||
@@ -649,6 +862,19 @@ export interface PageDumpCandidate {
   boundaryConfidence: BoundaryConfidence;
   variantGroupId: number | null;
   isRepresentative: boolean;
+  /** Competitor Input Trust V2: the captured advertiser/page name for
+   *  this candidate — from its own per-card "Sponsored"/"Sponsored ·
+   *  Name" marker if one was found, else the page-level
+   *  leadingPageName fallback (a single-profile-view paste), else
+   *  null. null means attribution is genuinely impossible for this
+   *  candidate — never a guess. Exact, string-normalized comparisons
+   *  only (see groupPossibleVariants); no fuzzy matching, no AI. */
+  pageName: string | null;
+  /** Checkpoint 2: classifyAdvertiserAttribution(pageName,
+   *  competitorName) — computed once here, read back by the caller and
+   *  by selectRepresentatives above. See that function for the exact
+   *  match/mismatch/unknown rules. */
+  advertiserAttribution: AdvertiserAttribution;
 }
 
 export interface PageDumpResult {
@@ -672,14 +898,36 @@ export interface PageDumpResult {
 
 /**
  * The single entry point: one large pasted blob in, a reviewable set of
- * candidates out. `competitorName` is optional and used ONLY for the
- * exact-match competitor-name chrome-stripping rule (Stage A) — passing
- * it never changes boundary detection, grouping, or selection.
+ * candidates out. `competitorName` is optional and has two effects,
+ * both additive: the exact-match chrome-stripping rule (Stage A,
+ * unchanged since Checkpoint 1), and — new in Checkpoint 2 — the
+ * advertiserAttribution classification of every candidate against it
+ * (see classifyAdvertiserAttribution), which selectRepresentatives
+ * then uses as a hard eligibility gate. Passing it never changes
+ * boundary detection or grouping. `aliases` (Checkpoint 3) only widens
+ * the match set for that same classification — it has no effect on
+ * Stage A's chrome-stripping rule, which still only strips an exact
+ * competitorName line.
  */
-export function processPageDump(rawInput: string, competitorName?: string): PageDumpResult {
-  const { cleaned: withoutHeader, headerLinesRemoved } = stripLeadingHeader(rawInput);
+export function processPageDump(rawInput: string, competitorName?: string, aliases?: string[]): PageDumpResult {
+  const { cleaned: withoutHeader, headerLinesRemoved, leadingPageName } = stripLeadingHeader(rawInput);
   const { cleaned, removedLineCount } = stripChromeLines(withoutHeader, competitorName);
-  const allSegments = detectAdBoundaries(cleaned).filter((s) => s.raw.trim() !== "");
+  const rawSegments = detectAdBoundaries(cleaned).filter((s) => s.raw.trim() !== "");
+
+  // Competitor Input Trust V2: pull any per-segment advertiser marker
+  // out before anything else touches this text — parseAdExample,
+  // completeness, and grouping must never see the internal marker as
+  // ad content. A segment with no marker of its own falls back to the
+  // page-level leadingPageName (the single-profile-view paste shape)
+  // rather than being left unknown when a page-level name IS
+  // available; a segment with neither stays null (attribution
+  // genuinely impossible), never guessed.
+  const markerExtracted = rawSegments.map((s) => extractPageNameMarker(s.raw));
+  const allSegments: BoundarySegment[] = rawSegments.map((s, i) => ({
+    raw: markerExtracted[i].raw,
+    confidence: s.confidence,
+  }));
+  const allPageNames: (string | null)[] = markerExtracted.map((e) => e.pageName ?? leadingPageName);
 
   const allParsed = allSegments.map((s) => parseAdExample(s.raw));
   const allCompleteness = allParsed.map((p) => computeAdCompleteness(p));
@@ -710,6 +958,7 @@ export function processPageDump(rawInput: string, competitorName?: string): Page
   const segments = useFilter ? allSegments.filter((_, i) => keepFlags[i]) : allSegments;
   const parsedList = useFilter ? allParsed.filter((_, i) => keepFlags[i]) : allParsed;
   const completenessList = useFilter ? allCompleteness.filter((_, i) => keepFlags[i]) : allCompleteness;
+  const pageNames = useFilter ? allPageNames.filter((_, i) => keepFlags[i]) : allPageNames;
   const nonAdFragmentsSkipped = useFilter
     ? exclusionReasons.filter((r) => r === "non-ad-fragment").length
     : 0;
@@ -717,9 +966,23 @@ export function processPageDump(rawInput: string, competitorName?: string): Page
     ? exclusionReasons.filter((r) => r === "destination-preview").length
     : 0;
 
+  // Checkpoint 2: classify once, per filtered candidate, then feed the
+  // SAME array into selectRepresentatives as a hard eligibility gate —
+  // never a ranking factor. This is what guarantees a mismatch/unknown
+  // candidate can't become default-included just by being the
+  // richest/first in its group or pool. The gate itself only applies
+  // when a real competitorName was actually typed — with none given
+  // yet (e.g. "Extract ads" clicked before the name field is filled
+  // in), there is nothing to validate against, so selection falls back
+  // to the exact pre-Checkpoint-2 (richness-only) behavior rather than
+  // zeroing out every default just because everything reads "unknown".
+  const hasAnyAcceptedName =
+    (competitorName !== undefined && competitorName.trim() !== "") || (aliases ?? []).some((a) => a.trim() !== "");
+  const attribution = pageNames.map((pageName) => classifyAdvertiserAttribution(pageName, competitorName, aliases));
+
   const texts = segments.map((s) => s.raw);
-  const { groupIdByIndex, groups } = groupPossibleVariants(texts);
-  const selection = selectRepresentatives(completenessList, groupIdByIndex);
+  const { groupIdByIndex, groups } = groupPossibleVariants(texts, pageNames);
+  const selection = selectRepresentatives(completenessList, groupIdByIndex, hasAnyAcceptedName ? attribution : undefined);
 
   const candidates: PageDumpCandidate[] = segments.map((seg, i) => ({
     id: i,
@@ -729,6 +992,8 @@ export function processPageDump(rawInput: string, competitorName?: string): Page
     boundaryConfidence: seg.confidence,
     variantGroupId: groupIdByIndex[i],
     isRepresentative: selection.isRepresentative[i],
+    pageName: pageNames[i],
+    advertiserAttribution: attribution[i],
   }));
 
   const warnings: PageDumpWarning[] = [];

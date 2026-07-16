@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type {
   AdCompleteness,
+  AdvertiserAttribution,
   BoundaryConfidence,
   CompetitorDebrief,
   CompetitorDebriefApiError,
@@ -16,6 +17,7 @@ import {
   findDuplicateIndices,
   normalizeForDedupe,
   parseAdExample,
+  parseAliases,
   parseBulkAdExamples,
   parseInternalLearnings,
   processPageDump,
@@ -26,11 +28,18 @@ import { btnPrimary, btnSecondary, card, cardNested, fieldLabel, inputBase } fro
 import { AlertTriangleIcon, CopyIcon, SparklesIcon } from "@/components/ui/icons";
 import { CompetitorDebriefResult } from "./CompetitorDebriefResult";
 import {
+  blocksGenerateForAttribution,
+  computeAdvertiserSummary,
   computeBlockIndexById,
   computePageDumpLiveStats,
   computeRenderItems,
+  countManuallyIncludedNonMatches,
+  hasAnyCapturedPageName,
+  hasPageDumpBlocks,
   isBlockIncludedForGenerate,
+  recomputeLiveAttribution,
   type AdBlock,
+  type AdvertiserSummaryGroup,
 } from "./pageDumpReview";
 
 /** Fill-in-the-blank shape the parser reads most reliably (explicit
@@ -129,6 +138,37 @@ const CONFIDENCE_COPY: Record<BoundaryConfidence, { label: string; className: st
   medium: { label: "Medium confidence split", className: "text-amber-300" },
   low: { label: "Low confidence split", className: "text-red-300" },
 };
+
+/** Checkpoint 3: per-candidate attribution badge — deliberately a
+ *  SEPARATE line from CONFIDENCE_COPY/completeness/duplicate above
+ *  (never merged into one badge), since "can we trust the split" and
+ *  "can we trust the source" are different questions. */
+const ATTRIBUTION_BADGE_COPY: Record<AdvertiserAttribution, { label: string; className: string }> = {
+  match: { label: "Match", className: "text-emerald-400" },
+  mismatch: { label: "Different advertiser", className: "text-amber-300" },
+  unknown: { label: "Unattributed", className: "text-zinc-400" },
+};
+
+/** Checkpoint 3: the "Advertisers detected" summary's per-group copy.
+ *  `disposition` describes the DEFAULT behavior of the whole group
+ *  ("included"/"excluded"), not a live per-render count — the
+ *  separate manual-inclusion warning banner covers what happens once a
+ *  user overrides that default for an individual candidate. */
+const ADVERTISER_SUMMARY_COPY: Record<
+  AdvertiserAttribution,
+  { icon: string; className: string; disposition: "included" | "excluded"; label: string }
+> = {
+  match: { icon: "✓", className: "text-emerald-400", disposition: "included", label: "Matches" },
+  mismatch: { icon: "⚠", className: "text-amber-300", disposition: "excluded", label: "Different advertiser" },
+  unknown: { icon: "?", className: "text-zinc-400", disposition: "excluded", label: "Unattributed" },
+};
+
+function summaryGroupLine(group: AdvertiserSummaryGroup, competitorName: string): string {
+  const copy = ADVERTISER_SUMMARY_COPY[group.status];
+  const noun = `ad${group.count === 1 ? "" : "s"}`;
+  const label = group.status === "match" ? `Matches ${competitorName || "competitor"}` : copy.label;
+  return `${label} — ${group.count} ${noun} ${copy.disposition}`;
+}
 
 function AdBlockCard({
   block,
@@ -240,6 +280,20 @@ function AdBlockCard({
             </span>
           )}
         </div>
+      )}
+      {pageDumpMeta && (
+        // Checkpoint 3: its own line, deliberately separate from the
+        // confidence/completeness/duplicate row above — attribution
+        // answers "can we trust the SOURCE", a different question from
+        // "can we trust the SPLIT" or "is there enough content".
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+          <span className="min-w-0 truncate text-zinc-400">
+            {pageDumpMeta.pageName ?? "Advertiser unknown"}
+          </span>
+          <span className={ATTRIBUTION_BADGE_COPY[pageDumpMeta.advertiserAttribution].className}>
+            {ATTRIBUTION_BADGE_COPY[pageDumpMeta.advertiserAttribution].label}
+          </span>
+        </p>
       )}
       {pageDumpMeta?.boundaryConfidence === "low" && (
         <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-red-300">
@@ -364,6 +418,11 @@ interface PageDumpStats {
 
 export function CompetitorDebriefPanel() {
   const [core, setCore] = useState<CoreFields>(EMPTY_CORE);
+  // Checkpoint 3: deliberately its OWN state, never merged into `core`
+  // — `core` is spread directly into the API request body
+  // (`...core` in handleGenerate below), and aliases are local-only
+  // matching context that must never reach the payload.
+  const [aliasesText, setAliasesText] = useState("");
   const [bulkPasteText, setBulkPasteText] = useState("");
   const [blocks, setBlocks] = useState<AdBlock[] | null>(null);
   const [internalLearningsText, setInternalLearningsText] = useState("");
@@ -438,7 +497,7 @@ export function CompetitorDebriefPanel() {
   // uses; nothing downstream (parseAdExample, dedupe, the generate
   // payload, the engine) needs to know which mode produced it.
   function handleProcessPageDump() {
-    const result = processPageDump(pageDumpText, core.competitorName);
+    const result = processPageDump(pageDumpText, core.competitorName, parseAliases(aliasesText));
     setBlocks(
       result.candidates.map((c) => ({
         id: nextBlockId++,
@@ -447,6 +506,8 @@ export function CompetitorDebriefPanel() {
           boundaryConfidence: c.boundaryConfidence,
           variantGroupId: c.variantGroupId,
           included: c.isRepresentative,
+          pageName: c.pageName,
+          advertiserAttribution: c.advertiserAttribution,
         },
       }))
     );
@@ -476,6 +537,26 @@ export function CompetitorDebriefPanel() {
     });
   }
 
+  // Checkpoint 3: parsed once per render (cheap — a short comma-split),
+  // then fed into the live-attribution recompute below so every
+  // downstream consumer (badges, the advertiser summary, blocking)
+  // reflects the CURRENT alias text immediately, not a stale snapshot
+  // from whenever "Extract ads" was last clicked.
+  const aliases = useMemo(() => parseAliases(aliasesText), [aliasesText]);
+
+  // Checkpoint 3: re-derives every page-dump block's attribution from
+  // its own frozen pageName plus the CURRENT competitor name/aliases —
+  // see recomputeLiveAttribution's own doc comment for why this never
+  // touches `included`. Every read of `blocks` below this point should
+  // go through `liveBlocks` instead, so nothing downstream (badges,
+  // the summary, blocking, the generate payload) can drift from what
+  // the OTHER consumers see. `blocks` itself (the raw state) remains
+  // the only thing setBlocks/toggleBlockIncluded/etc. ever write to.
+  const liveBlocks = useMemo(
+    () => recomputeLiveAttribution(blocks ?? [], core.competitorName, aliases),
+    [blocks, core.competitorName, aliases]
+  );
+
   // Single source of truth for "is there usable ad evidence" — shared
   // with the actual submit payload's intent (malformed fragments and
   // exact duplicates never count), so eligibility can't drift from
@@ -490,18 +571,48 @@ export function CompetitorDebriefPanel() {
   // excluded here too — a no-op filter for the manual flow, since its
   // blocks never carry pageDumpMeta.
   const usableAdCount = useMemo(
-    () => countUsableAds((blocks ?? []).filter(isBlockIncludedForGenerate).map((b) => b.parsed)),
-    [blocks]
+    () => countUsableAds(liveBlocks.filter(isBlockIncludedForGenerate).map((b) => b.parsed)),
+    [liveBlocks]
   );
   const hasUsableNotes = advancedNotes.trim() !== "";
-  const canGenerate = core.competitorName.trim() !== "" && (usableAdCount > 0 || hasUsableNotes);
+  // Competitor Input Trust V2 Checkpoint 2, Generate-blocking rule B:
+  // the Ads Library page flow was used, but not one extracted candidate
+  // was attributed to the typed competitor name. This blocks Generate
+  // outright — manually checking a mismatched/unknown candidate is
+  // still possible (see the checkbox below) but can never be a way to
+  // route around this specific rule when NOTHING in the paste ever
+  // matched the name typed. A no-op for the manual "Paste ads" flow.
+  // Reads liveBlocks (not blocks), so a newly-added alias that resolves
+  // a match unblocks Generate immediately — Checkpoint 3's requirement.
+  const attributionBlocksGenerate = useMemo(() => blocksGenerateForAttribution(liveBlocks), [liveBlocks]);
+  // Checkpoint 3: distinguishes "nothing matched the name" from
+  // "nothing here could be attributed to any advertiser at all" — the
+  // two get different blocking copy below.
+  const anyPageNameCaptured = useMemo(() => hasAnyCapturedPageName(liveBlocks), [liveBlocks]);
+  const canGenerate =
+    core.competitorName.trim() !== "" && (usableAdCount > 0 || hasUsableNotes) && !attributionBlocksGenerate;
 
   const disabledReason =
     !loading && !canGenerate
       ? core.competitorName.trim() === ""
         ? "Add a competitor name to continue."
-        : "Paste at least one usable ad (or add advanced manual notes) to continue — malformed or duplicate-only content doesn't count."
+        : attributionBlocksGenerate
+          ? hasPageDumpBlocks(liveBlocks) && !anyPageNameCaptured
+            ? "Debrief couldn't identify advertiser names from this paste. Review the ads manually or use Paste individual ads."
+            : `No extracted ads matched ${core.competitorName.trim()}. Check the competitor name or paste individual ads instead.`
+          : "Paste at least one usable ad (or add advanced manual notes) to continue — malformed or duplicate-only content doesn't count."
       : null;
+
+  // Checkpoint 3: live count of candidates the user has manually
+  // included despite a mismatch/unknown attribution — drives the
+  // manual-inclusion warning banner near Generate. Never a blocking
+  // condition, just a compact confirm-before-you-submit nudge.
+  const manuallyIncludedNonMatchCount = useMemo(() => countManuallyIncludedNonMatches(liveBlocks), [liveBlocks]);
+
+  // Checkpoint 3: the "Advertisers detected" summary, one row per
+  // non-empty group — see pageDumpReview.ts's own doc comment for why
+  // it always computes all three groups rather than pre-filtering.
+  const advertiserSummary = useMemo(() => computeAdvertiserSummary(liveBlocks), [liveBlocks]);
 
   // Duplicate flags are recomputed from the current blocks on every
   // render (cheap string comparisons) so editing a block's text always
@@ -510,8 +621,8 @@ export function CompetitorDebriefPanel() {
   // nothing new (clarification: exact duplicates may remain excluded
   // using this existing mechanism rather than a second one).
   const duplicateIndices = useMemo(
-    () => findDuplicateIndices((blocks ?? []).map((b) => b.parsed.raw)),
-    [blocks]
+    () => findDuplicateIndices(liveBlocks.map((b) => b.parsed.raw)),
+    [liveBlocks]
   );
 
   // Live "about to submit" count while typing, before "Parse ads" is
@@ -528,16 +639,16 @@ export function CompetitorDebriefPanel() {
   const livePageDumpCharCount = pageDumpText.length;
 
   // Grouped rendering, block indexing, and the summary-bar live stats
-  // are all pure functions of `blocks` (+ duplicateIndices) — see
+  // are all pure functions of `liveBlocks` (+ duplicateIndices) — see
   // ./pageDumpReview.ts for the implementations and their unit tests
   // (scripts/pageDumpReview.test.ts). These useMemo calls are thin
-  // wrappers so the component only re-derives them when `blocks`
+  // wrappers so the component only re-derives them when `liveBlocks`
   // actually changes.
-  const renderItems = useMemo(() => computeRenderItems(blocks ?? []), [blocks]);
-  const blockIndexById = useMemo(() => computeBlockIndexById(blocks ?? []), [blocks]);
+  const renderItems = useMemo(() => computeRenderItems(liveBlocks), [liveBlocks]);
+  const blockIndexById = useMemo(() => computeBlockIndexById(liveBlocks), [liveBlocks]);
   const pageDumpLiveStats = useMemo(
-    () => computePageDumpLiveStats(blocks ?? [], blockIndexById, duplicateIndices, renderItems),
-    [blocks, blockIndexById, duplicateIndices, renderItems]
+    () => computePageDumpLiveStats(liveBlocks, blockIndexById, duplicateIndices, renderItems),
+    [liveBlocks, blockIndexById, duplicateIndices, renderItems]
   );
 
   // Internal Learnings MVP: parsed live, purely for the review preview
@@ -553,8 +664,11 @@ export function CompetitorDebriefPanel() {
       // isBlockIncludedForGenerate is the ONLY new condition here — a
       // no-op for the manual flow, whose blocks never carry
       // pageDumpMeta. Everything after this line (dedupe, textForAnalysis,
-      // payload shape) is completely unchanged.
-      const activeBlocks = (blocks ?? []).filter(
+      // payload shape) is completely unchanged. liveBlocks vs. blocks
+      // makes no difference to what's actually sent — attribution
+      // never touches `.parsed`/`.included` — but reads liveBlocks for
+      // consistency with every other derived value above.
+      const activeBlocks = liveBlocks.filter(
         (b) => b.parsed.raw.trim() !== "" && isBlockIncludedForGenerate(b)
       );
       // Deduped once, here (by raw text — the same key the duplicate-
@@ -654,6 +768,26 @@ export function CompetitorDebriefPanel() {
           </div>
 
           <div>
+            <label className="mb-1.5 block text-xs text-zinc-500" htmlFor="competitor-aliases">
+              Also known as / alternate Page names <span className="text-zinc-600">(optional)</span>
+            </label>
+            <input
+              id="competitor-aliases"
+              type="text"
+              autoComplete="off"
+              className={`${inputBase} text-xs`}
+              placeholder="e.g. Lululemon, lululemon Europe"
+              value={aliasesText}
+              onChange={(e) => setAliasesText(e.target.value)}
+            />
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Comma-separated. Recognizes the same advertiser under a different
+              Page name (e.g. a regional page) — exact match only, no fuzzy
+              matching.
+            </p>
+          </div>
+
+          <div>
             <label className={`${fieldLabel} mb-1.5 block`} htmlFor="ads-library-url">
               Meta Ads Library URL
             </label>
@@ -699,7 +833,7 @@ export function CompetitorDebriefPanel() {
               {(
                 [
                   ["individual", "Paste individual ads"],
-                  ["pageDump", "Ads Library page"],
+                  ["pageDump", "Ads Library page — review required"],
                 ] as const
               ).map(([mode, label]) => (
                 <button
@@ -717,6 +851,12 @@ export function CompetitorDebriefPanel() {
                 </button>
               ))}
             </div>
+            {inputMode === "pageDump" && (
+              <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                Paste the copied Ads Library page. Debrief will separate
+                advertisers and ask you to review the detected ads.
+              </p>
+            )}
           </div>
 
           {inputMode === "individual" && (
@@ -783,6 +923,28 @@ export function CompetitorDebriefPanel() {
                     group likely repeat variants, and pick a representative
                     set for you to review before anything is generated.
                   </p>
+                  <details className="mb-2">
+                    <summary className="cursor-pointer text-[11px] font-medium text-accent-soft hover:underline">
+                      View paste example
+                    </summary>
+                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.02] p-2 text-[10px] leading-relaxed text-zinc-400">
+{`Meta Ads Library
+Results: ~24
+
+Sponsored · GlowSkin Co
+Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.
+Shop Now
+
+Sponsored · RivalGlow Beauty
+Ditch the sticky serums. Our lightweight oil absorbs instantly.
+Learn More`}
+                    </pre>
+                    <p className="mt-1.5 text-[11px] text-zinc-500">
+                      Two different advertisers, like a real results page can
+                      contain — Debrief separates them and asks you which one
+                      is your competitor.
+                    </p>
+                  </details>
                   <textarea
                     id="page-dump-paste"
                     rows={9}
@@ -846,6 +1008,33 @@ export function CompetitorDebriefPanel() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Checkpoint 3: "Advertisers detected" — Ads Library page
+              mode only, after extraction, before the ad-by-ad review
+              list. Reads liveBlocks via advertiserSummary, so it's
+              always in sync with the current competitor name/aliases,
+              not a frozen snapshot from when "Extract ads" was
+              clicked. Only groups that actually have candidates render
+              — a compact summary, not three fixed lines. */}
+          {inputMode === "pageDump" && blocks && advertiserSummary.some((g) => g.count > 0) && (
+            <div className={`${cardNested} space-y-1.5 p-3`}>
+              <p className={fieldLabel}>Advertisers detected</p>
+              {advertiserSummary
+                .filter((g) => g.count > 0)
+                .map((g) => (
+                  <div key={g.status} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
+                    <span className={ADVERTISER_SUMMARY_COPY[g.status].className}>
+                      {ADVERTISER_SUMMARY_COPY[g.status].icon} {summaryGroupLine(g, core.competitorName.trim())}
+                    </span>
+                    {g.pageNames.length > 0 && (
+                      <span className="min-w-0 truncate text-zinc-500" title={g.pageNames.join(", ")}>
+                        ({g.pageNames.join(", ")})
+                      </span>
+                    )}
+                  </div>
+                ))}
             </div>
           )}
 
@@ -968,6 +1157,18 @@ export function CompetitorDebriefPanel() {
             {loading ? "Generating…" : "Generate competitor debrief"}
           </button>
           {disabledReason && <p className="mt-2 text-[11px] text-zinc-500">{disabledReason}</p>}
+          {/* Checkpoint 3: a warning, not a second confirmation modal —
+              the checkbox behavior above is unchanged; this only makes
+              a manual override visible right where Generate is clicked. */}
+          {manuallyIncludedNonMatchCount > 0 && (
+            <p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber-300">
+              <AlertTriangleIcon className="mt-0.5 h-3 w-3 shrink-0" />
+              You&rsquo;re including {manuallyIncludedNonMatchCount} ad
+              {manuallyIncludedNonMatchCount === 1 ? "" : "s"} that Debrief could not
+              match to {core.competitorName.trim() || "this competitor"}. Confirm they
+              belong to this competitor before generating.
+            </p>
+          )}
         </div>
 
         {error && (

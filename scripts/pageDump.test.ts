@@ -18,16 +18,18 @@
  */
 import assert from "node:assert/strict";
 import {
+  classifyAdvertiserAttribution,
   detectAdBoundaries,
   groupPossibleVariants,
   isDestinationPreviewFragment,
   MAX_REPRESENTATIVES,
+  parseAliases,
   processPageDump,
   selectRepresentatives,
   stripChromeLines,
   stripLeadingHeader,
 } from "../modules/competitorDebrief/pageDump.ts";
-import { computeAdCompleteness, parseAdExample } from "../modules/competitorDebrief/adParser.ts";
+import { computeAdCompleteness, normalizeForDedupe, parseAdExample } from "../modules/competitorDebrief/adParser.ts";
 import type { AdCompleteness } from "../modules/competitorDebrief/adParser.ts";
 
 /* ============================ Stage A0: stripLeadingHeader ============================== */
@@ -811,6 +813,512 @@ const REAL_ADS_LIBRARY_DUMP = [
   const result = processPageDump(dump);
   assert.equal(result.candidates.length, 1);
   assert.equal(result.destinationPreviewSkipped, 0);
+}
+
+/* ================ Competitor Input Trust V2: advertiser/page-name capture ================ */
+/* Requirement: prevent mixed-brand Ads Library pastes from silently contaminating a          */
+/* competitor debrief. Every case below runs through the REAL, unmodified processPageDump     */
+/* pipeline (not a simulation), proving capture, grouping safety, and honest "unknown"         */
+/* behavior — verified against actual output before writing these assertions, not hand-traced. */
+
+{
+  // (1) One brand only — combined "Sponsored · Name" chrome shape.
+  // Proves single-brand behavior is UNCHANGED: same candidate count,
+  // same raw ad text (the marker never leaks into it), same zero
+  // variant groups — the only new thing is pageName now being
+  // populated on every candidate.
+  const dump = [
+    "Sponsored · GlowSkin Co",
+    "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.",
+    "Shop Now",
+    "",
+    "Sponsored · GlowSkin Co",
+    "Real customers, real results. 10,000+ five-star reviews.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 2);
+  assert.ok(
+    result.candidates.every((c) => c.pageName === "GlowSkin Co"),
+    "single-brand paste: every candidate attributed to the one brand"
+  );
+  assert.equal(
+    result.candidates[0].raw,
+    "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.\nShop Now",
+    "ad text unaffected by capture — the marker never leaks into candidate raw text"
+  );
+  assert.equal(result.candidates[1].raw, "Real customers, real results. 10,000+ five-star reviews.\nShop Now");
+  assert.equal(result.variantGroups.length, 0, "two genuinely different ads from the same brand are not grouped");
+}
+
+{
+  // (2) Two clearly different brands — combined chrome shape. Both
+  // candidates keep their OWN distinct pageName. Checkpoint 1 captures
+  // metadata only — deciding which one "is the competitor" is
+  // Checkpoint 2/3 work, not tested here.
+  const dump = [
+    "Sponsored · GlowSkin Co",
+    "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.",
+    "Shop Now",
+    "",
+    "Sponsored · RivalGlow Beauty",
+    "Ditch the sticky serums. Our lightweight oil absorbs instantly.",
+    "Learn More",
+  ].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.candidates[0].pageName, "GlowSkin Co");
+  assert.equal(result.candidates[1].pageName, "RivalGlow Beauty");
+}
+
+{
+  // (3) Same brand, capitalization/whitespace variation — three real
+  // spellings of the same advertiser, differing only in case and
+  // incidental whitespace runs — exactly what normalizeForDedupe
+  // itself normalizes (trim + lowercase + collapse whitespace; see its
+  // own definition). Each is captured VERBATIM (this module never
+  // rewrites the stored name), but normalizeForDedupe — the same
+  // helper this module already uses everywhere else — treats all
+  // three as the same brand, which is exactly what
+  // groupPossibleVariants' new gate relies on.
+  const dump = [
+    "Sponsored · GlowSkin Co",
+    "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.",
+    "Shop Now",
+    "",
+    "Sponsored ·   GLOWSKIN   CO",
+    "Real customers, real results. 10,000+ five-star reviews.",
+    "Shop Now",
+    "",
+    "Sponsored · glowskin co",
+    "New: our overnight mask sells out every restock.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump);
+  assert.equal(result.candidates.length, 3);
+  const normalizedNames = result.candidates.map((c) => (c.pageName ? normalizeForDedupe(c.pageName) : null));
+  assert.ok(
+    normalizedNames.every((n) => n === normalizedNames[0]),
+    "capitalization/whitespace variants of the same brand normalize identically"
+  );
+}
+
+{
+  // KNOWN LIMITATION (documented, not fixed in this checkpoint): per
+  // the task's explicit constraint, this reuses normalizeForDedupe
+  // exactly as it already exists — case + whitespace only, never
+  // punctuation-stripping or word-spacing-insensitive. A real page-
+  // name variant differing only by trailing punctuation or word
+  // spacing ("GlowSkin Co." vs "GlowSkin Co", or "GlowSkin Co" vs "Glow
+  // Skin Co") normalizes to two DIFFERENT strings and would be
+  // (incorrectly) treated as a brand mismatch by groupPossibleVariants'
+  // gate. Pinned here as an explicit regression/documentation test
+  // rather than silently glossed over — inventing a second, fuzzier
+  // normalization system to close this gap is explicitly out of scope.
+  assert.notEqual(
+    normalizeForDedupe("GlowSkin Co."),
+    normalizeForDedupe("GlowSkin Co"),
+    "known limitation: normalizeForDedupe does not strip trailing punctuation"
+  );
+  assert.notEqual(
+    normalizeForDedupe("GlowSkin Co"),
+    normalizeForDedupe("Glow Skin Co"),
+    "known limitation: normalizeForDedupe is not word-spacing-insensitive"
+  );
+}
+
+{
+  // (4) Parent brand + regional page — a real, documented pattern
+  // (see the audit: multinationals commonly run separate, differently-
+  // named regional Pages). Captured as two genuinely distinct names,
+  // never silently merged or guessed to be the same company — that
+  // judgment call belongs to a future user-supplied alias (Checkpoint
+  // 2+), never automatic inference.
+  const dump = [
+    "Sponsored · Lululemon",
+    "Align leggings, made to move with you.",
+    "Shop Now",
+    "",
+    "Sponsored · lululemon Europe",
+    "New drop: Euro-exclusive colorways, while supplies last.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump, "Lululemon");
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.candidates[0].pageName, "Lululemon");
+  assert.equal(result.candidates[1].pageName, "lululemon Europe");
+  assert.notEqual(
+    normalizeForDedupe(result.candidates[0].pageName ?? ""),
+    normalizeForDedupe(result.candidates[1].pageName ?? ""),
+    "a regional page name is never silently treated as identical to the parent brand"
+  );
+}
+
+{
+  // (5) Missing advertiser metadata — real ad content with no
+  // recognizable per-card or leading chrome at all (the "Paste
+  // individual ads" shape). pageName must be null for every candidate
+  // — attribution is honestly impossible here, never guessed.
+  const dump = [
+    "Struggling with dry skin every winter? Our balm fixes that fast.",
+    "Shop Now",
+    "",
+    "New to skincare? Start with the basics that actually work.",
+    "Learn More",
+  ].join("\n");
+  const result = processPageDump(dump);
+  assert.equal(result.candidates.length, 2);
+  assert.ok(
+    result.candidates.every((c) => c.pageName === null),
+    "no attribution evidence anywhere in the paste — must stay null, never guessed"
+  );
+}
+
+{
+  // (6) Near-identical copy from two different brands — the critical
+  // safety case this checkpoint exists for. Two candidates that WOULD
+  // cluster as "possible variants" on text similarity alone (confirmed
+  // below) must NOT be grouped once their captured pageNames disagree
+  // — brand identity overrules text similarity.
+  const dump = [
+    "Sponsored · GlowSkin Co",
+    "Real customers, real results. Thousands of five-star reviews and counting every single day.",
+    "Shop Now",
+    "",
+    "Sponsored · RivalGlow Beauty",
+    "Real customers, real results. Thousands of five star reviews and counting every single day.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump);
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.candidates[0].pageName, "GlowSkin Co");
+  assert.equal(result.candidates[1].pageName, "RivalGlow Beauty");
+  assert.equal(
+    result.variantGroups.length,
+    0,
+    "near-identical copy from two different captured brands must never be grouped as variants"
+  );
+  assert.equal(result.candidates[0].variantGroupId, null);
+  assert.equal(result.candidates[1].variantGroupId, null);
+  assert.ok(
+    result.candidates.every((c) => c.isRepresentative),
+    "both stay independently selected — neither silently hidden as 'the other one's variant'"
+  );
+
+  // Isolates exactly what the pageName gate changed: the SAME text,
+  // ungated, DOES cluster — proving the gate is doing real work, not
+  // just failing to fire because the texts were never similar enough
+  // to begin with.
+  const texts = [result.candidates[0].raw, result.candidates[1].raw];
+  const ungated = groupPossibleVariants(texts);
+  assert.equal(ungated.groups.length, 1, "sanity check: this fixture's text similarity alone clears the Jaccard threshold");
+}
+
+{
+  // (7) Foreign-language / unrecognized chrome — must remain
+  // unattributed rather than falsely attributed. English-only chrome
+  // patterns don't recognize "Remiama · Name" (Lithuanian for
+  // "Sponsored"), so no marker is ever created for it. Known
+  // limitation, honestly surfaced: the unrecognized chrome line also
+  // survives as noise inside the candidate's own ad text (nothing
+  // strips it), but pageName correctly stays null rather than guessing
+  // from text this module doesn't understand.
+  const dump = [
+    "Remiama · GlowSkin Co",
+    "Pavargote nuo blankios odos? Musu vitamino C serumas nusvies per 2 savaites.",
+    "Apsipirkti dabar",
+  ].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.ok(
+    result.candidates.every((c) => c.pageName === null),
+    "unrecognized (non-English) chrome must never be falsely attributed"
+  );
+}
+
+{
+  // Backward compatibility: groupPossibleVariants' new optional second
+  // argument is fully additive. Every pre-V2 caller passes only
+  // `texts` — that must behave identically to explicitly passing an
+  // all-null pageNames array.
+  const a = "Struggling with bloating after every meal? Our probiotic blend fixes that.\nShop Now";
+  const b = "Tired of bloating after every meal? Our probiotic blend fixes that too.\nShop Now";
+  const withoutPageNames = groupPossibleVariants([a, b]);
+  const withNullPageNames = groupPossibleVariants([a, b], [null, null]);
+  assert.deepEqual(withoutPageNames, withNullPageNames);
+}
+
+/* ============= Competitor Input Trust V2 Checkpoint 2: attribution gating ================ */
+/* Requirement: use captured pageName metadata to prevent mismatched-advertiser ads from       */
+/* being silently included in the generated debrief. Every case runs through the REAL,         */
+/* unmodified processPageDump pipeline — verified against actual output before writing these   */
+/* assertions, not hand-traced.                                                                 */
+
+{
+  // classifyAdvertiserAttribution direct unit coverage — the pure
+  // helper in isolation, independent of the full pipeline.
+  assert.equal(classifyAdvertiserAttribution(null, "GlowSkin Co"), "unknown", "no pageName captured — unknown, never mismatch");
+  assert.equal(classifyAdvertiserAttribution("GlowSkin Co", "GlowSkin Co"), "match");
+  assert.equal(classifyAdvertiserAttribution("RivalGlow Beauty", "GlowSkin Co"), "mismatch");
+  assert.equal(classifyAdvertiserAttribution(null, undefined), "unknown");
+  assert.equal(
+    classifyAdvertiserAttribution("GlowSkin Co", ""),
+    "unknown",
+    "an empty competitorName means nothing to compare against yet — unknown, never a false mismatch"
+  );
+  assert.equal(classifyAdvertiserAttribution("GLOWSKIN   CO", "glowskin co"), "match", "case/whitespace variation still matches");
+  assert.equal(classifyAdvertiserAttribution("GlowSkin Co.", "GlowSkin Co"), "mismatch", "trailing punctuation is NOT stripped — known limitation");
+}
+
+{
+  // (1) One-brand matching dump — matching ads remain included by
+  // default, exactly as before Checkpoint 2 (this is the common case
+  // this checkpoint must never regress).
+  const dump = [
+    "Sponsored · GlowSkin Co",
+    "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.",
+    "Shop Now",
+    "",
+    "Sponsored · GlowSkin Co",
+    "Real customers, real results. 10,000+ five-star reviews.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 2);
+  assert.ok(result.candidates.every((c) => c.advertiserAttribution === "match"));
+  assert.ok(result.candidates.every((c) => c.isRepresentative), "matching brand: both remain included by default");
+}
+
+{
+  // (2) Two-brand dump — matching brand included by default, foreign
+  // brand excluded by default. The core safety behavior this whole
+  // checkpoint exists for.
+  const dump = [
+    "Sponsored · GlowSkin Co",
+    "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.",
+    "Shop Now",
+    "",
+    "Sponsored · RivalGlow Beauty",
+    "Ditch the sticky serums. Our lightweight oil absorbs instantly.",
+    "Learn More",
+  ].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.candidates[0].advertiserAttribution, "match");
+  assert.equal(result.candidates[0].isRepresentative, true);
+  assert.equal(result.candidates[1].advertiserAttribution, "mismatch");
+  assert.equal(
+    result.candidates[1].isRepresentative,
+    false,
+    "a candidate must never default-include just for being rich/first if its attribution is mismatch"
+  );
+}
+
+{
+  // (3) Intended brand entirely absent from the paste — every
+  // candidate mismatches, so zero candidates default to included and
+  // (at the panel level) Generate is blocked.
+  const dump = [
+    "Sponsored · RivalGlow Beauty",
+    "Ditch the sticky serums. Our lightweight oil absorbs instantly.",
+    "Learn More",
+    "",
+    "Sponsored · AfterGlow Beauty",
+    "The bronzer that built a cult following.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 2);
+  assert.ok(result.candidates.every((c) => c.advertiserAttribution === "mismatch"));
+  assert.ok(result.candidates.every((c) => !c.isRepresentative), "no candidate matches — none default to included");
+}
+
+{
+  // (4) competitorName empty — classification honestly reports
+  // "unknown" (never a false "mismatch"), and — since there is nothing
+  // yet to gate against — selection falls back to the exact pre-
+  // Checkpoint-2 (richness-only) behavior. The panel's own pre-existing
+  // "competitor name required" rule is what actually blocks Generate in
+  // this state (unchanged, not re-tested here since it's a plain string
+  // check outside this module) — this proves the pure primitive this
+  // depends on behaves honestly either way.
+  const dump = ["Sponsored · GlowSkin Co", "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.", "Shop Now"].join("\n");
+  const result = processPageDump(dump, "");
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].advertiserAttribution, "unknown");
+  assert.equal(
+    result.candidates[0].isRepresentative,
+    true,
+    "no competitor name typed yet — falls back to richness-only selection, not zeroed out"
+  );
+}
+
+{
+  // (5) Candidate with pageName null — unknown, excluded by default.
+  const dump = ["Struggling with dry skin every winter? Our balm fixes that fast.", "Shop Now"].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].pageName, null);
+  assert.equal(result.candidates[0].advertiserAttribution, "unknown");
+  assert.equal(result.candidates[0].isRepresentative, false, "unknown attribution is excluded by default, same as mismatch");
+}
+
+{
+  // (6) Parent/regional page mismatch — excluded by default until a
+  // future checkpoint's alias support lets a user explicitly confirm
+  // "lululemon Europe" is the same competitor. No guessing here.
+  const dump = [
+    "Sponsored · Lululemon",
+    "Align leggings, made to move with you.",
+    "Shop Now",
+    "",
+    "Sponsored · lululemon Europe",
+    "New drop: Euro-exclusive colorways, while supplies last.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump, "Lululemon");
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.candidates[0].advertiserAttribution, "match");
+  assert.equal(result.candidates[0].isRepresentative, true);
+  assert.equal(result.candidates[1].advertiserAttribution, "mismatch");
+  assert.equal(result.candidates[1].isRepresentative, false, "regional page excluded until alias support exists");
+}
+
+{
+  // (7) Capitalization/whitespace variation accepted as match — the
+  // same normalizeForDedupe behavior Checkpoint 1 already relied on.
+  const dump = ["Sponsored ·   GLOWSKIN   CO", "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.", "Shop Now"].join("\n");
+  const result = processPageDump(dump, "glowskin co");
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].advertiserAttribution, "match");
+  assert.equal(result.candidates[0].isRepresentative, true);
+}
+
+{
+  // (8) Punctuation difference remains mismatch — documents the known
+  // limitation carried over from Checkpoint 1 (normalizeForDedupe does
+  // not strip trailing punctuation), now shown at the classification/
+  // selection level: a real page-name variant differing only by a
+  // trailing period is excluded by default, not matched.
+  const dump = ["Sponsored · GlowSkin Co.", "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.", "Shop Now"].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 1);
+  assert.equal(
+    result.candidates[0].advertiserAttribution,
+    "mismatch",
+    "known limitation: 'GlowSkin Co.' vs 'GlowSkin Co' is a mismatch, not a match, because normalizeForDedupe doesn't strip punctuation"
+  );
+  assert.equal(result.candidates[0].isRepresentative, false);
+}
+
+{
+  // (9) Near-identical cross-brand ads never collapse (Checkpoint 1's
+  // gate, reconfirmed here) AND only the match is included by default
+  // (Checkpoint 2's gate) — the two protections compose correctly.
+  const dump = [
+    "Sponsored · GlowSkin Co",
+    "Real customers, real results. Thousands of five-star reviews and counting every single day.",
+    "Shop Now",
+    "",
+    "Sponsored · RivalGlow Beauty",
+    "Real customers, real results. Thousands of five star reviews and counting every single day.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.variantGroups.length, 0, "still never grouped across brands");
+  assert.equal(result.candidates[0].advertiserAttribution, "match");
+  assert.equal(result.candidates[0].isRepresentative, true);
+  assert.equal(result.candidates[1].advertiserAttribution, "mismatch");
+  assert.equal(result.candidates[1].isRepresentative, false, "only the match is included — the near-identical mismatch is not");
+}
+
+/* ================ Competitor Input Trust V2 Checkpoint 3: aliases ======================== */
+/* Requirement: an optional, comma-separated alias list widens the match set using the same    */
+/* exact normalizeForDedupe comparison Checkpoints 1/2 already established — no fuzzy,          */
+/* substring, semantic, or AI matching. Verified against actual output, not hand-traced.        */
+
+{
+  // parseAliases: comma-separated, trimmed, empty entries dropped.
+  assert.deepEqual(parseAliases("Lululemon, lululemon Europe"), ["Lululemon", "lululemon Europe"]);
+  assert.deepEqual(parseAliases("  Brand Name , , Brand Name UK ,"), ["Brand Name", "Brand Name UK"], "empty entries and stray commas are dropped");
+  assert.deepEqual(parseAliases(""), []);
+  assert.deepEqual(parseAliases("   "), []);
+}
+
+{
+  // classifyAdvertiserAttribution with aliases: direct unit coverage.
+  assert.equal(
+    classifyAdvertiserAttribution("lululemon Europe", "Lululemon", ["lululemon Europe"]),
+    "match",
+    "an alias resolves a regional Page to a match"
+  );
+  assert.equal(
+    classifyAdvertiserAttribution("Brand Name UK", "Brand Name", ["Brand Name EU", "Brand Name UK"]),
+    "match",
+    "multiple aliases: the SECOND one matching is enough"
+  );
+  assert.equal(
+    classifyAdvertiserAttribution("GlowSkin Co", "SomeOtherBrand", ["Glow"]),
+    "mismatch",
+    "an alias must never create a substring match — 'Glow' does not match 'GlowSkin Co'"
+  );
+  assert.equal(
+    classifyAdvertiserAttribution("lululemon Europe", "Lululemon"),
+    "mismatch",
+    "without the alias, the same regional page is still a mismatch — confirms the alias is what changed it"
+  );
+  assert.equal(
+    classifyAdvertiserAttribution("GlowSkin Co", "", []),
+    "unknown",
+    "empty competitorName and empty aliases — nothing to compare against, honest unknown"
+  );
+  assert.equal(
+    classifyAdvertiserAttribution("Brand Name UK", undefined, ["Brand Name UK"]),
+    "match",
+    "an alias alone (no competitorName) is still enough to match"
+  );
+}
+
+{
+  // Full pipeline: a regional page that mismatches WITHOUT an alias
+  // becomes a match, and gets included by default, once the alias is
+  // supplied — proves aliases flow all the way through
+  // classification AND selectRepresentatives' eligibility gate.
+  const dump = [
+    "Sponsored · Lululemon",
+    "Align leggings, made to move with you.",
+    "Shop Now",
+    "",
+    "Sponsored · lululemon Europe",
+    "New drop: Euro-exclusive colorways, while supplies last.",
+    "Shop Now",
+  ].join("\n");
+
+  const withoutAlias = processPageDump(dump, "Lululemon");
+  assert.equal(withoutAlias.candidates[1].advertiserAttribution, "mismatch");
+  assert.equal(withoutAlias.candidates[1].isRepresentative, false);
+
+  const withAlias = processPageDump(dump, "Lululemon", ["lululemon Europe"]);
+  assert.equal(withAlias.candidates[0].advertiserAttribution, "match");
+  assert.equal(withAlias.candidates[1].advertiserAttribution, "match", "the alias resolves the regional page to a match");
+  assert.ok(withAlias.candidates.every((c) => c.isRepresentative), "both are now included by default");
+}
+
+{
+  // No page names captured at all anywhere in the paste — every
+  // candidate is "unknown", not "mismatch"; distinguishes a parsing/
+  // paste-shape problem from a wrong-competitor-name problem.
+  const dump = [
+    "Struggling with dry skin every winter? Our balm fixes that fast.",
+    "Shop Now",
+    "",
+    "New to skincare? Start with the basics.",
+    "Learn More",
+  ].join("\n");
+  const result = processPageDump(dump, "GlowSkin Co");
+  assert.equal(result.candidates.length, 2);
+  assert.ok(result.candidates.every((c) => c.advertiserAttribution === "unknown"));
+  assert.ok(result.candidates.every((c) => c.pageName === null));
 }
 
 console.log("pageDump: all assertions passed");
