@@ -27,7 +27,8 @@
     "test:monitoring-isolation": "node scripts/monitoring-isolation.test.ts",
     "test:monitoring-routes": "node scripts/monitoring-routes.test.ts",
     "monitoring:generate": "drizzle-kit generate",
-    "monitoring:migrate": "node scripts/monitoring-migrate.ts"
+    "monitoring:migrate": "node scripts/monitoring-migrate.ts",
+    "meta-ad-library:probe": "node scripts/metaAdLibraryProbe.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
