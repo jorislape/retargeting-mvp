@@ -41,17 +41,20 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
                   <Link href="/pricing" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
                     Pricing
                   </Link>
+                  <Link href="/founding" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
+                    Founding
+                  </Link>
                   <Link href="/about" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
                     About
                   </Link>
                   <Link href="/vs-chatgpt" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
                     vs. ChatGPT
                   </Link>
-                  <Link href="/privacy" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
-                    Privacy
-                  </Link>
                   <Link href="/security" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
                     Security
+                  </Link>
+                  <Link href="/privacy" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
+                    Privacy
                   </Link>
                   <a href="mailto:joris.adomas@gmail.com" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
                     joris.adomas@gmail.com

@@ -80,7 +80,27 @@ const DIFFERENCES: { icon: typeof GaugeIcon; title: string; body: ReactNode }[] 
   {
     icon: GaugeIcon,
     title: "Published, fixed rules — not a prompt",
-    body: "Spend gates, medians, and confidence thresholds are code, listed on /how-it-works. A prompt that produces a good analysis today can produce a different one next time you run it, or when the model changes. Debrief's rules don't drift, and you can check the math yourself instead of trusting a paraphrase. Chat tools can write and run Python, and the arithmetic in that executed code can be exact — that's not the difference. The difference is methodology: which analysis gets written, which thresholds get picked, and what counts as a winner can vary across prompts, runs, and model versions. Debrief fixes that methodology once and publishes it, instead of deciding it fresh each time.",
+    body: (
+      <>
+        Spend gates, medians, and confidence thresholds are code — see{" "}
+        <Link
+          href="/how-it-works"
+          className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
+        >
+          how the rules work
+        </Link>
+        . A prompt that produces a good analysis today can produce a
+        different one next time you run it, or when the model changes.
+        Debrief&rsquo;s rules don&rsquo;t drift, and you can check the math
+        yourself instead of trusting a paraphrase. Chat tools can write and
+        run Python, and the arithmetic in that executed code can be exact —
+        that&rsquo;s not the difference. The difference is methodology:
+        which analysis gets written, which thresholds get picked, and what
+        counts as a winner can vary across prompts, runs, and model
+        versions. Debrief fixes that methodology once and publishes it,
+        instead of deciding it fresh each time.
+      </>
+    ),
   },
   {
     icon: FileTextIcon,
@@ -90,7 +110,21 @@ const DIFFERENCES: { icon: typeof GaugeIcon; title: string; body: ReactNode }[] 
   {
     icon: ShieldIcon,
     title: "A stated privacy boundary",
-    body: "Your CSV is processed in memory for one request and never stored server-side, on any tier — see /security. Pasting spend and performance data into a general-purpose chat tool means trusting its retention policy, not a boundary this product is built around.",
+    body: (
+      <>
+        Your CSV is processed in memory for one request and never stored
+        server-side, on any tier — see{" "}
+        <Link
+          href="/security"
+          className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
+        >
+          the security policy
+        </Link>
+        . Pasting spend and performance data into a general-purpose chat
+        tool means trusting its retention policy, not a boundary this
+        product is built around.
+      </>
+    ),
   },
 ] as const;
 
@@ -121,7 +155,7 @@ const DIFFERENCES_2: { icon: typeof GaugeIcon; title: string; body: ReactNode }[
           href="/security"
           className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
         >
-          /security
+          the security page
         </Link>{" "}
         for what&rsquo;s built and what&rsquo;s still roadmap.
       </>

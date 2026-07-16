@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
 import { FlaskIcon, GaugeIcon, ShieldIcon } from "@/components/ui/icons";
 import {
   card,
@@ -14,7 +16,7 @@ export const metadata = {
   alternates: { canonical: "/about" },
 };
 
-const SECTIONS = [
+const SECTIONS: { icon: typeof GaugeIcon; title: string; body: ReactNode }[] = [
   {
     icon: GaugeIcon,
     title: "Who this is for",
@@ -23,14 +25,28 @@ const SECTIONS = [
   {
     icon: FlaskIcon,
     title: "What \"decision-support\" means here",
-    body: "Debrief is deterministic: the same valid CSV produces the same memo, every time. There's no model in the loop guessing at your numbers. Spend gates, medians, and confidence rules are fixed logic, not a prompt — published on /how-it-works so you can check the math yourself. It's a decision-support system, not an AI-powered one.",
+    body: (
+      <>
+        Debrief is deterministic: the same valid CSV produces the same
+        memo, every time. There&rsquo;s no model in the loop guessing at
+        your numbers. Spend gates, medians, and confidence rules are fixed
+        logic, not a prompt — see{" "}
+        <Link
+          href="/how-it-works"
+          className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
+        >
+          how the rules work
+        </Link>
+        . It&rsquo;s a decision-support system, not an AI-powered one.
+      </>
+    ),
   },
   {
     icon: ShieldIcon,
     title: "What it's honest about not doing",
     body: "It doesn't predict future performance, guarantee scale, simulate a market, or fetch competitor data automatically. Creative-format detection from ad names is a guess until you confirm it. Competitor reads only work from what you paste in — nothing is scraped. When there isn't enough signal to say something, the memo says so instead of inventing a narrative.",
   },
-] as const;
+];
 
 export default function AboutPage() {
   return (

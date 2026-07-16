@@ -198,6 +198,16 @@ export default function HomePage() {
           </Link>{" "}
           — see a full debrief before uploading anything.
         </p>
+        <p className="mt-2 text-[13px] text-zinc-400 lg:mt-1.5">
+          Want to check a competitor instead?{" "}
+          <Link
+            href="/competitor-debrief"
+            className="rounded-sm font-medium text-accent-soft underline decoration-accent/40 underline-offset-2 transition hover:decoration-accent"
+          >
+            Try the competitor debrief
+          </Link>
+          .
+        </p>
         <p className="mt-2.5 text-xs text-zinc-400">
           No login required. Ads data is never stored server-side. Optional read-only Meta connection.
         </p>
@@ -387,7 +397,7 @@ export default function HomePage() {
               Debrief your ads
               <ArrowIcon className="h-4 w-4" />
             </Link>
-            <Link href="/generator" className={btnSecondaryMd}>
+            <Link href="/sample" className={btnSecondaryMd}>
               <FlaskIcon className="h-4 w-4 text-zinc-400" />
               Try it with sample data
             </Link>

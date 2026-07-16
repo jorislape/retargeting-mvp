@@ -746,8 +746,8 @@ export function Report({
         <div role="group" aria-label="Report view" className="flex gap-6">
           {(
             [
-              ["buyer", "Buyer memo"],
-              ["client", "Client report"],
+              ["buyer", "Buyer"],
+              ["client", "Client"],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -772,6 +772,30 @@ export function Report({
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2 pb-2">
+          {/* Toolbar hierarchy: Print / Save PDF is the one primary
+              action once a report exists. Customize report and Copy
+              are secondary. Export TXT and New debrief are quieter,
+              lower-priority actions — same capabilities as before,
+              just less visual weight. */}
+          <button
+            onClick={() => window.print()}
+            title="Choose “Save as PDF” in the print dialog and disable browser headers and footers for the cleanest export."
+            className={`cursor-pointer ${btnPrimarySm}`}
+          >
+            <PrinterIcon className="h-3.5 w-3.5" />
+            Print / Save PDF
+          </button>
+          {/* Customization only ever appears once a report already
+              exists — this button lives here, inside Report itself,
+              never in the generator form. */}
+          <button
+            type="button"
+            onClick={() => setPanelOpen(true)}
+            className={`cursor-pointer ${btnSecondary}`}
+          >
+            <SlidersIcon className="h-3.5 w-3.5" />
+            Customize report
+          </button>
           <button
             onClick={handleCopy}
             className={`min-w-[5.5rem] cursor-pointer ${btnSecondary}`}
@@ -791,33 +815,17 @@ export function Report({
           </button>
           <button
             onClick={handleDownload}
-            className={`cursor-pointer ${btnSecondary}`}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm text-xs font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <DownloadIcon className="h-3.5 w-3.5" />
             Export TXT
           </button>
-          <button
-            onClick={() => window.print()}
-            title="Choose “Save as PDF” in the print dialog and disable browser headers and footers for the cleanest export."
-            className={`cursor-pointer ${btnSecondary}`}
-          >
-            <PrinterIcon className="h-3.5 w-3.5" />
-            Print / Save PDF
-          </button>
-          {/* Customization only ever appears once a report already
-              exists — this button lives here, inside Report itself,
-              never in the generator form. */}
-          <button
-            type="button"
-            onClick={() => setPanelOpen(true)}
-            className={`cursor-pointer ${btnSecondary}`}
-          >
-            <SlidersIcon className="h-3.5 w-3.5" />
-            Customize report
-          </button>
           {onNewDebrief && (
-            <button onClick={onNewDebrief} className={`cursor-pointer ${btnPrimarySm}`}>
-              <RefreshIcon className="h-4 w-4" />
+            <button
+              onClick={onNewDebrief}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm text-xs font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              <RefreshIcon className="h-3.5 w-3.5" />
               New debrief
             </button>
           )}
@@ -836,7 +844,7 @@ export function Report({
           <Wordmark className="text-sm" />
           <p className="text-[10px] leading-relaxed text-zinc-500">
             Deterministic Meta Ads creative performance analysis —{" "}
-            {client ? "client report" : "buyer memo"}.
+            {client ? "Client" : "Buyer"} version.
           </p>
         </div>
 
@@ -1360,6 +1368,7 @@ export function Report({
         actions={customizationActions}
         sections={PERFORMANCE_SECTIONS}
         defaultTitlePlaceholder={memo.scope.product}
+        modeReadout={{ internal: "Buyer", client: "Client" }}
       />
     </div>
   );

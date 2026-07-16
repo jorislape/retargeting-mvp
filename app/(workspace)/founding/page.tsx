@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
 import {
   FileTextIcon,
   FlaskIcon,
@@ -54,7 +56,7 @@ const STEPS = [
   { icon: GaugeIcon, text: "Decide whether the founding arrangement fits" },
 ] as const;
 
-const FAQ = [
+const FAQ: { q: string; a: ReactNode }[] = [
   {
     q: "Why only 10?",
     a: "Ten is what one person can onboard and support well while this is still a manual process — not a marketing number.",
@@ -65,13 +67,26 @@ const FAQ = [
   },
   {
     q: "What happens when the future Agency/Team workspace launches?",
-    a: "Founding agencies get early access and input into what it becomes, plus locked-in pricing once it launches. Scope and timeline aren't fixed yet — see /pricing for where that stands.",
+    a: (
+      <>
+        Founding agencies get early access and input into what it becomes,
+        plus locked-in pricing once it launches. Scope and timeline
+        aren&rsquo;t fixed yet — see{" "}
+        <Link
+          href="/pricing"
+          className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
+        >
+          pricing
+        </Link>{" "}
+        for where that stands.
+      </>
+    ),
   },
   {
     q: "Is payment live today?",
     a: "Not yet. The founding program starts with a short conversation and a manual agreement. Hosted payment links will be added once the first cohort is confirmed.",
   },
-] as const;
+];
 
 export default function FoundingPage() {
   return (

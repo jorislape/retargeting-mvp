@@ -59,7 +59,7 @@ export default function PrivacyPage() {
             href="/security"
             className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-4 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
           >
-            /security
+            the security page
           </Link>
           .
         </p>

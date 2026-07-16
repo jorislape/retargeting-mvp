@@ -12,25 +12,18 @@ import {
   ZapIcon,
 } from "@/components/ui/icons";
 
+/* Usability Simplification V1: the persistent primary nav is core
+   product routes only — Pricing/Founding/About/vs. ChatGPT/Security
+   moved to the workspace footer (see app/(workspace)/layout.tsx),
+   which is reachable identically from desktop and mobile. Privacy
+   moved there too, for the same reason: it's a trust/company page,
+   not a tool a user picks between. */
 const NAV = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/generator", label: "Generator", icon: ZapIcon },
   { href: "/competitor-debrief", label: "Competitor debrief", icon: SparklesIcon },
   { href: "/sample", label: "Sample report", icon: FileTextIcon },
   { href: "/how-it-works", label: "How it works", icon: HelpCircleIcon },
-  { href: "/privacy", label: "Privacy", icon: ShieldIcon },
-] as const;
-
-/* Desktop-sidebar-only secondary links: company/trust pages that don't
-   belong in the primary in-app nav (and can't join it without also
-   growing MobileTabBar's fixed 6-column grid). Reachable on mobile via
-   the workspace footer instead. */
-const SECONDARY_NAV = [
-  { href: "/pricing", label: "Pricing" },
-  { href: "/founding", label: "Founding" },
-  { href: "/about", label: "About" },
-  { href: "/vs-chatgpt", label: "vs. ChatGPT" },
-  { href: "/security", label: "Security" },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
@@ -76,24 +69,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      <nav aria-label="Secondary" className="mt-4 flex flex-col gap-0.5 border-t border-white/[0.06] px-3 pt-4">
-        {SECONDARY_NAV.map((item) => {
-          const active = isActive(pathname, item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={`rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                active ? "text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-
       <div className="mt-auto border-t border-white/[0.06] p-4">
         <p className="flex items-start gap-2 text-[10px] leading-relaxed text-zinc-400">
           <ShieldIcon className="mt-0.5 h-3 w-3 shrink-0 text-zinc-400" />
@@ -129,7 +104,7 @@ export function MobileTabBar() {
       aria-label="Primary"
       className="print-hidden fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-carbon/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
-      <div className="grid grid-cols-6">
+      <div className="grid grid-cols-5">
         {NAV.map((item) => {
           const active = isActive(pathname, item.href);
           return (

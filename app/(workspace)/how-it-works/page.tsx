@@ -213,7 +213,7 @@ export default function HowItWorksPage() {
             href="/security"
             className="rounded-sm text-zinc-300 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60"
           >
-            /security
+            the security page
           </Link>{" "}
           will be updated before anything in that direction ships.
         </p>
@@ -226,7 +226,7 @@ export default function HowItWorksPage() {
           <ArrowIcon className="h-4 w-4" />
         </Link>
         <Link href="/sample" className={btnSecondaryMd}>
-          View the sample first
+          View sample report
         </Link>
       </div>
     </div>

@@ -27,12 +27,21 @@ export function ReportCustomizationPanel<Id extends string>({
   actions,
   sections,
   defaultTitlePlaceholder,
+  modeReadout,
 }: {
   open: boolean;
   onClose: () => void;
   actions: UseReportCustomizationResult<Id>;
   sections: readonly SectionDescriptor<Id>[];
   defaultTitlePlaceholder: string;
+  /** Read-only "current mode" context line, labeled with the calling
+   *  report's own vocabulary. The report's own toolbar (Report.tsx's
+   *  Buyer/Client tabs) is the ONE place mode is ever changed — this
+   *  panel only displays the current state, never a second control.
+   *  Omit entirely for reports with no content register to display
+   *  (the competitor report has no toolbar mode control at all, so it
+   *  passes nothing here and this section doesn't render). */
+  modeReadout?: { internal: string; client: string };
 }) {
   const { customization } = actions;
   const [sectionsExpanded, setSectionsExpanded] = useState(false);
@@ -69,40 +78,20 @@ export function ReportCustomizationPanel<Id extends string>({
         </div>
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
-          {/* Report mode */}
-          <div>
-            <span className={`${fieldLabel} mb-1.5 block`}>Report mode</span>
-            <div
-              role="group"
-              aria-label="Report mode"
-              className="inline-flex flex-wrap gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-0.5"
-            >
-              {(
-                [
-                  ["internal", "Internal buyer"],
-                  ["client", "Client-ready"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={customization.mode === value}
-                  onClick={() => actions.setMode(value)}
-                  className={`cursor-pointer rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                    customization.mode === value
-                      ? "bg-white/[0.09] text-white"
-                      : "text-zinc-400 hover:text-zinc-300"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+          {/* Report mode — read-only context only. The toolbar above
+              (Buyer/Client) is the one place this ever changes; this
+              panel never duplicates that control. */}
+          {modeReadout && (
+            <div>
+              <span className={`${fieldLabel} mb-1.5 block`}>Report mode</span>
+              <p className="text-xs text-zinc-300">
+                {customization.mode === "client" ? modeReadout.client : modeReadout.internal}
+              </p>
+              <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
+                Change the report mode using the Buyer / Client tabs above.
+              </p>
             </div>
-            <p className="mt-1.5 text-[10px] leading-relaxed text-zinc-500">
-              Switching mode sets a recommended starting point for which sections
-              show below — you can still toggle any section by hand afterward.
-            </p>
-          </div>
+          )}
 
           {/* Identity fields */}
           <div className="space-y-3">
