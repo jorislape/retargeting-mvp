@@ -32,6 +32,8 @@ import {
   isBlockIncludedForGenerate,
   type AdBlock,
 } from "./pageDumpReview";
+import { competitorAdToText, SUPPORTED_COUNTRIES, type PageCandidate } from "@/modules/metaAdLibrary/discovery";
+import type { CompetitorAd } from "@/modules/metaAdLibrary/types";
 
 /** Fill-in-the-blank shape the parser reads most reliably (explicit
  *  labels win over keyword-fallback detection) — offered as a one-click
@@ -346,7 +348,26 @@ interface CoreFields {
 
 const EMPTY_CORE: CoreFields = { competitorName: "", adsLibraryUrl: "", websiteUrl: "" };
 
-type AdInputMode = "individual" | "pageDump";
+type AdInputMode = "individual" | "pageDump" | "search";
+
+/** One fetched-and-verified ad in the "Search advertiser" review list.
+ *  `text` is the engine-ready serialization (competitorAdToText) —
+ *  computed once at fetch time so review, dedupe, and the generate
+ *  payload all read the same value. Kept as separate state from the
+ *  paste flows' `blocks` on purpose: API-fetched ads never mix with
+ *  pasted ads in one payload, and the paste flows stay byte-identical. */
+interface ApiAd {
+  ad: CompetitorAd;
+  text: string;
+  included: boolean;
+}
+
+/** Search-mode fetch metadata shown before Generate. */
+interface ApiAdsMeta {
+  excludedMismatchedCount: number;
+  hasMore: boolean;
+  after: string | null;
+}
 
 /** Snapshot of what processPageDump() found on the LAST processing run
  *  — describes what the algorithm decided at that moment (its
@@ -378,6 +399,23 @@ export function CompetitorDebriefPanel() {
   const [pageDumpText, setPageDumpText] = useState("");
   const [pageDumpStats, setPageDumpStats] = useState<PageDumpStats | null>(null);
   const [expandedVariantGroups, setExpandedVariantGroups] = useState<Set<number>>(new Set());
+
+  // Search advertiser — EU/UK beta (Meta Ad Library API Integration
+  // V1). Separate state from the paste flows' `blocks` by design: the
+  // discovery results (candidate Pages) are never ads, and the fetched
+  // ads never mix with pasted blocks in one payload. The token lives
+  // only on the server; this component talks to the two
+  // /api/meta-ad-library routes and never sees it.
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchCountry, setSearchCountry] = useState("DE");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [pageCandidates, setPageCandidates] = useState<PageCandidate[] | null>(null);
+  const [selectedPage, setSelectedPage] = useState<PageCandidate | null>(null);
+  const [adsLoading, setAdsLoading] = useState(false);
+  const [loadMoreLoading, setLoadMoreLoading] = useState(false);
+  const [apiAds, setApiAds] = useState<ApiAd[] | null>(null);
+  const [apiAdsMeta, setApiAdsMeta] = useState<ApiAdsMeta | null>(null);
+  const [searchError, setSearchError] = useState<CompetitorDebriefApiError | null>(null);
 
   const [debrief, setDebrief] = useState<CompetitorDebrief | null>(null);
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
@@ -467,6 +505,109 @@ export function CompetitorDebriefPanel() {
     setPageDumpStats(null);
   }
 
+  /* ---- Search advertiser handlers ---- */
+
+  const FALLBACK_SEARCH_ERROR: CompetitorDebriefApiError = {
+    title: "Connection issue",
+    message: "The request couldn't be completed.",
+    fix: "Check your connection and try again.",
+  };
+
+  async function handleSearchPages() {
+    setSearchLoading(true);
+    setSearchError(null);
+    // A new search invalidates any previous selection and fetched ads —
+    // never leave a stale Page/ads pairing on screen. Selection is
+    // always an explicit user click on a fresh result; nothing is ever
+    // auto-selected.
+    setPageCandidates(null);
+    setSelectedPage(null);
+    setApiAds(null);
+    setApiAdsMeta(null);
+    try {
+      const res = await fetch("/api/meta-ad-library/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchQuery.trim(), country: searchCountry }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) {
+        setSearchError(body?.error ?? FALLBACK_SEARCH_ERROR);
+        return;
+      }
+      setPageCandidates(body.pages as PageCandidate[]);
+    } catch {
+      setSearchError(FALLBACK_SEARCH_ERROR);
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
+  function handleSelectPage(candidate: PageCandidate) {
+    setSelectedPage(candidate);
+    setApiAds(null);
+    setApiAdsMeta(null);
+    setSearchError(null);
+    // The selected Page's own name is the authoritative competitor name
+    // for this debrief — Meta reported it, the user chose it. The Ads
+    // Library reference URL (token-free, public) is filled in the same
+    // way so the report's sources section cites the exact Page.
+    setCore((f) => ({
+      ...f,
+      competitorName: candidate.pageName,
+      adsLibraryUrl: `https://www.facebook.com/ads/library/?view_all_page_id=${candidate.pageId}`,
+    }));
+  }
+
+  async function fetchPageAds(after: string | null) {
+    if (!selectedPage) return;
+    const isLoadMore = after !== null;
+    (isLoadMore ? setLoadMoreLoading : setAdsLoading)(true);
+    setSearchError(null);
+    try {
+      const res = await fetch("/api/meta-ad-library/page-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pageId: selectedPage.pageId,
+          country: searchCountry,
+          ...(after ? { after } : {}),
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) {
+        setSearchError(body?.error ?? FALLBACK_SEARCH_ERROR);
+        return;
+      }
+      const fetched = (body.ads as CompetitorAd[]).map((ad) => ({
+        ad,
+        text: competitorAdToText(ad),
+        included: true,
+      }));
+      setApiAds((prev) => {
+        // "Load more" appends; a fresh fetch replaces. Guard against a
+        // misbehaving cursor by dropping any ad id already in the list.
+        const base = isLoadMore ? (prev ?? []) : [];
+        const seenIds = new Set(base.map((a) => a.ad.adId));
+        return [...base, ...fetched.filter((a) => !seenIds.has(a.ad.adId))];
+      });
+      setApiAdsMeta((prev) => ({
+        excludedMismatchedCount:
+          (isLoadMore ? (prev?.excludedMismatchedCount ?? 0) : 0) + (body.excludedMismatchedCount as number),
+        hasMore: body.hasMore as boolean,
+        after: (body.after as string | null) ?? null,
+      }));
+    } catch {
+      setSearchError(FALLBACK_SEARCH_ERROR);
+    } finally {
+      (isLoadMore ? setLoadMoreLoading : setAdsLoading)(false);
+    }
+  }
+
+  function toggleApiAdIncluded(adId: string) {
+    setApiAds((prev) => (prev ?? []).map((a) => (a.ad.adId === adId ? { ...a, included: !a.included } : a)));
+  }
+
   function toggleVariantGroupExpanded(groupId: number) {
     setExpandedVariantGroups((prev) => {
       const next = new Set(prev);
@@ -493,14 +634,22 @@ export function CompetitorDebriefPanel() {
     () => countUsableAds((blocks ?? []).filter(isBlockIncludedForGenerate).map((b) => b.parsed)),
     [blocks]
   );
+  // Search mode's own eligibility: included, non-empty-text fetched
+  // ads. The paste flows' blocks are deliberately NOT counted while in
+  // search mode (and vice versa) — one mode, one payload source.
+  const includedApiAds = useMemo(() => (apiAds ?? []).filter((a) => a.included && a.text !== ""), [apiAds]);
   const hasUsableNotes = advancedNotes.trim() !== "";
-  const canGenerate = core.competitorName.trim() !== "" && (usableAdCount > 0 || hasUsableNotes);
+  const canGenerate =
+    core.competitorName.trim() !== "" &&
+    (inputMode === "search" ? includedApiAds.length > 0 : usableAdCount > 0 || hasUsableNotes);
 
   const disabledReason =
     !loading && !canGenerate
       ? core.competitorName.trim() === ""
         ? "Add a competitor name to continue."
-        : "Paste at least one usable ad (or add advanced manual notes) to continue — malformed or duplicate-only content doesn't count."
+        : inputMode === "search"
+          ? "Search for the advertiser, choose the exact Page, fetch its active ads, and keep at least one included to continue."
+          : "Paste at least one usable ad (or add advanced manual notes) to continue — malformed or duplicate-only content doesn't count."
       : null;
 
   // Duplicate flags are recomputed from the current blocks on every
@@ -550,29 +699,38 @@ export function CompetitorDebriefPanel() {
     setLoading(true);
     setError(null);
     try {
-      // isBlockIncludedForGenerate is the ONLY new condition here — a
-      // no-op for the manual flow, whose blocks never carry
-      // pageDumpMeta. Everything after this line (dedupe, textForAnalysis,
-      // payload shape) is completely unchanged.
-      const activeBlocks = (blocks ?? []).filter(
-        (b) => b.parsed.raw.trim() !== "" && isBlockIncludedForGenerate(b)
-      );
-      // Deduped once, here (by raw text — the same key the duplicate-
-      // warning badges use), so a pasted duplicate can never be counted
-      // as a second, independent recurrence downstream. Each surviving
-      // block is then rendered through textForAnalysis, which strips
-      // any paragraphs the native parser flagged as disclaimers/legal
-      // boilerplate — otherwise that text would still reach the engine
-      // verbatim (it re-scans whatever it's sent) and could get counted
-      // as a "recurring" pattern shared only because every ad carries
-      // the same legal footer.
+      // Payload source is strictly per-mode: search mode reads ONLY the
+      // included API-fetched ads (each already validated server-side
+      // against the selected page_id); the paste modes read ONLY
+      // `blocks`, exactly as before this mode existed. Both go through
+      // the same normalizeForDedupe loop so a duplicate can never count
+      // as a second, independent recurrence downstream.
       const seenRawKeys = new Set<string>();
       const distinctAdTexts: string[] = [];
-      for (const b of activeBlocks) {
-        const key = normalizeForDedupe(b.parsed.raw);
-        if (seenRawKeys.has(key)) continue;
-        seenRawKeys.add(key);
-        distinctAdTexts.push(textForAnalysis(b.parsed));
+      if (inputMode === "search") {
+        for (const a of includedApiAds) {
+          const key = normalizeForDedupe(a.text);
+          if (seenRawKeys.has(key)) continue;
+          seenRawKeys.add(key);
+          distinctAdTexts.push(a.text);
+        }
+      } else {
+        // isBlockIncludedForGenerate is a no-op for the manual flow,
+        // whose blocks never carry pageDumpMeta. textForAnalysis strips
+        // any paragraphs the native parser flagged as disclaimers/legal
+        // boilerplate — otherwise that text would reach the engine
+        // verbatim (it re-scans whatever it's sent) and could get
+        // counted as a "recurring" pattern shared only because every ad
+        // carries the same legal footer.
+        const activeBlocks = (blocks ?? []).filter(
+          (b) => b.parsed.raw.trim() !== "" && isBlockIncludedForGenerate(b)
+        );
+        for (const b of activeBlocks) {
+          const key = normalizeForDedupe(b.parsed.raw);
+          if (seenRawKeys.has(key)) continue;
+          seenRawKeys.add(key);
+          distinctAdTexts.push(textForAnalysis(b.parsed));
+        }
       }
       const observations = [distinctAdTexts.join("\n\n"), advancedNotes.trim()]
         .filter((part) => part !== "")
@@ -699,7 +857,8 @@ export function CompetitorDebriefPanel() {
               {(
                 [
                   ["individual", "Paste individual ads"],
-                  ["pageDump", "Ads Library page"],
+                  ["pageDump", "Ads Library page — review required"],
+                  ["search", "Search advertiser — EU/UK beta"],
                 ] as const
               ).map(([mode, label]) => (
                 <button
@@ -849,7 +1008,196 @@ export function CompetitorDebriefPanel() {
             </div>
           )}
 
-          {blocks && (
+          {inputMode === "search" && (
+            <div className="mt-6 space-y-3">
+              <div>
+                <label className={`${fieldLabel} mb-1.5 block`} htmlFor="advertiser-search">
+                  Search advertiser
+                </label>
+                <p className="mb-2 text-[11px] leading-relaxed text-zinc-500">
+                  Search finds possible Pages. You choose the exact advertiser
+                  before any ads are analyzed.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    id="advertiser-search"
+                    type="text"
+                    autoComplete="off"
+                    className={`${inputBase} min-w-0 flex-1`}
+                    placeholder="Advertiser or brand name"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <select
+                    aria-label="Country"
+                    className={`${inputBase} w-auto shrink-0 cursor-pointer`}
+                    value={searchCountry}
+                    onChange={(e) => setSearchCountry(e.target.value)}
+                  >
+                    {SUPPORTED_COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className={`${btnSecondary} shrink-0`}
+                    disabled={searchLoading || searchQuery.trim() === ""}
+                    onClick={handleSearchPages}
+                  >
+                    {searchLoading ? "Searching…" : "Search Pages"}
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  EU/UK beta — Meta&rsquo;s Ad Library API only returns
+                  commercial ads for EU/UK markets.
+                </p>
+              </div>
+
+              {pageCandidates !== null && pageCandidates.length === 0 && (
+                <p className="text-[11px] text-zinc-400">
+                  No advertiser Pages found for that search in the selected
+                  country. Try a different spelling or country, or use a paste
+                  mode instead.
+                </p>
+              )}
+
+              {pageCandidates !== null && pageCandidates.length > 0 && (
+                <div className={`${cardNested} space-y-1.5 p-3`}>
+                  <p className={fieldLabel}>
+                    Choose the exact advertiser Page ({pageCandidates.length} found)
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    These are Pages whose ads matched your search text — the
+                    match is on ad wording, not ownership. Pick the one that is
+                    actually this competitor.
+                  </p>
+                  <div className="space-y-1 pt-1">
+                    {pageCandidates.map((c) => {
+                      const isSelected = selectedPage?.pageId === c.pageId;
+                      return (
+                        <button
+                          key={c.pageId}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => handleSelectPage(c)}
+                          className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
+                            isSelected
+                              ? "border-accent/40 bg-accent/[0.08] text-white"
+                              : "border-white/10 bg-white/[0.02] text-zinc-300 hover:border-white/20"
+                          }`}
+                        >
+                          <span className="min-w-0 truncate font-medium">{c.pageName}</span>
+                          <span className="shrink-0 text-[10px] text-zinc-500">
+                            page_id {c.pageId} · {c.sampleAdCount} ad{c.sampleAdCount === 1 ? "" : "s"} in sample
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedPage && (
+                <div className={`${cardNested} space-y-2 p-3`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className={`${fieldLabel} min-w-0`}>
+                      Selected: {selectedPage.pageName}{" "}
+                      <span className="font-normal text-zinc-500">(page_id {selectedPage.pageId})</span>
+                    </p>
+                    <button
+                      type="button"
+                      className={`${btnSecondary} shrink-0`}
+                      disabled={adsLoading}
+                      onClick={() => fetchPageAds(null)}
+                    >
+                      {adsLoading ? "Fetching…" : apiAds === null ? "Fetch active ads" : "Refetch"}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-500">
+                    Fetches this Page&rsquo;s currently active ads in{" "}
+                    {SUPPORTED_COUNTRIES.find((c) => c.code === searchCountry)?.label ?? searchCountry} from the
+                    Meta Ad Library API. Every ad is checked against this exact
+                    page_id before it can be analyzed.
+                  </p>
+
+                  {apiAds !== null && apiAds.length === 0 && (
+                    <p className="text-[11px] text-zinc-400">
+                      No active ads found for this Page in the selected country.
+                      Try another country, or paste ads manually instead.
+                    </p>
+                  )}
+
+                  {apiAdsMeta !== null && apiAdsMeta.excludedMismatchedCount > 0 && (
+                    <p className="flex items-start gap-1.5 text-[11px] text-amber-300">
+                      <AlertTriangleIcon className="mt-0.5 h-3 w-3 shrink-0" />
+                      {apiAdsMeta.excludedMismatchedCount} returned ad
+                      {apiAdsMeta.excludedMismatchedCount === 1 ? "" : "s"} belonged to a different Page and{" "}
+                      {apiAdsMeta.excludedMismatchedCount === 1 ? "was" : "were"} excluded automatically.
+                    </p>
+                  )}
+
+                  {apiAds !== null && apiAds.length > 0 && (
+                    <>
+                      <div className="space-y-1.5 pt-1">
+                        {apiAds.map((a, i) => (
+                          <div key={a.ad.adId} className="flex min-w-0 items-start gap-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
+                            <input
+                              type="checkbox"
+                              checked={a.included}
+                              onChange={() => toggleApiAdIncluded(a.ad.adId)}
+                              aria-label={`Include fetched ad ${i + 1} in generation`}
+                              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-accent"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="line-clamp-3 whitespace-pre-line break-words text-xs text-zinc-300">
+                                {a.text || "(no creative text returned)"}
+                              </p>
+                              <p className="mt-1 text-[10px] text-zinc-500">
+                                ad id {a.ad.adId}
+                                {a.ad.startedAt ? ` · started ${a.ad.startedAt}` : ""}
+                                {a.ad.platforms.length > 0 ? ` · ${a.ad.platforms.join(", ")}` : ""}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <p className="min-w-0 text-[11px] text-zinc-400">
+                          {apiAds.length} fetched · {includedApiAds.length} included ·{" "}
+                          {apiAdsMeta?.hasMore ? "more results available" : "no more results"}
+                        </p>
+                        {apiAdsMeta?.hasMore && apiAdsMeta.after && (
+                          <button
+                            type="button"
+                            className={`${btnSecondary} shrink-0`}
+                            disabled={loadMoreLoading}
+                            onClick={() => fetchPageAds(apiAdsMeta.after)}
+                          >
+                            {loadMoreLoading ? "Loading…" : "Load more"}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {searchError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/[0.06] p-3 text-xs text-red-300">
+                  <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="font-semibold">{searchError.title}</p>
+                    <p className="mt-0.5 text-red-300/80">{searchError.message}</p>
+                    <p className="mt-0.5 text-red-300/60">{searchError.fix}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {blocks && inputMode !== "search" && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className={`${fieldLabel} min-w-0`}>

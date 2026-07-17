@@ -152,13 +152,12 @@ export interface AdsArchiveQuery {
 }
 
 /**
- * One-shot query against ads_archive. Never throws on a well-formed
- * Graph error response — it maps that into AdLibraryApiError so the
- * probe script can classify auth/permission/rate-limit/other cleanly.
- * Network-level failures (DNS, timeout, refused) throw a generic
- * AdLibraryApiError with status 502.
+ * Pure request-shape builder, exported separately from the fetch so
+ * the exact wire format (ACTIVE filter, search_page_ids JSON encoding,
+ * cursor passthrough) is assertable in plain-Node tests without a
+ * network call (scripts/metaAdLibraryIntegration.test.ts).
  */
-export async function queryAdsArchive(query: AdsArchiveQuery): Promise<AdsArchiveResponse> {
+export function buildAdsArchiveParams(query: AdsArchiveQuery): URLSearchParams {
   const params = new URLSearchParams({
     access_token: query.accessToken,
     ad_type: query.adType ?? "ALL",
@@ -170,6 +169,18 @@ export async function queryAdsArchive(query: AdsArchiveQuery): Promise<AdsArchiv
   if (query.searchPageIds?.length) params.set("search_page_ids", JSON.stringify(query.searchPageIds));
   if (query.adActiveStatus) params.set("ad_active_status", query.adActiveStatus);
   if (query.after) params.set("after", query.after);
+  return params;
+}
+
+/**
+ * One-shot query against ads_archive. Never throws on a well-formed
+ * Graph error response — it maps that into AdLibraryApiError so the
+ * probe script can classify auth/permission/rate-limit/other cleanly.
+ * Network-level failures (DNS, timeout, refused) throw a generic
+ * AdLibraryApiError with status 502.
+ */
+export async function queryAdsArchive(query: AdsArchiveQuery): Promise<AdsArchiveResponse> {
+  const params = buildAdsArchiveParams(query);
 
   let res: Response;
   try {
