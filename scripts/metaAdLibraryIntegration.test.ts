@@ -544,4 +544,106 @@ function pageCandidate(pageId: string, pageName: string) {
   assert.ok(!claudeMd.includes("no fetching, ever, in this flow"), "outdated absolute no-fetch claim removed");
 }
 
+/* ================= Competitor Debrief V2 — integrated-branch regression ================= */
+/* Both source branches' pure layers running together in one process,
+ * plus source scans for the merged panel's mode isolation. The full
+ * per-branch coverage lives in scripts/pageDump.test.ts /
+ * scripts/pageDumpReview.test.ts (trust-v2) and the sections above
+ * (API V1) — these assertions only cover what the MERGE itself could
+ * have broken. */
+
+{
+  // Cross-branch smoke: trust-v2's alias-aware page-dump attribution
+  // pipeline works alongside the API modules in the same process.
+  const { processPageDump } = await import("../modules/competitorDebrief/pageDump.ts");
+  const { blocksGenerateForAttribution, recomputeLiveAttribution } = await import(
+    "../components/competitorDebrief/pageDumpReview.ts"
+  );
+
+  const dump = [
+    "Sponsored · GlowSkin Co",
+    "Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.",
+    "Shop Now",
+    "",
+    "Sponsored · RivalGlow Beauty",
+    "Ditch the sticky serums. Our lightweight oil absorbs instantly.",
+    "Learn More",
+  ].join("\n");
+
+  const result = processPageDump(dump, "GlowSkin Co");
+  const match = result.candidates.find((c) => c.pageName === "GlowSkin Co");
+  const mismatch = result.candidates.find((c) => c.pageName === "RivalGlow Beauty");
+  assert.ok(match && mismatch, "both advertisers extracted");
+  assert.equal(match!.advertiserAttribution, "match");
+  assert.equal(mismatch!.advertiserAttribution, "mismatch");
+  assert.equal(match!.isRepresentative, true, "match included by default");
+  assert.equal(mismatch!.isRepresentative, false, "mismatch excluded by default");
+
+  // Alias + live recompute + Generate blocking still work post-merge:
+  // a paste matching only a REGIONAL page name blocks until the alias
+  // resolves it — without re-extracting.
+  const regionalDump = ["Sponsored · GlowSkin Europe", "Glow like never before, now shipping EU-wide.", "Shop Now"].join("\n");
+  const regional = processPageDump(regionalDump, "GlowSkin Co");
+  let blocks: import("../components/competitorDebrief/pageDumpReview.ts").AdBlock[] = regional.candidates.map((c, i) => ({
+    id: i + 1,
+    parsed: c.parsed,
+    pageDumpMeta: {
+      boundaryConfidence: c.boundaryConfidence,
+      variantGroupId: c.variantGroupId,
+      included: c.isRepresentative,
+      pageName: c.pageName,
+      advertiserAttribution: c.advertiserAttribution,
+    },
+  }));
+  assert.equal(blocksGenerateForAttribution(blocks), true, "no alias — regional-only paste blocks Generate");
+  blocks = recomputeLiveAttribution(blocks, "GlowSkin Co", ["GlowSkin Europe"]);
+  assert.equal(blocksGenerateForAttribution(blocks), false, "alias resolves the match and unblocks");
+}
+
+{
+  // Merged-panel source scans: all three modes present, individual
+  // first/default, and each trust rule scoped to the mode that owns it.
+  const panel = read("components/competitorDebrief/CompetitorDebriefPanel.tsx");
+
+  // All three modes, in order, with the required labels.
+  const individualIdx = panel.indexOf('["individual", "Paste individual ads"]');
+  const pageDumpIdx = panel.indexOf('["pageDump", "Ads Library page — review required"]');
+  const searchIdx = panel.indexOf('["search", "Search advertiser — EU/UK beta"]');
+  assert.ok(individualIdx > -1 && pageDumpIdx > -1 && searchIdx > -1, "all three modes present");
+  assert.ok(individualIdx < pageDumpIdx && pageDumpIdx < searchIdx, "individual first, search last");
+  assert.ok(panel.includes('useState<AdInputMode>("individual")'), "individual is the default mode");
+
+  // trust-v2 features present post-merge.
+  assert.ok(panel.includes("ATTRIBUTION_BADGE_COPY"), "per-candidate attribution badges survived the merge");
+  assert.ok(panel.includes("Advertisers detected"), "advertiser summary survived the merge");
+  assert.ok(panel.includes("Also known as / alternate Page names"), "alias field survived the merge");
+  assert.ok(panel.includes("View paste example"), "paste example survived the merge");
+  assert.ok(panel.includes("could not\n              match to"), "manual-inclusion warning survived the merge");
+  assert.ok(panel.includes("recomputeLiveAttribution(blocks ?? []"), "live attribution recompute wired");
+
+  // Mode isolation:
+  // - attribution blocking gates PASTE modes only (search-mode branch of
+  //   canGenerate must not reference it);
+  assert.ok(
+    panel.includes("? searchPayload.adTexts.length > 0 && !searchOverBudget") &&
+      panel.includes(": (usableAdCount > 0 || hasUsableNotes) && !attributionBlocksGenerate"),
+    "attribution blocking applies to paste modes only; search mode has its own eligibility"
+  );
+  // - the search payload reads ONLY searchPayload; the paste payload
+  //   reads ONLY liveBlocks (each source disjoint from the other's state);
+  assert.ok(panel.includes("distinctAdTexts = searchPayload.adTexts"), "search payload from API ads only");
+  assert.ok(panel.includes("distinctAdTexts.push(textForAnalysis(b.parsed))"), "paste payload from blocks only");
+  // - alias field, advertiser summary, review list, and the manual-
+  //   inclusion warning are all scoped away from search mode;
+  assert.ok(panel.includes('{inputMode !== "search" && (\n            <div>\n              <label className="mb-1.5 block text-xs text-zinc-500" htmlFor="competitor-aliases">'), "alias field hidden in search mode");
+  assert.ok(panel.includes('{inputMode === "pageDump" && blocks && advertiserSummary.some'), "summary is pageDump-only");
+  assert.ok(panel.includes('{blocks && inputMode !== "search" && ('), "paste review list hidden in search mode");
+  assert.ok(panel.includes('{inputMode !== "search" && manuallyIncludedNonMatchCount > 0 && ('), "manual-inclusion warning hidden in search mode");
+  // - sourceMode is per-mode (manual for BOTH paste modes);
+  assert.ok(panel.includes('sourceMode: inputMode === "search" ? "adsLibraryApi" : "manual"'));
+  // - no token material can reach the client component.
+  assert.ok(!panel.includes("META_AD_LIBRARY"), "panel never references the token env var");
+  assert.ok(!panel.includes("NEXT_PUBLIC_"));
+}
+
 console.log("metaAdLibraryIntegration: all assertions passed");

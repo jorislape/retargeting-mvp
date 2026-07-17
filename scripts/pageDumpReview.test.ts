@@ -10,10 +10,17 @@
  */
 import assert from "node:assert/strict";
 import {
+  blocksGenerateForAttribution,
+  computeAdvertiserSummary,
   computeBlockIndexById,
   computePageDumpLiveStats,
   computeRenderItems,
+  countManuallyIncludedNonMatches,
+  hasAnyCapturedPageName,
+  hasMatchingAdvertiser,
+  hasPageDumpBlocks,
   isBlockIncludedForGenerate,
+  recomputeLiveAttribution,
   type AdBlock,
 } from "../components/competitorDebrief/pageDumpReview.ts";
 import { parseAdExample } from "../modules/competitorDebrief/adParser.ts";
@@ -24,7 +31,13 @@ function manualBlock(raw: string): AdBlock {
 }
 function pageDumpBlock(
   raw: string,
-  opts: { included: boolean; variantGroupId?: number | null; boundaryConfidence?: "high" | "medium" | "low" }
+  opts: {
+    included: boolean;
+    variantGroupId?: number | null;
+    boundaryConfidence?: "high" | "medium" | "low";
+    pageName?: string | null;
+    advertiserAttribution?: "match" | "mismatch" | "unknown";
+  }
 ): AdBlock {
   return {
     id: id++,
@@ -33,6 +46,8 @@ function pageDumpBlock(
       boundaryConfidence: opts.boundaryConfidence ?? "high",
       variantGroupId: opts.variantGroupId ?? null,
       included: opts.included,
+      pageName: opts.pageName ?? null,
+      advertiserAttribution: opts.advertiserAttribution ?? "unknown",
     },
   };
 }
@@ -202,6 +217,238 @@ function pageDumpBlock(
 
   const finalIncluded = blocks.filter(isBlockIncludedForGenerate).map((b) => b.id);
   assert.deepEqual(finalIncluded, [variant.id, distinctAd.id], "the user's manual re-inclusion/exclusion is respected exactly");
+}
+
+/* ========== Competitor Input Trust V2 Checkpoint 2: attribution gating (review state) ======== */
+
+/* ---- hasPageDumpBlocks / hasMatchingAdvertiser / blocksGenerateForAttribution ---- */
+
+{
+  // (12) Individual-ad mode remains byte-for-byte behaviorally
+  // unchanged: an all-manual block list never carries pageDumpMeta, so
+  // none of the three new helpers can ever fire for it — the
+  // attribution-blocking rule is a true no-op for the manual flow.
+  const blocks = [manualBlock("Ad one.\nShop Now"), manualBlock("Ad two.\nLearn More")];
+  assert.equal(hasPageDumpBlocks(blocks), false);
+  assert.equal(hasMatchingAdvertiser(blocks), false);
+  assert.equal(blocksGenerateForAttribution(blocks), false, "manual flow never gets blocked by attribution");
+}
+
+{
+  // A page-dump session with at least one match: not blocked.
+  const match = pageDumpBlock("Matching ad.\nShop Now", { included: true, advertiserAttribution: "match" });
+  const mismatch = pageDumpBlock("Foreign ad.\nLearn More", { included: false, advertiserAttribution: "mismatch" });
+  const blocks = [match, mismatch];
+  assert.equal(hasPageDumpBlocks(blocks), true);
+  assert.equal(hasMatchingAdvertiser(blocks), true);
+  assert.equal(blocksGenerateForAttribution(blocks), false, "at least one match exists — Generate is not blocked");
+}
+
+{
+  // A page-dump session with zero matches (all mismatch/unknown):
+  // blocked, regardless of each block's CURRENT included state — this
+  // is what makes rule B unconditional rather than something a manual
+  // checkbox toggle can route around.
+  const mismatch = pageDumpBlock("Foreign ad.\nLearn More", { included: true, advertiserAttribution: "mismatch" });
+  const unknown = pageDumpBlock("Unattributed ad.\nGet Started", { included: true, advertiserAttribution: "unknown" });
+  const blocks = [mismatch, unknown];
+  assert.equal(hasMatchingAdvertiser(blocks), false);
+  assert.equal(
+    blocksGenerateForAttribution(blocks),
+    true,
+    "zero match candidates — blocked even though both are currently manually included"
+  );
+}
+
+/* ---- (10)/(11) default payload never contains mismatch/unknown; manual re-inclusion works ---- */
+
+{
+  // Simulates the exact sequence handleProcessPageDump ->
+  // (Checkpoint 2 default selection) -> handleGenerate's activeBlocks
+  // filter, without React. Mirrors the manual-toggle simulation already
+  // proven above for variant groups, now for attribution.
+  const match = pageDumpBlock("Tired of dull skin? Our Vitamin C serum brightens in 2 weeks.\nShop Now", {
+    included: true, // Checkpoint 2 default: match candidates start included
+    advertiserAttribution: "match",
+  });
+  const mismatch = pageDumpBlock("Ditch the sticky serums. Our lightweight oil absorbs instantly.\nLearn More", {
+    included: false, // Checkpoint 2 default: mismatch candidates start excluded
+    advertiserAttribution: "mismatch",
+  });
+  const unknown = pageDumpBlock("Some ad with no recognizable advertiser line at all.\nGet Started", {
+    included: false, // Checkpoint 2 default: unknown candidates start excluded
+    advertiserAttribution: "unknown",
+  });
+  let blocks: AdBlock[] = [match, mismatch, unknown];
+
+  // (11) Default payload proof: only the match candidate is included —
+  // mismatch and unknown never appear in the derived payload by default.
+  const defaultIncluded = blocks.filter(isBlockIncludedForGenerate).map((b) => b.id);
+  assert.deepEqual(defaultIncluded, [match.id], "default payload contains only the match candidate");
+
+  // (10) User manually checks the mismatch candidate's box.
+  blocks = blocks.map((b) =>
+    b.id === mismatch.id && b.pageDumpMeta ? { ...b, pageDumpMeta: { ...b.pageDumpMeta, included: true } } : b
+  );
+  const afterManualInclude = blocks.filter(isBlockIncludedForGenerate).map((b) => b.id);
+  assert.deepEqual(
+    afterManualInclude,
+    [match.id, mismatch.id],
+    "manually checking a mismatch candidate causes it to enter the derived payload — explicit user action, not a default"
+  );
+  // The still-excluded unknown candidate proves this was a targeted,
+  // per-block change, not a blanket re-inclusion of everything.
+  assert.ok(!afterManualInclude.includes(unknown.id), "the untouched unknown candidate remains excluded");
+}
+
+/* ================= Competitor Input Trust V2 Checkpoint 3 ================= */
+
+/* ---- computeAdvertiserSummary ---- */
+
+{
+  // (13) Summary counts for match/mismatch/unknown, including
+  // includedCount reflecting current (not default) inclusion, and
+  // pageNames deduped per group. Always returns all three groups, even
+  // when a group's count is 0 (unknown, here) — the panel filters
+  // zero-count groups at render time, not this helper.
+  const match1 = pageDumpBlock("Match one.\nShop Now", {
+    included: true,
+    advertiserAttribution: "match",
+    pageName: "Brand Name",
+  });
+  const match2 = pageDumpBlock("Match two.\nShop Now", {
+    included: true,
+    advertiserAttribution: "match",
+    pageName: "Brand Name",
+  });
+  const mismatch = pageDumpBlock("Foreign ad.\nLearn More", {
+    included: false,
+    advertiserAttribution: "mismatch",
+    pageName: "Some Other Brand",
+  });
+  const blocks = [match1, match2, mismatch];
+  const summary = computeAdvertiserSummary(blocks);
+  const byStatus = new Map(summary.map((g) => [g.status, g]));
+  assert.equal(byStatus.get("match")?.count, 2);
+  assert.equal(byStatus.get("match")?.includedCount, 2);
+  assert.deepEqual(byStatus.get("match")?.pageNames, ["Brand Name"]);
+  assert.equal(byStatus.get("mismatch")?.count, 1);
+  assert.equal(byStatus.get("mismatch")?.includedCount, 0);
+  assert.deepEqual(byStatus.get("mismatch")?.pageNames, ["Some Other Brand"]);
+  assert.equal(byStatus.get("unknown")?.count, 0, "unknown group still present, just empty");
+  assert.deepEqual(byStatus.get("unknown")?.pageNames, []);
+}
+
+/* ---- countManuallyIncludedNonMatches ---- */
+
+{
+  // (14) Only counts CURRENTLY included mismatch/unknown blocks — a
+  // match candidate being included doesn't count, and a mismatch/unknown
+  // candidate left at its default excluded state doesn't count either.
+  const match = pageDumpBlock("Match ad.\nShop Now", { included: true, advertiserAttribution: "match" });
+  const mismatchIncluded = pageDumpBlock("Foreign ad, manually included.\nLearn More", {
+    included: true,
+    advertiserAttribution: "mismatch",
+  });
+  const mismatchExcluded = pageDumpBlock("Foreign ad, left excluded.\nLearn More", {
+    included: false,
+    advertiserAttribution: "mismatch",
+  });
+  const unknownIncluded = pageDumpBlock("Unattributed ad, manually included.\nGet Started", {
+    included: true,
+    advertiserAttribution: "unknown",
+  });
+  const blocks = [match, mismatchIncluded, mismatchExcluded, unknownIncluded];
+  assert.equal(countManuallyIncludedNonMatches(blocks), 2);
+
+  // Manual flow: always 0, since manual blocks never carry pageDumpMeta.
+  assert.equal(countManuallyIncludedNonMatches([manualBlock("Ad.\nShop Now")]), 0);
+}
+
+/* ---- hasAnyCapturedPageName ---- */
+
+{
+  // (15) No page names captured at all — every page-dump block has a
+  // null pageName (the paste had no recognizable Ads Library chrome at
+  // all), distinguishing this from "some names captured, none matched."
+  const noNamesBlocks = [
+    pageDumpBlock("Ad with no chrome.\nShop Now", { included: true, advertiserAttribution: "unknown", pageName: null }),
+    pageDumpBlock("Another ad with no chrome.\nLearn More", {
+      included: true,
+      advertiserAttribution: "unknown",
+      pageName: null,
+    }),
+  ];
+  assert.equal(hasAnyCapturedPageName(noNamesBlocks), false);
+
+  const someNamesBlocks = [
+    ...noNamesBlocks,
+    pageDumpBlock("Ad with chrome.\nGet Started", {
+      included: false,
+      advertiserAttribution: "mismatch",
+      pageName: "Some Other Brand",
+    }),
+  ];
+  assert.equal(hasAnyCapturedPageName(someNamesBlocks), true);
+
+  // Manual flow: always false.
+  assert.equal(hasAnyCapturedPageName([manualBlock("Ad.\nShop Now")]), false);
+}
+
+/* ---- recomputeLiveAttribution + blocksGenerateForAttribution together ---- */
+
+{
+  // (16) Alias change recomputes match and unblocks: a candidate whose
+  // frozen pageName is "lululemon Europe" was classified "mismatch" at
+  // extraction time (competitorName was just "Lululemon"). Adding the
+  // alias "lululemon Europe" and recomputing must flip it live to
+  // "match" and unblock Generate — without needing to re-extract.
+  const regional = pageDumpBlock("Euro-exclusive drop.\nShop Now", {
+    included: false,
+    advertiserAttribution: "mismatch",
+    pageName: "lululemon Europe",
+  });
+  let blocks: AdBlock[] = [regional];
+
+  assert.equal(blocksGenerateForAttribution(blocks), true, "no alias yet — still blocked");
+
+  blocks = recomputeLiveAttribution(blocks, "Lululemon", []);
+  assert.equal(
+    blocks[0].pageDumpMeta?.advertiserAttribution,
+    "mismatch",
+    "recompute with no alias yet leaves it a mismatch"
+  );
+  assert.equal(blocksGenerateForAttribution(blocks), true, "still blocked before the alias is added");
+
+  blocks = recomputeLiveAttribution(blocks, "Lululemon", ["lululemon Europe"]);
+  assert.equal(blocks[0].pageDumpMeta?.advertiserAttribution, "match", "alias resolves the regional page to a match");
+  assert.equal(blocksGenerateForAttribution(blocks), false, "alias resolves the match — Generate unblocks immediately");
+
+  // included (the checkbox state) is deliberately untouched by the
+  // recompute — only re-running "Extract ads" changes default selection.
+  assert.equal(blocks[0].pageDumpMeta?.included, false, "recompute never auto-checks a box");
+
+  // Recompute is a no-op (same reference) when attribution hasn't
+  // actually changed, and a true no-op for manual-flow blocks.
+  const stable = recomputeLiveAttribution(blocks, "Lululemon", ["lululemon Europe"]);
+  assert.equal(stable[0], blocks[0], "recompute returns the same object reference when nothing changed");
+  const manual = [manualBlock("Ad.\nShop Now")];
+  assert.equal(recomputeLiveAttribution(manual, "Anything", [])[0], manual[0]);
+}
+
+/* ---- default individual-ad mode remains unchanged ---- */
+
+{
+  // (17) A purely manual session run through every Checkpoint 3 helper:
+  // none of them can produce a non-default/non-empty result, proving
+  // the new logic is a true no-op for the pre-existing "Paste ads" flow.
+  const blocks = [manualBlock("Manual ad one.\nShop Now"), manualBlock("Manual ad two.\nLearn More")];
+  assert.equal(hasAnyCapturedPageName(blocks), false);
+  assert.equal(countManuallyIncludedNonMatches(blocks), 0);
+  const summary = computeAdvertiserSummary(blocks);
+  assert.ok(summary.every((g) => g.count === 0), "no page-dump blocks — every summary group is empty");
+  const recomputed = recomputeLiveAttribution(blocks, "Some Competitor", ["Some Alias"]);
+  assert.deepEqual(recomputed, blocks, "recompute leaves a manual-only block list byte-for-byte unchanged");
 }
 
 console.log("pageDumpReview: all assertions passed");

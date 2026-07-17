@@ -24,13 +24,16 @@ export {
 } from "./adParser";
 export { isBareCtaLine, looksLikeAdsLibraryCopy } from "./adsLibraryParser";
 export {
+  classifyAdvertiserAttribution,
   groupPossibleVariants,
   isDestinationPreviewFragment,
   MAX_REPRESENTATIVES,
+  parseAliases,
   processPageDump,
   selectRepresentatives,
   stripChromeLines,
   stripLeadingHeader,
+  type AdvertiserAttribution,
   type BoundaryConfidence,
   type LeadingHeaderStripResult,
   type PageDumpCandidate,
