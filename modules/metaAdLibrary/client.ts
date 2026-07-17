@@ -14,6 +14,24 @@
  * (UK is cited in secondary sources but wasn't confirmed on an
  * official page during this spike — see the report).
  *
+ * CONFIRMED LIVE (2026-07, real requests with a fresh ads_read User
+ * Access Token on the existing MVP app — no new Meta app needed):
+ *   - ads_archive returns real commercial-ad data at v24.0 after
+ *     completing Meta's identity verification;
+ *   - search_terms is full-text discovery over creative content, NOT
+ *     advertiser attribution (searching a brand name returns unrelated
+ *     Pages whose ad text matches);
+ *   - search_page_ids IS supported and reliably single-advertiser:
+ *     every result across multiple pages belonged to the queried
+ *     page_id, cursor paging advanced without overlap, and
+ *     ad_active_status=ACTIVE returned only end-date-less ads;
+ *   - ad_snapshot_url embeds the caller's own access token — treat it
+ *     as a credential (normalize.ts strips it before anything else
+ *     sees the URL).
+ * The viable future flow is therefore: keyword/name discovery to find
+ * candidate Pages -> user confirms the exact Page -> search_page_ids
+ * query -> normalized CompetitorAd[] -> the existing engine, unchanged.
+ *
  * Token handling: read from an environment variable only, forwarded
  * as a query param the way Meta's own ads_archive examples show it
  * (this edge, unlike Insights, does not document an Authorization-
@@ -22,7 +40,9 @@
  * as modules/meta/graph.ts.
  */
 
-export const AD_LIBRARY_GRAPH_API_VERSION = "v23.0";
+/** v24.0 confirmed live 2026-07: a real ads_archive request with a
+ *  fresh ads_read User Access Token returned data at this version. */
+export const AD_LIBRARY_GRAPH_API_VERSION = "v24.0";
 const GRAPH_BASE = `https://graph.facebook.com/${AD_LIBRARY_GRAPH_API_VERSION}`;
 
 export class AdLibraryApiError extends Error {
@@ -109,13 +129,26 @@ const FIELDS = [
 
 export interface AdsArchiveQuery {
   accessToken: string;
-  searchTerms: string;
+  /** Full-text keyword search over creative content. CONFIRMED LIVE
+   *  (2026-07): this is discovery, NOT advertiser attribution —
+   *  search_terms="Nike" returned ads from entirely unrelated Pages
+   *  whose creative text merely matched. Never treat its results as
+   *  belonging to the searched advertiser; use searchPageIds for that. */
+  searchTerms?: string;
+  /** Exact Page-scoped query (`search_page_ids`) — the advertiser-
+   *  attribution path. Provide at least one of searchTerms /
+   *  searchPageIds; the API rejects a query with neither. */
+  searchPageIds?: string[];
   /** ISO country codes. Per the confirmed EU-scoping fact, this must
    *  contain at least one EU country for a non-political advertiser's
    *  ads to return anything at all. */
   adReachedCountries: string[];
   adType?: "ALL" | "POLITICAL_AND_ISSUE_ADS" | "FINANCIAL_PRODUCTS_AND_SERVICES_ADS" | "EMPLOYMENT_ADS" | "HOUSING_ADS";
+  adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
   limit?: number;
+  /** Opaque paging cursor from a previous response
+   *  (paging.cursors.after) — passed straight through as `after`. */
+  after?: string;
 }
 
 /**
@@ -128,12 +161,15 @@ export interface AdsArchiveQuery {
 export async function queryAdsArchive(query: AdsArchiveQuery): Promise<AdsArchiveResponse> {
   const params = new URLSearchParams({
     access_token: query.accessToken,
-    search_terms: query.searchTerms,
     ad_type: query.adType ?? "ALL",
     ad_reached_countries: JSON.stringify(query.adReachedCountries),
     fields: FIELDS,
     limit: String(query.limit ?? 10),
   });
+  if (query.searchTerms) params.set("search_terms", query.searchTerms);
+  if (query.searchPageIds?.length) params.set("search_page_ids", JSON.stringify(query.searchPageIds));
+  if (query.adActiveStatus) params.set("ad_active_status", query.adActiveStatus);
+  if (query.after) params.set("after", query.after);
 
   let res: Response;
   try {

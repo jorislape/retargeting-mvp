@@ -19,6 +19,12 @@ export interface CompetitorAd {
   source: CompetitorAdSource;
   /** The advertiser/Page name as Meta reports it — not user-typed. */
   advertiserName: string | null;
+  /** Meta's page_id for the advertiser. Load-bearing after the live
+   *  validation: search_terms is keyword discovery over creative text
+   *  (unrelated Pages match), so page_id is the ONLY reliable
+   *  advertiser attribution key — the future flow queries by it via
+   *  search_page_ids after the user picks the exact Page. */
+  advertiserPageId: string | null;
   /** Meta's ad_archive_id (or archive-equivalent id) for this ad. */
   adId: string;
   /** Creative body text, when the API exposes it directly (never
