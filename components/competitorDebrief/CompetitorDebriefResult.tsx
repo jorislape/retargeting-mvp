@@ -307,7 +307,7 @@ export function CompetitorDebriefResult({
         </p>
       </div>
 
-      <div className="print-hidden flex items-center justify-end gap-2">
+      <div className="print-hidden flex flex-wrap items-center justify-end gap-2">
         {/* Toolbar hierarchy: Print / Save PDF is the one primary
             action; Customize report is secondary. */}
         <button

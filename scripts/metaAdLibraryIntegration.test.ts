@@ -724,4 +724,44 @@ function pageCandidate(pageId: string, pageName: string) {
   assert.equal(cleared.observations, "");
 }
 
+/* ===================== UX polish (source scans) ===================== */
+
+{
+  const panel = read("components/competitorDebrief/CompetitorDebriefPanel.tsx");
+
+  // "How many ads feed the report" is surfaced near Generate, derived
+  // (not a separate estimate) and mode-aware.
+  assert.ok(
+    panel.includes('const generateAdCount = inputMode === "search" ? searchPayload.adTexts.length : usableAdCount'),
+    "ads-used count derives from the same values the payload uses"
+  );
+  assert.ok(panel.includes("will be used to generate this debrief"), "ready-state ads-used line present");
+
+  // Excluded page-dump review cards recede (dimmed + explicit tag) so
+  // included vs excluded is obvious at a scan.
+  assert.ok(panel.includes('const excluded = pageDumpMeta ? !pageDumpMeta.included : false'), "excluded state derived per card");
+  assert.ok(panel.includes('${excluded ? "opacity-60" : ""}'), "excluded cards are dimmed");
+  assert.ok(panel.includes(">\n              Excluded\n            </span>"), "excluded cards carry an explicit tag");
+
+  // Per-card attribution badge carries the same glyph as the summary,
+  // so the two read as one signal (still keyword-derived, not fuzzy).
+  assert.ok(panel.includes('match: { icon: "✓", label: "Match"'), "attribution badge gains a glyph matching the summary");
+  assert.ok(panel.includes("ATTRIBUTION_BADGE_COPY[pageDumpMeta.advertiserAttribution].icon"), "badge renders its glyph");
+
+  // Parser diagnostics are demoted (muted heading, no competing colored
+  // confidence counts); the advertiser summary is strengthened.
+  assert.ok(panel.includes(">Parser details<"), "diagnostics relabelled as secondary detail");
+  assert.ok(!panel.includes('text-emerald-400">{pageDumpLiveStats.confidenceCounts.high}'), "no competing colored confidence triple");
+  assert.ok(panel.includes('border-l-2 border-l-accent/40'), "advertiser summary strengthened over diagnostics");
+
+  // Internal implementation language is softened for users.
+  assert.ok(!panel.includes("page_id {") && !panel.includes("(page_id "), "raw page_id label removed from UI copy");
+  assert.ok(!panel.includes("ad id {a.ad.adId}"), "raw ad id label removed from UI copy");
+
+  // Trust/limitation language preserved through the copy trims.
+  assert.ok(panel.includes("never fetched"), "Ads Library 'never fetched' trust note preserved");
+  assert.ok(panel.includes("exact match only"), "alias exact-match limitation preserved");
+  assert.ok(panel.includes("Never infers spend, conversions, or performance"), "no-performance-inference trust line preserved");
+}
+
 console.log("metaAdLibraryIntegration: all assertions passed");

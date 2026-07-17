@@ -152,10 +152,12 @@ const CONFIDENCE_COPY: Record<BoundaryConfidence, { label: string; className: st
  *  SEPARATE line from CONFIDENCE_COPY/completeness/duplicate above
  *  (never merged into one badge), since "can we trust the split" and
  *  "can we trust the source" are different questions. */
-const ATTRIBUTION_BADGE_COPY: Record<AdvertiserAttribution, { label: string; className: string }> = {
-  match: { label: "Match", className: "text-emerald-400" },
-  mismatch: { label: "Different advertiser", className: "text-amber-300" },
-  unknown: { label: "Unattributed", className: "text-zinc-400" },
+const ATTRIBUTION_BADGE_COPY: Record<AdvertiserAttribution, { icon: string; label: string; className: string }> = {
+  // Glyphs mirror ADVERTISER_SUMMARY_COPY below so the per-card badge
+  // and the summary read as the same signal at a glance.
+  match: { icon: "✓", label: "Match", className: "text-emerald-400" },
+  mismatch: { icon: "⚠", label: "Different advertiser", className: "text-amber-300" },
+  unknown: { icon: "?", label: "Unattributed", className: "text-zinc-400" },
 };
 
 /** Checkpoint 3: the "Advertisers detected" summary's per-group copy.
@@ -231,8 +233,14 @@ function AdBlockCard({
         : "text-amber-300"
     : (evidence?.toneClass ?? "text-amber-300");
 
+  // Excluded page-dump ads recede: dimmed card + an explicit "Excluded"
+  // tag, so included vs excluded is obvious at a scan without opening a
+  // card. Controls stay fully legible (the tag/checkbox are above the
+  // dim). Manual-flow blocks have no pageDumpMeta and are never dimmed.
+  const excluded = pageDumpMeta ? !pageDumpMeta.included : false;
+
   return (
-    <div className={`${cardNested} min-w-0 p-3`}>
+    <div className={`${cardNested} min-w-0 p-3 ${excluded ? "opacity-60" : ""}`}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {pageDumpMeta && (
@@ -245,6 +253,11 @@ function AdBlockCard({
             />
           )}
           <p className="min-w-0 truncate text-xs font-semibold text-white">Ad {index + 1}</p>
+          {excluded && (
+            <span className="shrink-0 whitespace-nowrap rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
+              Excluded
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -300,6 +313,7 @@ function AdBlockCard({
             {pageDumpMeta.pageName ?? "Advertiser unknown"}
           </span>
           <span className={ATTRIBUTION_BADGE_COPY[pageDumpMeta.advertiserAttribution].className}>
+            {ATTRIBUTION_BADGE_COPY[pageDumpMeta.advertiserAttribution].icon}{" "}
             {ATTRIBUTION_BADGE_COPY[pageDumpMeta.advertiserAttribution].label}
           </span>
         </p>
@@ -786,7 +800,7 @@ export function CompetitorDebriefPanel() {
       >
         <span className="min-w-0 truncate font-medium">{c.pageName}</span>
         <span className="shrink-0 text-[10px] text-zinc-500">
-          page_id {c.pageId} · {c.sampleAdCount} ad{c.sampleAdCount === 1 ? "" : "s"} in sample
+          Page ID {c.pageId} · {c.sampleAdCount} ad{c.sampleAdCount === 1 ? "" : "s"} in sample
         </span>
       </button>
     );
@@ -873,6 +887,12 @@ export function CompetitorDebriefPanel() {
     (inputMode === "search"
       ? searchPayload.adTexts.length > 0 && !searchOverBudget
       : (usableAdCount > 0 || hasUsableNotes) && !attributionBlocksGenerate);
+
+  // How many ads actually feed the report — surfaced next to Generate so
+  // the buyer knows the size of the read before clicking. Mode-aware and
+  // purely derived from the same values the payload uses (search:
+  // deduped included API ads; paste: included usable blocks).
+  const generateAdCount = inputMode === "search" ? searchPayload.adTexts.length : usableAdCount;
 
   const disabledReason =
     !loading && !canGenerate
@@ -1051,23 +1071,14 @@ export function CompetitorDebriefPanel() {
           <SparklesIcon className="h-4 w-4 text-accent-soft" />
           <h2 className="text-sm font-semibold text-white">Competitor debrief</h2>
         </div>
-        {inputMode === "search" ? (
-          <p className="mb-5 text-xs leading-relaxed text-zinc-400">
-            Search for an advertiser, choose the exact Page, and fetch its
-            active ads from Meta&rsquo;s Ads Library — then get a structured,
-            directional read: recurring hooks, formats, offers, and
-            positioning. This never infers spend, conversions, or performance
-            — it only interprets the ad text of the ads you select.
-          </p>
-        ) : (
-          <p className="mb-5 text-xs leading-relaxed text-zinc-400">
-            Paste a competitor&rsquo;s ads (e.g. from the Meta Ads Library) and get
-            a structured, directional read: recurring hooks, formats, offers, and
-            positioning. This never infers spend, conversions, or performance,
-            and it never fetches the Ads Library — it only interprets what you
-            paste.
-          </p>
-        )}
+        <p className="mb-5 text-xs leading-relaxed text-zinc-400">
+          A directional read of a competitor&rsquo;s ads — recurring hooks,
+          formats, offers, and positioning.{" "}
+          {inputMode === "search"
+            ? "Search for the advertiser, pick the exact Page, and fetch its active ads."
+            : "Paste their ads from the Meta Ads Library."}{" "}
+          Never infers spend, conversions, or performance.
+        </p>
 
         <div className="space-y-4">
           <div>
@@ -1104,16 +1115,15 @@ export function CompetitorDebriefPanel() {
                 onChange={(e) => setAliasesText(e.target.value)}
               />
               <p className="mt-1 text-[11px] text-zinc-500">
-                Comma-separated. Recognizes the same advertiser under a different
-                Page name (e.g. a regional page) — exact match only, no fuzzy
-                matching.
+                Comma-separated. Matches the same advertiser under another Page
+                name (e.g. a regional page) — exact match only.
               </p>
             </div>
           )}
 
           <div>
             <label className={`${fieldLabel} mb-1.5 block`} htmlFor="ads-library-url">
-              Meta Ads Library URL
+              Meta Ads Library URL <span className="text-zinc-600">(optional)</span>
             </label>
             <input
               id="ads-library-url"
@@ -1126,8 +1136,8 @@ export function CompetitorDebriefPanel() {
             />
             <p className="mt-1 text-[11px] text-zinc-500">
               {inputMode === "search"
-                ? "Filled automatically from your selected Page — used as the report's source link."
-                : "Ads Library URLs are saved as references and are not fetched automatically."}
+                ? "Filled in from your selected Page — the report's source link."
+                : "A reference link for the report — never fetched."}
             </p>
           </div>
 
@@ -1162,10 +1172,12 @@ export function CompetitorDebriefPanel() {
                 Clear current mode
               </button>
             </div>
+            {/* Full-width, equal thirds on mobile (long labels, tappable
+                targets); natural single row on sm+ (desktop-first). */}
             <div
               role="group"
               aria-label="Ad input mode"
-              className="inline-flex flex-wrap gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-0.5"
+              className="flex w-full flex-wrap gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-0.5 sm:inline-flex sm:w-auto"
             >
               {(
                 [
@@ -1179,7 +1191,7 @@ export function CompetitorDebriefPanel() {
                   type="button"
                   aria-pressed={inputMode === mode}
                   onClick={() => setInputMode(mode)}
-                  className={`cursor-pointer rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                  className={`flex-1 cursor-pointer rounded-md px-2.5 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none ${
                     inputMode === mode
                       ? "bg-white/[0.09] text-white"
                       : "text-zinc-400 hover:text-zinc-300"
@@ -1255,11 +1267,9 @@ export function CompetitorDebriefPanel() {
                     Paste the full Ads Library page
                   </label>
                   <p className="mb-2 text-[11px] leading-relaxed text-zinc-500">
-                    Select all and copy everything on the Ads Library results
-                    page — multiple ads, interface text, and all. We&rsquo;ll
-                    remove obvious page chrome, split it into individual ads,
-                    group likely repeat variants, and pick a representative
-                    set for you to review before anything is generated.
+                    Select-all and copy the whole results page — interface text
+                    and all. We remove page chrome, split it into ads, and group
+                    repeat variants for you to review before generating.
                   </p>
                   <details className="mb-2">
                     <summary className="cursor-pointer text-[11px] font-medium text-accent-soft hover:underline">
@@ -1308,9 +1318,14 @@ Learn More`}
                   </div>
                 </>
               ) : (
+                // Parser diagnostics are deliberately quiet (muted,
+                // uncolored counts): they're technical detail, and must
+                // read as secondary to the "Advertisers detected" trust
+                // summary that follows. Warnings stay amber — those are
+                // actionable, not just informational.
                 <div className={`${cardNested} space-y-2 p-3`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className={`${fieldLabel} min-w-0`}>Page dump results</p>
+                    <p className="min-w-0 text-[11px] font-medium text-zinc-500">Parser details</p>
                     <button
                       type="button"
                       className="shrink-0 cursor-pointer text-[11px] font-medium text-accent-soft hover:underline"
@@ -1319,17 +1334,18 @@ Learn More`}
                       Edit raw paste
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-400">
-                    <span>{pageDumpStats.candidatesFound} candidate{pageDumpStats.candidatesFound === 1 ? "" : "s"} found</span>
-                    <span>{pageDumpStats.selectedByDefault} selected by default</span>
-                    <span>{pageDumpLiveStats.exactDuplicateCount} exact duplicate{pageDumpLiveStats.exactDuplicateCount === 1 ? "" : "s"} (auto-excluded)</span>
-                    <span>{pageDumpLiveStats.variantGroupCount} possible-variant group{pageDumpLiveStats.variantGroupCount === 1 ? "" : "s"}</span>
-                    <span>{pageDumpLiveStats.includedCount} currently included</span>
-                  </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
-                    <span className="text-emerald-400">{pageDumpLiveStats.confidenceCounts.high} high confidence</span>
-                    <span className="text-amber-300">{pageDumpLiveStats.confidenceCounts.medium} medium confidence</span>
-                    <span className="text-red-300">{pageDumpLiveStats.confidenceCounts.low} low confidence</span>
+                    <span>{pageDumpStats.candidatesFound} candidate{pageDumpStats.candidatesFound === 1 ? "" : "s"} found</span>
+                    <span>{pageDumpLiveStats.includedCount} currently included</span>
+                    {pageDumpLiveStats.exactDuplicateCount > 0 && (
+                      <span>{pageDumpLiveStats.exactDuplicateCount} exact duplicate{pageDumpLiveStats.exactDuplicateCount === 1 ? "" : "s"} auto-excluded</span>
+                    )}
+                    {pageDumpLiveStats.variantGroupCount > 0 && (
+                      <span>{pageDumpLiveStats.variantGroupCount} possible-variant group{pageDumpLiveStats.variantGroupCount === 1 ? "" : "s"}</span>
+                    )}
+                    {pageDumpLiveStats.confidenceCounts.low > 0 && (
+                      <span>{pageDumpLiveStats.confidenceCounts.low} low-confidence split{pageDumpLiveStats.confidenceCounts.low === 1 ? "" : "s"}</span>
+                    )}
                     {pageDumpStats.chromeLinesRemoved > 0 && (
                       <span>{pageDumpStats.chromeLinesRemoved} interface line{pageDumpStats.chromeLinesRemoved === 1 ? "" : "s"} removed</span>
                     )}
@@ -1448,7 +1464,7 @@ Learn More`}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className={`${fieldLabel} min-w-0`}>
                       Selected: {selectedPage.pageName}{" "}
-                      <span className="font-normal text-zinc-500">(page_id {selectedPage.pageId})</span>
+                      <span className="font-normal text-zinc-500">(Page ID {selectedPage.pageId})</span>
                     </p>
                     <button
                       type="button"
@@ -1460,10 +1476,9 @@ Learn More`}
                     </button>
                   </div>
                   <p className="text-[11px] text-zinc-500">
-                    Fetches this Page&rsquo;s currently active ads in{" "}
-                    {SUPPORTED_COUNTRIES.find((c) => c.code === searchCountry)?.label ?? searchCountry} from the
-                    Meta Ad Library API. Every ad is checked against this exact
-                    page_id before it can be analyzed.
+                    Fetches this Page&rsquo;s active ads in{" "}
+                    {SUPPORTED_COUNTRIES.find((c) => c.code === searchCountry)?.label ?? searchCountry}. Every ad
+                    is verified to belong to this exact Page before it&rsquo;s analyzed.
                   </p>
 
                   {apiAds !== null && apiAds.length === 0 && (
@@ -1499,8 +1514,7 @@ Learn More`}
                                 {a.text || "(no creative text returned)"}
                               </p>
                               <p className="mt-1 text-[10px] text-zinc-500">
-                                ad id {a.ad.adId}
-                                {a.ad.startedAt ? ` · started ${a.ad.startedAt}` : ""}
+                                {a.ad.startedAt ? `Started ${a.ad.startedAt}` : `Ad ${a.ad.adId}`}
                                 {a.ad.platforms.length > 0 ? ` · ${a.ad.platforms.join(", ")}` : ""}
                               </p>
                             </div>
@@ -1560,8 +1574,11 @@ Learn More`}
               clicked. Only groups that actually have candidates render
               — a compact summary, not three fixed lines. */}
           {inputMode === "pageDump" && blocks && advertiserSummary.some((g) => g.count > 0) && (
-            <div className={`${cardNested} space-y-1.5 p-3`}>
-              <p className={fieldLabel}>Advertisers detected</p>
+            // Stronger than the muted parser-details card above: white
+            // heading + an accent left-edge, since this is the trust
+            // signal the buyer actually acts on before generating.
+            <div className={`${cardNested} space-y-1.5 border-l-2 border-l-accent/40 p-3`}>
+              <p className="text-xs font-semibold text-white">Advertisers detected</p>
               {advertiserSummary
                 .filter((g) => g.count > 0)
                 .map((g) => (
@@ -1698,6 +1715,14 @@ Learn More`}
             {loading ? "Generating…" : "Generate competitor debrief"}
           </button>
           {disabledReason && <p className="mt-2 text-[11px] text-zinc-500">{disabledReason}</p>}
+          {/* Ready-state reassurance: how many ads feed the report.
+              Only when Generate is enabled and ads (not just notes)
+              are driving it, so it never competes with disabledReason. */}
+          {!loading && canGenerate && generateAdCount > 0 && (
+            <p className="mt-2 text-[11px] text-zinc-400">
+              {generateAdCount} ad{generateAdCount === 1 ? "" : "s"} will be used to generate this debrief.
+            </p>
+          )}
           {/* Checkpoint 3: a warning, not a second confirmation modal —
               the checkbox behavior above is unchanged; this only makes
               a manual override visible right where Generate is clicked.
