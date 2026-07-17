@@ -646,4 +646,82 @@ function pageCandidate(pageId: string, pageName: string) {
   assert.ok(!panel.includes("NEXT_PUBLIC_"));
 }
 
+/* ===================== Clear current mode (per-mode isolation) ===================== */
+
+{
+  const panel = read("components/competitorDebrief/CompetitorDebriefPanel.tsx");
+
+  // The action exists with the exact required label, secondary styling
+  // (never btnPrimary), and a disabled state.
+  assert.ok(panel.includes(">\n                Clear current mode\n              </button>"), "exact label present");
+  assert.ok(panel.includes("disabled={!currentModeHasSomethingToClear}"), "disabled when nothing to clear");
+
+  // Isolate the clearCurrentMode function body and check, branch by
+  // branch, that each mode clears ONLY its own state.
+  const fnStart = panel.indexOf("function clearCurrentMode()");
+  const fnEnd = panel.indexOf("\n  }", fnStart);
+  const body = panel.slice(fnStart, fnEnd);
+  const individualBranch = body.slice(body.indexOf('if (inputMode === "individual")'), body.indexOf('else if (inputMode === "pageDump")'));
+  const pageDumpBranch = body.slice(body.indexOf('else if (inputMode === "pageDump")'), body.indexOf("} else {"));
+  const searchBranch = body.slice(body.indexOf("} else {"));
+
+  // Individual: clears its paste text + its own blocks; never touches
+  // page-dump raw text/stats/aliases or any search state.
+  assert.ok(individualBranch.includes("setBulkPasteText"));
+  for (const forbidden of ["setPageDumpText", "setAliasesText", "setSearchQuery", "setApiAds", "setSelectedPage", "setPageCandidates"]) {
+    assert.ok(!individualBranch.includes(forbidden), `individual clear must not call ${forbidden}`);
+  }
+  assert.ok(individualBranch.includes("if (!blocksBelongToPageDump) setBlocks(null)"), "individual clear only removes blocks it owns");
+
+  // Page dump: clears raw dump, stats, its own blocks, aliases; never
+  // touches individual paste text or any search state.
+  for (const required of ["setPageDumpText", "setPageDumpStats", "setAliasesText"]) {
+    assert.ok(pageDumpBranch.includes(required), `pageDump clear must call ${required}`);
+  }
+  for (const forbidden of ["setBulkPasteText", "setSearchQuery", "setApiAds", "setSelectedPage", "setPageCandidates"]) {
+    assert.ok(!pageDumpBranch.includes(forbidden), `pageDump clear must not call ${forbidden}`);
+  }
+  assert.ok(pageDumpBranch.includes("if (blocksBelongToPageDump) setBlocks(null)"), "pageDump clear only removes blocks it owns");
+
+  // Search: clears query, snapshot, candidates, selection, fetched ads,
+  // paging meta, and errors; never touches either paste mode.
+  for (const required of ["setSearchQuery", "setSubmittedQuery", "setPageCandidates", "setSelectedPage", "setApiAds", "setApiAdsMeta", "setSearchError"]) {
+    assert.ok(searchBranch.includes(required), `search clear must call ${required}`);
+  }
+  for (const forbidden of ["setBulkPasteText", "setPageDumpText", "setAliasesText", "setBlocks"]) {
+    assert.ok(!searchBranch.includes(forbidden), `search clear must not call ${forbidden}`);
+  }
+
+  // No branch clears the shared fields — only the explicit two-click
+  // full reset may do that.
+  assert.ok(!body.includes("setCore"), "per-mode clear never touches shared fields");
+  assert.ok(!body.includes("setInternalLearningsText") && !body.includes("setAdvancedNotes"), "learnings/notes survive per-mode clear");
+
+  // A cleared mode's result only disappears when it BELONGS to that
+  // mode family (sourceMode-gated), so a search clear can't wipe a
+  // paste-generated report or vice versa.
+  assert.ok(panel.includes("prev && prev.sourceMode === mode ? null : prev"), "result clearing is sourceMode-gated");
+  assert.ok(individualBranch.includes('clearResultForSourceMode("manual")'));
+  assert.ok(pageDumpBranch.includes('clearResultForSourceMode("manual")'));
+  assert.ok(searchBranch.includes('clearResultForSourceMode("adsLibraryApi")'));
+
+  // Full reset exists, is two-click armed, and is the only place the
+  // shared fields get cleared.
+  assert.ok(panel.includes("Reset entire competitor debrief"));
+  assert.ok(panel.includes("Click again to reset everything"), "explicit confirmation step");
+  const resetStart = panel.indexOf("function handleResetAll()");
+  const resetBody = panel.slice(resetStart, panel.indexOf("\n  }", resetStart));
+  for (const required of ["setCore(EMPTY_CORE)", "setBulkPasteText", "setPageDumpText", "setApiAds", "setAliasesText", "setInternalLearningsText", "setAdvancedNotes", "setDebrief(null)"]) {
+    assert.ok(resetBody.includes(required), `full reset must call ${required}`);
+  }
+}
+
+{
+  // Pure-level: an emptied active mode produces an empty payload, so
+  // Generate's eligibility flips off immediately after a clear.
+  const cleared = buildSearchPayload([], "");
+  assert.deepEqual(cleared.adTexts, []);
+  assert.equal(cleared.observations, "");
+}
+
 console.log("metaAdLibraryIntegration: all assertions passed");

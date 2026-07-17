@@ -677,6 +677,95 @@ export function CompetitorDebriefPanel() {
     setApiAds((prev) => (prev ?? []).map((a) => (a.ad.adId === adId ? { ...a, included: !a.included } : a)));
   }
 
+  /* ---- Clear current mode / reset ---- */
+
+  // `blocks` is deliberately shared between the two paste modes (both
+  // feed the same review list), so per-mode clearing uses OWNERSHIP:
+  // a review list produced by "Extract ads" carries pageDumpMeta and
+  // belongs to the page-dump mode; one produced by "Parse ads" doesn't
+  // and belongs to individual mode. Each mode's Clear only removes the
+  // blocks it owns, so it can never destroy the other paste mode's
+  // review state — and never touches search-mode state at all.
+  const blocksBelongToPageDump = hasPageDumpBlocks(blocks ?? []);
+
+  // A generated result belongs to the mode family that produced it
+  // (debrief.sourceMode) — clearing a paste mode removes a manual
+  // result, clearing search mode removes an API result, and neither
+  // can wipe the other's on-screen report.
+  function clearResultForSourceMode(mode: "manual" | "adsLibraryApi") {
+    setError(null);
+    setDebrief((prev) => (prev && prev.sourceMode === mode ? null : prev));
+  }
+
+  const currentModeHasSomethingToClear =
+    inputMode === "individual"
+      ? bulkPasteText !== "" || (blocks !== null && !blocksBelongToPageDump)
+      : inputMode === "pageDump"
+        ? pageDumpText !== "" || pageDumpStats !== null || (blocks !== null && blocksBelongToPageDump) || aliasesText !== ""
+        : searchQuery !== "" ||
+          submittedQuery !== "" ||
+          pageCandidates !== null ||
+          selectedPage !== null ||
+          apiAds !== null ||
+          searchError !== null;
+
+  function clearCurrentMode() {
+    if (inputMode === "individual") {
+      setBulkPasteText("");
+      if (!blocksBelongToPageDump) setBlocks(null);
+      clearResultForSourceMode("manual");
+    } else if (inputMode === "pageDump") {
+      setPageDumpText("");
+      setPageDumpStats(null);
+      if (blocksBelongToPageDump) setBlocks(null);
+      setExpandedVariantGroups(new Set());
+      setAliasesText("");
+      clearResultForSourceMode("manual");
+    } else {
+      setSearchQuery("");
+      setSubmittedQuery("");
+      setPageCandidates(null);
+      setSelectedPage(null);
+      setApiAds(null);
+      setApiAdsMeta(null);
+      setSearchError(null);
+      clearResultForSourceMode("adsLibraryApi");
+    }
+  }
+
+  // Full reset: all three modes plus the shared fields (which per-mode
+  // Clear deliberately never touches). Two-click confirm — the first
+  // click arms it, the second (within a few seconds) executes — so a
+  // stray click can't wipe everything; no browser-native confirm().
+  const [resetArmed, setResetArmed] = useState(false);
+  function handleResetAll() {
+    if (!resetArmed) {
+      setResetArmed(true);
+      setTimeout(() => setResetArmed(false), 4000);
+      return;
+    }
+    setResetArmed(false);
+    setCore(EMPTY_CORE);
+    setAliasesText("");
+    setBulkPasteText("");
+    setBlocks(null);
+    setInternalLearningsText("");
+    setAdvancedNotes("");
+    setPageDumpText("");
+    setPageDumpStats(null);
+    setExpandedVariantGroups(new Set());
+    setSearchQuery("");
+    setSubmittedQuery("");
+    setPageCandidates(null);
+    setSelectedPage(null);
+    setApiAds(null);
+    setApiAdsMeta(null);
+    setSearchError(null);
+    setError(null);
+    setDebrief(null);
+    setGeneratedAt(null);
+  }
+
   /** One discovery candidate row — shared by the "Exact Page match"
    *  and "Other Pages found from matching ad text" groups so both
    *  render (and select) identically; only the section they sit under
@@ -1060,6 +1149,18 @@ export function CompetitorDebriefPanel() {
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <span className={fieldLabel}>Ad input mode</span>
+              {/* Secondary/destructive, never the primary CTA: clears ONLY
+                  the active mode's inputs/review state (see
+                  clearCurrentMode) — shared fields and the other two
+                  modes' state are untouched. */}
+              <button
+                type="button"
+                onClick={clearCurrentMode}
+                disabled={!currentModeHasSomethingToClear}
+                className="shrink-0 cursor-pointer rounded-md border border-white/10 px-2 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:border-red-500/30 hover:text-red-300 disabled:cursor-default disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:text-zinc-400"
+              >
+                Clear current mode
+              </button>
             </div>
             <div
               role="group"
@@ -1624,6 +1725,22 @@ Learn More`}
             </div>
           </div>
         )}
+
+        {/* Low-emphasis full reset: two-click confirm (first click arms,
+            second executes; auto-disarms after a few seconds). The ONLY
+            action that clears shared fields — per-mode Clear above
+            never touches them. */}
+        <div className="mt-4 text-right">
+          <button
+            type="button"
+            onClick={handleResetAll}
+            className={`cursor-pointer text-[11px] font-medium transition-colors ${
+              resetArmed ? "text-red-300" : "text-zinc-600 hover:text-red-300"
+            }`}
+          >
+            {resetArmed ? "Click again to reset everything — all modes and shared fields" : "Reset entire competitor debrief"}
+          </button>
+        </div>
       </div>
 
       {debrief && <CompetitorDebriefResult debrief={debrief} generatedAt={generatedAt} />}

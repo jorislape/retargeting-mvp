@@ -1321,4 +1321,79 @@ const REAL_ADS_LIBRARY_DUMP = [
   assert.ok(result.candidates.every((c) => c.pageName === null));
 }
 
+/* ========== Regression: real metadata → name → Sponsored card ordering ========== */
+
+{
+  // The realistic full-card shape Meta actually renders (status +
+  // Library ID + international "1 Jul 2026" date + platform lines,
+  // then Page name ABOVE a bare "Sponsored" line, then a blank line,
+  // then the creative). Previously: the intl date survived as a fake
+  // "Hook" candidate, no page names were captured (name-before-
+  // Sponsored was unsupported, and the exact-competitor-name delete
+  // destroyed the "Nike" line first), and Generate stayed blocked.
+  const card = (id: number, date: string, name: string, body: string, cta: string) =>
+    ["Active", `Library ID: ${id}`, `Started running on ${date}`, "Platforms", "Facebook", "Instagram", "", name, "Sponsored", "", body, cta].join("\n");
+  const dump = [
+    card(111111111, "1 Jul 2026", "Nike", "Run further with responsive cushioning built for everyday miles.", "Shop now"),
+    card(222222222, "2 Jul 2026", "Nike Deutschland", "Designed for runners who want soft landings and a smoother ride.", "Learn more"),
+    card(333333333, "3 Jul 2026", "Adidas", "Built for speed. Engineered for race day.", "Shop now"),
+  ].join("\n\n");
+
+  const result = processPageDump(dump, "Nike", ["Nike Deutschland"]);
+
+  assert.equal(result.candidates.length, 3, "3 ads, not 6 metadata fragments");
+  const [nike, nikeDe, adidas] = result.candidates;
+
+  assert.equal(nike.pageName, "Nike");
+  assert.equal(nike.advertiserAttribution, "match");
+  assert.equal(nike.isRepresentative, true, "exact match included by default");
+
+  assert.equal(nikeDe.pageName, "Nike Deutschland");
+  assert.equal(nikeDe.advertiserAttribution, "match", "regional page matches via alias");
+  assert.equal(nikeDe.isRepresentative, true, "alias match included by default");
+
+  assert.equal(adidas.pageName, "Adidas");
+  assert.equal(adidas.advertiserAttribution, "mismatch");
+  assert.equal(adidas.isRepresentative, false, "different advertiser excluded by default");
+
+  // Metadata never becomes ad content: no candidate raw carries the
+  // date/status/platform chrome, and the creative text is intact.
+  for (const c of result.candidates) {
+    for (const forbidden of ["Started running", "Library ID", "Active", "Platforms", "Facebook", "Instagram"]) {
+      assert.ok(!c.raw.includes(forbidden), `"${forbidden}" must never appear in candidate raw`);
+    }
+  }
+  assert.ok(nike.raw.includes("Run further with responsive cushioning"));
+  assert.ok(adidas.raw.includes("Built for speed."));
+}
+
+{
+  // Both "Started running on" date orderings are chrome; a real
+  // sentence merely mentioning running still is not.
+  assert.equal(stripChromeLines("Started running on 1 Jul 2026").removedLineCount, 1, "intl date order");
+  assert.equal(stripChromeLines("Started running on Jul 1, 2026").removedLineCount, 1, "US date order");
+  assert.equal(
+    stripChromeLines("I started running on empty stomachs every morning.").removedLineCount,
+    0,
+    "a real sentence never matches the chrome pattern"
+  );
+}
+
+{
+  // Name-before-Sponsored capture is exact and conservative: a long,
+  // punctuated line before "Sponsored" is NOT treated as a page name —
+  // the bare Sponsored line is just removed, and attribution stays
+  // honestly unknown rather than guessed from creative text.
+  const dump = [
+    "This sentence is definitely creative copy, not a label.",
+    "Sponsored",
+    "",
+    "Real ad body follows here with plenty of text.",
+    "Shop Now",
+  ].join("\n");
+  const result = processPageDump(dump, "Nike");
+  assert.ok(result.candidates.every((c) => c.pageName === null), "no name invented from non-label text");
+  assert.ok(result.candidates.every((c) => c.advertiserAttribution === "unknown"));
+}
+
 console.log("pageDump: all assertions passed");

@@ -226,10 +226,15 @@ export function stripLeadingHeader(text: string): LeadingHeaderStripResult {
 const CHROME_LINE_PATTERNS: { label: string; re: RegExp }[] = [
   { label: "status badge", re: /^\s*(?:active|inactive)\s*$/i },
   { label: "library id", re: /^\s*library\s*id\b[:#\s-]*\d[\d,\s]*$/i },
-  // Requires an immediate Month Day, Year date so a real sentence like
-  // "I started running on empty stomachs" can never match — the Meta
-  // chrome phrase is always followed by a date, never a description.
-  { label: "started running on", re: /^\s*started\s+running\s+on\s+[A-Za-z]+\.?\s+\d{1,2},?\s+\d{4}\b.*$/i },
+  // Requires an immediate date so a real sentence like "I started
+  // running on empty stomachs" can never match — the Meta chrome
+  // phrase is always followed by a date, never a description. Both
+  // date orderings Meta renders are accepted: US "Jul 1, 2026" and
+  // international "1 Jul 2026" (what non-US locales see).
+  {
+    label: "started running on",
+    re: /^\s*started\s+running\s+on\s+(?:[A-Za-z]+\.?\s+\d{1,2},?|\d{1,2}\s+[A-Za-z]+\.?,?)\s+\d{4}\b.*$/i,
+  },
   // NOTE: bare "Sponsored" and "Sponsored · Page Name" are NOT in this
   // generic list — Competitor Input Trust V2 handles both with
   // dedicated logic in stripChromeLines below, since (unlike every
@@ -287,21 +292,30 @@ const BARE_SPONSORED_RE = /^\s*sponsored\s*$/i;
  * lines are always preserved (they still matter for Stage B's reused
  * blank-line-run tier).
  *
- * Competitor Input Trust V2: the two per-card "this is whose ad it is"
- * shapes are no longer silently deleted — they're replaced with an
+ * Competitor Input Trust V2: the three per-card "this is whose ad it
+ * is" shapes are no longer silently deleted — they're replaced with an
  * internal marker (see above) so processPageDump can attach the
  * captured name to whichever candidate follows:
  *   - "Sponsored · Page Name" (one line) — name captured directly.
- *   - bare "Sponsored" immediately followed by a short, unpunctuated,
- *     non-CTA, non-chrome label line (the real shape this repo's own
- *     Ads Library regression fixture uses: "Sponsored" / "Nike" on two
- *     separate lines) — reuses the EXACT label-shape heuristic
- *     stripLeadingHeader already uses, not a new pattern. If nothing
- *     label-shaped follows, only the bare "Sponsored" line is removed,
+ *   - a short, unpunctuated, non-CTA, non-chrome label line IMMEDIATELY
+ *     followed by bare "Sponsored" (the real Ads Library card header:
+ *     "Nike" / "Sponsored" on two lines, name FIRST) — checked before
+ *     the exact-competitor-name delete below, since that delete would
+ *     otherwise destroy the attribution evidence exactly when the card
+ *     belongs to the competitor the user typed.
+ *   - bare "Sponsored" immediately followed by a label-shaped line
+ *     (name AFTER — the shape this repo's own Ads Library regression
+ *     fixture uses: "Sponsored" / "Nike"). If nothing label-shaped
+ *     precedes OR follows, only the bare "Sponsored" line is removed,
  *     exactly as before.
- * Every other chrome pattern (Library ID, Active/Inactive, Platforms,
- * etc.) is still a plain, unrecovered delete — none of them carry
- * attribution evidence.
+ * All three reuse the EXACT label-shape heuristic stripLeadingHeader
+ * already uses, not a new pattern. After a marker is emitted, blank
+ * lines immediately following the consumed card header are skipped so
+ * the marker stays glued to the creative text it labels — otherwise
+ * Stage B's blank-line splitting could cut the marker into its own
+ * (attribution-less) segment. Every other chrome pattern (Library ID,
+ * Active/Inactive, Started running on, Platforms, etc.) is still a
+ * plain, unrecovered delete — none of them carry attribution evidence.
  */
 export function stripChromeLines(text: string, competitorName?: string): ChromeStripResult {
   const normalizedCompetitorName =
@@ -311,6 +325,26 @@ export function stripChromeLines(text: string, competitorName?: string): ChromeS
   const kept: string[] = [];
   let removedLineCount = 0;
   let i = 0;
+
+  const looksLikeLabelLine = (trimmed: string): boolean => {
+    const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+    return (
+      trimmed !== "" &&
+      wordCount > 0 &&
+      wordCount <= MAX_PREAMBLE_LABEL_WORDS &&
+      !/[.!?]$/.test(trimmed) &&
+      !isBareCtaLine(trimmed) &&
+      !PAGE_NAME_MARKER_LINE_RE.test(trimmed) &&
+      !CHROME_LINE_PATTERNS.some(({ re }) => re.test(trimmed))
+    );
+  };
+
+  // Glue: after a captured card header, skip the blank line(s) between
+  // it and the creative text so the marker can't be split off into its
+  // own segment by Stage B. A no-op when no blank follows.
+  const skipFollowingBlanks = () => {
+    while (i < lines.length && lines[i].trim() === "") i++;
+  };
 
   while (i < lines.length) {
     const line = lines[i];
@@ -327,23 +361,29 @@ export function stripChromeLines(text: string, competitorName?: string): ChromeS
       removedLineCount++;
       kept.push(makePageNameMarker(sponsoredNameMatch[1]));
       i++;
+      skipFollowingBlanks();
+      continue;
+    }
+
+    // Name BEFORE "Sponsored" — the real Ads Library card header order.
+    // Must run before the exact-competitor-name delete below: when the
+    // card is the competitor's own, that delete would otherwise remove
+    // the name line first and leave the card unattributable.
+    if (looksLikeLabelLine(trimmed) && i + 1 < lines.length && BARE_SPONSORED_RE.test(lines[i + 1].trim())) {
+      removedLineCount += 2;
+      kept.push(makePageNameMarker(trimmed));
+      i += 2;
+      skipFollowingBlanks();
       continue;
     }
 
     if (BARE_SPONSORED_RE.test(trimmed)) {
       const nextTrimmed = i + 1 < lines.length ? lines[i + 1].trim() : "";
-      const nextWordCount = nextTrimmed.split(/\s+/).filter(Boolean).length;
-      const nextLooksLikeLabel =
-        nextTrimmed !== "" &&
-        nextWordCount > 0 &&
-        nextWordCount <= MAX_PREAMBLE_LABEL_WORDS &&
-        !/[.!?]$/.test(nextTrimmed) &&
-        !isBareCtaLine(nextTrimmed) &&
-        !CHROME_LINE_PATTERNS.some(({ re }) => re.test(nextTrimmed));
-      if (nextLooksLikeLabel) {
+      if (looksLikeLabelLine(nextTrimmed)) {
         removedLineCount += 2;
         kept.push(makePageNameMarker(nextTrimmed));
         i += 2;
+        skipFollowingBlanks();
         continue;
       }
       // Bare "Sponsored" always gets removed, whether or not anything
