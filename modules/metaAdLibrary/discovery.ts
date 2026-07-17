@@ -94,19 +94,39 @@ export function partitionAdsByPage(
   return { matching, excludedMismatchedCount: ads.length - matching.length };
 }
 
+/** Per-ad size cap for the engine serialization below. Confirmed live:
+ *  real ads_archive bodies run up to ~47,000 characters each (long-form
+ *  story ads embed entire novel chapters), so even ONE uncapped ad
+ *  overflows the debrief API's 20,000-character observations limit.
+ *  Head + tail (rather than head only) because ad copy front-loads the
+ *  hook and back-loads the offer/CTA — the middle of a story body is
+ *  the least signal-dense part for the engine's keyword scan. At most
+ *  10 ads/fetch × ~1.8k chars fits the 20k budget with room to spare. */
+export const AD_TEXT_HEAD_CHARS = 1500;
+export const AD_TEXT_TAIL_CHARS = 300;
+export const MAX_AD_TEXT_CHARS = AD_TEXT_HEAD_CHARS + AD_TEXT_TAIL_CHARS;
+
+function truncateAdText(text: string): string {
+  if (text.length <= MAX_AD_TEXT_CHARS) return text;
+  return `${text.slice(0, AD_TEXT_HEAD_CHARS).trimEnd()}\n…\n${text.slice(-AD_TEXT_TAIL_CHARS).trimStart()}`;
+}
+
 /**
  * One normalized ad -> the plain text block the existing engine
  * pipeline consumes (the same `adTexts[]` shape the paste flows
  * produce). Only the ad's own creative fields are used — never the
  * search query, never the Page name, never invented labels — so the
  * engine sees exactly what Meta reported the ad saying, nothing more.
+ * Oversized bodies are capped head+tail (see MAX_AD_TEXT_CHARS above);
+ * this is the ONE serialization both the review UI and the generate
+ * payload read, so what the user reviews is what the engine gets.
  * Returns "" for an ad with no usable creative text (caller filters).
  */
 export function competitorAdToText(ad: CompetitorAd): string {
   const parts = [ad.body?.trim(), ad.headline?.trim()].filter(
     (p): p is string => p !== undefined && p !== ""
   );
-  return parts.join("\n");
+  return truncateAdText(parts.join("\n"));
 }
 
 /** Normalized ads -> engine-ready adTexts: serialized, empties dropped.

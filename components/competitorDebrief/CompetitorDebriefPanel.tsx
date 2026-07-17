@@ -34,6 +34,12 @@ import {
 } from "./pageDumpReview";
 import { competitorAdToText, SUPPORTED_COUNTRIES, type PageCandidate } from "@/modules/metaAdLibrary/discovery";
 import type { CompetitorAd } from "@/modules/metaAdLibrary/types";
+import {
+  buildSearchPayload,
+  mergeFetchedAds,
+  SEARCH_OBSERVATIONS_LIMIT,
+  type ApiAd,
+} from "./searchAdsPayload";
 
 /** Fill-in-the-blank shape the parser reads most reliably (explicit
  *  labels win over keyword-fallback detection) — offered as a one-click
@@ -350,17 +356,13 @@ const EMPTY_CORE: CoreFields = { competitorName: "", adsLibraryUrl: "", websiteU
 
 type AdInputMode = "individual" | "pageDump" | "search";
 
-/** One fetched-and-verified ad in the "Search advertiser" review list.
- *  `text` is the engine-ready serialization (competitorAdToText) —
- *  computed once at fetch time so review, dedupe, and the generate
- *  payload all read the same value. Kept as separate state from the
- *  paste flows' `blocks` on purpose: API-fetched ads never mix with
- *  pasted ads in one payload, and the paste flows stay byte-identical. */
-interface ApiAd {
-  ad: CompetitorAd;
-  text: string;
-  included: boolean;
-}
+// ApiAd (one fetched-and-verified ad in the review list) and the pure
+// payload/merge logic now live in ./searchAdsPayload.ts, a plain
+// (non-JSX) file, so the exact generate-payload bytes are unit-testable
+// in plain Node — see that file's doc comment. Kept as separate state
+// from the paste flows' `blocks` on purpose: API-fetched ads never mix
+// with pasted ads in one payload, and the paste flows stay
+// byte-identical.
 
 /** Search-mode fetch metadata shown before Generate. */
 interface ApiAdsMeta {
@@ -579,18 +581,17 @@ export function CompetitorDebriefPanel() {
         setSearchError(body?.error ?? FALLBACK_SEARCH_ERROR);
         return;
       }
-      const fetched = (body.ads as CompetitorAd[]).map((ad) => ({
+      // Newly fetched ads default to included (they already passed the
+      // server-side page_id gate); mergeFetchedAds preserves the user's
+      // existing checkbox states verbatim on "Load more" and drops any
+      // cursor-overlap re-delivery of an ad already in the list — see
+      // its doc comment for the full contract.
+      const fetched: ApiAd[] = (body.ads as CompetitorAd[]).map((ad) => ({
         ad,
         text: competitorAdToText(ad),
         included: true,
       }));
-      setApiAds((prev) => {
-        // "Load more" appends; a fresh fetch replaces. Guard against a
-        // misbehaving cursor by dropping any ad id already in the list.
-        const base = isLoadMore ? (prev ?? []) : [];
-        const seenIds = new Set(base.map((a) => a.ad.adId));
-        return [...base, ...fetched.filter((a) => !seenIds.has(a.ad.adId))];
-      });
+      setApiAds((prev) => mergeFetchedAds(prev ?? [], fetched, isLoadMore));
       setApiAdsMeta((prev) => ({
         excludedMismatchedCount:
           (isLoadMore ? (prev?.excludedMismatchedCount ?? 0) : 0) + (body.excludedMismatchedCount as number),
@@ -638,17 +639,26 @@ export function CompetitorDebriefPanel() {
   // ads. The paste flows' blocks are deliberately NOT counted while in
   // search mode (and vice versa) — one mode, one payload source.
   const includedApiAds = useMemo(() => (apiAds ?? []).filter((a) => a.included && a.text !== ""), [apiAds]);
+  // THE search-mode payload — the same object handleGenerate sends, so
+  // the character readout, the over-budget block, and the request body
+  // physically cannot disagree (see ./searchAdsPayload.ts).
+  const searchPayload = useMemo(() => buildSearchPayload(apiAds ?? [], advancedNotes), [apiAds, advancedNotes]);
+  const searchOverBudget = searchPayload.observations.length > SEARCH_OBSERVATIONS_LIMIT;
   const hasUsableNotes = advancedNotes.trim() !== "";
   const canGenerate =
     core.competitorName.trim() !== "" &&
-    (inputMode === "search" ? includedApiAds.length > 0 : usableAdCount > 0 || hasUsableNotes);
+    (inputMode === "search"
+      ? searchPayload.adTexts.length > 0 && !searchOverBudget
+      : usableAdCount > 0 || hasUsableNotes);
 
   const disabledReason =
     !loading && !canGenerate
       ? core.competitorName.trim() === ""
         ? "Add a competitor name to continue."
         : inputMode === "search"
-          ? "Search for the advertiser, choose the exact Page, fetch its active ads, and keep at least one included to continue."
+          ? searchOverBudget
+            ? "Selected ads exceed the size limit. Select fewer or shorter ads before generating."
+            : "Search for the advertiser, choose the exact Page, fetch its active ads, and keep at least one included to continue."
           : "Paste at least one usable ad (or add advanced manual notes) to continue — malformed or duplicate-only content doesn't count."
       : null;
 
@@ -699,21 +709,17 @@ export function CompetitorDebriefPanel() {
     setLoading(true);
     setError(null);
     try {
-      // Payload source is strictly per-mode: search mode reads ONLY the
-      // included API-fetched ads (each already validated server-side
-      // against the selected page_id); the paste modes read ONLY
-      // `blocks`, exactly as before this mode existed. Both go through
-      // the same normalizeForDedupe loop so a duplicate can never count
-      // as a second, independent recurrence downstream.
-      const seenRawKeys = new Set<string>();
-      const distinctAdTexts: string[] = [];
+      // Payload source is strictly per-mode: search mode sends the
+      // EXACT searchPayload object the readout and the over-budget
+      // check already measured (see ./searchAdsPayload.ts — selection,
+      // dedupe, and the observations join all happen there, once); the
+      // paste modes read ONLY `blocks`, exactly as before this mode
+      // existed.
+      let distinctAdTexts: string[];
+      let observations: string;
       if (inputMode === "search") {
-        for (const a of includedApiAds) {
-          const key = normalizeForDedupe(a.text);
-          if (seenRawKeys.has(key)) continue;
-          seenRawKeys.add(key);
-          distinctAdTexts.push(a.text);
-        }
+        distinctAdTexts = searchPayload.adTexts;
+        observations = searchPayload.observations;
       } else {
         // isBlockIncludedForGenerate is a no-op for the manual flow,
         // whose blocks never carry pageDumpMeta. textForAnalysis strips
@@ -721,20 +727,25 @@ export function CompetitorDebriefPanel() {
         // boilerplate — otherwise that text would reach the engine
         // verbatim (it re-scans whatever it's sent) and could get
         // counted as a "recurring" pattern shared only because every ad
-        // carries the same legal footer.
+        // carries the same legal footer. Deduped by the same
+        // normalizeForDedupe key the duplicate-warning badges use, so a
+        // pasted duplicate can never count as a second, independent
+        // recurrence downstream.
         const activeBlocks = (blocks ?? []).filter(
           (b) => b.parsed.raw.trim() !== "" && isBlockIncludedForGenerate(b)
         );
+        const seenRawKeys = new Set<string>();
+        distinctAdTexts = [];
         for (const b of activeBlocks) {
           const key = normalizeForDedupe(b.parsed.raw);
           if (seenRawKeys.has(key)) continue;
           seenRawKeys.add(key);
           distinctAdTexts.push(textForAnalysis(b.parsed));
         }
+        observations = [distinctAdTexts.join("\n\n"), advancedNotes.trim()]
+          .filter((part) => part !== "")
+          .join("\n\n");
       }
-      const observations = [distinctAdTexts.join("\n\n"), advancedNotes.trim()]
-        .filter((part) => part !== "")
-        .join("\n\n");
 
       const res = await fetch("/api/competitor-debrief", {
         method: "POST",
@@ -754,12 +765,20 @@ export function CompetitorDebriefPanel() {
       });
       const body = await res.json();
       if (!res.ok || !body.ok) {
+        const serverError = body?.error ?? {
+          title: "Something went wrong",
+          message: "The debrief couldn't be generated.",
+          fix: "Try again in a moment.",
+        };
+        // The route's size-limit fix line tells the user to trim their
+        // pasted text — wrong guidance for fetched ads, so it's reworded
+        // for this mode (client-side only; the shared route stays
+        // paste-first). Near-unreachable anyway: the over-budget check
+        // above disables Generate against this exact payload beforehand.
         setError(
-          body?.error ?? {
-            title: "Something went wrong",
-            message: "The debrief couldn't be generated.",
-            fix: "Try again in a moment.",
-          }
+          inputMode === "search" && typeof serverError.title === "string" && serverError.title === "Observations too long"
+            ? { ...serverError, fix: "Select fewer or shorter ads before generating." }
+            : serverError
         );
         setDebrief(null);
         return;
@@ -1165,8 +1184,11 @@ export function CompetitorDebriefPanel() {
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                         <p className="min-w-0 text-[11px] text-zinc-400">
-                          {apiAds.length} fetched · {includedApiAds.length} included ·{" "}
-                          {apiAdsMeta?.hasMore ? "more results available" : "no more results"}
+                          {apiAds.length} fetched · {includedApiAds.length} included
+                          {searchPayload.adTexts.length !== includedApiAds.length
+                            ? ` (${searchPayload.adTexts.length} in payload after removing duplicates)`
+                            : ""}{" "}
+                          · {apiAdsMeta?.hasMore ? "more results available" : "no more results"}
                         </p>
                         {apiAdsMeta?.hasMore && apiAdsMeta.after && (
                           <button
@@ -1179,6 +1201,14 @@ export function CompetitorDebriefPanel() {
                           </button>
                         )}
                       </div>
+                      {/* Measures the EXACT observations string Generate
+                          sends (same buildSearchPayload output) — never a
+                          separate estimate that could drift. */}
+                      <p className={`text-[11px] ${searchOverBudget ? "text-red-300" : "text-zinc-500"}`}>
+                        {searchPayload.observations.length.toLocaleString()} /{" "}
+                        {SEARCH_OBSERVATIONS_LIMIT.toLocaleString()} characters selected
+                        {searchOverBudget ? " — select fewer or shorter ads before generating." : ""}
+                      </p>
                     </>
                   )}
                 </div>

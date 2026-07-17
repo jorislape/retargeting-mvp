@@ -17,13 +17,22 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AdLibraryApiError, buildAdsArchiveParams, type RawArchivedAd } from "../modules/metaAdLibrary/client.ts";
 import {
+  AD_TEXT_HEAD_CHARS,
+  AD_TEXT_TAIL_CHARS,
   buildEngineAdTexts,
   competitorAdToText,
   dedupePageCandidates,
   isSupportedCountry,
+  MAX_AD_TEXT_CHARS,
   partitionAdsByPage,
   SUPPORTED_COUNTRIES,
 } from "../modules/metaAdLibrary/discovery.ts";
+import {
+  buildSearchPayload,
+  mergeFetchedAds,
+  SEARCH_OBSERVATIONS_LIMIT,
+  type ApiAd,
+} from "../components/competitorDebrief/searchAdsPayload.ts";
 import { describeAdLibraryError, MISSING_TOKEN_ERROR } from "../modules/metaAdLibrary/errors.ts";
 import { normalizeArchivedAd, sanitizeSnapshotUrl } from "../modules/metaAdLibrary/normalize.ts";
 import type { CompetitorAd } from "../modules/metaAdLibrary/types.ts";
@@ -284,6 +293,125 @@ const read = (p: string) => readFileSync(join(root, p), "utf8");
   assert.ok(panel.includes("includedApiAds"), "search-mode payload derives from included fetched ads");
   assert.ok(!panel.includes("setSelectedPage(body.pages"), "no auto-selection of a discovery result");
   assert.ok(!panel.includes("NEXT_PUBLIC_"));
+}
+
+/* ===================== per-ad text cap (competitorAdToText) ===================== */
+
+{
+  // Confirmed live: single ads_archive bodies run 40k–47k characters
+  // (long-form story ads), so an uncapped serialization overflowed the
+  // debrief API's 20,000-char observations limit even with ONE ad
+  // selected — the exact reported bug. The cap keeps head (hook) and
+  // tail (offer/CTA), never the signal-thin middle.
+  const hugeBody = `HOOK_OPENING ${"middle filler ".repeat(3500)}FINAL_OFFER_CTA`;
+  assert.ok(hugeBody.length > 40_000, "fixture mirrors the live 40k+ case");
+  const text = competitorAdToText(makeAd({ body: hugeBody, headline: null }));
+  assert.ok(
+    text.length <= MAX_AD_TEXT_CHARS + 3,
+    `capped to ~${MAX_AD_TEXT_CHARS} chars (got ${text.length})`
+  );
+  assert.ok(text.startsWith("HOOK_OPENING"), "head (hook) preserved");
+  assert.ok(text.endsWith("FINAL_OFFER_CTA"), "tail (offer/CTA) preserved");
+  assert.ok(text.includes("…"), "truncation is visible, never silent");
+
+  // A normal-sized ad is byte-identical to before the cap existed.
+  assert.equal(competitorAdToText(makeAd({})), "Body text.\nHeadline text.");
+  const exactFit = "x".repeat(MAX_AD_TEXT_CHARS);
+  assert.equal(competitorAdToText(makeAd({ body: exactFit, headline: null })), exactFit);
+  assert.equal(AD_TEXT_HEAD_CHARS + AD_TEXT_TAIL_CHARS, MAX_AD_TEXT_CHARS);
+}
+
+/* ===================== buildSearchPayload (selection -> exact payload) ===================== */
+
+function apiAd(adId: string, text: string, included: boolean): ApiAd {
+  return { ad: makeAd({ adId, body: text, headline: null }), text, included };
+}
+
+{
+  // THE reported bug's shape: 10 fetched, only 1 selected -> the
+  // payload contains exactly that one ad and nothing else.
+  const ads: ApiAd[] = Array.from({ length: 10 }, (_, i) =>
+    apiAd(String(i + 1), `Distinct ad body number ${i + 1}.`, i === 3)
+  );
+  const payload = buildSearchPayload(ads, "");
+  assert.deepEqual(payload.adTexts, ["Distinct ad body number 4."], "exactly the one selected ad");
+  assert.equal(payload.observations, "Distinct ad body number 4.");
+  // Deselected ads never enter observations OR adTexts.
+  for (let i = 1; i <= 10; i++) {
+    if (i === 4) continue;
+    assert.ok(!payload.observations.includes(`number ${i}.`), `deselected ad ${i} absent from observations`);
+  }
+}
+
+{
+  // Unchecking removes immediately; rechecking restores — the payload
+  // is a pure function of current state, no caching to go stale.
+  let ads: ApiAd[] = [apiAd("1", "First ad.", true), apiAd("2", "Second ad.", true)];
+  assert.equal(buildSearchPayload(ads, "").adTexts.length, 2);
+  ads = ads.map((a) => (a.ad.adId === "2" ? { ...a, included: false } : a));
+  assert.deepEqual(buildSearchPayload(ads, "").adTexts, ["First ad."]);
+  ads = ads.map((a) => (a.ad.adId === "2" ? { ...a, included: true } : a));
+  assert.equal(buildSearchPayload(ads, "").adTexts.length, 2);
+}
+
+{
+  // The readout's character count IS the sent payload's length — same
+  // function, same string; also true with advanced notes appended, and
+  // the over-budget comparison uses that exact value.
+  const ads = [apiAd("1", "A".repeat(500), true), apiAd("2", "B".repeat(600), true)];
+  const withNotes = buildSearchPayload(ads, "  some notes  ");
+  assert.equal(withNotes.observations, `${"A".repeat(500)}\n\n${"B".repeat(600)}\n\nsome notes`);
+  assert.equal(withNotes.observations.length, 500 + 2 + 600 + 2 + 10);
+  assert.equal(SEARCH_OBSERVATIONS_LIMIT, 20_000, "mirrors the route's MAX_OBSERVATIONS_CHARS");
+
+  // Duplicate creative variants collapse to one payload entry (same
+  // normalizeForDedupe key the paste flows use).
+  const dupes = [apiAd("1", "Same creative.", true), apiAd("2", "same   CREATIVE.", true)];
+  assert.equal(buildSearchPayload(dupes, "").adTexts.length, 1);
+}
+
+/* ===================== mergeFetchedAds (Load more selection preservation) ===================== */
+
+{
+  const first: ApiAd[] = [apiAd("1", "One.", true), apiAd("2", "Two.", false), apiAd("3", "Three.", true)];
+
+  // Load more: appended page preserves every existing checkbox state
+  // verbatim; new ads follow the one documented default (included).
+  const secondPage = [apiAd("4", "Four.", true), apiAd("5", "Five.", true)];
+  const merged = mergeFetchedAds(first, secondPage, true);
+  assert.deepEqual(
+    merged.map((a) => [a.ad.adId, a.included]),
+    [["1", true], ["2", false], ["3", true], ["4", true], ["5", true]]
+  );
+
+  // A cursor that re-delivers an already-listed ad (id 2, deselected,
+  // re-arriving as included:true) is dropped — it can neither duplicate
+  // the row nor silently re-select what the user unchecked.
+  const overlapping = [apiAd("2", "Two.", true), apiAd("6", "Six.", true)];
+  const afterOverlap = mergeFetchedAds(merged, overlapping, true);
+  assert.equal(afterOverlap.filter((a) => a.ad.adId === "2").length, 1, "no duplicate row");
+  assert.equal(afterOverlap.find((a) => a.ad.adId === "2")?.included, false, "deselection survives cursor overlap");
+  assert.equal(afterOverlap.find((a) => a.ad.adId === "6")?.included, true, "genuinely new ad gets the default");
+
+  // Fresh fetch (not load-more) replaces the list entirely.
+  const fresh = mergeFetchedAds(afterOverlap, [apiAd("9", "Nine.", true)], false);
+  assert.deepEqual(fresh.map((a) => a.ad.adId), ["9"]);
+}
+
+/* ===================== panel wiring (source scans for this fix) ===================== */
+
+{
+  const panel = read("components/competitorDebrief/CompetitorDebriefPanel.tsx");
+  // Generate and the readout must read the SAME payload object.
+  assert.ok(panel.includes("searchPayload.observations.length"), "readout measures the exact payload string");
+  assert.ok(panel.includes("distinctAdTexts = searchPayload.adTexts"), "generate sends the exact payload adTexts");
+  assert.ok(panel.includes("observations = searchPayload.observations"), "generate sends the exact payload observations");
+  assert.ok(!panel.includes("Trim the pasted text"), "paste-specific size copy never shown by the panel");
+  assert.ok(panel.includes("Select fewer or shorter ads before generating"), "search-mode size copy present");
+  // The paste branch still serializes from blocks via textForAnalysis —
+  // unchanged by this fix (its own suites prove behavior; this pins the
+  // source path).
+  assert.ok(panel.includes("distinctAdTexts.push(textForAnalysis(b.parsed))"));
 }
 
 console.log("metaAdLibraryIntegration: all assertions passed");
