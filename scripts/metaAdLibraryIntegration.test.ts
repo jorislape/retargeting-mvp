@@ -30,9 +30,11 @@ import {
 import {
   buildSearchPayload,
   mergeFetchedAds,
+  partitionPageCandidates,
   SEARCH_OBSERVATIONS_LIMIT,
   type ApiAd,
 } from "../components/competitorDebrief/searchAdsPayload.ts";
+import { generateCompetitorDebrief } from "../modules/competitorDebrief/engine.ts";
 import { describeAdLibraryError, MISSING_TOKEN_ERROR } from "../modules/metaAdLibrary/errors.ts";
 import { normalizeArchivedAd, sanitizeSnapshotUrl } from "../modules/metaAdLibrary/normalize.ts";
 import type { CompetitorAd } from "../modules/metaAdLibrary/types.ts";
@@ -412,6 +414,134 @@ function apiAd(adId: string, text: string, included: boolean): ApiAd {
   // unchanged by this fix (its own suites prove behavior; this pins the
   // source path).
   assert.ok(panel.includes("distinctAdTexts.push(textForAnalysis(b.parsed))"));
+}
+
+/* ===================== partitionPageCandidates (discovery hierarchy) ===================== */
+
+function pageCandidate(pageId: string, pageName: string) {
+  return { pageId, pageName, sampleAdCount: 1 };
+}
+
+{
+  // Exact normalized Page-name match is separated from ad-text-matched
+  // Pages — same normalizeForDedupe comparison (case/whitespace), NO
+  // fuzzy or substring matching, and every candidate stays visible in
+  // exactly one group.
+  const candidates = [
+    pageCandidate("1", "NovelFlow"),
+    pageCandidate("2", "  nike "), // exact after normalization
+    pageCandidate("3", "Nike Store DE"), // substring — must NOT be an exact match
+    pageCandidate("4", "Nike"), // exact
+  ];
+  const { exactMatches, others } = partitionPageCandidates(candidates, "Nike");
+  assert.deepEqual(exactMatches.map((c) => c.pageId), ["2", "4"]);
+  assert.deepEqual(others.map((c) => c.pageId), ["1", "3"]);
+  assert.equal(exactMatches.length + others.length, candidates.length, "nothing hidden");
+}
+
+{
+  // No exact match: exactMatches is empty (the UI shows the explicit
+  // no-match message) and every candidate remains visible under
+  // "Other Pages found from matching ad text".
+  const candidates = [pageCandidate("1", "NovelFlow"), pageCandidate("2", "Calvirea")];
+  const { exactMatches, others } = partitionPageCandidates(candidates, "Nike");
+  assert.deepEqual(exactMatches, []);
+  assert.equal(others.length, 2);
+
+  // Degenerate inputs: empty candidate list, and an empty query never
+  // "exact-matches" everything.
+  assert.deepEqual(partitionPageCandidates([], "Nike"), { exactMatches: [], others: [] });
+  const emptyQuery = partitionPageCandidates(candidates, "");
+  assert.deepEqual(emptyQuery.exactMatches, []);
+  assert.equal(emptyQuery.others.length, 2);
+}
+
+/* ===================== source-aware report wording (engine) ===================== */
+
+{
+  // Same evidence, both modes — analysis identical, wording source-true.
+  const observations =
+    "Tired of dull skin? 20% off your first order. Dermatologist tested, 5,000+ five-star reviews. Shop Now.";
+  const shared = {
+    competitorName: "GlowSkin",
+    observations,
+    exampleCount: 3,
+    adTexts: [observations],
+  };
+  const apiDebrief = generateCompetitorDebrief({ ...shared, sourceMode: "adsLibraryApi" });
+  const manualDebrief = generateCompetitorDebrief({ ...shared });
+
+  // API mode: "selected Meta Ads Library ads", no paste-only wording.
+  assert.equal(apiDebrief.sourceMode, "adsLibraryApi");
+  assert.ok(apiDebrief.evidenceSummary.includes("Based on 3 selected Meta Ads Library ads."));
+  assert.ok(
+    apiDebrief.caveat.includes("Based only on the selected ads fetched from Meta's Ads Library for GlowSkin."),
+    "API caveat uses the fetched-ads wording"
+  );
+  assert.ok(apiDebrief.caveat.includes("No spend, conversion, or performance inference."));
+  const apiVisibleText = JSON.stringify([
+    apiDebrief.evidenceSummary,
+    apiDebrief.caveat,
+    apiDebrief.whatToMonitorNext,
+    apiDebrief.insufficientEvidenceNote,
+  ]);
+  for (const phrase of ["pasted", "paste ", "reference only", "never fetched"]) {
+    assert.ok(!apiVisibleText.toLowerCase().includes(phrase), `API-mode wording must not contain "${phrase}"`);
+  }
+
+  // Manual mode: byte-identical to the pre-existing paste wording.
+  assert.equal(manualDebrief.sourceMode, "manual");
+  assert.ok(manualDebrief.evidenceSummary.includes("Based on 3 pasted ad examples for GlowSkin."));
+  assert.ok(manualDebrief.caveat.includes("Based only on what you pasted about GlowSkin"));
+  assert.ok(manualDebrief.caveat.includes("The Ads Library URL is a reference only, never fetched."));
+  assert.ok(manualDebrief.whatToMonitorNext.some((m) => m.includes("paste fresh observations")));
+
+  // The ANALYSIS is identical across modes — wording is the only diff.
+  assert.deepEqual(apiDebrief.recurringHooks, manualDebrief.recurringHooks);
+  assert.deepEqual(apiDebrief.offerPatterns, manualDebrief.offerPatterns);
+  assert.deepEqual(apiDebrief.nextTests, manualDebrief.nextTests);
+  assert.deepEqual(apiDebrief.whatStandsOut, manualDebrief.whatStandsOut);
+}
+
+{
+  // API-mode insufficient evidence gets fetch-appropriate guidance.
+  const empty = generateCompetitorDebrief({
+    competitorName: "GlowSkin",
+    observations: "",
+    sourceMode: "adsLibraryApi",
+  });
+  assert.ok(empty.insufficientEvidence);
+  assert.ok(empty.evidenceSummary.includes("selected Meta Ads Library ads"));
+  assert.ok(!`${empty.evidenceSummary} ${empty.insufficientEvidenceNote}`.toLowerCase().includes("paste"));
+}
+
+/* ===================== polish source scans ===================== */
+
+{
+  const panel = read("components/competitorDebrief/CompetitorDebriefPanel.tsx");
+  // Discovery hierarchy copy + grouping against the SUBMITTED query.
+  assert.ok(panel.includes("Exact Page match"));
+  assert.ok(panel.includes("Other Pages found from matching ad text"));
+  assert.ok(panel.includes("was found in this result sample"), "explicit no-exact-match message present");
+  assert.ok(panel.includes("partitionPageCandidates(pageCandidates ?? [], submittedQuery)"));
+  // Still no auto-selection anywhere.
+  assert.ok(!panel.includes("handleSelectPage(candidateGroups"), "grouping never auto-selects");
+  // The wording flag is sent, derived from the input mode.
+  assert.ok(panel.includes('sourceMode: inputMode === "search" ? "adsLibraryApi" : "manual"'));
+
+  const result = read("components/competitorDebrief/CompetitorDebriefResult.tsx");
+  // The "(reference only — not fetched)" note must be conditional on
+  // source mode for the Ads Library link.
+  assert.ok(result.includes('referenceOnly={debrief.sourceMode !== "adsLibraryApi"}'));
+
+  const privacy = read("app/(workspace)/privacy/page.tsx");
+  assert.ok(privacy.includes("Ad Library API"), "privacy page discloses the API source");
+  assert.ok(privacy.includes("does not store, cache, or log"), "privacy page states the no-persistence rule for this flow");
+  assert.ok(privacy.includes("can't speak to what Meta logs"), "never claims Meta itself doesn't log");
+
+  const claudeMd = read("CLAUDE.md");
+  assert.ok(claudeMd.includes("Meta Ad Library API Integration V1"), "scope doc records the approved milestone");
+  assert.ok(!claudeMd.includes("no fetching, ever, in this flow"), "outdated absolute no-fetch claim removed");
 }
 
 console.log("metaAdLibraryIntegration: all assertions passed");

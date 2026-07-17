@@ -66,9 +66,11 @@ function Section({ title, items }: { title: string; items: string[] }) {
 /** Concise, overflow-safe source reference: a short clickable label
  *  (never the raw URL as visible text) with the full address available
  *  via title/aria-label for verification on hover or with a screen
- *  reader. Source URLs are references only — never fetched by this
- *  app — so there is nothing to preview beyond the link itself. */
-function SourceLink({ label, url }: { label: string; url: string }) {
+ *  reader. `referenceOnly` (default true) appends the manual modes'
+ *  "(reference only — not fetched)" note — pass false for the Ads
+ *  Library link when sourceMode is "adsLibraryApi", where the ads WERE
+ *  fetched via Meta's Ad Library API and that note would be false. */
+function SourceLink({ label, url, referenceOnly = true }: { label: string; url: string; referenceOnly?: boolean }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
       <a
@@ -82,7 +84,7 @@ function SourceLink({ label, url }: { label: string; url: string }) {
         <span className="truncate">{label} — Open source</span>
         <ArrowIcon className="h-3 w-3 shrink-0 -rotate-45" />
       </a>
-      <span className="shrink-0 text-[11px] text-zinc-600">(reference only — not fetched)</span>
+      {referenceOnly && <span className="shrink-0 text-[11px] text-zinc-600">(reference only — not fetched)</span>}
     </div>
   );
 }
@@ -299,8 +301,9 @@ export function CompetitorDebriefResult({
           Competitor Debrief
         </p>
         <p className="text-[10px] leading-relaxed text-zinc-500">
-          Directional read of pasted competitor ad examples — evidence and
-          interpretation kept separate throughout.
+          {debrief.sourceMode === "adsLibraryApi"
+            ? "Directional read of selected Meta Ads Library ads — evidence and interpretation kept separate throughout."
+            : "Directional read of pasted competitor ad examples — evidence and interpretation kept separate throughout."}
         </p>
       </div>
 
@@ -366,7 +369,15 @@ export function CompetitorDebriefResult({
         {sections.sources && (
           <>
             {debrief.sources.adsLibraryUrl && (
-              <SourceLink label="Meta Ads Library" url={debrief.sources.adsLibraryUrl} />
+              <SourceLink
+                label="Meta Ads Library"
+                url={debrief.sources.adsLibraryUrl}
+                // In Search advertiser mode the ads WERE fetched from the
+                // Ad Library API — "reference only — not fetched" is
+                // manual-paste wording. The website link below keeps it in
+                // both modes: the website is never fetched by this flow.
+                referenceOnly={debrief.sourceMode !== "adsLibraryApi"}
+              />
             )}
             {debrief.sources.websiteUrl && (
               <SourceLink label="Website" url={debrief.sources.websiteUrl} />
@@ -407,8 +418,9 @@ export function CompetitorDebriefResult({
             <div className="min-w-0 space-y-2">
               <p className={sectionLabel}>Strategic patterns — directional interpretation</p>
               <p className="text-[11px] leading-relaxed text-zinc-500">
-                Only patterns observed repeatedly across the pasted examples —
-                never from a single example.
+                {debrief.sourceMode === "adsLibraryApi"
+                  ? "Only patterns observed repeatedly across the selected ads — never from a single example."
+                  : "Only patterns observed repeatedly across the pasted examples — never from a single example."}
               </p>
               <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <Section title="Dominant narrative / mechanism" items={debrief.dominantNarrative} />

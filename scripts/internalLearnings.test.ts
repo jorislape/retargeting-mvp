@@ -170,6 +170,7 @@ const BASE_TEST: CompetitorDebriefTest = {
 function baseDebrief(nextTests: CompetitorDebriefTest[]): CompetitorDebrief {
   return {
     competitorName: "TestCo",
+    sourceMode: "manual",
     sources: { adsLibraryUrl: "https://example.com/ads", websiteUrl: null },
     evidenceSummary: "Observed evidence for TestCo includes offer patterns.",
     insufficientEvidence: false,

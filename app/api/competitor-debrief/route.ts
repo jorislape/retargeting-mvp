@@ -73,8 +73,16 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { competitorName, adsLibraryUrl, websiteUrl, observations, exampleCount, adTexts, internalLearningsText } =
-    body as Record<string, unknown>;
+  const {
+    competitorName,
+    adsLibraryUrl,
+    websiteUrl,
+    observations,
+    exampleCount,
+    adTexts,
+    internalLearningsText,
+    sourceMode,
+  } = body as Record<string, unknown>;
 
   if (typeof competitorName !== "string" || competitorName.trim() === "") {
     return fail(400, {
@@ -180,6 +188,10 @@ export async function POST(request: NextRequest) {
 
   const debrief = generateCompetitorDebrief({
     competitorName,
+    // Wording-only flag (see CompetitorDebriefSourceMode): anything
+    // other than the exact API value falls back to "manual", so a
+    // malformed value can only ever get the pre-existing paste wording.
+    sourceMode: sourceMode === "adsLibraryApi" ? "adsLibraryApi" : "manual",
     adsLibraryUrl: normalizedAdsLibraryUrl,
     websiteUrl: normalizedWebsiteUrl,
     observations,

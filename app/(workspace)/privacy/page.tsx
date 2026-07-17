@@ -33,6 +33,10 @@ const SECTIONS = [
     body: "If you enable weekly monitoring for a competitor page, Debrief stores server-side: the page URL you entered, the deterministic signals extracted from that public page (headline, CTA, offer, claims — never a full page copy), and a short history of check outcomes. All of it is keyed to your anonymous workspace cookie, and none of it is ever connected to your ads data, which stays in-memory only. Scheduled checks run at most weekly; you can also retry a failed check manually. Pages that block us are recorded as blocked, never worked around. Removing a monitored page deletes it.",
   },
   {
+    title: "Competitor ads from Meta's Ad Library (optional)",
+    body: "The competitor debrief page has an optional \"Search advertiser\" mode. When you use it, our server queries Meta's public Ad Library API for the advertiser Page you pick, and the returned ads are processed in memory to render that one debrief — this flow does not store, cache, or log them. The manual paste modes make no such request. Meta operates the Ad Library API and handles those requests under its own terms; we can't speak to what Meta logs on its side. Your own CSV and performance data are never involved in this flow.",
+  },
+  {
     title: "Meta affiliation",
     body: "Debrief reads CSV exports you download yourself, or — only if you choose to connect — pulls read-only insights (ads_read) from the Meta API. The access token lives in your browser's memory for the session and is never stored. Debrief isn't affiliated with or endorsed by Meta Platforms, Inc.",
   },

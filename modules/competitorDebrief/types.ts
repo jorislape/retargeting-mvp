@@ -10,19 +10,36 @@ import type { InternalLearningNote, InternalLearningsSummary } from "./internalL
  * honesty policy this type shape exists to enforce.
  */
 
+/** Where the ad evidence came from. "manual" = the paste flows
+ *  (unchanged, the default); "adsLibraryApi" = the Search advertiser
+ *  mode, whose ads were fetched server-side from Meta's Ad Library API
+ *  (app/api/meta-ad-library/*). Affects WORDING ONLY — evidence
+ *  summary, caveat, monitor-next phrasing, and the report's source-link
+ *  annotation. Every analysis/interpretation rule is identical for
+ *  both values. */
+export type CompetitorDebriefSourceMode = "manual" | "adsLibraryApi";
+
 export interface CompetitorDebriefInput {
   competitorName: string;
-  /** Reference only — never fetched. The Ads Library is not crawled by
-   *  this app in any version. Optional: a competitor debrief can be
-   *  built from pasted ad copy alone, without a library URL on hand —
-   *  see the "Generate" button eligibility fix in CompetitorDebriefPanel. */
+  /** Optional; omitted means "manual" — pre-existing callers and
+   *  payloads behave exactly as before this field existed. */
+  sourceMode?: CompetitorDebriefSourceMode;
+  /** The URL itself is a reference — this engine never fetches it (the
+   *  Search advertiser mode's ads are fetched by app/api/meta-ad-library/*
+   *  via the official Ad Library API BEFORE this engine runs, and in
+   *  that mode this field is the selected Page's public library URL,
+   *  used as the report's source link). Optional: a competitor debrief
+   *  can be built from pasted ad copy alone, without a library URL on
+   *  hand — see the "Generate" button eligibility fix in
+   *  CompetitorDebriefPanel. */
   adsLibraryUrl?: string;
   /** Reference only — never fetched, unlike the separate one-time
    *  Competitor Landing Page Fetch feature (modules/competitor). */
   websiteUrl?: string;
-  /** The actual evidence: pasted ad copy/hooks, formats, offers, CTAs,
-   *  dates, or general observations. Everything this flow interprets
-   *  comes from this field alone. */
+  /** The actual evidence: ad copy/hooks, formats, offers, CTAs, dates,
+   *  or general observations — pasted by the user, or serialized from
+   *  the ads selected in the Search advertiser mode. Everything this
+   *  flow interprets comes from this field alone. */
   observations: string;
   /** Number of individual ad examples the "Paste ads" flow split
    *  `observations` into (modules/competitorDebrief/adParser.ts),
@@ -72,6 +89,11 @@ export interface CompetitorDebriefTest {
 
 export interface CompetitorDebrief {
   competitorName: string;
+  /** Echoed from the input (default "manual") so the report can pick
+   *  source-accurate wording — e.g. the Ads Library link's "reference
+   *  only — not fetched" note is wrong when the ads WERE fetched via
+   *  the Ad Library API. Presentation only, never a calculation. */
+  sourceMode: CompetitorDebriefSourceMode;
   sources: {
     adsLibraryUrl: string | null;
     websiteUrl: string | null;

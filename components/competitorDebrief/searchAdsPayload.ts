@@ -5,6 +5,7 @@
 // pageDumpReview.ts imports this way.
 import { normalizeForDedupe } from "../../modules/competitorDebrief/adParser.ts";
 import type { CompetitorAd } from "../../modules/metaAdLibrary/types.ts";
+import type { PageCandidate } from "../../modules/metaAdLibrary/discovery.ts";
 
 /**
  * Pure payload/state logic for the "Search advertiser" mode — split out
@@ -82,4 +83,29 @@ export function mergeFetchedAds(prev: ApiAd[], fetched: ApiAd[], isLoadMore: boo
   const base = isLoadMore ? prev : [];
   const seenIds = new Set(base.map((a) => a.ad.adId));
   return [...base, ...fetched.filter((a) => !seenIds.has(a.ad.adId))];
+}
+
+/**
+ * Splits discovery candidates into "Exact Page match" vs "Other Pages
+ * found from matching ad text" for the result hierarchy — because
+ * search_terms matches ad TEXT, a "Nike" search returns Pages that
+ * merely mention Nike, which reads as a broken advertiser search
+ * without this separation. Matching is the same exact, normalized
+ * (case/whitespace) comparison used everywhere else in this repo
+ * (normalizeForDedupe) — deliberately NO fuzzy/substring/semantic
+ * matching, so "Nike Store DE" is an "other", never an "exact".
+ * Every candidate lands in exactly one group; nothing is hidden and
+ * nothing is auto-selected.
+ */
+export function partitionPageCandidates(
+  candidates: PageCandidate[],
+  query: string
+): { exactMatches: PageCandidate[]; others: PageCandidate[] } {
+  const normalizedQuery = normalizeForDedupe(query);
+  const exactMatches: PageCandidate[] = [];
+  const others: PageCandidate[] = [];
+  for (const c of candidates) {
+    (normalizedQuery !== "" && normalizeForDedupe(c.pageName) === normalizedQuery ? exactMatches : others).push(c);
+  }
+  return { exactMatches, others };
 }

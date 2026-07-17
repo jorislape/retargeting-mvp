@@ -16,8 +16,15 @@ import type { CompetitorDebrief, CompetitorDebriefInput, CompetitorDebriefTest }
  * system: extractMarketSignals (modules/debrief) for hooks/formats/
  * offers, and the positioning/trust/benefit tables from
  * modules/competitor/pageSignals.ts. No network access anywhere in
- * this file — the Ads Library URL and website URL are stored and
- * echoed back as source references only, never fetched.
+ * this file (test-enforced) — for the manual paste modes the Ads
+ * Library URL and website URL are stored and echoed back as source
+ * references only, never fetched; for the Search advertiser mode
+ * (input.sourceMode === "adsLibraryApi") the ads were fetched
+ * server-side by app/api/meta-ad-library/* BEFORE this engine ran, and
+ * arrive here as the same plain observations/adTexts strings.
+ * sourceMode changes WORDING ONLY (evidence summary, caveat,
+ * monitor-next phrasing) — every analysis rule below is identical for
+ * both modes.
  *
  * Honesty policy (mirrors the CSV engine's "metrics only — angle
  * unknown" rule): if nothing recognizable was pasted, the debrief says
@@ -36,9 +43,16 @@ import type { CompetitorDebrief, CompetitorDebriefInput, CompetitorDebriefTest }
 
 /** Short, non-repetitive — the four things that matter: scope, no
  *  performance inference, the Ads Library URL's status, and that
- *  interpretation is not evidence. */
+ *  interpretation is not evidence. Manual (paste) modes only. */
 export const COMPETITOR_DEBRIEF_CAVEAT = (competitorName: string): string =>
   `Based only on what you pasted about ${competitorName} — not a review of their Ads Library. No spend, conversion, or performance inference. The Ads Library URL is a reference only, never fetched. Interpretation above (what stands out, next tests) is directional, not evidence.`;
+
+/** The Search advertiser mode's counterpart: the ads WERE fetched from
+ *  Meta's Ad Library API, so "what you pasted" / "never fetched" would
+ *  both be false here — but it's still only the SELECTED ads, still no
+ *  performance inference, and interpretation is still not evidence. */
+export const ADS_LIBRARY_API_CAVEAT = (competitorName: string): string =>
+  `Based only on the selected ads fetched from Meta's Ads Library for ${competitorName}. No spend, conversion, or performance inference. Interpretation above (what stands out, next tests) is directional, not evidence.`;
 
 function wordCount(text: string): number {
   const trimmed = text.trim();
@@ -327,12 +341,14 @@ function buildSynthesis(
   return { whatStandsOut, nextTests: tests.slice(0, 5) };
 }
 
-function buildWhatToMonitorNext(competitorName: string): string[] {
+function buildWhatToMonitorNext(competitorName: string, sourceMode: "manual" | "adsLibraryApi"): string[] {
   return [
     `Whether ${competitorName} keeps running this offer/hook combination over time, or rotates it.`,
     `Whether new positioning or trust claims appear the next time you review their ads.`,
     `Whether the creative format mix shifts (e.g. new video or UGC vs. static).`,
-    "This flow does not monitor automatically — revisit this page and paste fresh observations to update the debrief.",
+    sourceMode === "adsLibraryApi"
+      ? "This flow does not monitor automatically — revisit this page and fetch the advertiser's current active ads to update the debrief."
+      : "This flow does not monitor automatically — revisit this page and paste fresh observations to update the debrief.",
   ];
 }
 
@@ -368,17 +384,26 @@ export function generateCompetitorDebrief(
 
   const insufficientEvidence = words === 0 || categoriesMatched === 0;
 
+  // Source-accurate wording only — the numbers, categories, and every
+  // rule around them are identical for both modes.
+  const isApiSource = input.sourceMode === "adsLibraryApi";
   const exampleCountLabel =
     typeof input.exampleCount === "number" && input.exampleCount > 0
-      ? `Based on ${input.exampleCount} pasted ad example${input.exampleCount === 1 ? "" : "s"} for ${competitorName}. `
+      ? isApiSource
+        ? `Based on ${input.exampleCount} selected Meta Ads Library ad${input.exampleCount === 1 ? "" : "s"}. `
+        : `Based on ${input.exampleCount} pasted ad example${input.exampleCount === 1 ? "" : "s"} for ${competitorName}. `
       : "";
 
   const evidenceSummary = insufficientEvidence
-    ? `Not enough was pasted to identify hooks, formats, offers, or positioning for ${competitorName || "this competitor"}.`
+    ? isApiSource
+      ? `Not enough usable ad text was found in the selected Meta Ads Library ads to identify hooks, formats, offers, or positioning for ${competitorName || "this competitor"}.`
+      : `Not enough was pasted to identify hooks, formats, offers, or positioning for ${competitorName || "this competitor"}.`
     : `${exampleCountLabel}Observed evidence for ${competitorName} includes ${describeEvidenceCoverage(evidence)}.`;
 
   const insufficientEvidenceNote = insufficientEvidence
-    ? "Paste specific ad copy, hooks, offers, formats, or other observations from the Ads Library to get a meaningful debrief. Generic or empty notes can't be interpreted."
+    ? isApiSource
+      ? "Select ads with more creative text (or add manual observations) to get a meaningful debrief. Ads with little or no text can't be interpreted."
+      : "Paste specific ad copy, hooks, offers, formats, or other observations from the Ads Library to get a meaningful debrief. Generic or empty notes can't be interpreted."
     : null;
 
   const synthesis = insufficientEvidence
@@ -413,6 +438,7 @@ export function generateCompetitorDebrief(
 
   const baseDebrief: CompetitorDebrief = {
     competitorName,
+    sourceMode: isApiSource ? "adsLibraryApi" : "manual",
     sources: {
       adsLibraryUrl: input.adsLibraryUrl?.trim() || null,
       websiteUrl: input.websiteUrl?.trim() || null,
@@ -434,8 +460,12 @@ export function generateCompetitorDebrief(
     creativeStructure: strategicPatterns.creativeStructure,
     strategicSummary,
     nextTests,
-    whatToMonitorNext: insufficientEvidence ? [] : buildWhatToMonitorNext(competitorName),
-    caveat: COMPETITOR_DEBRIEF_CAVEAT(competitorName || "this competitor"),
+    whatToMonitorNext: insufficientEvidence
+      ? []
+      : buildWhatToMonitorNext(competitorName, isApiSource ? "adsLibraryApi" : "manual"),
+    caveat: isApiSource
+      ? ADS_LIBRARY_API_CAVEAT(competitorName || "this competitor")
+      : COMPETITOR_DEBRIEF_CAVEAT(competitorName || "this competitor"),
     internalLearnings: null,
   };
 

@@ -1,9 +1,10 @@
-export { COMPETITOR_DEBRIEF_CAVEAT, generateCompetitorDebrief } from "./engine";
+export { ADS_LIBRARY_API_CAVEAT, COMPETITOR_DEBRIEF_CAVEAT, generateCompetitorDebrief } from "./engine";
 export type {
   CompetitorDebrief,
   CompetitorDebriefApiError,
   CompetitorDebriefInput,
   CompetitorDebriefResponse,
+  CompetitorDebriefSourceMode,
   CompetitorDebriefTest,
 } from "./types";
 export {

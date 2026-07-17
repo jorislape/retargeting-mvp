@@ -37,6 +37,7 @@ import type { CompetitorAd } from "@/modules/metaAdLibrary/types";
 import {
   buildSearchPayload,
   mergeFetchedAds,
+  partitionPageCandidates,
   SEARCH_OBSERVATIONS_LIMIT,
   type ApiAd,
 } from "./searchAdsPayload";
@@ -409,6 +410,11 @@ export function CompetitorDebriefPanel() {
   // only on the server; this component talks to the two
   // /api/meta-ad-library routes and never sees it.
   const [searchQuery, setSearchQuery] = useState("");
+  // Snapshot of the query the CURRENT results were searched with — the
+  // exact-match grouping and the no-match message read this, not the
+  // live input, so editing the search text after results arrive can't
+  // silently reshuffle or relabel them.
+  const [submittedQuery, setSubmittedQuery] = useState("");
   const [searchCountry, setSearchCountry] = useState("DE");
   const [searchLoading, setSearchLoading] = useState(false);
   const [pageCandidates, setPageCandidates] = useState<PageCandidate[] | null>(null);
@@ -518,6 +524,7 @@ export function CompetitorDebriefPanel() {
   async function handleSearchPages() {
     setSearchLoading(true);
     setSearchError(null);
+    setSubmittedQuery(searchQuery.trim());
     // A new search invalidates any previous selection and fetched ads —
     // never leave a stale Page/ads pairing on screen. Selection is
     // always an explicit user click on a fresh result; nothing is ever
@@ -609,6 +616,32 @@ export function CompetitorDebriefPanel() {
     setApiAds((prev) => (prev ?? []).map((a) => (a.ad.adId === adId ? { ...a, included: !a.included } : a)));
   }
 
+  /** One discovery candidate row — shared by the "Exact Page match"
+   *  and "Other Pages found from matching ad text" groups so both
+   *  render (and select) identically; only the section they sit under
+   *  differs. */
+  function renderPageCandidate(c: PageCandidate) {
+    const isSelected = selectedPage?.pageId === c.pageId;
+    return (
+      <button
+        key={c.pageId}
+        type="button"
+        aria-pressed={isSelected}
+        onClick={() => handleSelectPage(c)}
+        className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
+          isSelected
+            ? "border-accent/40 bg-accent/[0.08] text-white"
+            : "border-white/10 bg-white/[0.02] text-zinc-300 hover:border-white/20"
+        }`}
+      >
+        <span className="min-w-0 truncate font-medium">{c.pageName}</span>
+        <span className="shrink-0 text-[10px] text-zinc-500">
+          page_id {c.pageId} · {c.sampleAdCount} ad{c.sampleAdCount === 1 ? "" : "s"} in sample
+        </span>
+      </button>
+    );
+  }
+
   function toggleVariantGroupExpanded(groupId: number) {
     setExpandedVariantGroups((prev) => {
       const next = new Set(prev);
@@ -644,6 +677,13 @@ export function CompetitorDebriefPanel() {
   // physically cannot disagree (see ./searchAdsPayload.ts).
   const searchPayload = useMemo(() => buildSearchPayload(apiAds ?? [], advancedNotes), [apiAds, advancedNotes]);
   const searchOverBudget = searchPayload.observations.length > SEARCH_OBSERVATIONS_LIMIT;
+  // Exact-match vs matched-ad-text grouping for the discovery results —
+  // grouped against the query these results were SEARCHED with (see
+  // submittedQuery above), never the live input.
+  const candidateGroups = useMemo(
+    () => partitionPageCandidates(pageCandidates ?? [], submittedQuery),
+    [pageCandidates, submittedQuery]
+  );
   const hasUsableNotes = advancedNotes.trim() !== "";
   const canGenerate =
     core.competitorName.trim() !== "" &&
@@ -752,6 +792,10 @@ export function CompetitorDebriefPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...core,
+          // Wording-only: lets the engine/report say "selected Meta Ads
+          // Library ads" instead of paste phrasing when the evidence
+          // was API-fetched. Analysis is identical either way.
+          sourceMode: inputMode === "search" ? "adsLibraryApi" : "manual",
           observations,
           exampleCount: distinctAdTexts.length > 0 ? distinctAdTexts.length : undefined,
           // The individual ad texts let the engine check for patterns
@@ -806,13 +850,23 @@ export function CompetitorDebriefPanel() {
           <SparklesIcon className="h-4 w-4 text-accent-soft" />
           <h2 className="text-sm font-semibold text-white">Competitor debrief</h2>
         </div>
-        <p className="mb-5 text-xs leading-relaxed text-zinc-400">
-          Paste a competitor&rsquo;s ads (e.g. from the Meta Ads Library) and get
-          a structured, directional read: recurring hooks, formats, offers, and
-          positioning. This never infers spend, conversions, or performance,
-          and it never fetches the Ads Library — it only interprets what you
-          paste.
-        </p>
+        {inputMode === "search" ? (
+          <p className="mb-5 text-xs leading-relaxed text-zinc-400">
+            Search for an advertiser, choose the exact Page, and fetch its
+            active ads from Meta&rsquo;s Ads Library — then get a structured,
+            directional read: recurring hooks, formats, offers, and
+            positioning. This never infers spend, conversions, or performance
+            — it only interprets the ad text of the ads you select.
+          </p>
+        ) : (
+          <p className="mb-5 text-xs leading-relaxed text-zinc-400">
+            Paste a competitor&rsquo;s ads (e.g. from the Meta Ads Library) and get
+            a structured, directional read: recurring hooks, formats, offers, and
+            positioning. This never infers spend, conversions, or performance,
+            and it never fetches the Ads Library — it only interprets what you
+            paste.
+          </p>
+        )}
 
         <div className="space-y-4">
           <div>
@@ -844,8 +898,9 @@ export function CompetitorDebriefPanel() {
               onChange={(e) => setCoreField("adsLibraryUrl")(e.target.value)}
             />
             <p className="mt-1 text-[11px] text-zinc-500">
-              Ads Library URLs are saved as references and are not fetched
-              automatically.
+              {inputMode === "search"
+                ? "Filled automatically from your selected Page — used as the report's source link."
+                : "Ads Library URLs are saved as references and are not fetched automatically."}
             </p>
           </div>
 
@@ -1092,29 +1147,32 @@ export function CompetitorDebriefPanel() {
                     match is on ad wording, not ownership. Pick the one that is
                     actually this competitor.
                   </p>
-                  <div className="space-y-1 pt-1">
-                    {pageCandidates.map((c) => {
-                      const isSelected = selectedPage?.pageId === c.pageId;
-                      return (
-                        <button
-                          key={c.pageId}
-                          type="button"
-                          aria-pressed={isSelected}
-                          onClick={() => handleSelectPage(c)}
-                          className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
-                            isSelected
-                              ? "border-accent/40 bg-accent/[0.08] text-white"
-                              : "border-white/10 bg-white/[0.02] text-zinc-300 hover:border-white/20"
-                          }`}
-                        >
-                          <span className="min-w-0 truncate font-medium">{c.pageName}</span>
-                          <span className="shrink-0 text-[10px] text-zinc-500">
-                            page_id {c.pageId} · {c.sampleAdCount} ad{c.sampleAdCount === 1 ? "" : "s"} in sample
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {/* Exact-name matches first; everything else is honestly
+                      labeled as found via ad text. Both groups stay fully
+                      visible and clickable — grouping is display order
+                      only, never hiding, never auto-selection. */}
+                  {candidateGroups.exactMatches.length > 0 ? (
+                    <div className="pt-1">
+                      <p className="mb-1 text-[11px] font-medium text-emerald-400">Exact Page match</p>
+                      <div className="space-y-1">
+                        {candidateGroups.exactMatches.map(renderPageCandidate)}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="pt-1 text-[11px] text-amber-300">
+                      No Page named &ldquo;{submittedQuery}&rdquo; was found in this result sample.
+                    </p>
+                  )}
+                  {candidateGroups.others.length > 0 && (
+                    <div className="pt-1">
+                      <p className="mb-1 text-[11px] font-medium text-zinc-500">
+                        Other Pages found from matching ad text
+                      </p>
+                      <div className="space-y-1">
+                        {candidateGroups.others.map(renderPageCandidate)}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
