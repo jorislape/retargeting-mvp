@@ -114,6 +114,68 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
   );
 }
 
+/* Decision-First V1: the one committed call, directly under the
+   masthead. Unnumbered on purpose — it sits above the numbered
+   sections the way the masthead does, so nothing below renumbers.
+   Same memo.decision in both views; only the register differs. The
+   confidence line is DERIVED here from memo.confidence (per spec —
+   deliberately not a schema field). Visual weight: the accent-rail
+   box the client "What this means" block already established as
+   "the important thing" — prominent, but under the masthead. */
+function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
+  const d = memo.decision;
+  const client = view === "client";
+  const avoid = client ? d.avoidNow.client : d.avoidNow.buyer;
+  const confidenceDetail = client
+    ? memo.confidence.clientWhy
+    : memo.confidence.reasons[0] ?? "";
+  return (
+    <section
+      aria-label="Next move"
+      className="print-avoid-break animate-rise mt-8 rounded-xl border border-accent/25 border-l-[3px] border-l-accent/70 bg-accent/[0.05] p-5 sm:p-6"
+    >
+      <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+        Next move
+      </p>
+      <p className="mt-3 max-w-3xl text-[17px] font-semibold leading-snug text-zinc-50 sm:text-[19px]">
+        {client ? d.clientHeadline : d.headline}
+      </p>
+      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-zinc-300">
+        {client ? d.clientRationale : d.rationale}
+      </p>
+      <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
+        <span
+          className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${CONFIDENCE_COLOR[memo.confidence.level]}`}
+        >
+          Confidence: {memo.confidence.level}
+        </span>
+        {confidenceDetail && <> — {confidenceDetail}</>}
+      </p>
+      {avoid.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            {client ? "What we're deliberately not doing yet" : "Not yet"}
+          </p>
+          <ul className="mt-1.5 space-y-1.5">
+            {avoid.map((bullet, i) => (
+              <li
+                key={i}
+                className="border-l border-amber-300/40 pl-3 text-[13px] leading-relaxed text-zinc-400"
+              >
+                {bullet}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="mt-4 border-t border-white/[0.08] pt-3 text-xs leading-relaxed text-zinc-400">
+        {client ? d.reassess.client : d.reassess.buyer}
+      </p>
+    </section>
+  );
+}
+
 function AdTable({
   rows,
   tone,
@@ -959,6 +1021,8 @@ export function Report({
           </div>
           )}
         </header>
+
+        <DecisionCard memo={memo} view={view} />
 
         {sections.executiveSummary && <ExecutiveSummary memo={memo} view={view} />}
 

@@ -1,3 +1,4 @@
+import { buildDecision, SCALE_TEST_MIN_DELTA_PCT } from "./decision";
 import {
   fmtCount,
   fmtDeltaVsMedian,
@@ -371,9 +372,11 @@ const directionFor = (tag: string | null | undefined): string[] =>
  * and the losers section; at most one scaling action appears here, and
  * only when the data strongly supports it (top winner ≥30% past the
  * median). The other slots are always angle/format iterations tied to
- * named ads and their numbers.
+ * named ads and their numbers. The 30% bar itself now lives in
+ * decision.ts (SCALE_TEST_MIN_DELTA_PCT, imported above) so the memo
+ * and the Next-move decision can never disagree about what earns a
+ * budget move.
  */
-const SCALE_TEST_MIN_DELTA_PCT = 30;
 
 function buildNextTests(analysis: AnalysisResult, context: DebriefContext): MemoTest[] {
   const {
@@ -1129,7 +1132,16 @@ function buildConfidence(
 export function generateMemo(analysis: AnalysisResult, context: DebriefContext): Memo {
   const { kpi, currency, median } = analysis;
 
+  // Built once: the list feeds both the memo's tests section and the
+  // Next-move decision (T1 recommends exactly nextTests[0]).
+  const nextTests = buildNextTests(analysis, context);
+
   return {
+    // Decision-First V1: purely additive — everything below this line
+    // is byte-identical to the pre-decision memo for the same input.
+    decision: buildDecision(analysis, nextTests[0]?.test ?? null, (v) =>
+      fmtMoney(v, currency)
+    ),
     scope: {
       product: context.product || "Your account",
       kpiLabel: KPI_LABELS[kpi],
@@ -1164,7 +1176,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     },
     patterns: buildPatterns(analysis),
     marketSignal: buildMarketSignal(analysis, context),
-    nextTests: buildNextTests(analysis, context),
+    nextTests,
     avoid: buildAvoid(analysis, context),
     confidence: buildConfidence(analysis, context.marketContext.trim() !== ""),
   };

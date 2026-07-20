@@ -2,6 +2,14 @@ export { parseCsv, toTable, parseNumericCell } from "./csv";
 export { resolveColumns, requiredColumnsFor } from "./columns";
 export { applyFormatOverrides, extractAds, extractNameTags } from "./extract";
 export { analyze, DEFAULT_SPEND_FLOOR } from "./analysis";
+export {
+  buildDecision,
+  CONCENTRATION_GUARDRAIL_PCT,
+  CUT_MIN_SPEND_SHARE_PCT,
+  DECISION_MIN_JUDGED,
+  FLAT_FIELD_DELTA_PCT,
+  SCALE_TEST_MIN_DELTA_PCT,
+} from "./decision";
 export { fmtMoney } from "./format";
 export { generateMemo } from "./memo";
 export {

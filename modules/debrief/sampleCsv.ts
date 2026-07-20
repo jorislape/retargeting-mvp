@@ -25,6 +25,14 @@ import type { DebriefContext } from "./types";
  *     engine takes.
  *   - Loser group carries a "static" name tag on ≥ half its ads (ROAS
  *     view), so the tentative name-signal hint fires.
+ *   - Decision-First V1 (pinned, asserted by scripts/decision.test.ts):
+ *     with SAMPLE_CONTEXT (ROAS) the Next-move decision is a BUDGET
+ *     shift — "UGC_MorningRoutine_V1" is +100% vs the median ROAS
+ *     (past the 30% scale bar) AND the 5 below-benchmark ads hold 35%
+ *     of judged spend, $1,150.65 (past the 25% cut bar), so both B1
+ *     branches fire and the card reads "Shift budget from … into
+ *     'UGC_MorningRoutine_V1'". Editing rows in a way that changes
+ *     this action/leader breaks that test on purpose.
  */
 
 export const SAMPLE_CSV_FILENAME =

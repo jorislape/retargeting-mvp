@@ -134,6 +134,11 @@ export interface AnalysisResult {
   adsJudged: number;
   adsSetAside: number;
   totalSpend: number;
+  /** Spend across judged ads only (totalSpend minus set-aside spend).
+   *  Added for Decision-First V1: cut-eligibility and concentration
+   *  shares are computed against spend that actually earned a verdict,
+   *  never against spend the gate excluded. */
+  judgedSpend: number;
   currency: string | null;
   dateRange: { start: string; end: string } | null;
   spendGate: number;
@@ -221,8 +226,43 @@ export interface MemoMarketSignal {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Decision-First V1: the "Next move" card                             */
+/* ------------------------------------------------------------------ */
+
+/** The single committed call at the top of the report. Three actions,
+ *  not five — budget movement is ONE decision with copy variants
+ *  (shift/scale/cut), not separate action types. Always present:
+ *  weak evidence yields an explicit `hold`, never a forced call.
+ *
+ *  Honesty contract (same as the rest of the memo): every number in
+ *  the copy traces to an AnalysisResult value; metrics-only claims —
+ *  the card never infers creative angles; the buyer and client
+ *  registers always describe the SAME recommendation; `reassess`
+ *  always contains a numeric trigger. */
+export interface MemoDecision {
+  action: "budget" | "test" | "hold";
+  /** Present only when action is "hold". */
+  holdReason?: "insufficient_data" | "flat_performance";
+  headline: string;
+  /** Jargon-free counterpart — no "kill/gate/benchmark/median/judged". */
+  clientHeadline: string;
+  rationale: string;
+  clientRationale: string;
+  /** Max 2 items per register. Includes the concentration guardrail
+   *  line (copy-only — it never changes the action) when the top
+   *  winner already holds ≥ CONCENTRATION_GUARDRAIL_PCT of judged
+   *  spend under a scale/shift recommendation. */
+  avoidNow: { buyer: string[]; client: string[] };
+  /** One sentence per register; always ends in a numeric trigger. */
+  reassess: { buyer: string; client: string };
+}
+
 export interface Memo {
   scope: MemoScope;
+  /** Decision-First V1: the committed "Next move" — purely additive;
+   *  no other memo field changed when this shipped. */
+  decision: MemoDecision;
   tldr: string[];
   /** Plain-language verdict for the client-facing view — same facts as
    *  tldr, none of the buyer shorthand. */

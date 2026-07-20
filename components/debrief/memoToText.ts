@@ -1,4 +1,8 @@
-import { Memo } from "@/modules/debrief";
+// Relative (not the "@/" alias) on purpose: scripts/decision.test.ts
+// compiles this file alongside modules/debrief with plain `tsc` (no
+// webpack path aliases) to test the serialized decision block against
+// the real engine. Type-only, so it changes nothing at runtime.
+import type { Memo } from "../../modules/debrief";
 
 export type ReportView = "buyer" | "client";
 
@@ -38,6 +42,26 @@ export function memoToText(
     `Ads analyzed: ${scope.adsAnalyzed} · Judged: ${scope.adsJudged} · Set aside: ${scope.adsSetAside}`
   );
   lines.push(`Total spend: ${scope.totalSpendLabel} · ${view === "client" ? "Typical" : "Median"} ${scope.kpiLabel}: ${scope.medianLabel}`);
+  lines.push("");
+
+  /* Decision-First V1: the committed call leads the text exactly as it
+     leads the rendered report — one block, active register only, and
+     never a duplicate of the winners/losers evidence below. */
+  const d = memo.decision;
+  lines.push("NEXT MOVE");
+  lines.push(view === "client" ? d.clientHeadline : d.headline);
+  lines.push(view === "client" ? d.clientRationale : d.rationale);
+  const confidenceDetail =
+    view === "client" ? memo.confidence.clientWhy : memo.confidence.reasons[0] ?? "";
+  lines.push(
+    `Confidence: ${memo.confidence.level}${confidenceDetail ? ` — ${confidenceDetail}` : ""}`
+  );
+  const decisionAvoid = view === "client" ? d.avoidNow.client : d.avoidNow.buyer;
+  if (decisionAvoid.length > 0) {
+    lines.push(view === "client" ? "What we're deliberately not doing yet:" : "Not yet:");
+    decisionAvoid.forEach((b) => lines.push(`- ${b}`));
+  }
+  lines.push(view === "client" ? d.reassess.client : d.reassess.buyer);
   lines.push("");
 
   lines.push(view === "client" ? "SUMMARY" : "THE CALL");

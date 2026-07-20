@@ -138,6 +138,7 @@ export function analyze(
     adsJudged: judged.length,
     adsSetAside: ads.length - judged.length,
     totalSpend: ads.reduce((sum, a) => sum + a.spend, 0),
+    judgedSpend: judged.reduce((sum, a) => sum + a.spend, 0),
     currency: columns.currency,
     dateRange: extractDateRange(rawRows, columns),
     spendGate,
