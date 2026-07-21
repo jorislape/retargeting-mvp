@@ -62,6 +62,25 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # feed pattern/test/brief wording only, never spend/KPI/gate/ranking;
                   # no overrides in → the same array back out, output byte-identical)
   analysis.ts     # spend gate, median benchmark, winners/losers, pattern hints
+  decision.ts     # Decision-First V1 — the "Next move" layer. buildDecision(analysis,
+                  # firstTestTitle, money) turns an AnalysisResult into ONE committed
+                  # call: four rules, first match wins (too few judged ads → hold; a
+                  # budget move in shift/scale/cut variants; a flat field → hold; else
+                  # run the top test). Pure — analysis computes, this file CHOOSES, and
+                  # it never reads name tags or creative notes, so a metrics-only run
+                  # stays metrics-only. Every threshold is a named exported constant
+                  # (DECISION_MIN_JUDGED, FLAT_FIELD_DELTA_PCT, CUT_MIN_SPEND_SHARE_PCT,
+                  # CONCENTRATION_GUARDRAIL_PCT) and the rationale copy always cites the
+                  # exact numbers and bars that decided — transparency is the feature.
+                  # SCALE_TEST_MIN_DELTA_PCT is DEFINED HERE (moved out of memo.ts,
+                  # which now imports it) so the memo's next-test wording and the
+                  # decision can never disagree about what earns a budget move. Weak
+                  # evidence yields an explicit hold, never a forced call; the
+                  # concentration guardrail is COPY ONLY — it may add an avoidNow line
+                  # but can never change the chosen action. Imports nothing from memo.ts
+                  # and takes a money formatter as an argument rather than importing
+                  # format.ts, which (with the deliberate ".ts" import extensions) is
+                  # what keeps it runnable under the plain-Node test runner
   memo.ts         # assembles the memo — templated, not an LLM call (see below)
   marketSignals.ts# ONE keyword map (formats/hooks/offers) shared by memo generation and
                   # the generator UI: extractMarketSignals, structureMarketNotes (the
@@ -372,9 +391,10 @@ components/debrief/
 - Routes stay thin; domain logic lives in `modules/`. Import from each module's `index.ts` only. The debrief engine never imports from `modules/meta` and never learns where a CSV came from.
 - `modules/competitor/guardedFetch.ts` is the ONE fetch pipeline shared by both network features — the one-time competitor-page fetch (`modules/competitor/server.ts`) and the monitoring beta's scheduled checks (`modules/monitoring/fetcher.ts`). SSRF validation (`ssrf.ts`) happens per redirect hop, and the resolved IPs are then pinned at the socket layer via a custom `node:http(s)` `lookup` (not undici — evaluated and rejected: not an installed/vendored dependency here) so a DNS answer that changes after validation can't redirect the connection. Changing timeout/redirect/size limits or the SSRF rules changes both features at once.
 - `modules/debrief/memo.ts`'s `generateMemo(analysis, context)` is deterministic template code, not an LLM call — documented as the seam for a future LLM-backed version (same `(AnalysisResult, DebriefContext)` in, same `Memo` shape out, so the route/UI wouldn't need to change). Do not add an actual AI call here unless explicitly asked; it's out of scope for this version.
+- The debrief pipeline is three separable steps: `analysis.ts` **computes** (gate, median, winners/losers), `decision.ts` **chooses** (one committed next move via `buildDecision`), `Report.tsx` **renders** (the "Next move" card directly under the masthead, unnumbered so nothing below renumbers). Keep those roles apart — `decision.ts` must stay free of memo imports and creative inference, and it is also the seam where a future hypothesis-evaluation layer would plug in. The decision carries both registers (`headline`/`clientHeadline`, `rationale`/`clientRationale`, `avoidNow.buyer`/`.client`, `reassess.buyer`/`.client`), so it follows the same view rules as the rest of the memo; its confidence line is derived in `Report.tsx` from `memo.confidence`, deliberately not a schema field.
 - The Buyer/Client report views are one memo, two renderings: `memo.ts` generates both registers (`tldr` + `clientSummary`, `killInstruction` + `clientInstruction`, `avoid.buyer` + `avoid.client`, `confidence.reasons` + `confidence.clientWhy`, `kpiExplainer`), and `Report.tsx`/`memoToText.ts` pick per view. Client copy must stay jargon-free — no "kill", "benchmark", or "spend gate"; client view shows top-3 performers only and never shows Patterns or creative briefs. Print/PDF and Copy follow the active view (and include briefs only while they're on screen).
 - Everything the memo asserts must trace to data: each next test carries `signals` (own numbers first, market notes suffixed "— directional", guardrails last) and a `brief` built from those same facts; "What not to do" bullets render only when their condition holds; confidence `reasons` derive from the exact conditions that set the level. Creative briefs contain structural direction only — never invented product claims, quotes, discounts, guarantees, or competitor facts.
-- Next-tests rule (`buildNextTests`): tests are creative/angle tests tied to named ads and numbers. A budget action may occupy at most the third slot, and only when the top winner beats the median by ≥30% (`SCALE_TEST_MIN_DELTA_PCT`). Market context may *reframe* a test (founder-led variant, problem-first hook, bundle offer variant in the non-scale T3 slot) but never adds a budget action or a competitor-performance claim. Budget movement otherwise lives in the verdict and losers section.
+- Next-tests rule (`buildNextTests`): tests are creative/angle tests tied to named ads and numbers. A budget action may occupy at most the third slot, and only when the top winner beats the median by ≥30% (`SCALE_TEST_MIN_DELTA_PCT`, defined in `decision.ts` and imported by `memo.ts`). Market context may *reframe* a test (founder-led variant, problem-first hook, bundle offer variant in the non-scale T3 slot) but never adds a budget action or a competitor-performance claim. Budget movement otherwise lives in the verdict and losers section.
 - `components/ui/theme.ts`, `icons.tsx`, `brand.tsx` are the shared design tokens (modern dark SaaS: carbon `#0b0c0f` canvas, soft translucent surfaces (`bg-white/[0.03]` + hairline borders), WHITE primary actions with dark text, icy-cyan accent (`bg-accent`/`text-accent-soft`) only for markers/selection/focus, emerald/red = win/loss only as plain colored text, amber only for warnings; Geist everywhere with Geist Mono reserved for numerals/data) — reuse them rather than inventing new visual patterns. Print CSS in `globals.css` flattens everything to ink-on-paper; keep `.print-hidden`/`.print-win`/`.print-loss` semantics intact. Motion is transform/opacity only and gated behind motion-safe / `useReducedMotion`; the marketing page loads motion via LazyMotion + the async `motionFeatures` chunk.
 
 ### Calculation rules (keep these honest — see `ARCHITECTURE.md` §5 for the full spec)

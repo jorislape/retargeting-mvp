@@ -78,6 +78,10 @@ modules/debrief/
                    # value from whichever columns are actually present
   analysis.ts      # the deterministic rules: spend gate, median
                    # benchmark, winners/losers, ad-name pattern hints
+  decision.ts      # the "Next move" layer: turns an AnalysisResult
+                   # into ONE committed call (buildDecision). Pure —
+                   # analysis computes, this chooses, the report
+                   # renders. See §5.
   format.ts        # money/count/KPI value formatting
   memo.ts          # assembles the 6-section memo from AnalysisResult —
                    # every sentence is templated from real numbers
@@ -119,6 +123,23 @@ components/debrief/
 - **Confidence level** (`high`/`medium`/`low`) and its notes are derived
   from how much data actually supported the read — see
   `buildConfidence` in `memo.ts`.
+- **Next move** (`buildDecision` in `decision.ts`) — the memo commits to
+  one call instead of offering a menu. The pipeline splits cleanly:
+  `analysis.ts` **computes**, `decision.ts` **chooses**, `Report.tsx`
+  **renders**. Four rules, first match wins:
+  1. fewer than `DECISION_MIN_JUDGED` (5) judged ads → an explicit hold;
+  2. a budget move — scale, cut, or shift — which requires clearing
+     `SCALE_TEST_MIN_DELTA_PCT` (30%, **defined in `decision.ts`** and
+     imported by `memo.ts` so the two can't disagree) and, for a cut,
+     `CUT_MIN_SPEND_SHARE_PCT` (25%) of judged spend;
+  3. every judged ad within `FLAT_FIELD_DELTA_PCT` (±15%) of the median
+     → a hold, because another change won't separate a flat field;
+  4. otherwise, run the top next test.
+  The honesty rules are the point: weak evidence yields a hold rather
+  than a forced call, the rationale always cites the exact numbers and
+  bars that decided, every reassess line ends in a numeric trigger, and
+  the concentration guardrail (`CONCENTRATION_GUARDRAIL_PCT`, 50%) is
+  copy-only — it can add a caution but can never change the action.
 
 ## 6. The AI seam (not built yet, on purpose)
 
