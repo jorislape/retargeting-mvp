@@ -119,11 +119,11 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
     const avgLoserSpend = losers.reduce((s, a) => s + a.spend, 0) / losers.length;
     if (avgWinnerSpend > avgLoserSpend * 1.2) {
       winnerNotes.push(
-        `Winners run higher spend on average (${fmtMoney(avgWinnerSpend, currency)} vs ${fmtMoney(avgLoserSpend, currency)}) — scale looks correlated with performance, not just noise.`
+        `Winners ran higher average spend (${fmtMoney(avgWinnerSpend, currency)} vs ${fmtMoney(avgLoserSpend, currency)}) — an observed association in this dataset, not a proven cause.`
       );
     } else if (avgLoserSpend > avgWinnerSpend * 1.2) {
       loserNotes.push(
-        `Losers actually spent more on average (${fmtMoney(avgLoserSpend, currency)} vs ${fmtMoney(avgWinnerSpend, currency)} for winners) — more budget isn't fixing weak creative here.`
+        `Losers ran higher average spend (${fmtMoney(avgLoserSpend, currency)} vs ${fmtMoney(avgWinnerSpend, currency)} for winners) — added budget did not coincide with better results here.`
       );
     }
   }
@@ -531,7 +531,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
               ? winnerTag.tag
               : top.nameTags[0]
         ),
-        keepConstant: `The angle, ${offerLabel} offer, audience, and placements of "${top.name}" — it earned its lead doing exactly this.`,
+        keepConstant: `The angle, ${offerLabel} offer, audience, and placements of "${top.name}" — the configuration it ran while it out-performed; the test isolates whether the angle is the reason.`,
         change: founderLed
           ? "Only the opening: one variant gets a new hook, the other gets the founder-led front."
           : "Only the opening 3 seconds / first frame — nothing else.",
@@ -1062,7 +1062,7 @@ function buildConfidence(
     );
     if (topPct != null && topPct >= 30) {
       reasons.push(
-        `The top winner is ${Math.round(topPct)}% past the median — a meaningful lead, not noise.`
+        `The top winner is ${Math.round(topPct)}% past the median — a clear observed lead within this dataset.`
       );
     }
     if (losers.length > 0 && belowBenchmarkSpend > 0) {
@@ -1100,7 +1100,7 @@ function buildConfidence(
     }
     if (topPct != null && topPct < 30) {
       reasons.push(
-        `The top winner is only ${Math.round(topPct)}% past the median — a lead, not a landslide.`
+        `The top winner is ${Math.round(topPct)}% past the median — an observed lead, though the gap is moderate.`
       );
     }
     clientWhy =
@@ -1139,8 +1139,16 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
   return {
     // Decision-First V1: purely additive — everything below this line
     // is byte-identical to the pre-decision memo for the same input.
-    decision: buildDecision(analysis, nextTests[0]?.test ?? null, (v) =>
-      fmtMoney(v, currency)
+    decision: buildDecision(
+      analysis,
+      nextTests[0]?.test ?? null,
+      (v) => fmtMoney(v, currency),
+      // Evidence-Explicit Decision V1: surface the first test's
+      // preserve/change on the card. Sourced from the already-built
+      // brief — no new computation. null when there is no next test.
+      nextTests[0]
+        ? { preserve: nextTests[0].brief.keepConstant, change: nextTests[0].brief.change }
+        : null
     ),
     scope: {
       product: context.product || "Your account",

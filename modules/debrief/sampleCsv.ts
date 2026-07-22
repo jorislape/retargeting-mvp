@@ -33,6 +33,13 @@ import type { DebriefContext } from "./types";
  *     branches fire and the card reads "Shift budget from … into
  *     'UGC_MorningRoutine_V1'". Editing rows in a way that changes
  *     this action/leader breaks that test on purpose.
+ *   - Evidence-Explicit Decision V1 (pinned): the same run is
+ *     evidenceState "supported" / evidenceShape "separation" — 11
+ *     judged ads (≥ the 10-ad bar), no missing required columns, a
+ *     non-flat field, and 5 winners / 5 losers (both ≥ 3). Evidence is
+ *     derived independently of the action; this is a supported budget
+ *     move, but a supported test or supported flat hold are equally
+ *     possible shapes on other data.
  */
 
 export const SAMPLE_CSV_FILENAME =

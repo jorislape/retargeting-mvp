@@ -54,6 +54,14 @@ export const CONCENTRATION_GUARDRAIL_PCT = 50;
  *  never disagree about what earns a budget move). */
 export const SCALE_TEST_MIN_DELTA_PCT = 30;
 
+/** Judged-ad count at or above which the evidenceState heuristic treats
+ *  THIS dataset as a fuller sample. This is a DETERMINISTIC PRODUCT
+ *  HEURISTIC, NOT a statistical-significance guarantee — it deliberately
+ *  mirrors the existing confidence high/medium boundary in memo.ts
+ *  (buildConfidence already treats < 10 judged ads as a reason to
+ *  soften). Evidence-Explicit Decision V1. */
+export const SUPPORTED_MIN_JUDGED = 10;
+
 /** Injected money formatter: (value) => "$1,234.56"-style label.
  *  memo.ts binds fmtMoney with the account currency; tests pass a
  *  simple stub. */
@@ -79,10 +87,130 @@ function stripTrailingPeriod(text: string): string {
   return text.trim().replace(/\.+$/, "");
 }
 
+/**
+ * Evidence-Explicit Decision V1 — how strongly THIS dataset supports its
+ * own conclusion, derived ONLY from evidence facts (median presence,
+ * judged count, group sizes, completeness, field flatness) and NEVER
+ * from the recommended action. Two "supported" shapes: a materially
+ * separated field with populated groups (supported separation), or a
+ * clearly flat field over a sufficient, complete sample (supported
+ * flatness). "No meaningful difference found" is a supported conclusion,
+ * NOT missing evidence — so flatness never requires winner/loser groups.
+ * Insufficient is reserved for the genuine inability to evaluate: no
+ * median, or fewer than DECISION_MIN_JUDGED judged ads. Group absence
+ * alone (every ad equal to the median) is a flat result, not
+ * insufficient data.
+ */
+export function deriveEvidenceState(
+  analysis: AnalysisResult,
+  flatField: boolean
+): "insufficient" | "limited" | "supported" {
+  const { median, adsJudged, winners, losers, missingColumns } = analysis;
+
+  if (median == null || adsJudged < DECISION_MIN_JUDGED) return "insufficient";
+
+  const enoughSample = adsJudged >= SUPPORTED_MIN_JUDGED;
+  const complete = missingColumns.length === 0;
+  if (enoughSample && complete) {
+    if (flatField) return "supported"; // supported flatness — no group requirement
+    if (winners.length >= 3 && losers.length >= 3) return "supported"; // supported separation
+  }
+  return "limited";
+}
+
+/** The evidence shape, independent of the action. Set whenever the field
+ *  could be evaluated (a median exists); undefined otherwise. */
+export function deriveEvidenceShape(
+  analysis: AnalysisResult,
+  flatField: boolean
+): "separation" | "flatness" | undefined {
+  if (analysis.median == null) return undefined;
+  return flatField ? "flatness" : "separation";
+}
+
+/**
+ * What this read CANNOT establish. One permanent dataset-only caveat (no
+ * causation, no future-performance guarantee, no control for unobserved
+ * differences) plus conditional lines drawn ONLY from facts already
+ * tracked in AnalysisResult. Two registers; the client register carries
+ * no buyer jargon (kill/gate/benchmark/median/judged).
+ */
+export function buildLimits(
+  analysis: AnalysisResult,
+  flatField: boolean
+): { buyer: string[]; client: string[] } {
+  const buyer: string[] = [];
+  const client: string[] = [];
+
+  // Permanent — true of every CSV read, by construction.
+  buyer.push(
+    "This reads one uploaded dataset: it shows what happened, not why. It can't establish that an ad's creative caused its result, doesn't guarantee future performance, and doesn't control for differences in audience, timing, budget, objective, or other conditions the export doesn't capture."
+  );
+  client.push(
+    "This is based only on the data in this file. It shows what happened, not why — and it can't account for differences in audience, timing, budget, or goals the export doesn't include, or promise the same result going forward."
+  );
+
+  if (analysis.adsSetAside > 0) {
+    buyer.push(
+      `${analysis.adsSetAside} ad${analysis.adsSetAside === 1 ? "" : "s"} had too little spend to judge and were set aside — no conclusion is drawn about them either way.`
+    );
+    client.push(
+      `${analysis.adsSetAside} ad${analysis.adsSetAside === 1 ? "" : "s"} didn't have enough spend to include yet, so they're not part of this read.`
+    );
+  }
+  if (!analysis.hasCreativeNotes && !analysis.hasNameSignal) {
+    buyer.push(
+      "No creative notes or clear ad-name pattern — this is a metrics-only read, so it can't say which creative attribute is behind any difference."
+    );
+    client.push(
+      "Without notes on the creative, this read is based on the numbers alone — it can't say which part of an ad made the difference."
+    );
+  }
+  if (analysis.missingColumns.includes("Ad name")) {
+    buyer.push(
+      "No ad-name column was found, so ads are labeled generically and name-based patterns can't be read."
+    );
+    client.push("The file didn't include ad names, so ads are shown generically.");
+  }
+  if (analysis.missingColumns.includes("Reporting date range")) {
+    buyer.push(
+      "No reporting date range in the export — all rows are treated as one period, so time-based shifts are invisible."
+    );
+    client.push("The file didn't include dates, so everything is treated as one period.");
+  }
+  if (flatField) {
+    buyer.push(
+      `No ad separated beyond the ±${FLAT_FIELD_DELTA_PCT}% band around the median — the field is effectively flat, so no ad can be called a clear winner or loser yet.`
+    );
+    client.push("The ads performed at a similar level — none pulled clearly ahead or behind yet.");
+  } else if (analysis.winners.length < 3 || analysis.losers.length < 3) {
+    buyer.push(
+      `Small comparison groups (${analysis.winners.length} clearly ahead, ${analysis.losers.length} clearly behind) — one ad can swing the read.`
+    );
+    client.push(
+      "Only a few ads landed clearly ahead or behind, so one ad can move the picture."
+    );
+  }
+  if (analysis.adsJudged < SUPPORTED_MIN_JUDGED) {
+    buyer.push(
+      `Only ${analysis.adsJudged} ad${analysis.adsJudged === 1 ? "" : "s"} cleared the spend gate — under the ${SUPPORTED_MIN_JUDGED}-ad bar this read treats as a fuller sample, so more spend could still shift the pattern.`
+    );
+    client.push(
+      `Fewer than ${SUPPORTED_MIN_JUDGED} ads had enough spend to compare, so more spend could still change the picture.`
+    );
+  }
+
+  return { buyer, client };
+}
+
 export function buildDecision(
   analysis: AnalysisResult,
   firstTestTitle: string | null,
-  money: MoneyFormatter
+  money: MoneyFormatter,
+  /** Facts from the first next test (nextTests[0].brief), used only to
+   *  surface nextControlledTest on the card. Optional so the pure rule
+   *  tests can call buildDecision without threading a test through. */
+  nextTestFacts?: { preserve: string; change: string } | null
 ): MemoDecision {
   const kpiLabel = KPI_LABELS[analysis.kpi];
   const gateLabel = money(analysis.spendGate);
@@ -108,7 +236,41 @@ export function buildDecision(
       ? (top.spend / analysis.judgedSpend) * 100
       : 0;
 
+  /* ---- flat-field fact (hoisted above the rule branches so every
+     return path can label the evidence; B1 and H2 are mutually
+     exclusive — a ±15% extreme can never clear the 30%/25% budget bars
+     — so hoisting does not change which branch returns). Checkable from
+     the extremes: winners/losers are sorted best-/worst-first, so if
+     BOTH extremes sit within the band, every judged ad does; an empty
+     pool side is trivially within it, and a null deltaPct (zero median)
+     disqualifies the rule rather than guessing. ---- */
+  const topWithin =
+    top == null || (top.deltaPct != null && top.deltaPct <= FLAT_FIELD_DELTA_PCT);
+  const worstWithin =
+    worst == null ||
+    (worst.deltaPct != null && Math.abs(worst.deltaPct) <= FLAT_FIELD_DELTA_PCT);
+  const flatField =
+    topWithin && worstWithin && (top?.deltaPct != null || worst?.deltaPct != null || analysis.median != null);
+
+  /* ---- Evidence-Explicit Decision V1: evidence strength, shape, and
+     limits — a SEPARATE dimension from the action below. Computed once
+     and spread into every return, so the action rules are untouched. ---- */
+  const evidenceState = deriveEvidenceState(analysis, flatField);
+  const evidenceShape = deriveEvidenceShape(analysis, flatField);
+  const limits = buildLimits(analysis, flatField);
+  const nextControlledTest = nextTestFacts
+    ? { preserve: nextTestFacts.preserve, change: nextTestFacts.change, watch: kpiLabel }
+    : undefined;
+  const evidence: Pick<MemoDecision, "evidenceState" | "limits"> &
+    Partial<Pick<MemoDecision, "evidenceShape" | "nextControlledTest">> = {
+    evidenceState,
+    limits,
+  };
+  if (evidenceShape) evidence.evidenceShape = evidenceShape;
+  if (nextControlledTest) evidence.nextControlledTest = nextControlledTest;
+
   const insufficientHold = (): MemoDecision => ({
+    ...evidence,
     action: "hold",
     holdReason: "insufficient_data",
     headline: `Hold — ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads cleared the ${gateLabel} spend gate; this call needs ${DECISION_MIN_JUDGED}.`,
@@ -156,6 +318,7 @@ export function buildDecision(
       avoidBuyer.push("Don't pair this with a new creative test — one variable at a time.");
       avoidClient.push("We're making this one change on its own so results stay readable.");
       return {
+        ...evidence,
         action: "budget",
         headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
         clientHeadline: `Move budget from the weakest ads into "${top!.name}", the clear leader.`,
@@ -170,6 +333,7 @@ export function buildDecision(
       avoidBuyer.push("No new creative test alongside the scale — one variable at a time.");
       avoidClient.push("We're making this one change on its own so results stay readable.");
       return {
+        ...evidence,
         action: "budget",
         headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% past the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,
@@ -184,6 +348,7 @@ export function buildDecision(
     avoidBuyer.push("Don't move the freed budget into a new test yet — park it behind current ads.");
     avoidClient.push("We're not starting anything new with the freed budget yet.");
     return {
+      ...evidence,
       action: "budget",
       headline: `Cut ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
@@ -194,20 +359,11 @@ export function buildDecision(
     };
   }
 
-  /* ---- H2: flat field (checkable from the extremes: winners/losers
-     are sorted best-/worst-first, so if BOTH extremes sit within the
-     band, every judged ad does; an empty pool side is trivially
-     within it, and a null deltaPct — zero median — disqualifies the
-     rule rather than guessing) ---- */
-  const topWithin =
-    top == null || (top.deltaPct != null && top.deltaPct <= FLAT_FIELD_DELTA_PCT);
-  const worstWithin =
-    worst == null ||
-    (worst.deltaPct != null && Math.abs(worst.deltaPct) <= FLAT_FIELD_DELTA_PCT);
-  const flatField =
-    topWithin && worstWithin && (top?.deltaPct != null || worst?.deltaPct != null || analysis.median != null);
+  /* ---- H2: flat field (flatField computed above, once, for both this
+     rule and the evidence label) ---- */
   if (flatField) {
     return {
+      ...evidence,
       action: "hold",
       holdReason: "flat_performance",
       headline: `Hold — every judged ad is within ${FLAT_FIELD_DELTA_PCT}% of the median. Another change won't separate a flat field.`,
@@ -231,6 +387,7 @@ export function buildDecision(
   if (firstTestTitle != null && firstTestTitle.trim() !== "") {
     const testTitle = stripTrailingPeriod(firstTestTitle);
     return {
+      ...evidence,
       action: "test",
       headline: `Run one test: ${testTitle}. Nothing has earned a budget move yet.`,
       clientHeadline: `Run one focused test next: ${testTitle}.`,
@@ -239,7 +396,7 @@ export function buildDecision(
         "No single ad is far enough ahead or behind to justify moving budget yet — the fastest path to a clear winner is one focused test.",
       avoidNow: {
         buyer: [`No budget moves yet — nothing has cleared the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`],
-        client: ["We're not moving budget yet — no ad has earned it."],
+        client: ["We're not moving budget yet — no ad has separated enough yet."],
       },
       reassess: {
         buyer: `Reassess when the test clears the ${gateLabel} spend gate — then judge it against the median.`,

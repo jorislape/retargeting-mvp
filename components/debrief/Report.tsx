@@ -122,6 +122,15 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
    deliberately not a schema field). Visual weight: the accent-rail
    box the client "What this means" block already established as
    "the important thing" — prominent, but under the masthead. */
+const EVIDENCE_COPY: Record<
+  Memo["decision"]["evidenceState"],
+  { label: string; className: string }
+> = {
+  supported: { label: "Supported by this dataset", className: "text-emerald-400" },
+  limited: { label: "Limited evidence", className: "text-amber-300" },
+  insufficient: { label: "Not enough evidence yet", className: "text-red-400" },
+};
+
 function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
   const d = memo.decision;
   const client = view === "client";
@@ -129,15 +138,30 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
   const confidenceDetail = client
     ? memo.confidence.clientWhy
     : memo.confidence.reasons[0] ?? "";
+  const evidence = EVIDENCE_COPY[d.evidenceState];
+  const limits = client ? d.limits.client : d.limits.buyer;
+  // nextControlledTest is a single register; clientize defensively in
+  // the client view so a future test string can't leak buyer jargon.
+  const cz = (text: string) => (client ? clientizeText(text) : text);
   return (
     <section
       aria-label="Next move"
       className="print-avoid-break animate-rise mt-8 rounded-xl border border-accent/25 border-l-[3px] border-l-accent/70 bg-accent/[0.05] p-5 sm:p-6"
     >
-      <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
-        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
-        Next move
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+          Next move
+        </p>
+        <p
+          className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${evidence.className}`}
+        >
+          Evidence: {evidence.label}
+          {d.evidenceShape && (
+            <span className="text-zinc-500"> · {d.evidenceShape}</span>
+          )}
+        </p>
+      </div>
       <p className="mt-3 max-w-3xl text-[17px] font-semibold leading-snug text-zinc-50 sm:text-[19px]">
         {client ? d.clientHeadline : d.headline}
       </p>
@@ -169,9 +193,47 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
           </ul>
         </div>
       )}
+      {d.nextControlledTest && (
+        <div className="mt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            Next controlled test
+          </p>
+          <dl className="mt-1.5 space-y-1 text-[13px] leading-relaxed text-zinc-300">
+            <div className="flex gap-2">
+              <dt className="shrink-0 font-medium text-zinc-500">Preserve</dt>
+              <dd>{cz(d.nextControlledTest.preserve)}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="shrink-0 font-medium text-zinc-500">Change</dt>
+              <dd>{cz(d.nextControlledTest.change)}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="shrink-0 font-medium text-zinc-500">Watch</dt>
+              <dd>{cz(d.nextControlledTest.watch)}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
       <p className="mt-4 border-t border-white/[0.08] pt-3 text-xs leading-relaxed text-zinc-400">
         {client ? d.reassess.client : d.reassess.buyer}
       </p>
+      {limits.length > 0 && (
+        <div className="mt-4 border-t border-white/[0.08] pt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            {client ? "What we can't conclude yet" : "What this can't establish"}
+          </p>
+          <ul className="mt-1.5 space-y-1.5">
+            {limits.map((line, i) => (
+              <li
+                key={i}
+                className="border-l border-white/[0.08] pl-3 text-[12px] leading-relaxed text-zinc-500"
+              >
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

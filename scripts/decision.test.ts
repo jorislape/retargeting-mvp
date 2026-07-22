@@ -25,11 +25,15 @@ import { join } from "node:path";
 const require = createRequire(import.meta.url);
 import {
   buildDecision,
+  buildLimits,
   CONCENTRATION_GUARDRAIL_PCT,
   CUT_MIN_SPEND_SHARE_PCT,
   DECISION_MIN_JUDGED,
+  deriveEvidenceShape,
+  deriveEvidenceState,
   FLAT_FIELD_DELTA_PCT,
   SCALE_TEST_MIN_DELTA_PCT,
+  SUPPORTED_MIN_JUDGED,
 } from "../modules/debrief/decision.ts";
 import type { AnalysisResult, MemoDecision, RankedAd } from "../modules/debrief/types.ts";
 
@@ -45,6 +49,13 @@ function ad(name: string, spend: number, deltaPct: number | null): RankedAd {
     deltaFromMedian: deltaPct ?? 0,
     deltaPct,
   };
+}
+
+/** N ranked ads at a fixed delta — for group-size fixtures where only
+ *  the count (and, in buildDecision integration, the extreme delta)
+ *  matters. */
+function ads(n: number, deltaPct: number): RankedAd[] {
+  return Array.from({ length: n }, (_, i) => ad(`A${i}`, 100, deltaPct));
 }
 
 function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
@@ -89,6 +100,21 @@ function assertContract(d: MemoDecision, label: string) {
   }
   // hold ⇔ holdReason.
   assert.equal(d.holdReason !== undefined, d.action === "hold", `${label}: holdReason iff hold`);
+
+  // Evidence-Explicit Decision V1: evidence fields present on every
+  // decision, and the client register of limits stays jargon-free.
+  assert.ok(
+    ["insufficient", "limited", "supported"].includes(d.evidenceState),
+    `${label}: valid evidenceState (got: ${d.evidenceState})`
+  );
+  assert.ok(
+    d.limits.buyer.length > 0 && d.limits.client.length > 0,
+    `${label}: limits populated in both registers`
+  );
+  const clientLimits = d.limits.client.join(" ").toLowerCase();
+  for (const word of banned) {
+    assert.ok(!clientLimits.includes(word), `${label}: client limits must not contain "${word}"`);
+  }
 }
 
 /* ===================== H1: minimum judged ads ===================== */
@@ -255,6 +281,238 @@ function assertContract(d: MemoDecision, label: string) {
   assertContract(d, "null-median");
 }
 
+/* ============ Evidence-Explicit Decision V1: state derivation ============ */
+
+/* deriveEvidenceState in isolation — flatField passed explicitly, so
+   only the evidence facts (median, judged count, groups, completeness,
+   flatness) decide. */
+{
+  // Insufficient = genuine inability to evaluate.
+  assert.equal(deriveEvidenceState(fixture({ median: null }), false), "insufficient", "null median");
+  assert.equal(deriveEvidenceState(fixture({ adsJudged: 4 }), false), "insufficient", "under 5 judged");
+  // Group absence alone is NOT insufficient — that's a flat result.
+  assert.equal(
+    deriveEvidenceState(fixture({ adsJudged: 12, winners: [], losers: [] }), true),
+    "supported",
+    "0/0 with 12 judged + flat = supported flatness, not insufficient"
+  );
+  // Supported separation.
+  assert.equal(
+    deriveEvidenceState(fixture({ adsJudged: 12, winners: ads(3, 22), losers: ads(3, -22) }), false),
+    "supported"
+  );
+  // Supported flatness needs no groups.
+  assert.equal(deriveEvidenceState(fixture({ adsJudged: 10, winners: [], losers: [] }), true), "supported");
+  // Completeness gates supported.
+  assert.equal(
+    deriveEvidenceState(fixture({ adsJudged: 12, missingColumns: ["Ad name"] }), true),
+    "limited",
+    "missing column blocks supported flatness"
+  );
+  // Sample-size boundary: 9 vs 10.
+  assert.equal(
+    deriveEvidenceState(fixture({ adsJudged: 9, winners: ads(3, 22), losers: ads(3, -22) }), false),
+    "limited"
+  );
+  assert.equal(
+    deriveEvidenceState(fixture({ adsJudged: 10, winners: ads(3, 22), losers: ads(3, -22) }), false),
+    "supported"
+  );
+  // Group-balance boundary: 2 vs 3 (separation shape).
+  assert.equal(
+    deriveEvidenceState(fixture({ adsJudged: 12, winners: ads(2, 22), losers: ads(3, -22) }), false),
+    "limited"
+  );
+  assert.equal(
+    deriveEvidenceState(fixture({ adsJudged: 12, winners: ads(3, 22), losers: ads(3, -22) }), false),
+    "supported"
+  );
+
+  // Shape — set only when a median exists; independent of action.
+  assert.equal(deriveEvidenceShape(fixture({ median: null }), false), undefined, "no median → no shape");
+  assert.equal(deriveEvidenceShape(fixture({}), true), "flatness");
+  assert.equal(deriveEvidenceShape(fixture({}), false), "separation");
+  assert.equal(SUPPORTED_MIN_JUDGED, 10, "documented heuristic bar");
+
+  // Limits — permanent dataset-only line always present; client register clean.
+  const lim = buildLimits(fixture({ adsSetAside: 2 }), false);
+  assert.ok(lim.buyer.length >= 1 && lim.client.length >= 1, "limits both registers");
+  assert.ok(lim.buyer[0].includes("not why") && lim.buyer[0].includes("doesn't guarantee future"), "permanent buyer caveat");
+  assert.ok(lim.client[0].includes("audience") && lim.client[0].includes("budget"), "permanent client caveat names uncontrolled dimensions");
+  for (const word of ["kill", "gate", "benchmark", "median", "judged"]) {
+    assert.ok(!lim.client.join(" ").toLowerCase().includes(word), `client limits clean of "${word}"`);
+  }
+}
+
+/* action ⟂ evidenceState — the seven canonical cases, proving the two
+   dimensions are independent (a test can be supported, a budget can be
+   limited, a hold can be supported / limited / insufficient). */
+{
+  const separationWin = [ad("W1", 200, 22), ad("W2", 180, 20), ad("W3", 160, 18)];
+  const separationLose = [ad("L1", 120, -18), ad("L2", 110, -17), ad("L3", 100, -16)];
+
+  // supported budget (shift): both bars clear, 12 judged, groups ≥3.
+  const supportedBudget = buildDecision(
+    fixture({
+      adsJudged: 12,
+      winners: [ad("W1", 300, 45), ...ads(3, 32)],
+      losers: [ad("L1", 200, -40), ...ads(3, -33)],
+      judgedSpend: 1000,
+      belowBenchmarkSpend: 570,
+      belowBenchmarkCount: 4,
+    }),
+    "T",
+    money
+  );
+  assert.equal(supportedBudget.action, "budget");
+  assert.equal(supportedBudget.evidenceState, "supported");
+  assert.equal(supportedBudget.evidenceShape, "separation");
+  assertContract(supportedBudget, "supported-budget");
+
+  // limited budget: scale fires (+32%), but only 6 judged.
+  const limitedBudget = buildDecision(
+    fixture({
+      adsJudged: 6,
+      winners: [ad("W", 300, 32)],
+      losers: [ad("L", 100, -10)],
+      judgedSpend: 1000,
+      belowBenchmarkSpend: 100,
+      belowBenchmarkCount: 1,
+    }),
+    "T",
+    money
+  );
+  assert.equal(limitedBudget.action, "budget");
+  assert.equal(limitedBudget.evidenceState, "limited");
+  assertContract(limitedBudget, "limited-budget");
+
+  // supported test: moderate separation, 14 judged, groups ≥3.
+  const supportedTest = buildDecision(
+    fixture({ adsJudged: 14, winners: separationWin, losers: separationLose }),
+    "Test problem-first hooks.",
+    money
+  );
+  assert.equal(supportedTest.action, "test");
+  assert.equal(supportedTest.evidenceState, "supported");
+  assert.equal(supportedTest.evidenceShape, "separation");
+  assertContract(supportedTest, "supported-test");
+
+  // limited test: same shape, only 8 judged.
+  const limitedTest = buildDecision(
+    fixture({ adsJudged: 8, winners: [ad("W", 200, 18)], losers: [ad("L", 150, -18)] }),
+    "Test problem-first hooks.",
+    money
+  );
+  assert.equal(limitedTest.action, "test");
+  assert.equal(limitedTest.evidenceState, "limited");
+  assertContract(limitedTest, "limited-test");
+
+  // supported hold: clearly flat over a sufficient, complete sample.
+  const supportedHold = buildDecision(
+    fixture({ adsJudged: 12, winners: [ad("W", 200, 10)], losers: [ad("L", 200, -10)] }),
+    "T",
+    money
+  );
+  assert.equal(supportedHold.action, "hold");
+  assert.equal(supportedHold.holdReason, "flat_performance");
+  assert.equal(supportedHold.evidenceState, "supported");
+  assert.equal(supportedHold.evidenceShape, "flatness");
+  assertContract(supportedHold, "supported-hold");
+
+  // limited hold: flat but under 10 judged.
+  const limitedHold = buildDecision(
+    fixture({ adsJudged: 7, winners: [ad("W", 200, 10)], losers: [ad("L", 200, -10)] }),
+    "T",
+    money
+  );
+  assert.equal(limitedHold.action, "hold");
+  assert.equal(limitedHold.holdReason, "flat_performance");
+  assert.equal(limitedHold.evidenceState, "limited");
+  assertContract(limitedHold, "limited-hold");
+
+  // insufficient hold: under 5 judged.
+  const insufficientHold = buildDecision(
+    fixture({ adsJudged: 4, winners: [ad("W", 200, 10)], losers: [ad("L", 200, -10)] }),
+    "T",
+    money
+  );
+  assert.equal(insufficientHold.action, "hold");
+  assert.equal(insufficientHold.holdReason, "insufficient_data");
+  assert.equal(insufficientHold.evidenceState, "insufficient");
+  assertContract(insufficientHold, "insufficient-hold");
+}
+
+/* Zero winners/losers (every ad equals the median) — a flat RESULT, not
+   missing data. Judged count alone moves it across the tiers; it is
+   never insufficient unless the count itself is too low. */
+{
+  const allEqual12 = buildDecision(fixture({ adsJudged: 12, winners: [], losers: [] }), "T", money);
+  assert.equal(allEqual12.action, "hold");
+  assert.equal(allEqual12.holdReason, "flat_performance");
+  assert.equal(allEqual12.evidenceState, "supported", "0/0 + 12 judged = supported flatness");
+  assert.equal(allEqual12.evidenceShape, "flatness");
+
+  const allEqual7 = buildDecision(fixture({ adsJudged: 7, winners: [], losers: [] }), "T", money);
+  assert.equal(allEqual7.evidenceState, "limited", "0/0 + 7 judged = limited, still not insufficient");
+
+  const allEqual4 = buildDecision(fixture({ adsJudged: 4, winners: [], losers: [] }), "T", money);
+  assert.equal(allEqual4.evidenceState, "insufficient", "0/0 + 4 judged = genuinely insufficient");
+}
+
+/* Boundaries where evidenceState flips but the ACTION does not. */
+{
+  const base = {
+    winners: [ad("W1", 200, 22), ad("W2", 180, 20), ad("W3", 160, 18)],
+    losers: [ad("L1", 120, -18), ad("L2", 110, -17), ad("L3", 100, -16)],
+  };
+  // 9 vs 10 judged.
+  const at9 = buildDecision(fixture({ ...base, adsJudged: 9 }), "T", money);
+  const at10 = buildDecision(fixture({ ...base, adsJudged: 10 }), "T", money);
+  assert.equal(at9.evidenceState, "limited");
+  assert.equal(at10.evidenceState, "supported");
+  assert.equal(at9.action, at10.action, "9↔10 judged: action unchanged");
+
+  // 2 vs 3 winners (group balance).
+  const g2 = buildDecision(fixture({ ...base, adsJudged: 12, winners: base.winners.slice(0, 2) }), "T", money);
+  const g3 = buildDecision(fixture({ ...base, adsJudged: 12 }), "T", money);
+  assert.equal(g2.evidenceState, "limited");
+  assert.equal(g3.evidenceState, "supported");
+  assert.equal(g2.action, g3.action, "2↔3 winners: action unchanged");
+
+  // Missing column: supported → limited.
+  const complete = buildDecision(fixture({ ...base, adsJudged: 12 }), "T", money);
+  const missing = buildDecision(fixture({ ...base, adsJudged: 12, missingColumns: ["Reporting date range"] }), "T", money);
+  assert.equal(complete.evidenceState, "supported");
+  assert.equal(missing.evidenceState, "limited");
+  assert.equal(complete.action, missing.action, "missing column: action unchanged");
+}
+
+/* Additivity invariance: the new nextTestFacts argument never changes any
+   pre-existing decision output — only populates nextControlledTest. */
+{
+  const shape = fixture({
+    adsJudged: 12,
+    winners: [ad("W1", 200, 22), ad("W2", 180, 20), ad("W3", 160, 18)],
+    losers: [ad("L1", 120, -18), ad("L2", 110, -17), ad("L3", 100, -16)],
+  });
+  const noFacts = buildDecision(shape, "Some test.", money);
+  const withFacts = buildDecision(shape, "Some test.", money, { preserve: "P", change: "C" });
+  for (const k of ["action", "holdReason", "headline", "clientHeadline", "rationale", "clientRationale"] as const) {
+    assert.deepEqual(noFacts[k], withFacts[k], `nextTestFacts must not change ${k}`);
+  }
+  assert.deepEqual(noFacts.avoidNow, withFacts.avoidNow, "nextTestFacts must not change avoidNow");
+  assert.deepEqual(noFacts.reassess, withFacts.reassess, "nextTestFacts must not change reassess");
+  assert.deepEqual(noFacts.limits, withFacts.limits, "nextTestFacts must not change limits");
+  assert.equal(noFacts.nextControlledTest, undefined, "no facts → no controlled test");
+  assert.ok(
+    withFacts.nextControlledTest &&
+      withFacts.nextControlledTest.preserve === "P" &&
+      withFacts.nextControlledTest.change === "C",
+    "facts → controlled test populated from the first test"
+  );
+  assert.equal(withFacts.nextControlledTest!.watch, "ROAS", "watch = active KPI label");
+}
+
 console.log("decision (stage 1 — rules): all assertions passed");
 
 /* ===================== Stage 2: sample-dataset pin via the real engine ===================== */
@@ -285,6 +543,21 @@ console.log("decision (stage 1 — rules): all assertions passed");
     assert.ok(memo.decision.reassess.buyer.includes("$120.91"), "documented spend gate in the reassess trigger");
     assertContract(memo.decision, "sample");
 
+    // Evidence-Explicit Decision V1 — pinned evidence read on the sample:
+    // supported by the dataset, materially separated, controlled test and
+    // limits both surfaced. Action stays the documented budget shift.
+    assert.equal(memo.decision.evidenceState, "supported", "sample is supported by the dataset");
+    assert.equal(memo.decision.evidenceShape, "separation", "sample field is materially separated");
+    assert.ok(memo.decision.nextControlledTest, "sample surfaces a controlled next test");
+    assert.ok(
+      memo.decision.limits.buyer.length >= 1 && memo.decision.limits.client.length >= 1,
+      "sample carries limits in both registers"
+    );
+    assert.ok(
+      memo.decision.limits.buyer.some((l: string) => l.includes("doesn't guarantee future")),
+      "sample limits include the permanent causation/guarantee caveat"
+    );
+
     // Structural additivity: decision aside, the memo's shape is unchanged.
     const keys = Object.keys(memo);
     assert.deepEqual(
@@ -304,6 +577,15 @@ console.log("decision (stage 1 — rules): all assertions passed");
     }
     assert.ok(buyerText.includes(memo.decision.headline), "buyer text carries the buyer headline");
     assert.ok(buyerText.includes(memo.decision.reassess.buyer), "buyer text carries the buyer reassess line");
+
+    // Evidence-Explicit Decision V1 in the serialized output.
+    assert.ok(
+      buyerText.includes(`Evidence: ${memo.decision.evidenceState}`),
+      "buyer text leads the NEXT MOVE block with evidence state"
+    );
+    assert.ok(buyerText.includes("Next controlled test:"), "buyer text surfaces the controlled test");
+    assert.ok(buyerText.includes("WHAT THIS CAN'T ESTABLISH"), "buyer text has the limits block");
+    assert.ok(clientText.includes("WHAT WE CAN'T CONCLUDE YET"), "client text has the limits block");
     assert.ok(clientText.includes(memo.decision.clientHeadline), "client text carries the client headline");
     assert.ok(!clientText.includes(memo.decision.headline), "client text never carries the buyer headline");
     assert.ok(!buyerText.includes(memo.decision.clientHeadline), "buyer text never carries the client headline");

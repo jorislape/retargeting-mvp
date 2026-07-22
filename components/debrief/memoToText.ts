@@ -49,6 +49,12 @@ export function memoToText(
      never a duplicate of the winners/losers evidence below. */
   const d = memo.decision;
   lines.push("NEXT MOVE");
+  // Evidence-Explicit Decision V1: evidence strength/shape lead the
+  // block — a separate dimension from the action, honest about how far
+  // the dataset actually supports the call.
+  lines.push(
+    `Evidence: ${d.evidenceState}${d.evidenceShape ? ` (${d.evidenceShape})` : ""}`
+  );
   lines.push(view === "client" ? d.clientHeadline : d.headline);
   lines.push(view === "client" ? d.clientRationale : d.rationale);
   const confidenceDetail =
@@ -61,8 +67,24 @@ export function memoToText(
     lines.push(view === "client" ? "What we're deliberately not doing yet:" : "Not yet:");
     decisionAvoid.forEach((b) => lines.push(`- ${b}`));
   }
+  // The single controlled next test (preserve / change / watch); the
+  // numeric reassessment trigger stays on its own line below.
+  if (d.nextControlledTest) {
+    lines.push("Next controlled test:");
+    lines.push(`- Preserve: ${c(d.nextControlledTest.preserve)}`);
+    lines.push(`- Change: ${c(d.nextControlledTest.change)}`);
+    lines.push(`- Watch: ${c(d.nextControlledTest.watch)}`);
+  }
   lines.push(view === "client" ? d.reassess.client : d.reassess.buyer);
   lines.push("");
+
+  // What this read cannot establish — its own block, active register.
+  const limits = view === "client" ? d.limits.client : d.limits.buyer;
+  if (limits.length > 0) {
+    lines.push(view === "client" ? "WHAT WE CAN'T CONCLUDE YET" : "WHAT THIS CAN'T ESTABLISH");
+    limits.forEach((l) => lines.push(`- ${l}`));
+    lines.push("");
+  }
 
   lines.push(view === "client" ? "SUMMARY" : "THE CALL");
   (view === "client" ? memo.clientSummary : memo.tldr).forEach((line) =>

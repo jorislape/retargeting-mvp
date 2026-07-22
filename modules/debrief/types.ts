@@ -256,6 +256,33 @@ export interface MemoDecision {
   avoidNow: { buyer: string[]; client: string[] };
   /** One sentence per register; always ends in a numeric trigger. */
   reassess: { buyer: string; client: string };
+
+  /* ---------------------------------------------------------------- */
+  /* Evidence-Explicit Decision V1 (additive). Evidence strength and    */
+  /* its limits are a SEPARATE dimension from `action`: a controlled     */
+  /* test can be supported, a budget move can be limited, and a hold can */
+  /* be supported when the field is clearly flat. All four fields below  */
+  /* derive ONLY from AnalysisResult facts, never from `action`.         */
+  /* See modules/debrief/decision.ts.                                    */
+  /* ---------------------------------------------------------------- */
+  /** How strongly THIS uploaded dataset supports its own conclusion —
+   *  "supported by the currently available campaign dataset", never
+   *  causally proven, externally validated, or a fair experiment. */
+  evidenceState: "insufficient" | "limited" | "supported";
+  /** The shape of the evidence, independent of the action: a materially
+   *  separated field vs a clearly flat one. Set whenever a median exists
+   *  (i.e. the field could be evaluated); undefined when it can't. */
+  evidenceShape?: "separation" | "flatness";
+  /** What this read cannot establish: one permanent dataset-only caveat
+   *  (no causation, no future-performance guarantee, no control for
+   *  unobserved differences) plus conditional lines from already-tracked
+   *  facts. Two registers, like the rest of the memo. */
+  limits: { buyer: string[]; client: string[] };
+  /** The single controlled next test surfaced on the card: what to hold
+   *  constant, the one variable to change, and which metric to watch.
+   *  Sourced from the first next test; the numeric reassessment trigger
+   *  stays separate (`reassess`). Absent when no next test exists. */
+  nextControlledTest?: { preserve: string; change: string; watch: string };
 }
 
 export interface Memo {
