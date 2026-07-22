@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/icons";
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
-import { clientizeText, memoToText, type ReportView } from "./memoToText";
+import { clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { computePerformanceSectionNumbers } from "@/components/report/reportNumbering";
 import { PERFORMANCE_CLIENT_MODE_HIDDEN, PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/report/reportSections";
 import { accentCssVars, getAccentById } from "@/components/report/reportCustomization";
@@ -114,31 +114,40 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
   );
 }
 
-/* Decision-First V1: the one committed call, directly under the
-   masthead. Unnumbered on purpose — it sits above the numbered
-   sections the way the masthead does, so nothing below renumbers.
-   Same memo.decision in both views; only the register differs. The
-   confidence line is DERIVED here from memo.confidence (per spec —
-   deliberately not a schema field). Visual weight: the accent-rail
-   box the client "What this means" block already established as
-   "the important thing" — prominent, but under the masthead. */
-const EVIDENCE_COPY: Record<
-  Memo["decision"]["evidenceState"],
-  { label: string; className: string }
-> = {
-  supported: { label: "Supported by this dataset", className: "text-emerald-400" },
-  limited: { label: "Limited evidence", className: "text-amber-300" },
-  insufficient: { label: "Not enough evidence yet", className: "text-red-400" },
+/* Decision-First V1 → Evidence-Explicit polish: the one committed call,
+   directly under the masthead. Unnumbered on purpose — it sits above
+   the numbered sections the way the masthead does, so nothing below
+   renumbers. Same memo.decision in both views; only the register
+   differs. Visible immediately: headline, rationale, one evidence-
+   strength sentence, "Not yet", Preserve/Change/Watch, and the numeric
+   reassess trigger — that's the "answer in a few seconds" set. Only the
+   detailed limits go behind a native <details>, closed by default.
+   evidenceState is the card's ONLY strength signal — the full
+   Confidence read keeps its own section further down (unchanged); no
+   standalone Confidence line is duplicated here, since the two can
+   legitimately disagree (e.g. a clearly flat, sufficient field reads
+   evidenceState "supported" while confidence's own rules can still
+   land on "low") and showing both on one card reads as a contradiction
+   rather than two distinct signals. */
+const EVIDENCE_COLOR: Record<Memo["decision"]["evidenceState"], string> = {
+  supported: "text-emerald-400",
+  limited: "text-amber-300",
+  insufficient: "text-red-400",
 };
+
+/** Card-only truncation: keeps "Preserve" compact by dropping any
+ *  explanatory clause after the first em dash. The stored value on
+ *  MemoDecision is untouched, and text export (memoToText.ts) always
+ *  serializes the full sentence — this trims the on-screen card only. */
+function firstClause(text: string): string {
+  const idx = text.indexOf(" — ");
+  return idx === -1 ? text : text.slice(0, idx);
+}
 
 function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
   const d = memo.decision;
   const client = view === "client";
   const avoid = client ? d.avoidNow.client : d.avoidNow.buyer;
-  const confidenceDetail = client
-    ? memo.confidence.clientWhy
-    : memo.confidence.reasons[0] ?? "";
-  const evidence = EVIDENCE_COPY[d.evidenceState];
   const limits = client ? d.limits.client : d.limits.buyer;
   // nextControlledTest is a single register; clientize defensively in
   // the client view so a future test string can't leak buyer jargon.
@@ -148,20 +157,10 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
       aria-label="Next move"
       className="print-avoid-break animate-rise mt-8 rounded-xl border border-accent/25 border-l-[3px] border-l-accent/70 bg-accent/[0.05] p-5 sm:p-6"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
-          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
-          Next move
-        </p>
-        <p
-          className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${evidence.className}`}
-        >
-          Evidence: {evidence.label}
-          {d.evidenceShape && (
-            <span className="text-zinc-500"> · {d.evidenceShape}</span>
-          )}
-        </p>
-      </div>
+      <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+        Next move
+      </p>
       <p className="mt-3 max-w-3xl text-[17px] font-semibold leading-snug text-zinc-50 sm:text-[19px]">
         {client ? d.clientHeadline : d.headline}
       </p>
@@ -170,11 +169,12 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
       </p>
       <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
         <span
-          className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${CONFIDENCE_COLOR[memo.confidence.level]}`}
+          className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${EVIDENCE_COLOR[d.evidenceState]}`}
         >
-          Confidence: {memo.confidence.level}
+          {client ? "How sure we are" : "Evidence"}
         </span>
-        {confidenceDetail && <> — {confidenceDetail}</>}
+        {": "}
+        {evidenceLine(d, memo.scope.adsJudged, view)}
       </p>
       {avoid.length > 0 && (
         <div className="mt-4">
@@ -200,8 +200,10 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
           </p>
           <dl className="mt-1.5 space-y-1 text-[13px] leading-relaxed text-zinc-300">
             <div className="flex gap-2">
-              <dt className="shrink-0 font-medium text-zinc-500">Preserve</dt>
-              <dd>{cz(d.nextControlledTest.preserve)}</dd>
+              <dt className="shrink-0 font-medium text-zinc-500">
+                {client ? "Keep the same" : "Preserve"}
+              </dt>
+              <dd>{cz(firstClause(d.nextControlledTest.preserve))}</dd>
             </div>
             <div className="flex gap-2">
               <dt className="shrink-0 font-medium text-zinc-500">Change</dt>
@@ -218,21 +220,18 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
         {client ? d.reassess.client : d.reassess.buyer}
       </p>
       {limits.length > 0 && (
-        <div className="mt-4 border-t border-white/[0.08] pt-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-            {client ? "What we can't conclude yet" : "What this can't establish"}
-          </p>
-          <ul className="mt-1.5 space-y-1.5">
+        <details className="mt-4 border-t border-white/[0.08] pt-3">
+          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            {client ? "What we still can't conclude" : "Evidence limits"}
+          </summary>
+          <ul className="mt-2 space-y-1">
             {limits.map((line, i) => (
-              <li
-                key={i}
-                className="border-l border-white/[0.08] pl-3 text-[12px] leading-relaxed text-zinc-500"
-              >
+              <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
                 {line}
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
     </section>
   );

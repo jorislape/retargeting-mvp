@@ -19,6 +19,45 @@ export function clientizeText(text: string): string {
     .replace(/\bmedian\b/g, "typical result");
 }
 
+/**
+ * Evidence-Explicit Decision V1 — the single strength sentence shown on
+ * the Next-move card and in text export (both surfaces import this, so
+ * the wording can't drift between them). evidenceShape selects between
+ * two "supported" phrasings (a materially separated field vs a clearly
+ * flat one) and is used ONLY as an internal template selector — the raw
+ * "separation"/"flatness" terms are never rendered anywhere. Wording is
+ * deliberately dataset-scoped throughout: never implies statistical
+ * significance, causal proof, external validation, or a guarantee of
+ * future performance.
+ */
+export function evidenceLine(
+  decision: Memo["decision"],
+  adsJudged: number,
+  view: ReportView
+): string {
+  const client = view === "client";
+  if (decision.evidenceState === "insufficient") {
+    return client
+      ? "Not enough information yet."
+      : "Not enough data yet — more results are needed before making a reliable comparison.";
+  }
+  if (decision.evidenceState === "limited") {
+    return client
+      ? "Moderate — the results point in this direction, but the difference is not strong enough for a firm conclusion."
+      : "Directional — the available data supports a next step, but the conclusion remains limited.";
+  }
+  // supported
+  const flat = decision.evidenceShape === "flatness";
+  if (client) {
+    return flat
+      ? "Strong — the current results consistently show that no ad is clearly ahead yet."
+      : "Strong — the available results show a clear enough difference to support this direction.";
+  }
+  return flat
+    ? `Strong support from this dataset — no ad separated meaningfully across ${adsJudged} judged ads.`
+    : `Strong support from this dataset — one ad clearly pulled ahead across ${adsJudged} judged ads.`;
+}
+
 /** Plain-text serialization for the copy/share button — same content
  *  as the on-screen report in the active view, no markup, safe to
  *  paste into Slack, email, or a doc. `briefIndices` lists the tests
@@ -49,18 +88,15 @@ export function memoToText(
      never a duplicate of the winners/losers evidence below. */
   const d = memo.decision;
   lines.push("NEXT MOVE");
-  // Evidence-Explicit Decision V1: evidence strength/shape lead the
-  // block — a separate dimension from the action, honest about how far
-  // the dataset actually supports the call.
-  lines.push(
-    `Evidence: ${d.evidenceState}${d.evidenceShape ? ` (${d.evidenceShape})` : ""}`
-  );
+  // Order: decision → numeric rationale → evidence strength → not yet →
+  // preserve/change/watch → reassess. No standalone Confidence line here
+  // — the full confidence read has its own section further down
+  // (CONFIDENCE:); this block shows evidenceState only, never the raw
+  // evidenceShape enum.
   lines.push(view === "client" ? d.clientHeadline : d.headline);
   lines.push(view === "client" ? d.clientRationale : d.rationale);
-  const confidenceDetail =
-    view === "client" ? memo.confidence.clientWhy : memo.confidence.reasons[0] ?? "";
   lines.push(
-    `Confidence: ${memo.confidence.level}${confidenceDetail ? ` — ${confidenceDetail}` : ""}`
+    `${view === "client" ? "How sure we are" : "Evidence"}: ${evidenceLine(d, scope.adsJudged, view)}`
   );
   const decisionAvoid = view === "client" ? d.avoidNow.client : d.avoidNow.buyer;
   if (decisionAvoid.length > 0) {
@@ -68,20 +104,24 @@ export function memoToText(
     decisionAvoid.forEach((b) => lines.push(`- ${b}`));
   }
   // The single controlled next test (preserve / change / watch); the
-  // numeric reassessment trigger stays on its own line below.
+  // numeric reassessment trigger stays on its own line below. Unlike the
+  // on-screen card, text export always carries the FULL preserve wording
+  // — no space constraint, and a copy-pasted handoff benefits from the
+  // complete reasoning.
   if (d.nextControlledTest) {
     lines.push("Next controlled test:");
-    lines.push(`- Preserve: ${c(d.nextControlledTest.preserve)}`);
+    lines.push(`- ${view === "client" ? "Keep the same" : "Preserve"}: ${c(d.nextControlledTest.preserve)}`);
     lines.push(`- Change: ${c(d.nextControlledTest.change)}`);
     lines.push(`- Watch: ${c(d.nextControlledTest.watch)}`);
   }
   lines.push(view === "client" ? d.reassess.client : d.reassess.buyer);
   lines.push("");
 
-  // What this read cannot establish — its own block, active register.
+  // What this read cannot establish — collapsed on screen, always fully
+  // expanded in text export (a plain-text file has no "collapsed").
   const limits = view === "client" ? d.limits.client : d.limits.buyer;
   if (limits.length > 0) {
-    lines.push(view === "client" ? "WHAT WE CAN'T CONCLUDE YET" : "WHAT THIS CAN'T ESTABLISH");
+    lines.push(view === "client" ? "WHAT WE STILL CAN'T CONCLUDE" : "EVIDENCE LIMITS");
     limits.forEach((l) => lines.push(`- ${l}`));
     lines.push("");
   }

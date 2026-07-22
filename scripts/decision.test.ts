@@ -578,14 +578,24 @@ console.log("decision (stage 1 — rules): all assertions passed");
     assert.ok(buyerText.includes(memo.decision.headline), "buyer text carries the buyer headline");
     assert.ok(buyerText.includes(memo.decision.reassess.buyer), "buyer text carries the buyer reassess line");
 
-    // Evidence-Explicit Decision V1 in the serialized output.
+    // Evidence-Explicit Decision V1 polish: plain-language evidence
+    // sentence, no raw evidenceShape enum, relabeled limits header.
     assert.ok(
-      buyerText.includes(`Evidence: ${memo.decision.evidenceState}`),
-      "buyer text leads the NEXT MOVE block with evidence state"
+      buyerText.includes("Evidence: Strong support from this dataset"),
+      "buyer text carries the plain-language evidence sentence for the pinned supported/separation sample"
     );
+    assert.ok(
+      clientText.includes("How sure we are: Strong — the available results show a clear enough difference"),
+      "client text carries the plain-language client evidence sentence"
+    );
+    for (const text of [buyerText, clientText]) {
+      assert.ok(!text.includes("(separation)") && !/\bflatness\b/.test(text), "no raw evidenceShape enum anywhere in the serialized output");
+    }
     assert.ok(buyerText.includes("Next controlled test:"), "buyer text surfaces the controlled test");
-    assert.ok(buyerText.includes("WHAT THIS CAN'T ESTABLISH"), "buyer text has the limits block");
-    assert.ok(clientText.includes("WHAT WE CAN'T CONCLUDE YET"), "client text has the limits block");
+    assert.ok(buyerText.includes(`- Preserve: ${memo.decision.nextControlledTest?.preserve}`), "buyer text export carries the FULL, untruncated preserve wording");
+    assert.ok(clientText.includes(`- Keep the same: ${memo.decision.nextControlledTest?.preserve}`), "client text export label is 'Keep the same', full wording");
+    assert.ok(buyerText.includes("EVIDENCE LIMITS"), "buyer text has the relabeled limits block");
+    assert.ok(clientText.includes("WHAT WE STILL CAN'T CONCLUDE"), "client text has the relabeled limits block");
     assert.ok(clientText.includes(memo.decision.clientHeadline), "client text carries the client headline");
     assert.ok(!clientText.includes(memo.decision.headline), "client text never carries the buyer headline");
     assert.ok(!buyerText.includes(memo.decision.clientHeadline), "buyer text never carries the client headline");
@@ -594,14 +604,18 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // NEXT MOVE to the following blank line — the rest of the client
     // output has its own pre-existing register rules, e.g. the scope
     // line's "Judged:" count, which are out of this card's scope).
+    const buyerCardBlock = buyerText.split("NEXT MOVE")[1].split("\n\n")[0];
     const clientCard = clientText.split("NEXT MOVE")[1].split("\n\n")[0].toLowerCase();
     for (const word of ["kill", "gate", "benchmark", "median", "judged"]) {
       assert.ok(!clientCard.includes(word), `client card block must not contain "${word}"`);
     }
 
-    // Confidence line is derived from memo.confidence per register.
-    assert.ok(buyerText.includes(`Confidence: ${memo.confidence.level} — ${memo.confidence.reasons[0]}`), "buyer confidence line derived from reasons[0]");
-    assert.ok(clientText.includes(`Confidence: ${memo.confidence.level} — ${memo.confidence.clientWhy}`), "client confidence line derived from clientWhy");
+    // No duplicate Confidence line inside the card block in either
+    // register — the full confidence read (level/reasons/notes) keeps
+    // its own separate "CONFIDENCE:" section further down, asserted by
+    // the `order` check below; it must not be repeated inside NEXT MOVE.
+    assert.ok(!buyerCardBlock.includes("Confidence:"), "buyer NEXT MOVE block carries no duplicate Confidence line");
+    assert.ok(!clientCard.includes("confidence"), "client NEXT MOVE block carries no duplicate confidence line");
 
     // Section order intact: the decision leads, everything else follows
     // in the pre-existing order.
