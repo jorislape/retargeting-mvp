@@ -298,6 +298,11 @@ function AdTable({
                 <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
                   {ad.reason}
                 </p>
+                {ad.conversionLabel && (
+                  <p className="mt-0.5 font-mono text-[11px] leading-relaxed text-zinc-500 tabular-nums">
+                    {ad.conversionLabel}
+                  </p>
+                )}
               </td>
               <td className="py-3 pr-4 text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
                 {ad.valueLabel}
@@ -349,6 +354,7 @@ function ClientAdList({
               </p>
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
                 {ad.spendLabel} spent
+                {ad.conversionLabel ? ` · ${ad.conversionLabel}` : ""}
               </p>
             </div>
             <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">
@@ -1154,6 +1160,11 @@ export function Report({
         {sections.winners && (
         <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.winners))}>
           <SectionHead n={sectionNumbers.winners!} title={client ? "What worked" : "Winners"} />
+          {memo.leadingConversion && (
+            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
+              {client ? memo.leadingConversion.client : memo.leadingConversion.buyer}
+            </p>
+          )}
           <div className="mt-4">
             {memo.winners.length === 0 ? (
               <p className="border-l-2 border-white/15 py-1 pl-4 text-sm leading-relaxed text-zinc-400">

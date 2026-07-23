@@ -39,7 +39,7 @@ import {
   type FetchPageResponse,
   type WatchlistItem,
 } from "@/modules/competitor";
-import { useDebrief } from "@/components/workspace/DebriefProvider";
+import { useDebrief, type GeneratorFields } from "@/components/workspace/DebriefProvider";
 import { useMeta } from "@/components/workspace/MetaProvider";
 import { MetaConnect } from "@/components/debrief/MetaConnect";
 import { MonitoringErrorBoundary } from "@/components/monitoring/MonitoringErrorBoundary";
@@ -1298,6 +1298,104 @@ export function GeneratorPanel() {
                     Carries into creative briefs as guardrails — doesn&apos;t
                     affect scoring or ranking.
                   </p>
+                </div>
+              </div>
+
+              {/* Evidence Inputs V1 — compact, fully optional test-quality
+                  context. Default "not answered" (never "no"); answers
+                  ONLY add honesty caveats to the report's evidence limits
+                  — they never change the recommendation, ranking, or any
+                  number. Kept light: three short dropdowns, one line of
+                  help. */}
+              <div className="mt-5 border-t border-white/[0.06] pt-4">
+                <p className={fieldLabel}>Test quality (optional)</p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  Tells the report how much to trust the comparison. Answers
+                  only add honesty notes — they never change the
+                  recommendation or the numbers.
+                </p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label htmlFor="controlledTest" className={fieldLabel}>
+                      Was this a controlled test?
+                    </label>
+                    <select
+                      id="controlledTest"
+                      value={fields.controlledTest}
+                      onChange={(e) =>
+                        updateFields({
+                          controlledTest: e.target
+                            .value as GeneratorFields["controlledTest"],
+                        })
+                      }
+                      className={`mt-1.5 ${inputBase}`}
+                    >
+                      <option value="" className="bg-zinc-900">
+                        Not answered
+                      </option>
+                      <option value="yes" className="bg-zinc-900">
+                        Yes
+                      </option>
+                      <option value="no" className="bg-zinc-900">
+                        No
+                      </option>
+                      <option value="unsure" className="bg-zinc-900">
+                        Not sure
+                      </option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="trackingChanged" className={fieldLabel}>
+                      Did tracking change?
+                    </label>
+                    <select
+                      id="trackingChanged"
+                      value={fields.trackingChanged}
+                      onChange={(e) =>
+                        updateFields({
+                          trackingChanged: e.target
+                            .value as GeneratorFields["trackingChanged"],
+                        })
+                      }
+                      className={`mt-1.5 ${inputBase}`}
+                    >
+                      <option value="" className="bg-zinc-900">
+                        Not answered
+                      </option>
+                      <option value="yes" className="bg-zinc-900">
+                        Yes
+                      </option>
+                      <option value="no" className="bg-zinc-900">
+                        No
+                      </option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="setupChanged" className={fieldLabel}>
+                      Offer / page / audience / budget change?
+                    </label>
+                    <select
+                      id="setupChanged"
+                      value={fields.setupChanged}
+                      onChange={(e) =>
+                        updateFields({
+                          setupChanged: e.target
+                            .value as GeneratorFields["setupChanged"],
+                        })
+                      }
+                      className={`mt-1.5 ${inputBase}`}
+                    >
+                      <option value="" className="bg-zinc-900">
+                        Not answered
+                      </option>
+                      <option value="yes" className="bg-zinc-900">
+                        Yes
+                      </option>
+                      <option value="no" className="bg-zinc-900">
+                        No
+                      </option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>

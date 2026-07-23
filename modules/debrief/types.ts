@@ -85,8 +85,27 @@ export interface DebriefApiError {
   suggestedKpis?: KpiKey[];
 }
 
+/** Optional self-reported test-quality answers (Evidence Inputs V1).
+ *  Every field is optional and defaults to *unanswered* — an unanswered
+ *  set is a complete no-op (output byte-identical to before the
+ *  feature). These NEVER change ranking, median, spend gate, action, or
+ *  evidenceState — they only append explanatory lines to the memo's
+ *  evidence limits. See modules/debrief/decision.ts (buildLimits). */
+export interface TestQualityContext {
+  /** Was this a controlled test? "yes" suppresses the uncontrolled-test
+   *  caveat but adds NO positive claim; "no"/"unsure" append a caveat;
+   *  undefined = unanswered = no line. Never strengthens evidence. */
+  controlledTest?: "yes" | "no" | "unsure";
+  /** true = the user reported tracking changed mid-period → one
+   *  comparability caveat. undefined/false = no line. */
+  trackingChanged?: boolean;
+  /** true = the user reported the offer, landing page, audience, or
+   *  budget changed mid-period → one caveat. undefined/false = no line. */
+  setupChanged?: boolean;
+}
+
 /** Context the user fills in alongside the CSV — never stored. */
-export interface DebriefContext {
+export interface DebriefContext extends TestQualityContext {
   kpi: KpiKey;
   product: string;
   offer: string;
@@ -113,6 +132,12 @@ export interface ParsedAd {
    *  the memo then says "Format confirmed as …" instead of "Ad name
    *  suggests …". Still user context, never proof of causation. */
   formatConfirmed?: boolean;
+  /** Raw conversion count behind a purchase-based KPI (purchases for
+   *  roas/cpa/purchases, leads for leads) when a count column is present
+   *  in the CSV. null when the KPI isn't purchase-based (ctr/cpc) or no
+   *  count column resolved. NEVER estimated, and never read by the spend
+   *  gate, median, ranking, or any KPI value — display only. */
+  conversions?: number | null;
 }
 
 export type GateReason = "judged" | "below_spend_gate" | "no_kpi_value";
@@ -172,6 +197,11 @@ export interface MemoWinnerLoserRow {
   vsMedianLabel: string;
   spendLabel: string;
   reason: string;
+  /** Evidence Inputs V1: neutral conversion count for this ad
+   *  ("34 purchases" / "12 leads"), present only for purchase-based
+   *  KPIs when the CSV carried a count column. Display only — never a
+   *  quality judgment, never estimated. Absent otherwise. */
+  conversionLabel?: string;
 }
 
 /** A hand-off-ready creative brief for one next test. Generated
@@ -295,6 +325,13 @@ export interface Memo {
    *  tldr, none of the buyer shorthand. */
   clientSummary: string[];
   winners: MemoWinnerLoserRow[];
+  /** Evidence Inputs V1: a neutral, one-line statement of the conversion
+   *  count behind the leading ad — or an explicit "not in this export"
+   *  line when the count is unavailable. Two registers. null when there
+   *  is no leading ad (no winner) or the KPI isn't purchase-based
+   *  (ctr/cpc). Purely factual visibility — never a quality judgment,
+   *  never estimated, never changes the action or evidenceState. */
+  leadingConversion: { buyer: string; client: string } | null;
   losers: {
     rows: MemoWinnerLoserRow[];
     killInstruction: string;

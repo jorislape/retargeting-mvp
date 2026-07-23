@@ -120,6 +120,20 @@ export async function POST(request: NextRequest) {
     targetCpa = parsed;
   }
 
+  /* Evidence Inputs V1 — optional self-reported test-quality answers.
+     Any unrecognized/absent value is treated as UNANSWERED (undefined),
+     which is a complete no-op downstream: it appends no limits line and
+     leaves the memo byte-identical to a run without the feature. These
+     never touch ranking, median, spend gate, action, or evidenceState.
+     Read into memory for this request like the rest of the context;
+     never logged, never stored. */
+  const parseTriState = (
+    v: FormDataEntryValue | null
+  ): "yes" | "no" | "unsure" | undefined =>
+    v === "yes" || v === "no" || v === "unsure" ? v : undefined;
+  const parseChanged = (v: FormDataEntryValue | null): boolean | undefined =>
+    v === "yes" ? true : v === "no" ? false : undefined;
+
   const context = {
     kpi: kpi as KpiKey,
     product: String(form.get("product") ?? "").trim().slice(0, 200),
@@ -131,6 +145,9 @@ export async function POST(request: NextRequest) {
        the memo only. Read into memory for this request like the rest of
        the context; never logged, never stored. */
     marketContext: String(form.get("marketContext") ?? "").trim().slice(0, 2000),
+    controlledTest: parseTriState(form.get("controlledTest")),
+    trackingChanged: parseChanged(form.get("trackingChanged")),
+    setupChanged: parseChanged(form.get("setupChanged")),
   };
 
   /* Optional creative-format confirmations (ad name → format tag).

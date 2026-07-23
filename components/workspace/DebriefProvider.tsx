@@ -35,6 +35,12 @@ export interface GeneratorFields {
   creativeNotes: string;
   /** Optional pasted market/competitor notes — never required. */
   marketContext: string;
+  /* Evidence Inputs V1 — optional test-quality self-report. Default
+     "unanswered"; never required, and an unanswered set is a full no-op
+     on the memo (only appends limits lines when explicitly answered). */
+  controlledTest: "" | "yes" | "no" | "unsure";
+  trackingChanged: "" | "yes" | "no";
+  setupChanged: "" | "yes" | "no";
 }
 
 /* Competitor sources are an input aid for the market-notes field, not
@@ -55,6 +61,9 @@ const DEFAULT_FIELDS: GeneratorFields = {
   targetCpa: "",
   creativeNotes: "",
   marketContext: "",
+  controlledTest: "",
+  trackingChanged: "",
+  setupChanged: "",
 };
 
 /* The engine is deterministic and fast (~50ms); a sub-100ms flash of
@@ -147,6 +156,12 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     if (fields.targetCpa.trim() !== "") body.append("targetCpa", fields.targetCpa);
     body.append("creativeNotes", fields.creativeNotes);
     body.append("marketContext", fields.marketContext);
+    // Evidence Inputs V1: send test-quality answers only when the user
+    // actually picked one. An unanswered field is never sent, so the
+    // server treats it as undefined = no-op (memo byte-identical).
+    if (fields.controlledTest !== "") body.append("controlledTest", fields.controlledTest);
+    if (fields.trackingChanged !== "") body.append("trackingChanged", fields.trackingChanged);
+    if (fields.setupChanged !== "") body.append("setupChanged", fields.setupChanged);
     if (Object.keys(formatOverrides).length > 0) {
       body.append("creativeFormatOverrides", JSON.stringify(formatOverrides));
     }

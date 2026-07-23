@@ -7,7 +7,7 @@
 // why buildDecision takes a money formatter as an argument instead of
 // importing format.ts (whose own internal import is extensionless).
 import { KPI_LABELS } from "./types.ts";
-import type { AnalysisResult, MemoDecision } from "./types.ts";
+import type { AnalysisResult, MemoDecision, TestQualityContext } from "./types.ts";
 
 /**
  * Decision-First V1 — the "Next move" layer.
@@ -137,7 +137,12 @@ export function deriveEvidenceShape(
  */
 export function buildLimits(
   analysis: AnalysisResult,
-  flatField: boolean
+  flatField: boolean,
+  /** Evidence Inputs V1 — optional self-reported test-quality answers.
+   *  Undefined or unanswered fields append NOTHING (the output is
+   *  byte-identical to before the feature). These ONLY append caveat
+   *  lines; they never touch action, evidenceState, or any number. */
+  testQuality?: TestQualityContext
 ): { buyer: string[]; client: string[] } {
   const buyer: string[] = [];
   const client: string[] = [];
@@ -200,6 +205,39 @@ export function buildLimits(
     );
   }
 
+  /* ---- Evidence Inputs V1: user-reported test-quality caveats. These
+     ONLY append lines to the existing limits — they never change the
+     action, evidenceState, or any number. An unanswered field (or
+     controlledTest "yes") appends nothing, so an all-unanswered set
+     leaves the limits byte-identical to before the feature. A "yes"
+     never adds a positive claim; it simply withholds the caveat. ---- */
+  if (testQuality) {
+    if (testQuality.controlledTest === "no" || testQuality.controlledTest === "unsure") {
+      buyer.push(
+        "You indicated these ads weren't run as a controlled test, so differences may reflect setup — audience, budget, or timing — as much as the creative."
+      );
+      client.push(
+        "These ads weren't set up as a controlled test, so the difference between them may come partly from how they were run, not just the ads themselves."
+      );
+    }
+    if (testQuality.trackingChanged) {
+      buyer.push(
+        "You noted tracking changed during this period, so conversion figures may not be comparable across the range."
+      );
+      client.push(
+        "You mentioned tracking changed during this period, so the conversion numbers may not be directly comparable across the whole range."
+      );
+    }
+    if (testQuality.setupChanged) {
+      buyer.push(
+        "You noted the offer, landing page, audience, or budget changed mid-period, so results may partly reflect that change rather than the ads."
+      );
+      client.push(
+        "You mentioned the offer, page, audience, or budget changed partway through, so some of the results may reflect that change rather than the ads."
+      );
+    }
+  }
+
   return { buyer, client };
 }
 
@@ -210,7 +248,10 @@ export function buildDecision(
   /** Facts from the first next test (nextTests[0].brief), used only to
    *  surface nextControlledTest on the card. Optional so the pure rule
    *  tests can call buildDecision without threading a test through. */
-  nextTestFacts?: { preserve: string; change: string } | null
+  nextTestFacts?: { preserve: string; change: string } | null,
+  /** Evidence Inputs V1 — optional test-quality answers, forwarded to
+   *  buildLimits only. Never affects the action or evidenceState. */
+  testQuality?: TestQualityContext
 ): MemoDecision {
   const kpiLabel = KPI_LABELS[analysis.kpi];
   const gateLabel = money(analysis.spendGate);
@@ -257,7 +298,7 @@ export function buildDecision(
      and spread into every return, so the action rules are untouched. ---- */
   const evidenceState = deriveEvidenceState(analysis, flatField);
   const evidenceShape = deriveEvidenceShape(analysis, flatField);
-  const limits = buildLimits(analysis, flatField);
+  const limits = buildLimits(analysis, flatField, testQuality);
   const nextControlledTest = nextTestFacts
     ? { preserve: nextTestFacts.preserve, change: nextTestFacts.change, watch: kpiLabel }
     : undefined;

@@ -513,6 +513,93 @@ function assertContract(d: MemoDecision, label: string) {
   assert.equal(withFacts.nextControlledTest!.watch, "ROAS", "watch = active KPI label");
 }
 
+/* ============ Evidence Inputs V1: test-quality context (limits only) ============ */
+
+{
+  const base = fixture({ adsJudged: 12, winners: ads(3, 22), losers: ads(3, -22) });
+  const bare = buildLimits(base, false);
+
+  // Unanswered = complete no-op (undefined and {} both equal no-context).
+  assert.deepEqual(buildLimits(base, false, undefined), bare, "undefined testQuality = no-op");
+  assert.deepEqual(buildLimits(base, false, {}), bare, "empty testQuality = no-op");
+  assert.deepEqual(
+    buildLimits(base, false, { trackingChanged: false, setupChanged: false }),
+    bare,
+    "explicit false flags = no-op"
+  );
+
+  // controlledTest "yes": suppresses the caveat, adds NO positive claim.
+  const yes = buildLimits(base, false, { controlledTest: "yes" });
+  assert.deepEqual(yes, bare, "controlledTest yes adds nothing (never a positive claim)");
+
+  // "no"/"unsure": exactly one caveat line per register, no positive language.
+  for (const v of ["no", "unsure"] as const) {
+    const r = buildLimits(base, false, { controlledTest: v });
+    assert.equal(r.buyer.length, bare.buyer.length + 1, `controlledTest ${v}: +1 buyer line`);
+    assert.equal(r.client.length, bare.client.length + 1, `controlledTest ${v}: +1 client line`);
+    assert.ok(
+      r.buyer[r.buyer.length - 1].includes("weren't run as a controlled test"),
+      `controlledTest ${v}: buyer caveat present`
+    );
+    assert.ok(
+      !/\b(strong|supported|reliable|confident|proven|valid)\b/i.test(r.buyer[r.buyer.length - 1]),
+      `controlledTest ${v}: no positive/strengthening language`
+    );
+  }
+
+  // trackingChanged / setupChanged: one caveat line each.
+  const trk = buildLimits(base, false, { trackingChanged: true });
+  assert.equal(trk.buyer.length, bare.buyer.length + 1, "tracking: +1 line");
+  assert.ok(trk.buyer.some((l) => l.includes("tracking changed")), "tracking caveat present");
+  const stp = buildLimits(base, false, { setupChanged: true });
+  assert.equal(stp.buyer.length, bare.buyer.length + 1, "setup: +1 line");
+  assert.ok(
+    stp.buyer.some((l) => l.toLowerCase().includes("offer, landing page")),
+    "setup caveat present"
+  );
+
+  // All three answered → base + 3, both registers; client stays jargon-clean.
+  const all = buildLimits(base, false, {
+    controlledTest: "no",
+    trackingChanged: true,
+    setupChanged: true,
+  });
+  assert.equal(all.buyer.length, bare.buyer.length + 3, "three answers = three buyer lines");
+  assert.equal(all.client.length, bare.client.length + 3, "three answers = three client lines");
+  const clientJoined = all.client.join(" ").toLowerCase();
+  for (const w of ["kill", "gate", "benchmark", "median", "judged"]) {
+    assert.ok(!clientJoined.includes(w), `client test-quality caveats clean of "${w}"`);
+  }
+
+  // buildDecision invariance: testQuality changes ONLY limits — never the
+  // action, evidenceState, headline, rationale, reassess, or avoidNow.
+  const noCtx = buildDecision(base, "T", money, null);
+  const withCtx = buildDecision(base, "T", money, null, {
+    controlledTest: "no",
+    trackingChanged: true,
+    setupChanged: true,
+  });
+  for (const k of [
+    "action",
+    "holdReason",
+    "headline",
+    "clientHeadline",
+    "rationale",
+    "clientRationale",
+    "evidenceState",
+    "evidenceShape",
+  ] as const) {
+    assert.deepEqual(noCtx[k], withCtx[k], `testQuality must not change ${k}`);
+  }
+  assert.deepEqual(noCtx.reassess, withCtx.reassess, "testQuality must not change reassess");
+  assert.deepEqual(noCtx.avoidNow, withCtx.avoidNow, "testQuality must not change avoidNow");
+  assert.equal(
+    withCtx.limits.buyer.length,
+    noCtx.limits.buyer.length + 3,
+    "testQuality only appends limits lines"
+  );
+}
+
 console.log("decision (stage 1 — rules): all assertions passed");
 
 /* ===================== Stage 2: sample-dataset pin via the real engine ===================== */
@@ -562,8 +649,8 @@ console.log("decision (stage 1 — rules): all assertions passed");
     const keys = Object.keys(memo);
     assert.deepEqual(
       keys.filter((k) => k !== "decision"),
-      ["scope", "tldr", "clientSummary", "winners", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
-      "no pre-existing memo field added, removed, or reordered"
+      ["scope", "tldr", "clientSummary", "winners", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
+      "only the additive leadingConversion field was introduced; nothing else reordered"
     );
 
     /* ---- Session 2: memoToText presentation contract ---- */
@@ -633,6 +720,124 @@ console.log("decision (stage 1 — rules): all assertions passed");
     const noAvoidClient: string = memoToText(noAvoidMemo, "client");
     assert.ok(!noAvoidBuyer.includes("Not yet:"), "empty avoidNow: no buyer lead-in");
     assert.ok(!noAvoidClient.includes("What we're deliberately not doing yet:"), "empty avoidNow: no client lead-in");
+
+    /* ---- Evidence Inputs V1: conversion visibility (real engine) ---- */
+
+    // Sample is ROAS with a Purchases column → the leading ad's count is
+    // retained and shown, in neutral, register-appropriate wording.
+    assert.equal(
+      memo.leadingConversion?.buyer,
+      "The leading ad recorded 34 purchases during this period.",
+      "sample leading-ad conversion line (buyer wording, 34 purchases)"
+    );
+    assert.equal(
+      memo.leadingConversion?.client,
+      "This ad generated 34 purchases during the selected period.",
+      "sample leading-ad conversion line (client wording)"
+    );
+    assert.equal(memo.winners[0].conversionLabel, "34 purchases", "leading winner row carries a neutral count");
+    assert.ok(buyerText.includes("34 purchases"), "buyer text carries the conversion count");
+    assert.ok(clientText.includes("This ad generated 34 purchases"), "client text carries the client conversion line");
+
+    // Sample numeric/decision pins are unaffected by conversion visibility.
+    assert.equal(memo.decision.action, "budget", "conversion visibility didn't change the sample action");
+    assert.equal(memo.decision.evidenceState, "supported", "conversion visibility didn't change evidenceState");
+
+    /* Synthetic engine runs to prove the honesty rules that the sample
+       (which HAS counts, ROAS) can't exercise. Uses the same compiled
+       pipeline as sample.ts: parse → columns → extract → analyze → memo. */
+    const { parseCsv, toTable } = require(join(dist, "modules/debrief/csv.js"));
+    const { resolveColumns } = require(join(dist, "modules/debrief/columns.js"));
+    const { extractAds } = require(join(dist, "modules/debrief/extract.js"));
+    const { analyze } = require(join(dist, "modules/debrief/analysis.js"));
+    const { generateMemo } = require(join(dist, "modules/debrief/memo.js"));
+    const ctx = (kpi: string) => ({
+      kpi,
+      product: "",
+      offer: "",
+      goal: "",
+      targetCpa: null,
+      creativeNotes: "",
+      marketContext: "",
+    });
+    const runEngine = (csv: string, kpi: string) => {
+      const { headers, rows } = toTable(parseCsv(csv));
+      const columns = resolveColumns(headers);
+      const ads = extractAds(rows, columns, kpi);
+      return generateMemo(analyze(ads, rows, columns, ctx(kpi)), ctx(kpi));
+    };
+
+    // (a) ROAS with NO Purchases column → count unavailable, never estimated.
+    const roasNoCount =
+      "Ad name,Amount spent (USD),Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+      "A,400,5.0,2026-06-01,2026-06-30\n" +
+      "B,360,4.0,2026-06-01,2026-06-30\n" +
+      "C,320,3.0,2026-06-01,2026-06-30\n" +
+      "D,280,2.0,2026-06-01,2026-06-30\n" +
+      "E,240,1.5,2026-06-01,2026-06-30\n" +
+      "F,200,1.0,2026-06-01,2026-06-30\n";
+    const mNoCount = runEngine(roasNoCount, "roas");
+    assert.equal(
+      mNoCount.leadingConversion?.buyer,
+      "This export does not include purchase counts, so the number of purchases behind this result cannot be verified.",
+      "no-count ROAS: honest 'unavailable' line"
+    );
+    assert.ok(!/\d/.test(mNoCount.leadingConversion!.buyer), "unavailable line contains NO number (never estimated)");
+    assert.ok(
+      mNoCount.winners.every((w: { conversionLabel?: string }) => w.conversionLabel === undefined),
+      "no-count ROAS: no row shows a fabricated count"
+    );
+
+    // (b) CTR KPI → no conversion concept at all (leadingConversion null).
+    const ctrCsv =
+      "Ad name,Amount spent (USD),Impressions,Link clicks,Reporting starts,Reporting ends\n" +
+      "A,400,50000,1500,2026-06-01,2026-06-30\n" +
+      "B,360,50000,1200,2026-06-01,2026-06-30\n" +
+      "C,320,50000,900,2026-06-01,2026-06-30\n" +
+      "D,280,50000,700,2026-06-01,2026-06-30\n" +
+      "E,240,50000,500,2026-06-01,2026-06-30\n" +
+      "F,200,50000,300,2026-06-01,2026-06-30\n";
+    const mCtr = runEngine(ctrCsv, "ctr");
+    assert.equal(mCtr.leadingConversion, null, "CTR: no conversion line at all");
+    assert.ok(
+      [...mCtr.winners, ...mCtr.losers.rows].every((r: { conversionLabel?: string }) => r.conversionLabel === undefined),
+      "CTR: no row shows a conversion count"
+    );
+
+    // (c) Meta-derived CSV shape (insightsToCsv headers, incl. Purchases)
+    //     → counts retained identically to an upload; leads wording too.
+    const leadsCsv =
+      "Ad name,Amount spent (USD),Leads,Reporting starts,Reporting ends\n" +
+      "A,400,40,2026-06-01,2026-06-30\n" +
+      "B,360,32,2026-06-01,2026-06-30\n" +
+      "C,320,24,2026-06-01,2026-06-30\n" +
+      "D,280,16,2026-06-01,2026-06-30\n" +
+      "E,240,10,2026-06-01,2026-06-30\n" +
+      "F,200,6,2026-06-01,2026-06-30\n";
+    const mLeads = runEngine(leadsCsv, "leads");
+    assert.equal(
+      mLeads.leadingConversion?.buyer,
+      "The leading ad recorded 40 leads during this period.",
+      "leads KPI uses the 'leads' noun"
+    );
+    assert.equal(mLeads.winners[0].conversionLabel, "40 leads", "leads row label uses 'leads'");
+
+    // (d) Meta path parity: a Purchases-columned CSV (the exact shape
+    //     insightsToCsv emits) retains counts through the same parser.
+    const metaShape =
+      "Ad name,Amount spent (USD),Impressions,Link clicks,CTR (link click-through rate),CPC (cost per link click),Purchases,Purchases conversion value,Purchase ROAS (return on ad spend),Cost per purchase,Leads,Cost per lead,Reporting starts,Reporting ends\n" +
+      "A,400,50000,1500,3.0,0.27,50,4000,10.0,8.0,60,6.67,2026-06-01,2026-06-30\n" +
+      "B,360,45000,1200,2.7,0.30,30,2160,6.0,12.0,40,9.0,2026-06-01,2026-06-30\n" +
+      "C,320,40000,900,2.25,0.36,16,960,3.0,20.0,25,12.8,2026-06-01,2026-06-30\n" +
+      "D,280,35000,700,2.0,0.40,8,392,1.4,35.0,15,18.67,2026-06-01,2026-06-30\n" +
+      "E,240,30000,500,1.67,0.48,5,192,0.8,48.0,9,26.67,2026-06-01,2026-06-30\n" +
+      "F,200,25000,300,1.2,0.67,3,100,0.5,66.67,6,33.33,2026-06-01,2026-06-30\n";
+    const mMeta = runEngine(metaShape, "roas");
+    assert.equal(
+      mMeta.winners[0].conversionLabel,
+      "50 purchases",
+      "Meta-shape CSV (insightsToCsv headers) retains the purchase count through the same parser"
+    );
   } finally {
     rmSync(dist, { recursive: true, force: true });
   }

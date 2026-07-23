@@ -90,6 +90,30 @@ function kpiValueForRow(
   }
 }
 
+/** Evidence Inputs V1: the raw conversion count behind a purchase-based
+ *  KPI — purchases for roas/cpa/purchases, leads for leads — when a count
+ *  column is present. Returns null for ctr/cpc (their reliability axis is
+ *  clicks, not conversions) and null when no count column resolved. NEVER
+ *  estimated (e.g. never ROAS × spend ÷ AOV) and never fed to the gate,
+ *  median, ranking, or any KPI value — this is display-only context. */
+function conversionsForRow(
+  row: Record<string, string>,
+  columns: ColumnMap,
+  kpi: KpiKey
+): number | null {
+  switch (kpi) {
+    case "leads":
+      return columns.leads ? parseNumericCell(row[columns.leads]) : null;
+    case "roas":
+    case "cpa":
+    case "purchases":
+      return columns.purchases ? parseNumericCell(row[columns.purchases]) : null;
+    case "ctr":
+    case "cpc":
+      return null;
+  }
+}
+
 /** Converts raw CSV rows into ParsedAd[]. Rows with no ad-name column
  *  get a positional fallback label so the flow still works, but the
  *  caller should surface that as a confidence note. */
@@ -109,6 +133,7 @@ export function extractAds(
         spend,
         kpiValue: kpiValueForRow(row, columns, kpi, spend),
         nameTags: extractNameTags(name),
+        conversions: conversionsForRow(row, columns, kpi),
       };
     })
     .filter((ad) => ad.spend > 0 || ad.kpiValue != null); // drop fully-blank rows

@@ -139,6 +139,13 @@ export function memoToText(
     view === "client" ? memo.losers.rows.slice(0, 3) : memo.losers.rows;
 
   lines.push(view === "client" ? "WHAT WORKED" : "WINNERS");
+  // Evidence Inputs V1: the neutral leading-ad conversion line (or an
+  // explicit "not in this export" line), active register.
+  if (memo.leadingConversion) {
+    lines.push(
+      view === "client" ? memo.leadingConversion.client : memo.leadingConversion.buyer
+    );
+  }
   if (memo.winners.length === 0) {
     lines.push(
       view === "client"
@@ -147,7 +154,9 @@ export function memoToText(
     );
   } else {
     winnerRows.forEach((w) => {
-      lines.push(`- ${w.name} | ${w.valueLabel} (${c(w.vsMedianLabel)}) | ${w.spendLabel} | ${w.reason}`);
+      lines.push(
+        `- ${w.name} | ${w.valueLabel} (${c(w.vsMedianLabel)}) | ${w.spendLabel}${w.conversionLabel ? ` | ${w.conversionLabel}` : ""} | ${w.reason}`
+      );
     });
     if (view === "client" && memo.winners.length > winnerRows.length) {
       lines.push(
@@ -160,7 +169,9 @@ export function memoToText(
   lines.push(view === "client" ? "WHAT UNDERPERFORMED" : "LOSERS / KILL LIST");
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
   loserRows.forEach((l) => {
-    lines.push(`- ${l.name} | ${l.valueLabel} (${c(l.vsMedianLabel)}) | ${l.spendLabel} | ${l.reason}`);
+    lines.push(
+      `- ${l.name} | ${l.valueLabel} (${c(l.vsMedianLabel)}) | ${l.spendLabel}${l.conversionLabel ? ` | ${l.conversionLabel}` : ""} | ${l.reason}`
+    );
   });
   if (view === "client" && memo.losers.rows.length > loserRows.length) {
     lines.push(

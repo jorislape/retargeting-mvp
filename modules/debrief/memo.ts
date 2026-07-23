@@ -13,6 +13,7 @@ import {
   HIGHER_IS_BETTER,
   KPI_EXPLAINERS,
   KPI_LABELS,
+  KpiKey,
   Memo,
   MemoMarketSignal,
   MemoTest,
@@ -55,6 +56,52 @@ function describeAdReason(
   return "Metrics only — angle unknown.";
 }
 
+/* ---- Evidence Inputs V1: conversion visibility (display only) ----
+   The conversion noun is "purchases" for roas/cpa/purchases and "leads"
+   for leads; ctr/cpc have no conversion concept (their reliability axis
+   is clicks), so counts are never shown for them. None of this reads or
+   changes spend, the gate, median, ranking, KPI values, action, or
+   evidenceState — it only formats an already-retained count. */
+function conversionNouns(kpi: KpiKey): { one: string; many: string } | null {
+  if (kpi === "leads") return { one: "lead", many: "leads" };
+  if (kpi === "roas" || kpi === "cpa" || kpi === "purchases") {
+    return { one: "purchase", many: "purchases" };
+  }
+  return null; // ctr, cpc
+}
+
+/** Neutral per-row conversion label ("34 purchases" / "1 lead"), or
+ *  undefined when not applicable (non-purchase KPI or no count for this
+ *  ad). Never estimated. */
+function conversionLabelFor(ad: RankedAd, kpi: KpiKey): string | undefined {
+  const nouns = conversionNouns(kpi);
+  if (nouns == null || ad.conversions == null) return undefined;
+  const n = Math.round(ad.conversions);
+  return `${fmtCount(n)} ${n === 1 ? nouns.one : nouns.many}`;
+}
+
+/** The neutral leading-ad conversion line, both registers. null when
+ *  there is no leading ad (no winner) or the KPI isn't purchase-based.
+ *  When the count column is absent, states that plainly — never a
+ *  fabricated number. */
+function buildLeadingConversion(
+  analysis: AnalysisResult
+): { buyer: string; client: string } | null {
+  const nouns = conversionNouns(analysis.kpi);
+  const top = analysis.winners[0] ?? null;
+  if (nouns == null || top == null) return null;
+  if (top.conversions == null) {
+    const line = `This export does not include ${nouns.one} counts, so the number of ${nouns.many} behind this result cannot be verified.`;
+    return { buyer: line, client: line };
+  }
+  const n = Math.round(top.conversions);
+  const label = `${fmtCount(n)} ${n === 1 ? nouns.one : nouns.many}`;
+  return {
+    buyer: `The leading ad recorded ${label} during this period.`,
+    client: `This ad generated ${label} during the selected period.`,
+  };
+}
+
 function buildRow(
   ad: RankedAd,
   analysis: AnalysisResult,
@@ -66,6 +113,7 @@ function buildRow(
     vsMedianLabel: fmtDeltaVsMedian(ad.deltaFromMedian, ad.deltaPct),
     spendLabel: fmtMoney(ad.spend, analysis.currency),
     reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
+    conversionLabel: conversionLabelFor(ad, analysis.kpi),
   };
 }
 
@@ -1148,7 +1196,12 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       // brief — no new computation. null when there is no next test.
       nextTests[0]
         ? { preserve: nextTests[0].brief.keepConstant, change: nextTests[0].brief.change }
-        : null
+        : null,
+      // Evidence Inputs V1: forward the optional test-quality answers.
+      // DebriefContext extends TestQualityContext, so `context` already
+      // carries controlledTest/trackingChanged/setupChanged. Feeds
+      // buildLimits copy only — never the action or evidenceState.
+      context
     ),
     scope: {
       product: context.product || "Your account",
@@ -1166,6 +1219,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     tldr: buildTldr(analysis),
     clientSummary: buildClientSummary(analysis),
     winners: analysis.winners.map((ad) => buildRow(ad, analysis, context)),
+    leadingConversion: buildLeadingConversion(analysis),
     losers: {
       rows: analysis.losers.map((ad) => buildRow(ad, analysis, context)),
       killInstruction:
