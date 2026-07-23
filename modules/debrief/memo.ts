@@ -579,7 +579,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
               ? winnerTag.tag
               : top.nameTags[0]
         ),
-        keepConstant: `The angle, ${offerLabel} offer, audience, and placements of "${top.name}" — the configuration it ran while it out-performed; the test isolates whether the angle is the reason.`,
+        keepConstant: `The angle, ${offerLabel}, audience, and placements of "${top.name}" — the configuration it ran while it out-performed; the test isolates whether the angle is the reason.`,
         change: founderLed
           ? "Only the opening: one variant gets a new hook, the other gets the founder-led front."
           : "Only the opening 3 seconds / first frame — nothing else.",
