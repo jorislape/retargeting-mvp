@@ -273,7 +273,7 @@ function buildMarketSignal(
   /* What seems worth adapting — always tied back to own data. */
   if (top && signals.has("founder-led") && !isFounderLed(top)) {
     bullets.push(
-      `Worth testing: a founder-led take on "${top.name}"'s proven angle — adapt, don't copy.`
+      `Worth testing: a founder-led take on "${top.name}"'s leading angle — adapt, don't copy.`
     );
   } else if (top && signals.has("bundle")) {
     bullets.push(
@@ -545,9 +545,9 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       test: founderLed
         ? `Brief 2 new ${format}variants of "${top.name}" — keep the angle; make one a founder-led version (market signal), change only the hook on the other.`
         : `Brief 2 new ${format}variants of "${top.name}" — keep the angle, change the hook.`,
-      why: `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend. The angle has proven demand — new hooks find its ceiling before fatigue does.${
+      why: `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend. This version produced the strongest observed result in the current dataset — new hooks find its ceiling before fatigue does.${
         founderLed
-          ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of the proven angle. Adapt, don't copy."
+          ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of this leading angle. Adapt, don't copy."
           : ""
       }`,
       setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each clears the spend gate. Change only the opening 3 seconds / first frame between variants.`,
@@ -558,18 +558,18 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
           ? `Founder-led variant of the "${top.name}" angle`
           : `Hook variants of "${top.name}"`,
         objective:
-          "Learn whether the account's proven angle has more headroom — find a new opening that beats the original before fatigue does.",
+          "Learn whether the account's leading angle has more headroom — find a new opening that beats the original before fatigue does.",
         basedOn: signals,
         concept: `Two variants of the winning ad: identical angle, offer, and audience — only the opening changes.${
           founderLed
-            ? " One variant is fronted by the founder, adapting an observed market pattern onto the proven angle."
+            ? " One variant is fronted by the founder, adapting an observed market pattern onto this leading angle."
             : ""
         }`,
         hooks: [
           `Cold-open on the angle's payoff moment — the outcome "${top.name}" sells, before any context.`,
           `Question open: turn the angle's core promise for ${product} into a direct question in the first line.`,
           founderLed
-            ? `Founder to camera: a one-sentence "why we built this" open, then cut into the proven angle (market signal — adapt, don't copy).`
+            ? `Founder to camera: a one-sentence "why we built this" open, then cut into this leading angle (market signal — adapt, don't copy).`
             : "Text-led open: the angle's strongest existing line as bold on-screen text before any footage.",
         ],
         assetDirection: directionFor(
@@ -657,7 +657,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         brief: {
           title: `Problem-first rebuild of "${worst.name}"`,
           objective:
-            "Learn whether the hook, not the discount, is what's failing — one rebuild before the angle is retired.",
+            "Learn whether changing the hook improves performance while keeping the discount comparable — one rebuild before the angle is retired.",
           basedOn: signals,
           concept:
             "Rebuild of the discount ad: the opening sells the problem, the discount moves to the end as the closer. Same offer, same audience.",
@@ -685,7 +685,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
       );
       tests.push({
         test: `Reshoot "${worst.name}"'s message in the ${winnerTag.tag} format carrying your winners.`,
-        why: `The message got ${fmtMoney(worst.spend, currency)} of spend but ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}, while ${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots — test whether the format, not the message, is what's failing.${
+        why: `The message got ${fmtMoney(worst.spend, currency)} of spend but ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}, while ${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots — test whether changing the format improves performance while keeping the message comparable.${
           problemFirst
             ? " Give the reshoot a problem-first opening — a repeating pattern in your market notes (directional)."
             : ""
@@ -696,7 +696,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
         brief: {
           title: `${winnerTag.tag} reshoot of "${worst.name}"`,
           objective:
-            "Learn whether the message or the format is failing — the same message rebuilt in the format carrying your winners.",
+            "Learn whether changing the format improves performance while keeping the message comparable — the same message rebuilt in the format carrying your winners.",
           basedOn: signals,
           concept: `The loser's message reshot as ${winnerTag.tag} — the format holding ${winnerTag.count}/${winners.length} winner slots. Message, audience, and offer stay identical.`,
           hooks: [
@@ -807,7 +807,7 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
     );
     tests.push({
       test: `Scale "${top.name}" daily budget by 25–50%.`,
-      why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} vs median on ${fmtMoney(top.spend, currency)} already spent. Everything else this period is a creative problem, not a budget one.`,
+      why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} vs median on ${fmtMoney(top.spend, currency)} already spent. The clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before making broader budget moves.`,
       setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
       winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
       signals,
@@ -848,14 +848,14 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
     );
     tests.push({
       test: `Test "${top.name}"'s winning angle with a bundle offer variant (market signal).`,
-      why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already proven at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
+      why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already leading at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
       setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it clears the spend gate.`,
       winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
       signals,
       brief: {
         title: `Bundle offer variant of "${top.name}"`,
         objective:
-          "Learn whether a bundle offer lifts the proven angle — the offer is the only variable.",
+          "Learn whether a bundle offer lifts the leading angle — the offer is the only variable.",
         basedOn: signals,
         concept:
           "The winning creative and audience with the offer switched to a bundle — adapting an offer pattern observed in your market notes (directional).",
@@ -967,10 +967,10 @@ function buildAvoid(
   if (top && top.deltaPct != null) {
     if (top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT) {
       buyer.push(
-        `Do not scale anything except "${top.name}" — everything else this period is a creative problem, not a budget one.`
+        `Do not scale anything except "${top.name}" yet — the clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before broader budget moves.`
       );
       client.push(
-        `We're only increasing budget behind "${top.name}" — nowhere else until the next tests read.`
+        `We're only increasing budget behind "${top.name}" for now — the clearest case for more budget is the leading ad. For the remaining ads, controlled creative tests are safer than broader budget changes.`
       );
     } else {
       buyer.push(
