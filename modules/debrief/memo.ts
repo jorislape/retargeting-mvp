@@ -5,7 +5,7 @@ import {
   fmtKpiValue,
   fmtMoney,
 } from "./format";
-import { assessMarketNotes, extractMarketSignals } from "./marketSignals";
+import { assessMarketNotes, extractMarketSignals, MARKET_SIGNALS_DISCLOSURE } from "./marketSignals";
 import {
   AnalysisResult,
   CREATIVE_FORMAT_LABELS,
@@ -233,7 +233,7 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
 /* ------------------------------------------------------------------ */
 
 const MARKET_CAVEAT =
-  "Market context is directional — it does not confirm competitor spend or performance.";
+  `Market context is directional — it does not confirm competitor spend or performance. ${MARKET_SIGNALS_DISCLOSURE}`;
 
 /** 2–4 bullets restating the user's own market notes, plus the fixed
  *  directional caveat. Null when no context was pasted — the memo is
@@ -1053,11 +1053,16 @@ function buildClientSummary(analysis: AnalysisResult): string[] {
   return lines;
 }
 
-function buildConfidence(
-  analysis: AnalysisResult,
-  hasMarket: boolean
-): Memo["confidence"] {
-  const { adsJudged, adsSetAside, adsAnalyzed, winners, losers, median, hasCreativeNotes, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
+/* Input Honesty V1: confidence is derived ONLY from structural facts
+   (sample size, group sizes, column completeness, name-tag pattern) —
+   never from the mere presence of arbitrary free text. hasCreativeNotes
+   and marketContext presence are deliberately NOT read here; providing
+   notes (of any content, including nonsense) must never raise, lower,
+   or otherwise alter confidence.level, .reasons, or .notes. hasNameSignal
+   is kept because it's a structural fact derived from ad NAMES across a
+   group, not user prose. */
+function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
+  const { adsJudged, adsSetAside, adsAnalyzed, winners, losers, median, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
     analysis;
   const notes: string[] = [];
 
@@ -1065,9 +1070,6 @@ function buildConfidence(
     notes.push(
       `${adsSetAside} of ${adsAnalyzed} ads were set aside for insufficient spend (below ${fmtMoney(spendGate, currency)}) — excluded from winners/losers, not penalized.`
     );
-  }
-  if (!hasCreativeNotes && !hasNameSignal) {
-    notes.push("No creative notes or clear ad-name pattern — angle analysis is metrics-only.");
   }
   if (missingColumns.includes("Ad name")) {
     notes.push("Ad name column wasn't found — ads are labeled generically (Ad 1, Ad 2, …).");
@@ -1087,7 +1089,7 @@ function buildConfidence(
     winners.length < 3 ||
     losers.length < 3 ||
     missingColumns.length > 0 ||
-    (!hasCreativeNotes && !hasNameSignal)
+    !hasNameSignal
   ) {
     level = "medium";
   }
@@ -1118,11 +1120,6 @@ function buildConfidence(
         `${fmtMoney(belowBenchmarkSpend, currency)} sat below the median — the cut side is material.`
       );
     }
-    if (hasMarket) {
-      reasons.push(
-        "Market notes point the same direction — directional support only."
-      );
-    }
     clientWhy =
       "Confidence is high because most ads had enough spend to judge fairly and the gap between what worked and what didn't is clear.";
   } else if (level === "medium") {
@@ -1141,9 +1138,9 @@ function buildConfidence(
         `The export was missing ${missingColumns.length} column${missingColumns.length === 1 ? "" : "s"} — parts of the read are less precise.`
       );
     }
-    if (!hasCreativeNotes && !hasNameSignal) {
+    if (!hasNameSignal) {
       reasons.push(
-        "No creative notes or name pattern — the judgement is metrics-only."
+        "No clear ad-name pattern — the judgement leans on numbers alone."
       );
     }
     if (topPct != null && topPct < 30) {
@@ -1197,9 +1194,10 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       nextTests[0]
         ? { preserve: nextTests[0].brief.keepConstant, change: nextTests[0].brief.change }
         : null,
-      // Evidence Inputs V1: forward the optional test-quality answers.
-      // DebriefContext extends TestQualityContext, so `context` already
-      // carries controlledTest/trackingChanged/setupChanged. Feeds
+      // Evidence Inputs V1 + Input Honesty V1: forward the optional
+      // test-quality answers and objective. DebriefContext extends
+      // DecisionInputContext, so `context` already carries
+      // controlledTest/trackingChanged/setupChanged/objective. Feeds
       // buildLimits copy only — never the action or evidenceState.
       context
     ),
@@ -1240,6 +1238,6 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
     avoid: buildAvoid(analysis, context),
-    confidence: buildConfidence(analysis, context.marketContext.trim() !== ""),
+    confidence: buildConfidence(analysis),
   };
 }

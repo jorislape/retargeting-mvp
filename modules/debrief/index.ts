@@ -17,6 +17,7 @@ export {
   EMPTY_COMPETITOR_SOURCE,
   extractMarketSignals,
   formatCompetitorSources,
+  MARKET_SIGNALS_DISCLOSURE,
   MAX_COMPETITOR_SOURCES,
   mergeCompetitorSourcesIntoNotes,
   structureMarketNotes,

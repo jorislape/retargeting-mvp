@@ -190,7 +190,7 @@ export function memoToText(
   if (memo.marketSignal) {
     lines.push(view === "client" ? "MARKET CONTEXT" : "MARKET SIGNAL");
     memo.marketSignal.bullets.forEach((b) => lines.push(`- ${b}`));
-    lines.push(`Context quality: ${memo.marketSignal.quality.summary}`);
+    lines.push(memo.marketSignal.quality.summary);
     lines.push(memo.marketSignal.caveat);
     lines.push("");
   }

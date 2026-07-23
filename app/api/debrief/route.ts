@@ -13,6 +13,7 @@ import {
   toTable,
   type CreativeFormatOverrides,
   type DebriefApiError,
+  type Objective,
 } from "@/modules/debrief";
 
 /**
@@ -120,8 +121,9 @@ export async function POST(request: NextRequest) {
     targetCpa = parsed;
   }
 
-  /* Evidence Inputs V1 — optional self-reported test-quality answers.
-     Any unrecognized/absent value is treated as UNANSWERED (undefined),
+  /* Evidence Inputs V1 + Input Honesty V1 — optional self-reported
+     test-quality answers and the optional structured objective. Any
+     unrecognized/absent value is treated as UNANSWERED (undefined),
      which is a complete no-op downstream: it appends no limits line and
      leaves the memo byte-identical to a run without the feature. These
      never touch ranking, median, spend gate, action, or evidenceState.
@@ -133,12 +135,16 @@ export async function POST(request: NextRequest) {
     v === "yes" || v === "no" || v === "unsure" ? v : undefined;
   const parseChanged = (v: FormDataEntryValue | null): boolean | undefined =>
     v === "yes" ? true : v === "no" ? false : undefined;
+  /* Unknown/unrecognized objective values clamp to undefined (a no-op)
+     rather than failing the request — the field is optional framing
+     context, never worth a 400. */
+  const parseObjective = (v: FormDataEntryValue | null): Objective | undefined =>
+    v === "efficiency" || v === "growth" || v === "learning" ? v : undefined;
 
   const context = {
     kpi: kpi as KpiKey,
     product: String(form.get("product") ?? "").trim().slice(0, 200),
     offer: String(form.get("offer") ?? "").trim().slice(0, 200),
-    goal: String(form.get("goal") ?? "").trim().slice(0, 200),
     targetCpa,
     creativeNotes: String(form.get("creativeNotes") ?? "").trim().slice(0, 1000),
     /* Optional pasted market/competitor notes — directional context for
@@ -148,6 +154,7 @@ export async function POST(request: NextRequest) {
     controlledTest: parseTriState(form.get("controlledTest")),
     trackingChanged: parseChanged(form.get("trackingChanged")),
     setupChanged: parseChanged(form.get("setupChanged")),
+    objective: parseObjective(form.get("objective")),
   };
 
   /* Optional creative-format confirmations (ad name → format tag).

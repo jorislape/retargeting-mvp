@@ -161,7 +161,6 @@ const json = async (path: string, init?: RequestInit) => {
     form.append("kpi", "roas");
     form.append("product", "Test product");
     form.append("offer", "Test offer");
-    form.append("goal", "Test goal");
     form.append("creativeNotes", "");
     form.append("marketContext", "");
     const debrief = await fetch(`${BASE}/api/debrief`, {

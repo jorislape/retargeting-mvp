@@ -175,6 +175,10 @@ export function ReportCustomizationPanel<Id extends string>({
                   onChange={(e) => actions.setDateOverride(e.target.value)}
                 />
               )}
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                Changes the displayed report date only. It does not change
+                the analyzed data period.
+              </p>
             </div>
           </div>
 

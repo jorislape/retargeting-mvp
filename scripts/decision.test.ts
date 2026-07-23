@@ -600,6 +600,123 @@ function assertContract(d: MemoDecision, label: string) {
   );
 }
 
+/* ============ Input Honesty V1: objective (structured, enum-only) ============ */
+
+{
+  const separation = fixture({
+    adsJudged: 12,
+    winners: [ad("W1", 200, 45), ad("W2", 180, 20), ad("W3", 160, 18)],
+    losers: [ad("L1", 120, -18), ad("L2", 110, -17), ad("L3", 100, -16)],
+    judgedSpend: 1000,
+    belowBenchmarkSpend: 330,
+    belowBenchmarkCount: 3,
+  });
+  const noObjective = buildDecision(separation, "T", money, null);
+  const noneOf = ["action", "holdReason", "headline", "clientHeadline", "rationale", "clientRationale", "evidenceState", "evidenceShape", "reassess", "avoidNow"] as const;
+
+  // Unknown/unrecognized objective values are a complete no-op.
+  const unknown = buildDecision(separation, "T", money, null, { objective: "nonsense" as never });
+  for (const k of noneOf) assert.deepEqual(unknown[k], noObjective[k], `unknown objective must not change ${k}`);
+  assert.deepEqual(unknown.limits, noObjective.limits, "unknown objective adds no limits lines");
+
+  // objective never changes action/evidenceState/ranking/gate/median/KPI —
+  // proved across all three real values, on a BUDGET (scale) decision.
+  for (const objective of ["efficiency", "growth", "learning"] as const) {
+    const d = buildDecision(separation, "T", money, null, { objective });
+    for (const k of noneOf) {
+      assert.deepEqual(d[k], noObjective[k], `objective=${objective} must not change ${k}`);
+    }
+    assertContract(d, `objective=${objective}`);
+  }
+
+  // objective=efficiency + a scale-eligible budget action → the ONE
+  // action-dependent caveat. This fixture's action is "budget" (scale-only:
+  // the winner clears the 30% scale bar, but the worst loser's -18% delta
+  // doesn't clear the -30% cut bar) — exactly the case the caveat targets.
+  const eff = buildDecision(separation, "T", money, null, { objective: "efficiency" });
+  assert.equal(eff.action, "budget", "fixture is a budget action (precondition for this caveat)");
+  assert.equal(
+    eff.limits.buyer.length,
+    noObjective.limits.buyer.length + 1,
+    "objective=efficiency on a scale/shift budget action adds exactly one caveat"
+  );
+  assert.ok(
+    eff.limits.buyer[eff.limits.buyer.length - 1].includes("Verify profitability before increasing spend"),
+    "efficiency+scale caveat present"
+  );
+
+  // The same caveat must NOT fire on a cut-only decision (cutting
+  // reduces spend — no "verify profitability before increasing spend"
+  // concern applies).
+  const cutOnly = fixture({
+    adsJudged: 12,
+    winners: [ad("W", 200, 10)],
+    losers: [ad("L1", 300, -35), ad("L2", 250, -32), ad("L3", 200, -31)],
+    judgedSpend: 1000,
+    belowBenchmarkSpend: 750,
+    belowBenchmarkCount: 3,
+  });
+  const cutBase = buildDecision(cutOnly, "T", money, null);
+  const cutEff = buildDecision(cutOnly, "T", money, null, { objective: "efficiency" });
+  assert.equal(cutEff.action, "budget", "precondition: this fixture is a cut action");
+  assert.ok(cutBase.headline.startsWith("Cut "), "precondition: cut-only variant");
+  assert.deepEqual(cutEff.limits, cutBase.limits, "efficiency caveat does NOT fire on a cut-only action");
+
+  // objective=growth + KPI ctr/cpc → framing/limits only, both KPIs.
+  for (const kpi of ["ctr", "cpc"] as const) {
+    const f = fixture({ ...separation, kpi });
+    const base = buildDecision(f, "T", money, null);
+    const growth = buildDecision(f, "T", money, null, { objective: "growth" });
+    assert.equal(growth.action, base.action, `objective=growth must not change action (kpi=${kpi})`);
+    assert.equal(
+      growth.limits.buyer.length,
+      base.limits.buyer.length + 1,
+      `objective=growth + kpi=${kpi} adds exactly one caveat`
+    );
+    assert.ok(
+      growth.limits.buyer[growth.limits.buyer.length - 1].toLowerCase().includes("traffic efficiency"),
+      `growth+${kpi} caveat present`
+    );
+  }
+  // growth + roas (not ctr/cpc) → no caveat.
+  const growthRoas = buildDecision(separation, "T", money, null, { objective: "growth" });
+  assert.deepEqual(growthRoas.limits, noObjective.limits, "objective=growth + kpi=roas adds no caveat");
+
+  // objective=efficiency + KPI ctr → limits only.
+  const ctrFixture = fixture({ ...separation, kpi: "ctr" });
+  const ctrBase = buildDecision(ctrFixture, "T", money, null);
+  const ctrEff = buildDecision(ctrFixture, "T", money, null, { objective: "efficiency" });
+  assert.equal(ctrEff.action, ctrBase.action, "objective=efficiency must not change action (kpi=ctr)");
+  // Two caveats stack here: the ctr-doesn't-verify-efficiency rule (in
+  // buildLimits) AND the scale-action rule (withEfficiencyScaleCaveat) —
+  // both true and independent facts for this fixture's budget action.
+  assert.equal(
+    ctrEff.limits.buyer.length,
+    ctrBase.limits.buyer.length + 2,
+    "objective=efficiency + kpi=ctr on a budget action stacks both caveats"
+  );
+  assert.ok(
+    ctrEff.limits.buyer.some((l) => l.includes("doesn't verify CPA or ROAS efficiency")),
+    "efficiency+ctr caveat present"
+  );
+
+  // objective=learning → neutral framing only, never rewrites the action.
+  const learning = buildDecision(separation, "T", money, null, { objective: "learning" });
+  assert.equal(learning.action, noObjective.action, "objective=learning must not change action");
+  assert.equal(learning.limits.buyer.length, noObjective.limits.buyer.length + 1, "learning adds exactly one caveat");
+  assert.ok(learning.limits.buyer[learning.limits.buyer.length - 1].includes("learning phase"), "learning caveat present");
+
+  // Client register stays jargon-clean across every objective caveat.
+  for (const objective of ["efficiency", "growth", "learning"] as const) {
+    const f = objective === "growth" ? { ...separation, kpi: "ctr" as const } : separation;
+    const d = buildDecision(fixture(f), "T", money, null, { objective });
+    const clientJoined = d.limits.client.join(" ").toLowerCase();
+    for (const w of ["kill", "gate", "benchmark", "median", "judged"]) {
+      assert.ok(!clientJoined.includes(w), `objective=${objective} client limits clean of "${w}"`);
+    }
+  }
+}
+
 console.log("decision (stage 1 — rules): all assertions passed");
 
 /* ===================== Stage 2: sample-dataset pin via the real engine ===================== */
@@ -751,20 +868,20 @@ console.log("decision (stage 1 — rules): all assertions passed");
     const { extractAds } = require(join(dist, "modules/debrief/extract.js"));
     const { analyze } = require(join(dist, "modules/debrief/analysis.js"));
     const { generateMemo } = require(join(dist, "modules/debrief/memo.js"));
-    const ctx = (kpi: string) => ({
+    const ctx = (kpi: string, overrides: Record<string, unknown> = {}) => ({
       kpi,
       product: "",
       offer: "",
-      goal: "",
       targetCpa: null,
       creativeNotes: "",
       marketContext: "",
+      ...overrides,
     });
-    const runEngine = (csv: string, kpi: string) => {
+    const runEngine = (csv: string, kpi: string, overrides: Record<string, unknown> = {}) => {
       const { headers, rows } = toTable(parseCsv(csv));
       const columns = resolveColumns(headers);
       const ads = extractAds(rows, columns, kpi);
-      return generateMemo(analyze(ads, rows, columns, ctx(kpi)), ctx(kpi));
+      return generateMemo(analyze(ads, rows, columns, ctx(kpi, overrides)), ctx(kpi, overrides));
     };
 
     // (a) ROAS with NO Purchases column → count unavailable, never estimated.
@@ -838,6 +955,101 @@ console.log("decision (stage 1 — rules): all assertions passed");
       "50 purchases",
       "Meta-shape CSV (insightsToCsv headers) retains the purchase count through the same parser"
     );
+
+    /* ---- Input Honesty V1: real-engine invariance proofs ---- */
+
+    // Campaign goal is completely removed: the sample context (and any
+    // context object) carries no goal field at all.
+    const { SAMPLE_CONTEXT: compiledSampleContext } = require(join(dist, "modules/debrief/sampleCsv.js"));
+    assert.ok(!("goal" in compiledSampleContext), "SAMPLE_CONTEXT no longer carries a goal field");
+
+    // Arbitrary/nonsense/contradictory/empty free text in product, offer,
+    // creativeNotes, and marketContext must never change confidence,
+    // action, evidenceState, spend, median, or ranking — proved against
+    // the same CSV with wildly different context every time.
+    const confBase = runEngine(metaShape, "roas");
+    const confVariants: Record<string, unknown>[] = [
+      {},
+      {
+        product: "asdkjfhalskdjf",
+        offer: "!!!???",
+        creativeNotes: "lower CPC lower CPC lower CPC",
+        marketContext: "zzz not a real signal qqq",
+      },
+      { product: "", offer: "", creativeNotes: "", marketContext: "" },
+      {
+        creativeNotes:
+          "founder-led ugc testimonial video static carousel bundle discount free shipping",
+      },
+      {
+        product:
+          "Contradictory: lower CPC AND more profit AND less spend, all at once, forever",
+      },
+    ];
+    for (const overrides of confVariants) {
+      const m = runEngine(metaShape, "roas", overrides);
+      assert.deepEqual(
+        m.confidence,
+        confBase.confidence,
+        `arbitrary context must not change confidence (${JSON.stringify(overrides)})`
+      );
+      assert.equal(m.decision.action, confBase.decision.action, "arbitrary context must not change action");
+      assert.equal(
+        m.decision.evidenceState,
+        confBase.decision.evidenceState,
+        "arbitrary context must not change evidenceState"
+      );
+      assert.equal(m.scope.totalSpendLabel, confBase.scope.totalSpendLabel, "arbitrary context must not change spend");
+      assert.equal(m.scope.medianLabel, confBase.scope.medianLabel, "arbitrary context must not change median");
+      assert.deepEqual(
+        m.winners.map((w: { name: string }) => w.name),
+        confBase.winners.map((w: { name: string }) => w.name),
+        "arbitrary context must not change ranking"
+      );
+    }
+
+    // Scope check: creativeNotes is never scanned for market signals —
+    // only marketContext is. A keyword-dense creativeNotes with an
+    // EMPTY marketContext must produce no marketSignal section at all.
+    const notesOnly = runEngine(metaShape, "roas", {
+      creativeNotes: "founder-led ugc testimonial bundle discount",
+      marketContext: "",
+    });
+    assert.equal(notesOnly.marketSignal, null, "creativeNotes keywords never feed marketSignal extraction");
+
+    // Unknown objective values are a complete no-op end to end.
+    const objBase = runEngine(metaShape, "roas");
+    const objUnknown = runEngine(metaShape, "roas", { objective: "not-a-real-objective" });
+    assert.deepEqual(objUnknown.decision, objBase.decision, "unknown objective value is a full no-op on the real engine");
+
+    // "Context quality: Strong/Good/Weak" is fully gone from user-facing
+    // output; the fixed-list disclosure is present in both UI-equivalent
+    // report data and TXT export (via decision.limits/marketSignal.caveat
+    // which memoToText serializes verbatim).
+    const withMarket = runEngine(metaShape, "roas", {
+      marketContext: "founder-led video, bundle offers, problem-first hooks",
+    });
+    assert.ok(withMarket.marketSignal, "precondition: marketContext produced a marketSignal section");
+    const qualitySummary: string = withMarket.marketSignal.quality.summary;
+    assert.ok(!/\bstrong\b|\bgood\b|\bweak\b/i.test(qualitySummary), "no Strong/Good/Weak quality language in the summary");
+    assert.ok(qualitySummary.startsWith("Recognized market signals:"), "summary uses the neutral count format");
+    assert.ok(
+      withMarket.marketSignal.caveat.includes("Debrief checks for a fixed list of formats, hooks, and offers"),
+      "fixed-list disclosure present in marketSignal.caveat (renders in report UI and TXT export)"
+    );
+
+    // Same disclosure and absence of quality-judgment wording confirmed
+    // in the actual TXT export, both registers.
+    const withMarketBuyerText: string = memoToText(withMarket, "buyer");
+    const withMarketClientText: string = memoToText(withMarket, "client");
+    for (const text of [withMarketBuyerText, withMarketClientText]) {
+      assert.ok(!/Context quality:/i.test(text), "TXT export carries no 'Context quality:' label");
+      assert.ok(!/strong —|good —|weak —/i.test(text), "TXT export carries no Strong/Good/Weak quality phrasing");
+      assert.ok(
+        text.includes("Debrief checks for a fixed list of formats, hooks, and offers"),
+        "TXT export carries the fixed-list disclosure"
+      );
+    }
   } finally {
     rmSync(dist, { recursive: true, force: true });
   }

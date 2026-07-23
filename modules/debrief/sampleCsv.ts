@@ -68,7 +68,6 @@ export const SAMPLE_CONTEXT: DebriefContext = {
   kpi: "roas",
   product: "Lumen Skincare — Vitamin C Serum",
   offer: "20% off first order",
-  goal: "Scale past $500/day profitably",
   targetCpa: null,
   creativeNotes:
     "UGC_* and Testimonial_* ads are creator-shot; Static_* and ProductShot_* are designed statics; *_Video_* are edited brand cuts.",

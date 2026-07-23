@@ -7,7 +7,7 @@
 // why buildDecision takes a money formatter as an argument instead of
 // importing format.ts (whose own internal import is extensionless).
 import { KPI_LABELS } from "./types.ts";
-import type { AnalysisResult, MemoDecision, TestQualityContext } from "./types.ts";
+import type { AnalysisResult, DecisionInputContext, MemoDecision, Objective } from "./types.ts";
 
 /**
  * Decision-First V1 — the "Next move" layer.
@@ -138,11 +138,13 @@ export function deriveEvidenceShape(
 export function buildLimits(
   analysis: AnalysisResult,
   flatField: boolean,
-  /** Evidence Inputs V1 — optional self-reported test-quality answers.
-   *  Undefined or unanswered fields append NOTHING (the output is
-   *  byte-identical to before the feature). These ONLY append caveat
-   *  lines; they never touch action, evidenceState, or any number. */
-  testQuality?: TestQualityContext
+  /** Evidence Inputs V1 + Input Honesty V1 — optional self-reported
+   *  test-quality answers AND the optional structured objective.
+   *  Undefined or unanswered/unrecognized fields append NOTHING (the
+   *  output is byte-identical to before either feature). These ONLY
+   *  append caveat lines; they never touch action, evidenceState, or
+   *  any number. */
+  testQuality?: DecisionInputContext
 ): { buyer: string[]; client: string[] } {
   const buyer: string[] = [];
   const client: string[] = [];
@@ -238,7 +240,67 @@ export function buildLimits(
     }
   }
 
+  /* ---- Input Honesty V1: objective framing/mismatch caveats. Uses
+     ONLY the structured objective enum + the KPI already selected for
+     THIS debrief — never parses product/offer/notes/marketContext, and
+     never adds a keyword-based mismatch check. Two of these three rules
+     depend only on objective+KPI, so they're valid regardless of which
+     action fires and belong here; the "efficiency + scale/shift action"
+     rule depends on the ACTUAL chosen action and is appended separately
+     in buildDecision's scaleEligible branches — see
+     withEfficiencyScaleCaveat below. ---- */
+  const objective = testQuality?.objective;
+  const kpiLabel = KPI_LABELS[analysis.kpi];
+  if (objective === "growth" && (analysis.kpi === "ctr" || analysis.kpi === "cpc")) {
+    buyer.push(
+      `You flagged "scale profitable volume" as the objective, but ${kpiLabel} measures traffic efficiency, not profitable growth or purchase outcomes — this read can't confirm the extra traffic is profitable.`
+    );
+    client.push(
+      `Your goal is more profitable volume, but this report is based on ${kpiLabel}, which measures clicks — not whether that traffic turns into profitable sales.`
+    );
+  }
+  if (objective === "efficiency" && analysis.kpi === "ctr") {
+    buyer.push(
+      `You flagged "improve efficiency" as the objective, but CTR doesn't verify CPA or ROAS efficiency — pair this read with a CPA or ROAS export before acting on efficiency grounds.`
+    );
+    client.push(
+      "Your goal is efficiency, but this report is based on CTR (clicks), which doesn't confirm your cost or return efficiency."
+    );
+  }
+  if (objective === "learning") {
+    buyer.push(
+      "You flagged this as a learning phase — treat this call as one data point for ongoing testing, not a final decision."
+    );
+    client.push(
+      "You told us this is a learning phase — treat this as one useful data point, not a final call."
+    );
+  }
+
   return { buyer, client };
+}
+
+/** Input Honesty V1 — the one objective caveat that depends on WHICH
+ *  action actually fires, so it can't live inside buildLimits (which
+ *  runs before the action is chosen). Appended only to the two
+ *  scaleEligible branches of buildDecision (shift and scale-only);
+ *  never the cut-only branch, since cutting REDUCES spend and carries
+ *  no "verify profitability before increasing spend" concern. Copy
+ *  only — never changes the action. */
+function withEfficiencyScaleCaveat(
+  limits: { buyer: string[]; client: string[] },
+  objective: Objective | undefined
+): { buyer: string[]; client: string[] } {
+  if (objective !== "efficiency") return limits;
+  return {
+    buyer: [
+      ...limits.buyer,
+      `You flagged "improve efficiency" as the objective — this recommendation identifies the strongest relative result in this dataset, not a verified profitable one. Verify profitability before increasing spend.`,
+    ],
+    client: [
+      ...limits.client,
+      "Your goal is efficiency — this points to the strongest performer here relative to the rest. Check it against your margins before increasing its budget.",
+    ],
+  };
 }
 
 export function buildDecision(
@@ -249,9 +311,11 @@ export function buildDecision(
    *  surface nextControlledTest on the card. Optional so the pure rule
    *  tests can call buildDecision without threading a test through. */
   nextTestFacts?: { preserve: string; change: string } | null,
-  /** Evidence Inputs V1 — optional test-quality answers, forwarded to
-   *  buildLimits only. Never affects the action or evidenceState. */
-  testQuality?: TestQualityContext
+  /** Evidence Inputs V1 + Input Honesty V1 — optional test-quality
+   *  answers and objective, forwarded to buildLimits (and, for
+   *  objective="efficiency", to the scaleEligible branches below).
+   *  Never affects the action or evidenceState. */
+  testQuality?: DecisionInputContext
 ): MemoDecision {
   const kpiLabel = KPI_LABELS[analysis.kpi];
   const gateLabel = money(analysis.spendGate);
@@ -360,6 +424,7 @@ export function buildDecision(
       avoidClient.push("We're making this one change on its own so results stay readable.");
       return {
         ...evidence,
+        limits: withEfficiencyScaleCaveat(evidence.limits, testQuality?.objective),
         action: "budget",
         headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
         clientHeadline: `Move budget from the weakest ads into "${top!.name}", the clear leader.`,
@@ -375,6 +440,7 @@ export function buildDecision(
       avoidClient.push("We're making this one change on its own so results stay readable.");
       return {
         ...evidence,
+        limits: withEfficiencyScaleCaveat(evidence.limits, testQuality?.objective),
         action: "budget",
         headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% past the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,

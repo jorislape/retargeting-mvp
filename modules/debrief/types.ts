@@ -104,13 +104,43 @@ export interface TestQualityContext {
   setupChanged?: boolean;
 }
 
+/** Optional structured framing of the account's current objective
+ *  (Input Honesty V1). An ENUM ONLY — never derived from free text.
+ *  It never changes numeric analysis, ranking, spend gate, action, or
+ *  evidenceState; it may only frame report wording and append
+ *  deterministic objective/KPI mismatch caveats to the evidence limits
+ *  (see modules/debrief/decision.ts). Absent, or any value outside this
+ *  set (including from the API), is a complete no-op. */
+export type Objective = "efficiency" | "growth" | "learning";
+
+/** The full set of optional, non-numeric inputs that MAY affect
+ *  decision.ts's evidence limits/framing — and NOTHING else. Combines
+ *  TestQualityContext (Evidence Inputs V1) with Objective (Input
+ *  Honesty V1) into one clearly-scoped "framing-only" argument type. */
+export interface DecisionInputContext extends TestQualityContext {
+  objective?: Objective;
+}
+
 /** Context the user fills in alongside the CSV — never stored. */
-export interface DebriefContext extends TestQualityContext {
+export interface DebriefContext extends DecisionInputContext {
   kpi: KpiKey;
+  /** Report-identification and framing context only (interpolated into
+   *  headings and test/brief copy) — never analyzed, never affects
+   *  scoring, ranking, action, or evidenceState. Required only so the
+   *  report has a label; any text, including nonsense, is accepted
+   *  verbatim. */
   product: string;
+  /** Appears in tests and briefs as report context (e.g. "keep the
+   *  offer, change the hook") — never interpreted, never affects
+   *  scoring. Optional; empty uses a neutral fallback ("the current
+   *  offer"). */
   offer: string;
-  goal: string;
   targetCpa: number | null;
+  /** Copied into the report and creative briefs as the user's own
+   *  guardrails, and quoted verbatim in one row-reason line — never
+   *  interpreted, and its mere presence no longer affects confidence
+   *  (Input Honesty V1). Arbitrary text, including nonsense, is
+   *  accepted and reproduced as-is, never analyzed for meaning. */
   creativeNotes: string;
   /** Optional pasted market/competitor notes (V1: manual input only).
    *  Directional context for the memo — never a performance claim. */

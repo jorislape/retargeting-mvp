@@ -75,17 +75,29 @@ export function extractMarketSignals(text: string): MarketSignals {
 
 export interface MarketQuality {
   level: "strong" | "good" | "weak";
-  /** Full human sentence, e.g. "Strong — formats, hooks, and links detected." */
+  /** Full human sentence, e.g. "Recognized market signals: 3 formats ·
+   *  1 hook · 3 offers." — a count, never a quality judgment. */
   summary: string;
 }
 
 const countLabel = (n: number, singular: string, plural: string): string =>
   `${n} ${n === 1 ? singular : plural}`;
 
-/** Null when the text is empty. Level is the number of distinct signal
- *  categories present: ≥3 strong, 2 good, ≤1 weak. The summary names
- *  compact per-category COUNTS so the meter is measurable ("3 formats,
- *  2 hooks…"), derived from the exact same parse that sets the level. */
+/** Fixed, always-true disclosure of what the market-notes keyword
+ *  matcher actually does — never "understanding," never "quality."
+ *  Rendered alongside the count summary everywhere it appears (UI,
+ *  report, TXT export), so the recognized scope is never left
+ *  implicit. Input Honesty V1. */
+export const MARKET_SIGNALS_DISCLOSURE =
+  "Debrief checks for a fixed list of formats, hooks, and offers. Other wording is not interpreted. These signals are directional only.";
+
+/** Null when the text is empty. `level` is an internal tier (by distinct
+ *  signal-category count) kept only to choose visual weight — it is
+ *  NEVER rendered as a "quality" judgment ("Strong/Good/Weak"). The
+ *  summary is a purely descriptive count of what the fixed keyword list
+ *  recognized ("Recognized market signals: 3 formats · 1 hook · 3
+ *  offers."), derived from the exact same parse that sets the tier —
+ *  never a claim about how well-written or how "good" the notes are. */
 export function assessMarketNotes(rawText: string): MarketQuality | null {
   const text = rawText.trim();
   if (text === "") return null;
@@ -107,23 +119,14 @@ export function assessMarketNotes(rawText: string): MarketQuality | null {
     counts.push(countLabel(urls.length, "link/source", "links/sources"));
   }
 
-  if (counts.length >= 3) {
-    return { level: "strong", summary: `Strong — ${counts.join(", ")} detected.` };
+  if (counts.length === 0) {
+    return { level: "weak", summary: "No recognized formats, hooks, offers, or links." };
   }
-  if (counts.length === 2) {
-    return { level: "good", summary: `Good — ${counts.join(", ")} detected.` };
-  }
-  if (counts.length === 1) {
-    return {
-      level: "weak",
-      summary: `Weak — ${counts[0]} detected; add competitor hooks, offers, or links for better recommendations.`,
-    };
-  }
-  return {
-    level: "weak",
-    summary:
-      "Weak — add competitor hooks, offers, or Ads Library links for better recommendations.",
-  };
+
+  const summary = `Recognized market signals: ${counts.join(" · ")}.`;
+  if (counts.length >= 3) return { level: "strong", summary };
+  if (counts.length === 2) return { level: "good", summary };
+  return { level: "weak", summary };
 }
 
 /* ------------------------------------------------------------------ */

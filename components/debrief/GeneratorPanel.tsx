@@ -10,6 +10,7 @@ import {
   fmtMoney,
   HIGHER_IS_BETTER,
   KPI_LABELS,
+  MARKET_SIGNALS_DISCLOSURE,
   MAX_COMPETITOR_SOURCES,
   mergeCompetitorSourcesIntoNotes,
   parseCsv,
@@ -747,10 +748,11 @@ export function GeneratorPanel() {
     sourceTimer.current = setTimeout(() => setSourceState("idle"), 2500);
   };
 
-  const contextDone =
-    fields.product.trim() !== "" &&
-    fields.offer.trim() !== "" &&
-    fields.goal.trim() !== "";
+  // Input Honesty V1: Product/industry is the only required context
+  // field — it's report-identification only (never analyzed), but the
+  // report needs a label. Offer and Objective are optional; neither
+  // gates submission.
+  const contextDone = fields.product.trim() !== "";
   const canSubmit = !!file && contextDone;
 
   const handleFiles = (files: FileList | null) => {
@@ -774,7 +776,6 @@ export function GeneratorPanel() {
     updateFields({
       ...(fields.product.trim() === "" && { product: SAMPLE_CONTEXT.product }),
       ...(fields.offer.trim() === "" && { offer: SAMPLE_CONTEXT.offer }),
-      ...(fields.goal.trim() === "" && { goal: SAMPLE_CONTEXT.goal }),
       ...(fields.creativeNotes.trim() === "" && {
         creativeNotes: SAMPLE_CONTEXT.creativeNotes,
       }),
@@ -847,7 +848,7 @@ export function GeneratorPanel() {
       {/* The required path, stated once up front — everything else on
           this page is an optional enhancement. */}
       <p className="mb-10 border-l-2 border-accent/40 pl-3 text-xs leading-relaxed text-zinc-400">
-        Required: load data, then fill in product / offer / goal below —
+        Required: load data, then fill in product / industry below —
         everything else on this page is optional.
       </p>
 
@@ -1195,7 +1196,23 @@ export function GeneratorPanel() {
             </div>
           </fieldset>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          {/* Input Honesty V1: one compact, always-visible statement of
+              what actually drives the analysis vs. what's report
+              context only — set once here rather than repeated per
+              field. Kept to four short lines by design. */}
+          <div className="mt-5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              How inputs are used
+            </p>
+            <ul className="mt-1.5 space-y-0.5 text-xs leading-relaxed text-zinc-400">
+              <li>• Numbers drive scoring — the KPI and any numeric targets decide the analysis.</li>
+              <li>• Structured answers add honesty notes — never change the recommendation.</li>
+              <li>• Free text is report context only — it isn&apos;t analyzed.</li>
+              <li>• Market notes use a fixed keyword list and are directional only.</li>
+            </ul>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="product" className={fieldLabel}>
                 Product / industry *
@@ -1207,10 +1224,14 @@ export function GeneratorPanel() {
                 placeholder="Skincare, vitamin C serum"
                 className={`mt-1.5 ${inputBase}`}
               />
+              <p className="mt-1.5 text-xs text-zinc-400">
+                Used to label and frame the report. It is not analyzed and
+                does not affect scoring.
+              </p>
             </div>
             <div>
               <label htmlFor="offer" className={fieldLabel}>
-                Offer *
+                Offer
               </label>
               <input
                 id="offer"
@@ -1219,18 +1240,42 @@ export function GeneratorPanel() {
                 placeholder="25% off first order"
                 className={`mt-1.5 ${inputBase}`}
               />
+              <p className="mt-1.5 text-xs text-zinc-400">
+                Appears in tests and briefs as report context. It is not
+                interpreted and does not affect scoring.
+              </p>
             </div>
             <div>
-              <label htmlFor="goal" className={fieldLabel}>
-                Campaign goal *
+              <label htmlFor="objective" className={fieldLabel}>
+                Objective
               </label>
-              <input
-                id="goal"
-                value={fields.goal}
-                onChange={(e) => updateFields({ goal: e.target.value })}
-                placeholder="Scale past $500/day"
+              <select
+                id="objective"
+                value={fields.objective}
+                onChange={(e) =>
+                  updateFields({
+                    objective: e.target.value as GeneratorFields["objective"],
+                  })
+                }
                 className={`mt-1.5 ${inputBase}`}
-              />
+              >
+                <option value="" className="bg-zinc-900">
+                  Not specified
+                </option>
+                <option value="efficiency" className="bg-zinc-900">
+                  Improve efficiency
+                </option>
+                <option value="growth" className="bg-zinc-900">
+                  Scale profitable volume
+                </option>
+                <option value="learning" className="bg-zinc-900">
+                  Learn what works
+                </option>
+              </select>
+              <p className="mt-1.5 text-xs text-zinc-400">
+                Frames report wording and may add honesty notes. It never
+                changes the recommendation.
+              </p>
             </div>
           </div>
           <p className="mt-3 text-xs text-zinc-400">* Required.</p>
@@ -1295,8 +1340,9 @@ export function GeneratorPanel() {
                     className={`mt-1.5 resize-none ${inputBase}`}
                   />
                   <p className="mt-1.5 text-xs text-zinc-400">
-                    Carries into creative briefs as guardrails — doesn&apos;t
-                    affect scoring or ranking.
+                    Copied into the report and creative briefs as your own
+                    guardrails. It is not interpreted and does not affect
+                    scoring or confidence.
                   </p>
                 </div>
               </div>
@@ -1481,28 +1527,33 @@ export function GeneratorPanel() {
   https://www.facebook.com/ads/library/...`}
                   className={`mt-1.5 resize-none ${inputBase}`}
                 />
-                {/* One helper slot, three states (no layout shift):
-                    the "nothing to structure" notice wins, then the local
-                    deterministic quality meter once anything is typed,
-                    else the default helper text. */}
+                {/* One helper slot, three states (no layout shift): the
+                    "nothing to structure" notice wins, then the local
+                    RECOGNIZED-SIGNALS COUNT once anything is typed (a
+                    count, never a "quality" judgment — Input Honesty
+                    V1), else the default helper text. Styling is
+                    intentionally uniform across marketQuality states —
+                    only the distinct "empty" validation state is
+                    called out in amber. */}
                 <p
                   aria-live="polite"
                   className={`mt-1.5 text-xs leading-relaxed ${
-                    noteState === "empty" || marketQuality?.level === "weak"
-                      ? "text-amber-300"
-                      : marketQuality?.level === "strong"
-                        ? "font-medium text-accent-soft"
-                        : marketQuality
-                          ? "text-zinc-300"
-                          : "text-zinc-400"
+                    noteState === "empty" ? "text-amber-300" : "text-zinc-400"
                   }`}
                 >
                   {noteState === "empty"
                     ? "Add competitor notes or links first."
                     : marketQuality
-                      ? `Market context: ${marketQuality.summary}`
+                      ? marketQuality.summary
                       : "Market context: Optional — add notes, selected signals, competitor sources, or watchlist signals to improve creative test suggestions."}
                 </p>
+                {/* Fixed-list disclosure — always shown once text exists,
+                    so the recognized scope is never left implicit. */}
+                {fields.marketContext.trim() !== "" && (
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                    {MARKET_SIGNALS_DISCLOSURE}
+                  </p>
+                )}
               </div>
 
               {/* Market signal builder: guided chips → the same notes
@@ -2345,7 +2396,7 @@ export function GeneratorPanel() {
                     {KPI_OPTIONS.find((o) => o.value === fields.kpi)?.label}
                     {contextDone
                       ? " · ready"
-                      : " · fill product, offer, and goal in stage 2"}
+                      : " · fill product / industry in stage 2"}
                   </>
                 ) : (
                   "Load data in stage 1 to run."

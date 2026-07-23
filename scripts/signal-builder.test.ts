@@ -104,17 +104,19 @@ assert.ok(
 );
 assert.match(
   quality.summary,
-  /^\w+ — \d+ \w+/,
-  "summary carries measurable counts"
+  /^Recognized market signals: .*\d+ \w+/,
+  "summary carries measurable counts, neutral wording (Input Honesty V1 — never 'quality')"
 );
 
-/* ---- quality meter counts ---- */
+/* ---- quality meter counts (Input Honesty V1: neutral counts, never a
+   "Strong/Good/Weak" quality judgment) ---- */
 
 const strong = assessMarketNotes(
   "founder-led videos, ugc clips, problem-first hooks, bundle offers and discounts, https://example.com"
 );
 assert.equal(strong?.level, "strong");
-assert.match(strong.summary, /^Strong — /);
+assert.match(strong.summary, /^Recognized market signals: /);
+assert.ok(!/\bstrong\b|\bgood\b|\bweak\b/i.test(strong.summary), "no quality-judgment words in the summary");
 assert.ok(/\d+ formats?/.test(strong.summary), "format count present");
 assert.ok(/\d+ hooks?/.test(strong.summary), "hook count present");
 assert.ok(/\d+ offers?/.test(strong.summary), "offer count present");
@@ -122,10 +124,10 @@ assert.ok(/1 link\/source/.test(strong.summary), "link count present");
 
 const weakOne = assessMarketNotes("they run carousels");
 assert.equal(weakOne?.level, "weak");
-assert.match(weakOne.summary, /^Weak — 1 format detected;/);
+assert.equal(weakOne.summary, "Recognized market signals: 1 format.");
 
 const weakNone = assessMarketNotes("some vague text with no known terms");
 assert.equal(weakNone?.level, "weak");
-assert.match(weakNone.summary, /^Weak — add competitor hooks/);
+assert.equal(weakNone.summary, "No recognized formats, hooks, offers, or links.");
 
 console.log("signal-builder: all assertions passed");

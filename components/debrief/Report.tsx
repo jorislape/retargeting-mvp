@@ -1230,7 +1230,7 @@ export function Report({
               ))}
             </ul>
             <p className="mt-4 text-xs leading-relaxed text-zinc-400">
-              Context quality: {memo.marketSignal.quality.summary}
+              {memo.marketSignal.quality.summary}
             </p>
             <p className="mt-1 text-xs leading-relaxed text-zinc-400">
               {memo.marketSignal.caveat}

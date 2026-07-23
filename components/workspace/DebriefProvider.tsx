@@ -28,9 +28,12 @@ import type {
 
 export interface GeneratorFields {
   kpi: KpiKey;
+  /** Report-identification/framing only — required so the report has a
+   *  label, but never analyzed and never affects scoring. */
   product: string;
+  /** Report/framing context only — optional; empty uses a neutral
+   *  fallback ("the current offer"). Never interpreted. */
   offer: string;
-  goal: string;
   targetCpa: string;
   creativeNotes: string;
   /** Optional pasted market/competitor notes — never required. */
@@ -41,6 +44,11 @@ export interface GeneratorFields {
   controlledTest: "" | "yes" | "no" | "unsure";
   trackingChanged: "" | "yes" | "no";
   setupChanged: "" | "yes" | "no";
+  /* Input Honesty V1 — optional structured objective. Default "not
+     specified"; a full no-op on the memo unless explicitly set, and
+     even then it only frames wording / appends limits caveats — it
+     never changes action, evidenceState, ranking, or any number. */
+  objective: "" | "efficiency" | "growth" | "learning";
 }
 
 /* Competitor sources are an input aid for the market-notes field, not
@@ -57,13 +65,13 @@ const DEFAULT_FIELDS: GeneratorFields = {
   kpi: "roas",
   product: "",
   offer: "",
-  goal: "",
   targetCpa: "",
   creativeNotes: "",
   marketContext: "",
   controlledTest: "",
   trackingChanged: "",
   setupChanged: "",
+  objective: "",
 };
 
 /* The engine is deterministic and fast (~50ms); a sub-100ms flash of
@@ -152,7 +160,6 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     body.append("kpi", fields.kpi);
     body.append("product", fields.product);
     body.append("offer", fields.offer);
-    body.append("goal", fields.goal);
     if (fields.targetCpa.trim() !== "") body.append("targetCpa", fields.targetCpa);
     body.append("creativeNotes", fields.creativeNotes);
     body.append("marketContext", fields.marketContext);
@@ -162,6 +169,8 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     if (fields.controlledTest !== "") body.append("controlledTest", fields.controlledTest);
     if (fields.trackingChanged !== "") body.append("trackingChanged", fields.trackingChanged);
     if (fields.setupChanged !== "") body.append("setupChanged", fields.setupChanged);
+    // Input Honesty V1: same "send only when set" no-op contract.
+    if (fields.objective !== "") body.append("objective", fields.objective);
     if (Object.keys(formatOverrides).length > 0) {
       body.append("creativeFormatOverrides", JSON.stringify(formatOverrides));
     }
