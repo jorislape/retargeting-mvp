@@ -266,6 +266,14 @@ import {
     PERFORMANCE_PRESET_OPTIONS.map((o) => o.id),
     ["buyer", "client", "executive", "print"]
   );
+
+  // Naming correction: "Executive summary", NOT "one-pager" — the real
+  // sample report at this preset's settings runs to ~5 printed pages,
+  // so a one-page promise would be misleading. Label only; id and every
+  // behavioral field above are unchanged.
+  const executiveOption = PERFORMANCE_PRESET_OPTIONS.find((o) => o.id === "executive");
+  assert.equal(executiveOption?.label, "Executive summary");
+  assert.ok(!/one.pager|one page/i.test(executiveOption?.label ?? ""), "label must not promise a single page");
 }
 
 /** Builds a full ReportCustomization for the tests below — deliberately

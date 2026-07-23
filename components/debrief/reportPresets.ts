@@ -76,7 +76,13 @@ export const PERFORMANCE_PRESETS: Record<
 export const PRESET_LABELS: Record<Exclude<PresetId, "custom">, string> = {
   buyer: "Buyer analysis",
   client: "Client summary",
-  executive: "Executive one-pager",
+  // "Executive summary" — NOT "one-pager": the real sample report at
+  // this preset's section/density settings runs to ~5 printed pages,
+  // so a one-page promise would be misleading. The id ("executive")
+  // and every behavioral setting are unchanged; this is a label fix
+  // only. Forcing an actual single page is explicitly out of scope for
+  // this milestone.
+  executive: "Executive summary",
   print: "Print-friendly",
 };
 
