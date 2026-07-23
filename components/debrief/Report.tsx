@@ -998,7 +998,7 @@ export function Report({
         </div>
       </div>
 
-      <article className={customization.colorMode === "grayscale" ? "report-grayscale" : undefined}>
+      <article>
         {/* Print-only brand line — the on-screen sidebar wordmark is
             .print-hidden, so the printed document needs its own,
             otherwise the exported PDF carries no indication of what

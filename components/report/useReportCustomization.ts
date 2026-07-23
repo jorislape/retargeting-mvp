@@ -5,7 +5,6 @@ import {
   createDefaultCustomization,
   derivePreset,
   type AccentId,
-  type ColorMode,
   type Density,
   type PresetDefinition,
   type PresetId,
@@ -48,7 +47,10 @@ export interface UseReportCustomizationResult<Id extends string> {
   toggleSection: (id: Id) => void;
   setTopAdsShown: (value: TopAdsShown) => void;
   setDensity: (value: Density) => void;
-  setColorMode: (value: ColorMode) => void;
+  /** No `setColorMode` — colorMode is an internal, preset-scoped field
+   *  only (see reportCustomization.ts). It's never user-toggleable
+   *  directly; the only way it changes is via setPreset applying a
+   *  preset that specifies it (Print-friendly sets "grayscale"). */
   /** Applies a named preset's full snapshot (mode + sections +
    *  topAdsShown + density + colorMode) in one update. Identity/
    *  branding fields (agency/client name, title, logo, accent, date
@@ -139,16 +141,6 @@ export function useReportCustomization<Id extends string>(
     [presets, sectionIds]
   );
 
-  const setColorMode = useCallback(
-    (value: ColorMode) => {
-      setCustomization((c) => {
-        const next = { ...c, colorMode: value };
-        return { ...next, preset: derivePreset(next, presets, sectionIds) };
-      });
-    },
-    [presets, sectionIds]
-  );
-
   const setPreset = useCallback(
     (id: Exclude<PresetId, "custom">) => {
       const snapshot = presets?.[id];
@@ -183,7 +175,6 @@ export function useReportCustomization<Id extends string>(
     toggleSection,
     setTopAdsShown,
     setDensity,
-    setColorMode,
     setPreset,
     setAgencyLogoFile,
     reset,

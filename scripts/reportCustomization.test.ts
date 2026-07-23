@@ -422,30 +422,34 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
 }
 
 {
-  // .report-grayscale (globals.css): a structural check that the
-  // on-screen mirror exists and reasserts the same semantic classes the
-  // print stylesheet already uses — win/loss/accent/kv/section-label —
-  // never claiming color is the only encoding once toggled. Textual/
-  // structural, matching how the rest of this print system has no
-  // rendered-DOM test anywhere in this repo.
+  // Grayscale correction: the on-screen preview was removed (it read as
+  // an unfinished print-CSS mirror, not a polished theme) — .report-
+  // grayscale must be gone from globals.css entirely, and the existing
+  // @media print stylesheet must be provably unchanged (colorMode still
+  // exists as an internal, preset-scoped field — Print-friendly still
+  // sets it "grayscale" for preset matching — but nothing renders it).
+  // Textual/structural, matching how the rest of this print system has
+  // no rendered-DOM test anywhere in this repo.
   const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf-8");
-  assert.ok(css.includes(".report-grayscale"), "the grayscale class exists");
-  for (const selector of [
-    ".report-grayscale .print-win",
-    ".report-grayscale .print-loss",
-    ".report-grayscale .print-neutral",
-    ".report-grayscale .print-accent",
-    ".report-grayscale .print-kv-label",
-    ".report-grayscale .print-kv-value",
-    ".report-grayscale .print-section-label",
-  ]) {
-    assert.ok(css.includes(selector), `${selector} must be present — grayscale must preserve every semantic class print already uses`);
-  }
-  // The print stylesheet itself must be untouched by this addition —
-  // still exactly one @media print block's worth of win/loss rules,
-  // not merged into or replaced by the new selectors.
-  assert.ok(css.includes("@media print"), "the print stylesheet still exists independently");
+  assert.ok(!css.includes("report-grayscale"), "the on-screen grayscale preview class must not exist");
+  assert.ok(css.includes("@media print"), "the print stylesheet still exists");
   assert.ok(css.includes("body .print-win"), "print stylesheet's own win rule is untouched");
+  assert.equal((css.match(/@media print/g) ?? []).length, 1, "exactly one @media print block — not split around a since-removed insertion");
+
+  // The panel must not expose a Color/Grayscale control or any call
+  // into a setColorMode action — colorMode is preset-internal only now.
+  const panelSrc = readFileSync(
+    new URL("../components/report/ReportCustomizationPanel.tsx", import.meta.url),
+    "utf-8"
+  );
+  assert.ok(!panelSrc.includes("setColorMode"), "the panel must not call setColorMode");
+  assert.ok(!/color\s*mode/i.test(panelSrc), "the panel must not label a Color mode control");
+
+  const hookSrc = readFileSync(
+    new URL("../components/report/useReportCustomization.ts", import.meta.url),
+    "utf-8"
+  );
+  assert.ok(!/\bsetColorMode\b/.test(hookSrc.replace(/\/\*[\s\S]*?\*\//g, "")), "no setColorMode implementation or export (comments excluded)");
 }
 
 {

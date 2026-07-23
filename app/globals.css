@@ -312,73 +312,7 @@ body {
   body .print-footer {
     color: #71717a !important;
   }
-}
 
-/*
- * Report Foundation V1 — the Color/Grayscale toggle's on-screen
- * preview. Mirrors ONLY the color-semantic rules above (never the
- * print-only layout rules — page size, logo sizing, footer type scale,
- * etc.), scoped to a class instead of @media print, so previewing
- * grayscale on screen shows exactly the colors Print / Save PDF
- * already produces. The print stylesheet itself is untouched by this
- * block — it's a parallel mirror, not a shared rule set, so editing
- * one never silently changes the other.
- */
-.report-grayscale {
-  background: #ffffff !important;
-  color: #18181b !important;
-}
-.report-grayscale * {
-  background: transparent !important;
-  color: #18181b !important;
-  border-color: #d4d4d8 !important;
-  box-shadow: none !important;
-  text-shadow: none !important;
-  backdrop-filter: none !important;
-}
-.report-grayscale .gradient-phrase {
-  -webkit-text-fill-color: #18181b !important;
-  color: #18181b !important;
-}
-/* Win/loss are the two colors that carry meaning on screen too — see
-   the @media print block above for why these survive the flatten. */
-.report-grayscale .print-win {
-  color: #047857 !important;
-  border-left-color: #047857 !important;
-}
-.report-grayscale .print-loss {
-  color: #b91c1c !important;
-  border-left-color: #b91c1c !important;
-}
-.report-grayscale .print-neutral {
-  border-left-color: #a1a1aa !important;
-}
-.report-grayscale .print-accent {
-  color: var(--report-accent-print, #0e7490) !important;
-}
-.report-grayscale .print-accent-border {
-  border-color: var(--report-accent-print, #0e7490) !important;
-}
-.report-grayscale .print-kv-label {
-  color: #52525b !important;
-  font-weight: 600 !important;
-}
-.report-grayscale .print-kv-value {
-  color: #18181b !important;
-  font-weight: 600 !important;
-}
-.report-grayscale .print-section-label {
-  color: var(--report-accent-print, #0e7490) !important;
-  border-bottom-color: var(--report-accent-print, #0e7490) !important;
-}
-.report-grayscale .print-exec-summary {
-  border-color: var(--report-accent-print, #0e7490) !important;
-}
-.report-grayscale .print-footer {
-  color: #71717a !important;
-}
-
-@media print {
   html,
   body {
     width: 100% !important;

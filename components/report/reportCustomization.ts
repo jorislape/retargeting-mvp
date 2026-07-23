@@ -145,11 +145,15 @@ export interface ReportCustomization<SectionId extends string> {
    *  name, KPI value, vs-median delta, and spend — never a second
    *  layout system, never a change to what the engine generated. */
   density: Density;
-  /** "grayscale" applies .report-grayscale (globals.css), an on-screen
-   *  mirror of the existing print stylesheet's color-flatten rules —
-   *  the same win/loss/accent classes already used for print survive
-   *  identically, so grayscale on screen previews exactly what print
-   *  already produces. Never changes the print stylesheet itself. */
+  /** Report Foundation V1: an internal, preset-scoped field only — NOT
+   *  a user-facing control. The Print-friendly preset sets this to
+   *  "grayscale" so it still participates in preset matching
+   *  (derivePreset/matchesPreset), but nothing renders it as an
+   *  on-screen preview and there is no direct setter for it (removed —
+   *  a rough color-flatten mirror read as an unfinished print-CSS
+   *  preview rather than a polished theme). Printing itself is
+   *  unaffected either way: Print / Save PDF always uses the existing
+   *  @media print stylesheet, which this field has never touched. */
   colorMode: ColorMode;
   /** Derived, not independently settable — see derivePreset. Tracks
    *  which named preset (if any) the current presentation fields still

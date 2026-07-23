@@ -253,45 +253,6 @@ export function ReportCustomizationPanel<Id extends string>({
             </div>
           </div>
 
-          {/* Color / Grayscale — Report Foundation V1. Grayscale applies
-              .report-grayscale (globals.css), an on-screen mirror of the
-              existing print stylesheet's color-flatten rules, so this
-              previews exactly what Print / Save PDF already produces
-              rather than promising something different. */}
-          <div>
-            <span className={`${fieldLabel} mb-1.5 block`}>Color mode</span>
-            <div
-              role="group"
-              aria-label="Color mode"
-              className="inline-flex flex-wrap gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-0.5"
-            >
-              <button
-                type="button"
-                aria-pressed={customization.colorMode === "color"}
-                onClick={() => actions.setColorMode("color")}
-                className={`cursor-pointer rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                  customization.colorMode === "color" ? "bg-white/[0.09] text-white" : "text-zinc-400 hover:text-zinc-300"
-                }`}
-              >
-                Color
-              </button>
-              <button
-                type="button"
-                aria-pressed={customization.colorMode === "grayscale"}
-                onClick={() => actions.setColorMode("grayscale")}
-                className={`cursor-pointer rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                  customization.colorMode === "grayscale" ? "bg-white/[0.09] text-white" : "text-zinc-400 hover:text-zinc-300"
-                }`}
-              >
-                Grayscale
-              </button>
-            </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
-              Previews the report the way it already prints — win/loss and
-              accent colors are never the only way meaning is shown.
-            </p>
-          </div>
-
           {/* Advanced — collapsed by default so identity/branding stays
               the first thing anyone sees; section visibility, top ads
               shown, and density are the more power-user controls. */}
