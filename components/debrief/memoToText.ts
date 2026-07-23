@@ -60,12 +60,16 @@ export function evidenceLine(
 
 /** Plain-text serialization for the copy/share button — same content
  *  as the on-screen report in the active view, no markup, safe to
- *  paste into Slack, email, or a doc. `briefIndices` lists the tests
- *  whose creative briefs are currently generated/visible (buyer view);
- *  pass none and the output is identical to a report without briefs. */
+ *  paste into Slack, email, or a doc. `topAdsShown` (Report Foundation
+ *  V1) must be the SAME value the on-screen report is currently using,
+ *  so Buyer UI, Client UI, and this export always agree on row count.
+ *  `briefIndices` lists the tests whose creative briefs are currently
+ *  generated/visible (buyer view); pass none and the output is
+ *  identical to a report without briefs. */
 export function memoToText(
   memo: Memo,
   view: ReportView = "buyer",
+  topAdsShown: 3 | 5 = 5,
   briefIndices: number[] = []
 ): string {
   const lines: string[] = [];
@@ -132,11 +136,10 @@ export function memoToText(
   );
   lines.push("");
 
-  // Client view shows the top 3 each way (summary, not a data dump);
-  // buyer view keeps the full detail.
-  const winnerRows = view === "client" ? memo.winners.slice(0, 3) : memo.winners;
-  const loserRows =
-    view === "client" ? memo.losers.rows.slice(0, 3) : memo.losers.rows;
+  // Report Foundation V1: the same topAdsShown value the on-screen
+  // report is using, in both views — no more view-specific hardcoding.
+  const winnerRows = memo.winners.slice(0, topAdsShown);
+  const loserRows = memo.losers.rows.slice(0, topAdsShown);
 
   lines.push(view === "client" ? "WHAT WORKED" : "WINNERS");
   // Evidence Inputs V1: the neutral leading-ad conversion line (or an
@@ -158,9 +161,12 @@ export function memoToText(
         `- ${w.name} | ${w.valueLabel} (${c(w.vsMedianLabel)}) | ${w.spendLabel}${w.conversionLabel ? ` | ${w.conversionLabel}` : ""} | ${w.reason}`
       );
     });
-    if (view === "client" && memo.winners.length > winnerRows.length) {
+    if (memo.winners.length > winnerRows.length) {
+      const more = memo.winners.length - winnerRows.length;
       lines.push(
-        `(${memo.winners.length - winnerRows.length} more performed above the typical result.)`
+        view === "client"
+          ? `(${more} more performed above the typical result.)`
+          : `(${more} more ad${more === 1 ? "" : "s"} cleared the benchmark — shown count set in Customize report.)`
       );
     }
   }
@@ -173,9 +179,12 @@ export function memoToText(
       `- ${l.name} | ${l.valueLabel} (${c(l.vsMedianLabel)}) | ${l.spendLabel}${l.conversionLabel ? ` | ${l.conversionLabel}` : ""} | ${l.reason}`
     );
   });
-  if (view === "client" && memo.losers.rows.length > loserRows.length) {
+  if (memo.losers.rows.length > loserRows.length) {
+    const more = memo.losers.rows.length - loserRows.length;
     lines.push(
-      `(${memo.losers.rows.length - loserRows.length} more ran below the typical result.)`
+      view === "client"
+        ? `(${more} more ran below the typical result.)`
+        : `(${more} more ad${more === 1 ? "" : "s"} ran below it — shown count set in Customize report.)`
     );
   }
   lines.push(

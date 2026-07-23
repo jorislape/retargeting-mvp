@@ -772,8 +772,12 @@ console.log("decision (stage 1 — rules): all assertions passed");
 
     /* ---- Session 2: memoToText presentation contract ---- */
 
-    const buyerText: string = memoToText(memo, "buyer");
-    const clientText: string = memoToText(memo, "client");
+    // Report Foundation V1: explicit topAdsShown, matching each view's
+    // pre-existing historical default (5 for buyer — the engine's own
+    // cap; 3 for client) so every existing assertion below stays exactly
+    // as it was before topAdsShown existed as a parameter.
+    const buyerText: string = memoToText(memo, "buyer", 5);
+    const clientText: string = memoToText(memo, "client", 3);
 
     // Exactly one decision block per output, using the active register.
     for (const [label, text] of [["buyer", buyerText], ["client", clientText]] as const) {
@@ -833,8 +837,8 @@ console.log("decision (stage 1 — rules): all assertions passed");
       ...memo,
       decision: { ...memo.decision, avoidNow: { buyer: [], client: [] } },
     };
-    const noAvoidBuyer: string = memoToText(noAvoidMemo, "buyer");
-    const noAvoidClient: string = memoToText(noAvoidMemo, "client");
+    const noAvoidBuyer: string = memoToText(noAvoidMemo, "buyer", 5);
+    const noAvoidClient: string = memoToText(noAvoidMemo, "client", 3);
     assert.ok(!noAvoidBuyer.includes("Not yet:"), "empty avoidNow: no buyer lead-in");
     assert.ok(!noAvoidClient.includes("What we're deliberately not doing yet:"), "empty avoidNow: no client lead-in");
 
@@ -1040,8 +1044,8 @@ console.log("decision (stage 1 — rules): all assertions passed");
 
     // Same disclosure and absence of quality-judgment wording confirmed
     // in the actual TXT export, both registers.
-    const withMarketBuyerText: string = memoToText(withMarket, "buyer");
-    const withMarketClientText: string = memoToText(withMarket, "client");
+    const withMarketBuyerText: string = memoToText(withMarket, "buyer", 5);
+    const withMarketClientText: string = memoToText(withMarket, "client", 3);
     for (const text of [withMarketBuyerText, withMarketClientText]) {
       assert.ok(!/Context quality:/i.test(text), "TXT export carries no 'Context quality:' label");
       assert.ok(!/strong —|good —|weak —/i.test(text), "TXT export carries no Strong/Good/Weak quality phrasing");
@@ -1049,6 +1053,41 @@ console.log("decision (stage 1 — rules): all assertions passed");
         text.includes("Debrief checks for a fixed list of formats, hooks, and offers"),
         "TXT export carries the fixed-list disclosure"
       );
+    }
+
+    /* ---- Report Foundation V1: topAdsShown identical in Buyer, Client,
+       and TXT export. The sample has 5 winners and 5 losers, so 3 vs 5
+       is a real, observable difference to assert on. Names are derived
+       from the real memo rather than hardcoded, so this doesn't drift
+       if the sample dataset ever changes. ---- */
+    {
+      const buyer3 = memoToText(memo, "buyer", 3);
+      const client3 = memoToText(memo, "client", 3);
+      const buyer5 = memoToText(memo, "buyer", 5);
+      const client5 = memoToText(memo, "client", 5);
+
+      const winner4th = memo.winners[3].name; // 4th-ranked — only shown when topAdsShown=5
+      const loser4th = memo.losers.rows[3].name;
+
+      for (const [label, text] of [["buyer3", buyer3], ["client3", client3]] as const) {
+        assert.ok(!text.includes(`- ${winner4th} |`), `${label}: 4th-ranked winner row absent at topAdsShown=3`);
+        assert.ok(!text.includes(`- ${loser4th} |`), `${label}: 4th-ranked loser row absent at topAdsShown=3`);
+      }
+      for (const [label, text] of [["buyer5", buyer5], ["client5", client5]] as const) {
+        assert.ok(text.includes(`- ${winner4th} |`), `${label}: 4th-ranked winner row present at topAdsShown=5`);
+        assert.ok(text.includes(`- ${loser4th} |`), `${label}: 4th-ranked loser row present at topAdsShown=5`);
+      }
+
+      // Buyer and Client agree on exactly which rows show for the SAME
+      // topAdsShown value — the actual "identical across registers" claim.
+      for (const name of memo.winners.slice(0, 3).map((w: { name: string }) => w.name)) {
+        assert.ok(buyer3.includes(`- ${name} |`), `buyer3 includes winner ${name}`);
+        assert.ok(client3.includes(`- ${name} |`), `client3 includes winner ${name}`);
+      }
+      for (const name of memo.losers.rows.slice(0, 3).map((l: { name: string }) => l.name)) {
+        assert.ok(buyer3.includes(`- ${name} |`), `buyer3 includes loser ${name}`);
+        assert.ok(client3.includes(`- ${name} |`), `client3 includes loser ${name}`);
+      }
     }
   } finally {
     rmSync(dist, { recursive: true, force: true });

@@ -2,24 +2,35 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  applyModeDefaults,
   createDefaultCustomization,
+  derivePreset,
   type AccentId,
+  type ColorMode,
+  type Density,
+  type PresetDefinition,
+  type PresetId,
   type ReportCustomization,
   type ReportMode,
+  type TopAdsShown,
 } from "./reportCustomization";
 import { validateLogoFile } from "./logoValidation";
 
 /**
- * The stateful half of White-label Report Customization V1A — plain
- * React state, session-only (dies with the component, exactly like
- * every other piece of report state in this app: `Memo`, `queued`,
- * `briefIdxs`). No localStorage/sessionStorage, no server round-trip.
+ * The stateful half of Report Customization — plain React state,
+ * session-only (dies with the component, exactly like every other
+ * piece of report state in this app: `Memo`, `queued`, `briefIdxs`). No
+ * localStorage/sessionStorage, no server round-trip.
  *
  * Logo lifecycle: one agency logo (V1A scope — no client logo). A new
  * File is validated (logoValidation.ts, pure) before ever calling
  * URL.createObjectURL; the previous object URL is revoked on replace,
  * on explicit removal, and on unmount — never left dangling.
+ *
+ * Report Foundation V1: `presets` is optional and report-type-specific
+ * (e.g. components/debrief/reportPresets.ts for Performance) — this
+ * file stays generic and knows nothing about any concrete section id.
+ * When omitted (Competitor Debrief, this milestone), `preset` simply
+ * always reads "custom"; nothing else about the hook changes.
  */
 export interface UseReportCustomizationResult<Id extends string> {
   customization: ReportCustomization<Id>;
@@ -28,12 +39,21 @@ export interface UseReportCustomizationResult<Id extends string> {
   setReportTitle: (value: string) => void;
   setAccentId: (value: AccentId) => void;
   setDateOverride: (value: string | null) => void;
-  /** Switching mode applies that mode's recommended section defaults
-   *  (reportSections.ts's *_CLIENT_MODE_HIDDEN lists) — a one-time
-   *  starting point, not a standing rule; toggleSection after this
-   *  freely overrides it. */
+  /** Changes ONLY the report register (Buyer/Client). Per approved
+   *  decision #9: does not touch sections, does not reapply mode
+   *  defaults, and — because `mode` is excluded from matchesPreset —
+   *  never changes the current preset name. Switching Buyer/Client is
+   *  previewing the other register, not customizing the report. */
   setMode: (value: ReportMode) => void;
   toggleSection: (id: Id) => void;
+  setTopAdsShown: (value: TopAdsShown) => void;
+  setDensity: (value: Density) => void;
+  setColorMode: (value: ColorMode) => void;
+  /** Applies a named preset's full snapshot (mode + sections +
+   *  topAdsShown + density + colorMode) in one update. Identity/
+   *  branding fields (agency/client name, title, logo, accent, date
+   *  override) are never touched by a preset. */
+  setPreset: (id: Exclude<PresetId, "custom">) => void;
   /** Returns the validation result so the caller can surface an
    *  inline error without this hook needing to own any UI state.
    *  Passing `null` removes the current logo. */
@@ -43,11 +63,12 @@ export interface UseReportCustomizationResult<Id extends string> {
 
 export function useReportCustomization<Id extends string>(
   sectionIds: readonly Id[],
-  clientModeHidden: readonly Id[]
+  presets?: Partial<Record<Exclude<PresetId, "custom">, PresetDefinition<Id>>>
 ): UseReportCustomizationResult<Id> {
-  const [customization, setCustomization] = useState<ReportCustomization<Id>>(() =>
-    createDefaultCustomization(sectionIds)
-  );
+  const [customization, setCustomization] = useState<ReportCustomization<Id>>(() => {
+    const base = createDefaultCustomization(sectionIds);
+    return { ...base, preset: derivePreset(base, presets, sectionIds) };
+  });
   const logoUrlRef = useRef<string | null>(null);
 
   const revokeCurrentLogo = useCallback(() => {
@@ -81,25 +102,75 @@ export function useReportCustomization<Id extends string>(
     [revokeCurrentLogo]
   );
 
-  const setMode = useCallback(
-    (mode: ReportMode) => {
-      setCustomization((c) => ({
-        ...c,
-        mode,
-        sections: applyModeDefaults(sectionIds, mode, clientModeHidden),
-      }));
+  // Report Foundation V1: mode changes ONLY the register — no section
+  // reset, no preset invalidation (mode is excluded from
+  // matchesPreset), matching approved decision #9 exactly.
+  const setMode = useCallback((mode: ReportMode) => {
+    setCustomization((c) => ({ ...c, mode }));
+  }, []);
+
+  const toggleSection = useCallback(
+    (id: Id) => {
+      setCustomization((c) => {
+        const next = { ...c, sections: { ...c.sections, [id]: !c.sections[id] } };
+        return { ...next, preset: derivePreset(next, presets, sectionIds) };
+      });
     },
-    [sectionIds, clientModeHidden]
+    [presets, sectionIds]
   );
 
-  const toggleSection = useCallback((id: Id) => {
-    setCustomization((c) => ({ ...c, sections: { ...c.sections, [id]: !c.sections[id] } }));
-  }, []);
+  const setTopAdsShown = useCallback(
+    (value: TopAdsShown) => {
+      setCustomization((c) => {
+        const next = { ...c, topAdsShown: value };
+        return { ...next, preset: derivePreset(next, presets, sectionIds) };
+      });
+    },
+    [presets, sectionIds]
+  );
+
+  const setDensity = useCallback(
+    (value: Density) => {
+      setCustomization((c) => {
+        const next = { ...c, density: value };
+        return { ...next, preset: derivePreset(next, presets, sectionIds) };
+      });
+    },
+    [presets, sectionIds]
+  );
+
+  const setColorMode = useCallback(
+    (value: ColorMode) => {
+      setCustomization((c) => {
+        const next = { ...c, colorMode: value };
+        return { ...next, preset: derivePreset(next, presets, sectionIds) };
+      });
+    },
+    [presets, sectionIds]
+  );
+
+  const setPreset = useCallback(
+    (id: Exclude<PresetId, "custom">) => {
+      const snapshot = presets?.[id];
+      if (!snapshot) return; // no snapshot defined for this report type — no-op, never throws
+      setCustomization((c) => ({
+        ...c,
+        mode: snapshot.mode,
+        sections: { ...snapshot.sections },
+        topAdsShown: snapshot.topAdsShown,
+        density: snapshot.density,
+        colorMode: snapshot.colorMode,
+        preset: id,
+      }));
+    },
+    [presets]
+  );
 
   const reset = useCallback(() => {
     revokeCurrentLogo();
-    setCustomization(createDefaultCustomization(sectionIds));
-  }, [sectionIds, revokeCurrentLogo]);
+    const base = createDefaultCustomization(sectionIds);
+    setCustomization({ ...base, preset: derivePreset(base, presets, sectionIds) });
+  }, [sectionIds, presets, revokeCurrentLogo]);
 
   return {
     customization,
@@ -110,6 +181,10 @@ export function useReportCustomization<Id extends string>(
     setDateOverride: (value) => setCustomization((c) => ({ ...c, dateOverride: value })),
     setMode,
     toggleSection,
+    setTopAdsShown,
+    setDensity,
+    setColorMode,
+    setPreset,
     setAgencyLogoFile,
     reset,
   };

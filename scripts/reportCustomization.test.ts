@@ -28,7 +28,10 @@ import {
   applyModeDefaults,
   createDefaultCustomization,
   createDefaultSections,
+  derivePreset,
   getAccentById,
+  matchesPreset,
+  type ReportCustomization,
 } from "../components/report/reportCustomization.ts";
 import {
   PERFORMANCE_NUMBERED_ORDER,
@@ -36,6 +39,11 @@ import {
   type PerformanceSectionVisibility,
 } from "../components/report/reportNumbering.ts";
 import { MAX_LOGO_BYTES, validateLogoFile } from "../components/report/logoValidation.ts";
+import { readFileSync } from "node:fs";
+import {
+  PERFORMANCE_PRESET_OPTIONS,
+  PERFORMANCE_PRESETS,
+} from "../components/debrief/reportPresets.ts";
 
 /* ============================== reportSections.ts ========================== */
 
@@ -161,6 +169,283 @@ import { MAX_LOGO_BYTES, validateLogoFile } from "../components/report/logoValid
   assert.equal(def.mode, "internal");
   assert.ok(Object.values(def.sections).every((v) => v === true));
   assert.equal(Object.keys(def.sections).length, 9);
+  // Report Foundation V1: the new fields, still matching today's shipped
+  // behavior with zero divergence.
+  assert.equal(def.topAdsShown, 5);
+  assert.equal(def.density, "standard");
+  assert.equal(def.colorMode, "color");
+}
+
+/* ======================= Report Foundation V1 ======================= */
+
+{
+  // The 4 named presets are EXACT, approved snapshots — every field,
+  // not just a sample. This is the literal spec, byte for byte.
+  const p = PERFORMANCE_PRESETS;
+
+  assert.deepEqual(p.buyer, {
+    mode: "internal",
+    topAdsShown: 5,
+    density: "standard",
+    colorMode: "color",
+    sections: {
+      executiveSummary: true,
+      verdict: true,
+      winners: true,
+      underperformers: true,
+      patterns: true,
+      nextTests: true,
+      creativeBriefs: true,
+      confidence: true,
+      signOff: true,
+    },
+  });
+
+  assert.deepEqual(p.client, {
+    mode: "client",
+    topAdsShown: 3,
+    density: "standard",
+    colorMode: "color",
+    sections: {
+      executiveSummary: true,
+      verdict: true,
+      winners: true,
+      underperformers: true,
+      patterns: false,
+      nextTests: true,
+      creativeBriefs: false,
+      confidence: false,
+      signOff: true,
+    },
+  });
+
+  assert.deepEqual(p.executive, {
+    mode: "client",
+    topAdsShown: 3,
+    density: "compact",
+    colorMode: "color",
+    sections: {
+      executiveSummary: true,
+      verdict: true,
+      winners: true,
+      underperformers: false,
+      patterns: false,
+      nextTests: true,
+      creativeBriefs: false,
+      confidence: false,
+      signOff: true,
+    },
+  });
+
+  assert.deepEqual(p.print, {
+    mode: "internal",
+    topAdsShown: 5,
+    density: "compact",
+    colorMode: "grayscale",
+    sections: {
+      executiveSummary: true,
+      verdict: true,
+      winners: true,
+      underperformers: true,
+      patterns: true,
+      nextTests: true,
+      creativeBriefs: true,
+      confidence: true,
+      signOff: true,
+    },
+  });
+
+  // Test req #7 / #8, called out explicitly since they're the one
+  // section-level difference that justifies Executive existing as its
+  // own preset rather than "Client summary + compact":
+  assert.equal(p.executive.sections.underperformers, false, "Executive hides underperformers");
+  assert.equal(p.client.sections.underperformers, true, "Client summary shows underperformers");
+
+  assert.equal(PERFORMANCE_PRESET_OPTIONS.length, 4);
+  assert.deepEqual(
+    PERFORMANCE_PRESET_OPTIONS.map((o) => o.id),
+    ["buyer", "client", "executive", "print"]
+  );
+}
+
+/** Builds a full ReportCustomization for the tests below — deliberately
+ *  NOT createDefaultCustomization, so identity-field values are
+ *  distinctive (not empty-string) and any accidental dependency on them
+ *  would be obvious rather than silently passing. */
+function customization(
+  overrides: Partial<ReportCustomization<PerformanceIdForTests>> = {}
+): ReportCustomization<PerformanceIdForTests> {
+  return {
+    agencyName: "Acme Agency",
+    clientName: "Acme Client",
+    reportTitle: "Q2 Report",
+    agencyLogo: { url: "blob:x", name: "logo.png" },
+    accentId: "violet",
+    dateOverride: "2026-01-01",
+    mode: "internal",
+    sections: createDefaultSections(PERFORMANCE_SECTION_IDS),
+    topAdsShown: 5,
+    density: "standard",
+    colorMode: "color",
+    preset: "buyer",
+    ...overrides,
+  };
+}
+type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
+
+{
+  // matchesPreset: every presentation field independently gates the
+  // match; mode and every identity field are NEVER read.
+  const base = customization();
+  assert.ok(matchesPreset(base, PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "default state matches Buyer analysis");
+
+  assert.ok(!matchesPreset(customization({ topAdsShown: 3 }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "topAdsShown divergence breaks the match");
+  assert.ok(!matchesPreset(customization({ density: "compact" }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "density divergence breaks the match");
+  assert.ok(!matchesPreset(customization({ colorMode: "grayscale" }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "colorMode divergence breaks the match");
+  assert.ok(
+    !matchesPreset(
+      customization({ sections: { ...base.sections, patterns: false } }),
+      PERFORMANCE_PRESETS.buyer,
+      PERFORMANCE_SECTION_IDS
+    ),
+    "a single section toggle breaks the match"
+  );
+
+  // Test req #4 & approved decision #9: mode is NEVER part of the check.
+  assert.ok(
+    matchesPreset(customization({ mode: "client" }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS),
+    "mode alone never breaks a preset match"
+  );
+
+  // Test req #5: identity/branding fields are NEVER part of the check.
+  assert.ok(
+    matchesPreset(
+      customization({ agencyName: "Someone Else", clientName: "Other Client", reportTitle: "Different Title", accentId: "slate", dateOverride: "2030-12-31" }),
+      PERFORMANCE_PRESETS.buyer,
+      PERFORMANCE_SECTION_IDS
+    ),
+    "identity/branding fields never break a preset match"
+  );
+}
+
+{
+  // derivePreset: the single source of truth, fixed order, "custom"
+  // fallback. Exercised against the real PERFORMANCE_PRESETS table.
+  assert.equal(derivePreset(customization(), PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "buyer");
+  assert.equal(
+    derivePreset(
+      customization({ mode: "client", topAdsShown: 3, sections: PERFORMANCE_PRESETS.client.sections }),
+      PERFORMANCE_PRESETS,
+      PERFORMANCE_SECTION_IDS
+    ),
+    "client"
+  );
+  assert.equal(
+    derivePreset(
+      customization({ mode: "client", topAdsShown: 3, density: "compact", sections: PERFORMANCE_PRESETS.executive.sections }),
+      PERFORMANCE_PRESETS,
+      PERFORMANCE_SECTION_IDS
+    ),
+    "executive"
+  );
+  assert.equal(
+    derivePreset(
+      customization({ density: "compact", colorMode: "grayscale" }),
+      PERFORMANCE_PRESETS,
+      PERFORMANCE_SECTION_IDS
+    ),
+    "print"
+  );
+
+  // Test req #2: any one field change from a named preset -> "custom".
+  assert.equal(
+    derivePreset(customization({ topAdsShown: 3 }), PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS),
+    "custom",
+    "topAdsShown divergence -> custom"
+  );
+  assert.equal(
+    derivePreset(customization({ density: "compact" }), PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS),
+    "custom",
+    "density divergence -> custom"
+  );
+  assert.equal(
+    derivePreset(customization({ colorMode: "grayscale" }), PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS),
+    "custom",
+    "colorMode divergence -> custom"
+  );
+  assert.equal(
+    derivePreset(
+      customization({ sections: { ...customization().sections, confidence: false } }),
+      PERFORMANCE_PRESETS,
+      PERFORMANCE_SECTION_IDS
+    ),
+    "custom",
+    "a section toggle -> custom"
+  );
+
+  // Test req #3: returning the exact snapshot restores the named preset
+  // — proven by going custom, then back, in one sequence.
+  const drifted = customization({ topAdsShown: 3 });
+  assert.equal(derivePreset(drifted, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "custom");
+  const restored = { ...drifted, topAdsShown: 5 as const };
+  assert.equal(derivePreset(restored, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "buyer", "returning to the exact snapshot restores the preset name");
+
+  // Test req #4: mode switching alone never changes the preset name.
+  const clientPreviewOfBuyer = customization({ mode: "client" });
+  assert.equal(
+    derivePreset(clientPreviewOfBuyer, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS),
+    "buyer",
+    "previewing Client register while Buyer analysis is active stays named 'buyer'"
+  );
+
+  // Test req #5: branding/date changes never change the preset name.
+  const rebranded = customization({ agencyName: "New Agency", clientName: "New Client", reportTitle: "New Title", accentId: "cobalt", dateOverride: "2027-06-15" });
+  assert.equal(
+    derivePreset(rebranded, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS),
+    "buyer",
+    "identity/branding changes never change the preset name"
+  );
+
+  // Test req #12: no presets table (Competitor Debrief's call site) ->
+  // always "custom", regardless of state — never throws.
+  assert.equal(derivePreset(customization(), undefined, PERFORMANCE_SECTION_IDS), "custom");
+  assert.equal(derivePreset(customization({ mode: "client" }), {}, PERFORMANCE_SECTION_IDS), "custom");
+
+  // createDefaultCustomization + a Competitor Debrief-shaped id set still
+  // produces a complete, valid object — the same generic function both
+  // report types call, unaffected by Performance-only preset knowledge.
+  const competitorDefault = createDefaultCustomization(COMPETITOR_SECTION_IDS);
+  assert.equal(Object.keys(competitorDefault.sections).length, 10);
+  assert.equal(competitorDefault.topAdsShown, 5);
+  assert.equal(competitorDefault.density, "standard");
+  assert.equal(competitorDefault.colorMode, "color");
+}
+
+{
+  // .report-grayscale (globals.css): a structural check that the
+  // on-screen mirror exists and reasserts the same semantic classes the
+  // print stylesheet already uses — win/loss/accent/kv/section-label —
+  // never claiming color is the only encoding once toggled. Textual/
+  // structural, matching how the rest of this print system has no
+  // rendered-DOM test anywhere in this repo.
+  const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf-8");
+  assert.ok(css.includes(".report-grayscale"), "the grayscale class exists");
+  for (const selector of [
+    ".report-grayscale .print-win",
+    ".report-grayscale .print-loss",
+    ".report-grayscale .print-neutral",
+    ".report-grayscale .print-accent",
+    ".report-grayscale .print-kv-label",
+    ".report-grayscale .print-kv-value",
+    ".report-grayscale .print-section-label",
+  ]) {
+    assert.ok(css.includes(selector), `${selector} must be present — grayscale must preserve every semantic class print already uses`);
+  }
+  // The print stylesheet itself must be untouched by this addition —
+  // still exactly one @media print block's worth of win/loss rules,
+  // not merged into or replaced by the new selectors.
+  assert.ok(css.includes("@media print"), "the print stylesheet still exists independently");
+  assert.ok(css.includes("body .print-win"), "print stylesheet's own win rule is untouched");
 }
 
 {

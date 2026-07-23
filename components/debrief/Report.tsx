@@ -14,10 +14,11 @@ import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { computePerformanceSectionNumbers } from "@/components/report/reportNumbering";
-import { PERFORMANCE_CLIENT_MODE_HIDDEN, PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/report/reportSections";
+import { PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/report/reportSections";
 import { accentCssVars, getAccentById } from "@/components/report/reportCustomization";
 import { useReportCustomization } from "@/components/report/useReportCustomization";
 import { ReportCustomizationPanel } from "@/components/report/ReportCustomizationPanel";
+import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -248,11 +249,23 @@ function AdTable({
   rows,
   tone,
   view,
+  topAdsShown,
+  density,
 }: {
   rows: MemoWinnerLoserRow[];
   tone: "win" | "loss";
   view: ReportView;
+  /** Report Foundation V1 — same value used by the Client list and TXT
+   *  export; the engine may compute more rows than this (up to 5), so
+   *  an honest "N more" line follows when truncated. */
+  topAdsShown: 3 | 5;
+  /** "compact" hides the reason/creative-format note and the
+   *  conversion-count sub-line — name, value, vs-median, and spend
+   *  (the table's actual columns) are never affected. */
+  density: "compact" | "standard";
 }) {
+  const shown = rows.slice(0, topAdsShown);
+  const more = rows.length - shown.length;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[540px] text-sm">
@@ -276,7 +289,7 @@ function AdTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((ad, i) => (
+          {shown.map((ad, i) => (
             <tr
               key={ad.name + i}
               className="border-b border-white/[0.06] transition-colors last:border-0 hover:bg-white/[0.02]"
@@ -295,13 +308,17 @@ function AdTable({
                 <p className="break-words text-[13px] font-semibold leading-snug text-zinc-100">
                   {ad.name}
                 </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
-                  {ad.reason}
-                </p>
-                {ad.conversionLabel && (
-                  <p className="mt-0.5 font-mono text-[11px] leading-relaxed text-zinc-500 tabular-nums">
-                    {ad.conversionLabel}
-                  </p>
+                {density === "standard" && (
+                  <>
+                    <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
+                      {ad.reason}
+                    </p>
+                    {ad.conversionLabel && (
+                      <p className="mt-0.5 font-mono text-[11px] leading-relaxed text-zinc-500 tabular-nums">
+                        {ad.conversionLabel}
+                      </p>
+                    )}
+                  </>
                 )}
               </td>
               <td className="py-3 pr-4 text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
@@ -321,20 +338,33 @@ function AdTable({
           ))}
         </tbody>
       </table>
+      {more > 0 && (
+        <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+          {more} more ad{more === 1 ? "" : "s"} {tone === "win" ? "cleared the benchmark" : "ran below it"} —
+          shown count set in Customize report.
+        </p>
+      )}
     </div>
   );
 }
 
-/* Client view: the top 3 as ruled entries — a reading list, not a
+/* Client view: the top N as ruled entries — a reading list, not a
    data table. */
 function ClientAdList({
   rows,
   tone,
+  topAdsShown,
+  density,
 }: {
   rows: MemoWinnerLoserRow[];
   tone: "win" | "loss";
+  /** Report Foundation V1 — same value used by AdTable and TXT export. */
+  topAdsShown: 3 | 5;
+  /** "compact" drops the conversion-count sub-line only; spend (the
+   *  other half of that same line) always stays. */
+  density: "compact" | "standard";
 }) {
-  const top = rows.slice(0, 3);
+  const top = rows.slice(0, topAdsShown);
   const more = rows.length - top.length;
   return (
     <div>
@@ -354,7 +384,7 @@ function ClientAdList({
               </p>
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
                 {ad.spendLabel} spent
-                {ad.conversionLabel ? ` · ${ad.conversionLabel}` : ""}
+                {density === "standard" && ad.conversionLabel ? ` · ${ad.conversionLabel}` : ""}
               </p>
             </div>
             <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">
@@ -792,7 +822,7 @@ export function Report({
      customization.mode rather than tracked separately — one source of
      truth, translated at this single boundary so nothing downstream
      needs to know customization exists. */
-  const customizationActions = useReportCustomization(PERFORMANCE_SECTION_IDS, PERFORMANCE_CLIENT_MODE_HIDDEN);
+  const customizationActions = useReportCustomization(PERFORMANCE_SECTION_IDS, PERFORMANCE_PRESETS);
   const { customization } = customizationActions;
   const [panelOpen, setPanelOpen] = useState(false);
   const view: ReportView = customization.mode === "client" ? "client" : "buyer";
@@ -812,7 +842,7 @@ export function Report({
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(
-        memoToText(memo, view, view === "buyer" ? briefIdxs : [])
+        memoToText(memo, view, customization.topAdsShown, view === "buyer" ? briefIdxs : [])
       );
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -828,7 +858,7 @@ export function Report({
      currently active view, same content Copy would put on the
      clipboard. */
   const handleDownload = () => {
-    const text = memoToText(memo, view, view === "buyer" ? briefIdxs : []);
+    const text = memoToText(memo, view, customization.topAdsShown, view === "buyer" ? briefIdxs : []);
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -968,7 +998,7 @@ export function Report({
         </div>
       </div>
 
-      <article>
+      <article className={customization.colorMode === "grayscale" ? "report-grayscale" : undefined}>
         {/* Print-only brand line — the on-screen sidebar wordmark is
             .print-hidden, so the printed document needs its own,
             otherwise the exported PDF carries no indication of what
@@ -1173,9 +1203,9 @@ export function Report({
                   : "No ad cleared the benchmark by enough to call a winner — the next tests below are how you find one."}
               </p>
             ) : client ? (
-              <ClientAdList rows={memo.winners} tone="win" />
+              <ClientAdList rows={memo.winners} tone="win" topAdsShown={customization.topAdsShown} density={customization.density} />
             ) : (
-              <AdTable rows={memo.winners} tone="win" view={view} />
+              <AdTable rows={memo.winners} tone="win" view={view} topAdsShown={customization.topAdsShown} density={customization.density} />
             )}
           </div>
         </section>
@@ -1194,9 +1224,9 @@ export function Report({
           {memo.losers.rows.length > 0 && (
             <div className="mt-4">
               {client ? (
-                <ClientAdList rows={memo.losers.rows} tone="loss" />
+                <ClientAdList rows={memo.losers.rows} tone="loss" topAdsShown={customization.topAdsShown} density={customization.density} />
               ) : (
-                <AdTable rows={memo.losers.rows} tone="loss" view={view} />
+                <AdTable rows={memo.losers.rows} tone="loss" view={view} topAdsShown={customization.topAdsShown} density={customization.density} />
               )}
             </div>
           )}
@@ -1512,6 +1542,7 @@ export function Report({
         sections={PERFORMANCE_SECTIONS}
         defaultTitlePlaceholder={memo.scope.product}
         modeReadout={{ internal: "Buyer", client: "Client" }}
+        presetOptions={PERFORMANCE_PRESET_OPTIONS}
       />
     </div>
   );

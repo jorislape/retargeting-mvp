@@ -4,7 +4,6 @@ import { btnPrimarySm, btnSecondary, card, cardNested, eyebrow } from "@/compone
 import { AlertTriangleIcon, ArrowIcon, CheckIcon, PrinterIcon, SlidersIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/ui/brand";
 import {
-  COMPETITOR_CLIENT_MODE_HIDDEN,
   COMPETITOR_SECTIONS,
   COMPETITOR_SECTION_IDS,
 } from "@/components/report/reportSections";
@@ -281,7 +280,12 @@ export function CompetitorDebriefResult({
   debrief: CompetitorDebrief;
   generatedAt?: number | null;
 }) {
-  const customizationActions = useReportCustomization(COMPETITOR_SECTION_IDS, COMPETITOR_CLIENT_MODE_HIDDEN);
+  // Report Foundation V1: no preset table defined for Competitor Debrief
+  // yet (the approved presets are Performance-specific) — omitting the
+  // 2nd argument means `customization.preset` always reads "custom",
+  // harmlessly, and the panel's preset selector simply doesn't render
+  // (see ReportCustomizationPanel's presetOptions prop).
+  const customizationActions = useReportCustomization(COMPETITOR_SECTION_IDS);
   const { customization } = customizationActions;
   const [panelOpen, setPanelOpen] = useState(false);
   const accent = getAccentById(customization.accentId);

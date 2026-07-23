@@ -79,6 +79,45 @@ export interface LogoAsset {
   name: string;
 }
 
+/**
+ * Report Foundation V1 — the named starting points a report can be set
+ * to. Generic and report-type-agnostic on purpose: which concrete
+ * section snapshot each id maps to is defined per report type (e.g.
+ * components/debrief/reportPresets.ts for Performance), never here —
+ * this file must stay free of any Performance/Competitor-specific
+ * knowledge, since it's shared by both report types (see
+ * useReportCustomization.ts's optional `presets` argument). "custom" is
+ * never a selectable snapshot — it's the derived state when the current
+ * presentation fields don't match any named preset.
+ */
+export type PresetId = "buyer" | "client" | "executive" | "print" | "custom";
+
+/** The presentation-only fields a named preset fixes. Deliberately
+ *  EXCLUDES `mode`: applying a preset sets a starting mode, but
+ *  afterward switching Buyer/Client is treated as previewing the other
+ *  register, not customization — it must never flip a named preset to
+ *  "custom" (see matchesPreset). Also excludes every identity/branding
+ *  field (agencyName, clientName, reportTitle, agencyLogo, accentId,
+ *  dateOverride) for the same reason: those are the user's own inputs,
+ *  not "which parts of the report are shown." */
+export interface PresetSnapshot<SectionId extends string> {
+  sections: Record<SectionId, boolean>;
+  topAdsShown: TopAdsShown;
+  density: Density;
+  colorMode: ColorMode;
+}
+
+/** The starting mode a preset applies the moment it's selected — kept
+ *  separate from PresetSnapshot because mode is excluded from the
+ *  "still matches this preset" check (see above). */
+export interface PresetDefinition<SectionId extends string> extends PresetSnapshot<SectionId> {
+  mode: ReportMode;
+}
+
+export type TopAdsShown = 3 | 5;
+export type Density = "compact" | "standard";
+export type ColorMode = "color" | "grayscale";
+
 export interface ReportCustomization<SectionId extends string> {
   agencyName: string;
   clientName: string;
@@ -94,6 +133,28 @@ export interface ReportCustomization<SectionId extends string> {
   dateOverride: string | null;
   mode: ReportMode;
   sections: Record<SectionId, boolean>;
+  /** Report Foundation V1. Which of the 3 always-shown ad rows to show
+   *  per winners/losers list — used identically by the Buyer report,
+   *  Client report, and TXT export (see memoToText.ts). Deliberately no
+   *  "all" option: the engine itself never computes more than 5
+   *  winners/losers (analysis.ts's MAX_WINNERS_LOSERS), so "all" would
+   *  be indistinguishable from "5" while implying something untrue. */
+  topAdsShown: TopAdsShown;
+  /** "compact" hides secondary row sub-lines (the reason/creative-format
+   *  note and the conversion-count line) while keeping the primary ad
+   *  name, KPI value, vs-median delta, and spend — never a second
+   *  layout system, never a change to what the engine generated. */
+  density: Density;
+  /** "grayscale" applies .report-grayscale (globals.css), an on-screen
+   *  mirror of the existing print stylesheet's color-flatten rules —
+   *  the same win/loss/accent classes already used for print survive
+   *  identically, so grayscale on screen previews exactly what print
+   *  already produces. Never changes the print stylesheet itself. */
+  colorMode: ColorMode;
+  /** Derived, not independently settable — see derivePreset. Tracks
+   *  which named preset (if any) the current presentation fields still
+   *  match; "custom" once any of them diverge. */
+  preset: PresetId;
 }
 
 export function createDefaultSections<Id extends string>(ids: readonly Id[]): Record<Id, boolean> {
@@ -122,17 +183,77 @@ export function createDefaultCustomization<Id extends string>(
     dateOverride: null,
     mode: "internal",
     sections: createDefaultSections(ids),
+    topAdsShown: 5,
+    density: "standard",
+    colorMode: "color",
+    /* Placeholder — useReportCustomization's initializer immediately
+       recomputes this via derivePreset() against whatever preset table
+       (if any) the caller supplied. Kept here only so this function
+       returns a complete, independently-usable ReportCustomization on
+       its own (as the existing tests already call it directly). */
+    preset: "custom",
   };
 }
 
 /**
- * Section visibility a "Client-ready" mode switch recommends — a
- * one-time starting point applied at the moment mode changes, not a
- * standing rule re-applied on every render (the user's own manual
- * toggle edits after switching modes are never silently overwritten
- * — see useReportCustomization.ts's setMode). Switching back to
- * "Internal buyer" resets every section back to visible, mirroring
- * "Internal buyer" being the all-visible default state.
+ * Report Foundation V1 — does `customization` still match `snapshot`
+ * exactly? Compares ONLY the presentation fields a preset defines
+ * (sections/topAdsShown/density/colorMode) — deliberately NEVER `mode`
+ * (previewing the other register doesn't "leave" a preset) and NEVER
+ * any identity/branding field (those aren't part of what a preset
+ * means). Pure — no state, safe to call on every render.
+ */
+export function matchesPreset<Id extends string>(
+  customization: ReportCustomization<Id>,
+  snapshot: PresetSnapshot<Id>,
+  ids: readonly Id[]
+): boolean {
+  if (
+    customization.topAdsShown !== snapshot.topAdsShown ||
+    customization.density !== snapshot.density ||
+    customization.colorMode !== snapshot.colorMode
+  ) {
+    return false;
+  }
+  return ids.every((id) => customization.sections[id] === snapshot.sections[id]);
+}
+
+/**
+ * The single source of truth for "which named preset (if any) does the
+ * current state match" — the ONLY place this is decided. Every setter
+ * that touches a presentation field calls this after applying its own
+ * change, rather than tracking "is this still Custom?" ad hoc per
+ * setter. Checked in a fixed order; the first match wins (the four
+ * presets are constructed to never overlap, so order is a tie-breaker
+ * in principle only). `presets` is undefined for report types with no
+ * defined presets yet (Competitor Debrief, this milestone) — in that
+ * case this always returns "custom", harmlessly.
+ */
+export function derivePreset<Id extends string>(
+  customization: ReportCustomization<Id>,
+  presets: Partial<Record<Exclude<PresetId, "custom">, PresetSnapshot<Id>>> | undefined,
+  ids: readonly Id[]
+): PresetId {
+  if (!presets) return "custom";
+  const order: Exclude<PresetId, "custom">[] = ["buyer", "client", "executive", "print"];
+  for (const id of order) {
+    const snapshot = presets[id];
+    if (snapshot && matchesPreset(customization, snapshot, ids)) return id;
+  }
+  return "custom";
+}
+
+/**
+ * Section visibility a "Client-ready" mode recommends, computed on
+ * demand: every section visible for "internal", the given
+ * hiddenInClientMode ids hidden for "client".
+ *
+ * Report Foundation V1: no longer called by setMode. Applying a preset
+ * (setPreset) is now the one mechanism that sets mode + sections
+ * together; switching Buyer/Client afterward changes only the register
+ * (see useReportCustomization.ts's setMode and approved decision #9).
+ * Kept exported and tested as a standalone pure utility — still
+ * correct, just no longer wired into the mode toggle.
  */
 export function applyModeDefaults<Id extends string>(
   ids: readonly Id[],
