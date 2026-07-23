@@ -220,7 +220,14 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
         {client ? d.reassess.client : d.reassess.buyer}
       </p>
       {limits.length > 0 && (
-        <details className="mt-4 border-t border-white/[0.08] pt-3">
+        // key={view}: <details>'s `open` is a native, uncontrolled DOM
+        // property — React never resets it on a normal re-render since
+        // it's never part of the rendered props. Without this key, a
+        // user who manually expands the disclosure in one view finds
+        // it still open after toggling Buyer ↔ Client (same DOM node
+        // reused). The key forces a fresh node per view, so it's always
+        // closed by default again on either side of the toggle.
+        <details key={view} className="mt-4 border-t border-white/[0.08] pt-3">
           <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             {client ? "What we still can't conclude" : "Evidence limits"}
           </summary>
