@@ -902,11 +902,17 @@ export function CompetitorDebriefPanel() {
           ? searchOverBudget
             ? "Selected ads exceed the size limit. Select fewer or shorter ads before generating."
             : "Search for the advertiser, choose the exact Page, fetch its active ads, and keep at least one included to continue."
-          : attributionBlocksGenerate
-            ? hasPageDumpBlocks(liveBlocks) && !anyPageNameCaptured
-              ? "Debrief couldn't identify advertiser names from this paste. Review the ads manually or use Paste individual ads."
-              : `No extracted ads matched ${core.competitorName.trim()}. Check the competitor name or paste individual ads instead.`
-            : "Paste at least one usable ad (or add advanced manual notes) to continue — malformed or duplicate-only content doesn't count."
+          // Competitor Parse-Step Clarity: the required "Parse ads" click
+          // is easy to miss — name it specifically rather than falling
+          // through to the generic "paste something" message when the
+          // user HAS pasted text but hasn't parsed it yet.
+          : inputMode === "individual" && blocks === null && bulkPasteText.trim() !== ""
+            ? "Parse the pasted ads above before generating the report."
+            : attributionBlocksGenerate
+              ? hasPageDumpBlocks(liveBlocks) && !anyPageNameCaptured
+                ? "Debrief couldn't identify advertiser names from this paste. Review the ads manually or use Paste individual ads."
+                : `No extracted ads matched ${core.competitorName.trim()}. Check the competitor name or paste individual ads instead.`
+              : "Paste at least one usable ad (or add advanced manual notes) to continue — malformed or duplicate-only content doesn't count."
       : null;
 
   // Checkpoint 3: live count of candidates the user has manually
@@ -938,6 +944,25 @@ export function CompetitorDebriefPanel() {
     () => (bulkPasteText.trim() === "" ? 0 : splitAdBlocks(bulkPasteText).length),
     [bulkPasteText]
   );
+
+  // Competitor Parse-Step Clarity: `blocks === null` is the exact
+  // pre-existing "never parsed yet" signal (handleParseAds is the only
+  // thing that ever sets it non-null). Used to make the required parse
+  // step visually primary and explicit before it's taken, then get out
+  // of the way — no live "has the text changed since parsing" tracking
+  // is needed: once parsed, the CTA simply stays available as
+  // "Re-parse ads" and the pre-parse status/guidance never reappears
+  // (approved change #6 — no redundant next-step warning after a
+  // successful parse). Individual-paste mode only; page-dump mode has
+  // its own separate "Extract ads" flow, untouched by this milestone.
+  const hasParsedAds = blocks !== null;
+  const showPreParseGuidance = !hasParsedAds && liveAdCount > 0;
+  const showEmptyPasteHint = !hasParsedAds && liveAdCount === 0;
+  const parseButtonLabel = hasParsedAds
+    ? "Re-parse ads"
+    : liveAdCount > 0
+      ? `Parse ${liveAdCount} ad${liveAdCount === 1 ? "" : "s"}`
+      : "Parse ads";
 
   // Live "about to process" preview for the page-dump textarea —
   // mirrors liveAdCount above; the actual candidates only appear once
@@ -1234,19 +1259,36 @@ export function CompetitorDebriefPanel() {
                 value={bulkPasteText}
                 onChange={(e) => setBulkPasteText(e.target.value)}
               />
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="min-w-0 text-[11px] text-zinc-500">
-                  {liveAdCount > 0
-                    ? `≈${liveAdCount} ad${liveAdCount === 1 ? "" : "s"} detected — click Parse ads to review`
-                    : "Screenshot upload isn’t available yet — paste the text instead for now."}
+              {/* Competitor Parse-Step Clarity: before the first parse,
+                  the required next step is stated explicitly and the
+                  button is visually primary — the required click was
+                  easy to miss when it looked like a secondary action
+                  with no clear instruction. Once parsed, this status/
+                  guidance block doesn't reappear (approved change #6) —
+                  the review cards below are the next step by then. */}
+              {showPreParseGuidance && (
+                <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
+                  <span className="font-medium text-zinc-300">
+                    {liveAdCount} ad{liveAdCount === 1 ? "" : "s"} detected.
+                  </span>{" "}
+                  Next step: parse the pasted ads to review the detected
+                  hooks, formats, and offers.
                 </p>
+              )}
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                {showEmptyPasteHint && (
+                  <p className="min-w-0 text-[11px] text-zinc-500">
+                    Screenshot upload isn’t available yet — paste the text
+                    instead for now.
+                  </p>
+                )}
                 <button
                   type="button"
-                  className={`${btnSecondary} shrink-0`}
+                  className={`${showPreParseGuidance ? btnPrimary : btnSecondary} shrink-0 ${showEmptyPasteHint ? "" : "ml-auto"}`}
                   disabled={bulkPasteText.trim() === ""}
                   onClick={handleParseAds}
                 >
-                  Parse ads
+                  {parseButtonLabel}
                 </button>
               </div>
             </div>
