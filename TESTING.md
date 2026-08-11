@@ -213,3 +213,45 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] Mobile (~375px): generator stacks to one column, dropzone and
       KPI grid usable, report readable, no horizontal scroll.
 - [ ] `/sample` renders the same dataset via the real engine.
+
+## Decision & Comparison V2
+
+- [ ] **Criteria — custom gate**: sample data → set "Evidence gate
+      (spend per ad)" to 300 → Generate: fewer ads judged; the decision
+      card's headline/reassess say "spend gate you set"; "Decision bars
+      applied" (buyer view) tags the gate **Yours**, and the limits are
+      expanded ("What we don't know") instead of collapsed.
+- [ ] **Criteria — outcome minimum**: sample, ROAS, "Minimum purchases
+      before scaling" = 50 → Generate: the budget shift is withheld
+      (top winner has 34 purchases); the rationale/limits cite "your
+      50-purchase minimum"; setting it to 20 restores the budget move.
+- [ ] **Criteria — CTR**: switch KPI to CTR → the minimum input is
+      disabled with a "no purchase or lead count" note; a value sent
+      anyway (set under ROAS, then switch) yields a "doesn't apply"
+      limits line, action unchanged.
+- [ ] **Criteria — invalid**: gate = `-5` → structured 400 "Invalid
+      evidence gate", never a silent fallback.
+- [ ] **Comparison — happy path**: load sample as current AND (edited
+      copy with shifted dates/values) as "Compare with previous period"
+      → "What changed vs previous period" renders above the Next-move
+      card with the match-basis pill ("Matched by ad name" without Ad ID
+      columns), account movement, improved/declined, persistence,
+      caveat. The Next-move action is identical to a run WITHOUT the
+      previous file (comparison never changes the decision).
+- [ ] **Comparison — provenance**: add an `Ad ID` column to both files
+      → pill flips to "Matched by Ad ID"; rename an ad (same ID) → it
+      still matches. Name-mode rename → shows as removed + new.
+- [ ] **Comparison — refusals**: previous file with a different spend
+      currency → 400 "Currencies don't match"; previous file that's an
+      XLSX → 400 with "Previous period:" prefix.
+- [ ] **Expert commentary**: Customize report → Expert commentary text
+      → amber attributed block under the Next-move card, in both views,
+      in print/PDF, and labeled in Copy/TXT output; clearing the text
+      removes it everywhere.
+- [ ] **Section toggle**: "What changed (period comparison)" checkbox
+      hides/shows the section; on a single-period run the toggle is a
+      no-op (nothing rendered either way).
+- [ ] **Regression**: a run with no previous file, no criteria, and no
+      commentary looks identical to pre-V2 output (decision card gains
+      only the "What we know" label and collapsed "Decision bars
+      applied" disclosure).

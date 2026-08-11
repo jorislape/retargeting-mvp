@@ -70,7 +70,12 @@ export function memoToText(
   memo: Memo,
   view: ReportView = "buyer",
   topAdsShown: 3 | 5 = 5,
-  briefIndices: number[] = []
+  briefIndices: number[] = [],
+  /** Expert Commentary V2 — the report author's attributed take (from
+   *  report customization, not the memo). Serialized under an explicit
+   *  commentary label so plain-text output preserves the separation
+   *  between judgment and engine-derived claims. Empty = omitted. */
+  expertTake: string = ""
 ): string {
   const lines: string[] = [];
   const { scope } = memo;
@@ -87,6 +92,67 @@ export function memoToText(
   lines.push(`Total spend: ${scope.totalSpendLabel} · ${view === "client" ? "Typical" : "Median"} ${scope.kpiLabel}: ${scope.medianLabel}`);
   lines.push("");
 
+  /* Period Comparison V2 — mirrors the on-screen order: what changed
+     first, then the decision it contextualizes. Match provenance leads
+     the block (visible, never buried in the limits). Descriptive only;
+     the caveat closing the block states it never feeds the Next move. */
+  if (memo.comparison) {
+    const cmp = memo.comparison;
+    lines.push("WHAT CHANGED VS PREVIOUS PERIOD");
+    if (cmp.periodLabel.previous || cmp.periodLabel.current) {
+      lines.push(
+        `${cmp.periodLabel.previous ?? "previous period"} → ${cmp.periodLabel.current ?? "current period"}`
+      );
+    }
+    lines.push(
+      `${cmp.matchBasis === "ad_id" ? "Matched by Ad ID" : "Matched by ad name"}: ${cmp.matchNote}`
+    );
+    (view === "client" ? cmp.account.client : cmp.account.buyer).forEach((l) =>
+      lines.push(`- ${l}`)
+    );
+    const cmpImproved = cmp.improved.slice(0, topAdsShown);
+    const cmpDeclined = cmp.declined.slice(0, topAdsShown);
+    if (cmpImproved.length > 0) {
+      lines.push(view === "client" ? "Moved ahead:" : "Improved:");
+      cmpImproved.forEach((r) =>
+        lines.push(
+          `- ${r.name} | ${r.previousLabel} → ${r.currentLabel} | ${r.changeLabel}${r.conversionChangeLabel ? ` | ${r.conversionChangeLabel}` : ""}`
+        )
+      );
+    }
+    if (cmpDeclined.length > 0) {
+      lines.push(view === "client" ? "Fell behind:" : "Declined:");
+      cmpDeclined.forEach((r) =>
+        lines.push(
+          `- ${r.name} | ${r.previousLabel} → ${r.currentLabel} | ${r.changeLabel}${r.conversionChangeLabel ? ` | ${r.conversionChangeLabel}` : ""}`
+        )
+      );
+    }
+    const persistence =
+      view === "client" ? cmp.persistence.client : cmp.persistence.buyer;
+    if (persistence.length > 0) {
+      lines.push(view === "client" ? "Last period's leaders:" : "Winner persistence:");
+      persistence.forEach((l) => lines.push(`- ${l}`));
+    }
+    if (cmp.appeared.total > 0) {
+      lines.push(
+        `New this period: ${cmp.appeared.names.join(", ")}${cmp.appeared.total > cmp.appeared.names.length ? ` and ${cmp.appeared.total - cmp.appeared.names.length} more` : ""}.`
+      );
+    }
+    if (cmp.disappeared.total > 0) {
+      lines.push(
+        `No longer present: ${cmp.disappeared.names.join(", ")}${cmp.disappeared.total > cmp.disappeared.names.length ? ` and ${cmp.disappeared.total - cmp.disappeared.names.length} more` : ""}.`
+      );
+    }
+    const cmpLimits = view === "client" ? cmp.limits.client : cmp.limits.buyer;
+    if (cmpLimits.length > 0) {
+      lines.push(view === "client" ? "Worth knowing about this comparison:" : "Comparison limits:");
+      cmpLimits.forEach((l) => lines.push(`- ${l}`));
+    }
+    lines.push(cmp.caveat);
+    lines.push("");
+  }
+
   /* Decision-First V1: the committed call leads the text exactly as it
      leads the rendered report — one block, active register only, and
      never a duplicate of the winners/losers evidence below. */
@@ -102,6 +168,14 @@ export function memoToText(
   lines.push(
     `${view === "client" ? "How sure we are" : "Evidence"}: ${evidenceLine(d, scope.adsJudged, view)}`
   );
+  /* Decision Criteria V2 — whose bars decided (buyer view only; labels
+     carry buyer vocabulary). [yours] vs [default] mirrors the card. */
+  if (view === "buyer" && d.appliedCriteria.length > 0) {
+    lines.push("Decision bars applied:");
+    d.appliedCriteria.forEach((criterion) =>
+      lines.push(`- [${criterion.source === "user" ? "yours" : "default"}] ${criterion.label}`)
+    );
+  }
   const decisionAvoid = view === "client" ? d.avoidNow.client : d.avoidNow.buyer;
   if (decisionAvoid.length > 0) {
     lines.push(view === "client" ? "What we're deliberately not doing yet:" : "Not yet:");
@@ -120,6 +194,14 @@ export function memoToText(
   }
   lines.push(view === "client" ? d.reassess.client : d.reassess.buyer);
   lines.push("");
+
+  /* Expert Commentary V2 — attributed judgment, explicitly labeled so
+     the plain-text export preserves the engine/commentary separation. */
+  if (expertTake.trim() !== "") {
+    lines.push("EXPERT COMMENTARY (professional judgment — not derived from the data in this report)");
+    lines.push(expertTake.trim());
+    lines.push("");
+  }
 
   // What this read cannot establish — collapsed on screen, always fully
   // expanded in text export (a plain-text file has no "collapsed").

@@ -51,6 +51,7 @@ import {
   // Exact task-specified lists, in the exact order given — order
   // matters for the checklist UI and, for Performance, for numbering.
   assert.deepEqual(PERFORMANCE_SECTION_IDS, [
+    "whatChanged",
     "executiveSummary",
     "verdict",
     "winners",
@@ -73,7 +74,7 @@ import {
     "sources",
     "footer",
   ]);
-  assert.equal(PERFORMANCE_SECTIONS.length, 9);
+  assert.equal(PERFORMANCE_SECTIONS.length, 10);
   assert.equal(COMPETITOR_SECTIONS.length, 10);
   // Every descriptor has a non-empty, human-readable label.
   for (const s of [...PERFORMANCE_SECTIONS, ...COMPETITOR_SECTIONS]) {
@@ -168,7 +169,10 @@ import {
   assert.equal(def.dateOverride, null);
   assert.equal(def.mode, "internal");
   assert.ok(Object.values(def.sections).every((v) => v === true));
-  assert.equal(Object.keys(def.sections).length, 9);
+  assert.equal(Object.keys(def.sections).length, 10);
+  // Expert Commentary V2: default is empty — no block rendered, and
+  // (asserted below) never part of preset matching.
+  assert.equal(def.expertTake, "");
   // Report Foundation V1: the new fields, still matching today's shipped
   // behavior with zero divergence.
   assert.equal(def.topAdsShown, 5);
@@ -189,6 +193,7 @@ import {
     density: "standard",
     colorMode: "color",
     sections: {
+      whatChanged: true,
       executiveSummary: true,
       verdict: true,
       winners: true,
@@ -207,6 +212,7 @@ import {
     density: "standard",
     colorMode: "color",
     sections: {
+      whatChanged: true,
       executiveSummary: true,
       verdict: true,
       winners: true,
@@ -225,6 +231,7 @@ import {
     density: "compact",
     colorMode: "color",
     sections: {
+      whatChanged: true,
       executiveSummary: true,
       verdict: true,
       winners: true,
@@ -243,6 +250,7 @@ import {
     density: "compact",
     colorMode: "grayscale",
     sections: {
+      whatChanged: true,
       executiveSummary: true,
       verdict: true,
       winners: true,
@@ -290,6 +298,7 @@ function customization(
     agencyLogo: { url: "blob:x", name: "logo.png" },
     accentId: "violet",
     dateOverride: "2026-01-01",
+    expertTake: "We are holding creative changes until Friday.",
     mode: "internal",
     sections: createDefaultSections(PERFORMANCE_SECTION_IDS),
     topAdsShown: 5,

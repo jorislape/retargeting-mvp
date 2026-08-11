@@ -49,6 +49,13 @@ export interface GeneratorFields {
      even then it only frames wording / appends limits caveats — it
      never changes action, evidenceState, ranking, or any number. */
   objective: "" | "efficiency" | "growth" | "learning";
+  /* Decision Criteria V2 — the user's own decision bars, both optional.
+     spendGateOverride replaces the default evidence gate; minOutcomeCount
+     is the minimum purchases/leads on the leading ad before a scaling
+     move is recommended (only applied when the export can verify it).
+     Empty = Debrief defaults. */
+  spendGateOverride: string;
+  minOutcomeCount: string;
 }
 
 /* Competitor sources are an input aid for the market-notes field, not
@@ -72,6 +79,8 @@ const DEFAULT_FIELDS: GeneratorFields = {
   trackingChanged: "",
   setupChanged: "",
   objective: "",
+  spendGateOverride: "",
+  minOutcomeCount: "",
 };
 
 /* The engine is deterministic and fast (~50ms); a sub-100ms flash of
@@ -104,6 +113,11 @@ function normalizeError(raw: unknown): DebriefApiError {
 interface DebriefContextValue {
   status: GeneratorStatus;
   file: File | null;
+  /** Period Comparison V2 — optional previous-period CSV. Independent
+   *  of the primary file (swapping the primary keeps it; the API's
+   *  currency check guards against mismatched accounts). Same privacy
+   *  rules: React state only, gone on refresh, sent per-request. */
+  previousFile: File | null;
   fields: GeneratorFields;
   competitorSources: CompetitorSource[];
   /** Creative Format Confirmation: ad name → confirmed format tag.
@@ -114,6 +128,7 @@ interface DebriefContextValue {
   error: DebriefApiError | null;
   generatedAt: number | null;
   setFile: (file: File | null) => void;
+  setPreviousFile: (file: File | null) => void;
   updateFields: (patch: Partial<GeneratorFields>) => void;
   setCompetitorSources: Dispatch<SetStateAction<CompetitorSource[]>>;
   setFormatOverrides: (overrides: CreativeFormatOverrides) => void;
@@ -141,6 +156,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     setFileState(next);
     setFormatOverrides({});
   }, []);
+  const [previousFile, setPreviousFile] = useState<File | null>(null);
   const [memo, setMemo] = useState<Memo | null>(null);
   const [error, setError] = useState<DebriefApiError | null>(null);
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
@@ -171,6 +187,15 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     if (fields.setupChanged !== "") body.append("setupChanged", fields.setupChanged);
     // Input Honesty V1: same "send only when set" no-op contract.
     if (fields.objective !== "") body.append("objective", fields.objective);
+    // Decision Criteria V2: same contract — sent only when set.
+    if (fields.spendGateOverride.trim() !== "") {
+      body.append("spendGateOverride", fields.spendGateOverride);
+    }
+    if (fields.minOutcomeCount.trim() !== "") {
+      body.append("minOutcomeCount", fields.minOutcomeCount);
+    }
+    // Period Comparison V2: the optional previous-period file.
+    if (previousFile) body.append("previousCsv", previousFile);
     if (Object.keys(formatOverrides).length > 0) {
       body.append("creativeFormatOverrides", JSON.stringify(formatOverrides));
     }
@@ -200,13 +225,14 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       });
       setStatus("idle");
     }
-  }, [file, fields, formatOverrides]);
+  }, [file, previousFile, fields, formatOverrides]);
 
   const clearError = useCallback(() => setError(null), []);
 
   const reset = useCallback(() => {
     setStatus("idle");
     setFileState(null);
+    setPreviousFile(null);
     setFields(DEFAULT_FIELDS);
     setCompetitorSources([]);
     setFormatOverrides({});
@@ -219,6 +245,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       file,
+      previousFile,
       fields,
       competitorSources,
       formatOverrides,
@@ -226,6 +253,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       error,
       generatedAt,
       setFile,
+      setPreviousFile,
       updateFields,
       setCompetitorSources,
       setFormatOverrides,
@@ -233,7 +261,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       clearError,
       reset,
     }),
-    [status, file, fields, competitorSources, formatOverrides, memo, error, generatedAt, setFile, updateFields, generate, clearError, reset]
+    [status, file, previousFile, fields, competitorSources, formatOverrides, memo, error, generatedAt, setFile, updateFields, generate, clearError, reset]
   );
 
   return (

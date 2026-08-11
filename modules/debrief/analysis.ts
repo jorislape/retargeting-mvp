@@ -29,8 +29,16 @@ function median(values: number[]): number | null {
 
 function computeSpendGate(
   ads: ParsedAd[],
-  targetCpa: number | null
-): { gate: number; basis: "target_cpa" | "floor_or_mean" } {
+  targetCpa: number | null,
+  spendGateOverride: number | null
+): { gate: number; basis: "target_cpa" | "floor_or_mean" | "user_gate" } {
+  /* Decision Criteria V2: the user's own evidence bar wins over both
+     default rules — practitioners' thresholds vary by context, and a
+     stated criterion beats a universal default. Provenance is carried
+     via the basis and surfaced in the decision's appliedCriteria. */
+  if (spendGateOverride != null && spendGateOverride > 0) {
+    return { gate: spendGateOverride, basis: "user_gate" };
+  }
   if (targetCpa != null && targetCpa > 0) {
     return { gate: targetCpa * 3, basis: "target_cpa" };
   }
@@ -109,7 +117,8 @@ export function analyze(
   const { kpi, targetCpa } = context;
   const { gate: spendGate, basis: spendGateBasis } = computeSpendGate(
     ads,
-    targetCpa
+    targetCpa,
+    context.spendGateOverride
   );
   const gated = gateAds(ads, spendGate);
   const judged = gated.filter((a) => a.gate === "judged");
@@ -146,6 +155,7 @@ export function analyze(
     median: benchmark,
     winners,
     losers,
+    rankedAds: ranked,
     belowBenchmarkSpend: loserPool.reduce((sum, a) => sum + a.spend, 0),
     belowBenchmarkCount: loserPool.length,
     hasNameSignal: hasNameSignal(winnerPool, loserPool),

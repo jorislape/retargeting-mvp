@@ -38,6 +38,11 @@ function findHeader(headers: string[], aliases: readonly string[]): string | nul
 
 const ALIASES = {
   adName: ["ad name", "ad", "creative name"],
+  /* Period Comparison V2: Meta's optional "Ad ID" column — the reliable
+     cross-period identifier when the user included it in the export.
+     Exact-first like every alias; no existing header contains "ad id"
+     as a substring, so the fallback pass is safe too. */
+  adId: ["ad id"],
   spend: ["amount spent usd", "amount spent", "spend"],
   impressions: ["impressions"],
   linkClicks: ["link clicks", "clicks all", "clicks"],
@@ -75,6 +80,9 @@ const ALIASES = {
 
 export interface ColumnMap {
   adName: string | null;
+  /** "Ad ID" when present — optional; used only for cross-period ad
+   *  matching (Period Comparison V2), never required. */
+  adId: string | null;
   spend: string | null;
   impressions: string | null;
   linkClicks: string | null;
@@ -104,6 +112,7 @@ export function resolveColumns(headers: string[]): ColumnMap {
 
   return {
     adName: findHeader(headers, ALIASES.adName),
+    adId: findHeader(headers, ALIASES.adId),
     spend: spendHeader,
     impressions: findHeader(headers, ALIASES.impressions),
     linkClicks: findHeader(headers, ALIASES.linkClicks),

@@ -131,6 +131,14 @@ export interface ReportCustomization<SectionId extends string> {
   /** ISO date string (yyyy-mm-dd) or null — null means "use the
    *  generated date," matching today's default rendering exactly. */
   dateOverride: string | null;
+  /** Expert Commentary V2 — the practitioner's/agency's own attributed
+   *  take, rendered as a visually distinct block that is explicitly
+   *  labeled as commentary, never interleaved with engine-generated
+   *  claims. Session-only like every field here; never sent to any
+   *  API. "" = no block rendered. An identity-like field: excluded
+   *  from preset matching (it's the user's own input, not "which parts
+   *  of the report are shown"). */
+  expertTake: string;
   mode: ReportMode;
   sections: Record<SectionId, boolean>;
   /** Report Foundation V1. Which of the 3 always-shown ad rows to show
@@ -185,6 +193,7 @@ export function createDefaultCustomization<Id extends string>(
     agencyLogo: null,
     accentId: DEFAULT_ACCENT_ID,
     dateOverride: null,
+    expertTake: "",
     mode: "internal",
     sections: createDefaultSections(ids),
     topAdsShown: 5,

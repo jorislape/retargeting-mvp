@@ -73,4 +73,9 @@ export const SAMPLE_CONTEXT: DebriefContext = {
     "UGC_* and Testimonial_* ads are creator-shot; Static_* and ProductShot_* are designed statics; *_Video_* are edited brand cuts.",
   marketContext:
     "Observed formats: founder-led video, UGC testimonials\nRepeated hooks: problem-first\nOffer patterns: bundle offers, first-order discounts",
+  /* Decision Criteria V2: the sample runs on Debrief defaults — no
+     user-set gate or scaling minimum, so the pinned sample decision
+     (budget shift) is unchanged. */
+  spendGateOverride: null,
+  minOutcomeCount: null,
 };

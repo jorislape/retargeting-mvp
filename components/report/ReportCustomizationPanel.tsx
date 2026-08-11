@@ -223,6 +223,29 @@ export function ReportCustomizationPanel<Id extends string>({
                 the analyzed data period.
               </p>
             </div>
+            {/* Expert Commentary V2 — the practitioner's own attributed
+                take. Rendered as a clearly labeled commentary block near
+                the top of the report; never mixed into engine-generated
+                claims, never sent to any API. */}
+            <div>
+              <label className={`${fieldLabel} mb-1.5 block`} htmlFor="rc-expert-take">
+                Expert commentary
+              </label>
+              <textarea
+                id="rc-expert-take"
+                rows={3}
+                className={`${inputBase} resize-none`}
+                placeholder="e.g. We believe the CPA rise relates to the offer transition; holding creative changes until Friday."
+                value={customization.expertTake}
+                onChange={(e) => actions.setExpertTake(e.target.value)}
+              />
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                Shown as a clearly attributed commentary block — your
+                professional judgment, visibly separate from what the data
+                itself establishes. Included in print and Copy while
+                present.
+              </p>
+            </div>
           </div>
 
           <LogoPicker label="Agency logo" logo={customization.agencyLogo} onSelect={actions.setAgencyLogoFile} />

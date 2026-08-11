@@ -13,6 +13,7 @@ import {
   MARKET_SIGNALS_DISCLOSURE,
   MAX_COMPETITOR_SOURCES,
   mergeCompetitorSourcesIntoNotes,
+  outcomeNounsForKpi,
   parseCsv,
   parseNumericCell,
   requiredColumnsFor,
@@ -231,11 +232,13 @@ export function GeneratorPanel() {
   const {
     status,
     file,
+    previousFile,
     fields,
     competitorSources,
     formatOverrides,
     error,
     setFile,
+    setPreviousFile,
     updateFields,
     setCompetitorSources,
     setFormatOverrides,
@@ -1059,6 +1062,73 @@ export function GeneratorPanel() {
             </div>
           )}
 
+          {/* Period Comparison V2 — optional previous-period export.
+              Deliberately subordinate to the primary path: collapsed
+              unless a file is already loaded, one plain file input, no
+              second dropzone competing with the main one. The file is
+              held in React state like the primary CSV (refresh wipes)
+              and sent per-request; the report gains a descriptive
+              "What changed" section that never alters the Next move. */}
+          <details
+            open={previousFile != null}
+            className="group mt-3 rounded-lg border border-white/[0.07] bg-white/[0.03] open:border-white/[0.09]"
+          >
+            <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden">
+              <span className="text-[13px] font-semibold tracking-tight text-zinc-100">
+                Compare with previous period
+              </span>
+              <span className="text-xs text-zinc-400">Optional</span>
+            </summary>
+            <div className="border-t border-white/[0.06] px-4 pb-4 pt-3">
+              <p className="text-xs leading-relaxed text-zinc-400">
+                Add the same ad-level export for the period before this one.
+                The report gains a &ldquo;What changed&rdquo; section —
+                descriptive only, it never changes the recommendation.
+                Include the <span className="text-zinc-300">Ad ID</span>{" "}
+                column in both exports for the most reliable matching;
+                otherwise ads are matched by exact name.
+              </p>
+              {previousFile ? (
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+                  <FileTextIcon className="h-4 w-4 shrink-0 text-zinc-400" />
+                  <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-zinc-200">
+                    {previousFile.name}
+                  </p>
+                  <span className="font-mono text-[11px] text-zinc-400">
+                    {fmtBytes(previousFile.size)} · previous period
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPreviousFile(null)}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white"
+                  >
+                    <XIcon className="h-3 w-3" />
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="previous-csv-input"
+                  className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/[0.09] bg-white/[0.04] px-3.5 py-2 text-[13px] font-medium text-zinc-200 transition hover:border-white/[0.14] hover:bg-white/[0.06] focus-within:ring-2 focus-within:ring-accent/60"
+                >
+                  <UploadIcon className="h-3.5 w-3.5 text-zinc-400" />
+                  Choose previous-period CSV
+                  <input
+                    id="previous-csv-input"
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      setPreviousFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          </details>
+
           {/* Grouped tight to the cards above (help content is CSV-
               specific), not floating as its own section — the bigger
               gap belongs after this block, before Stage 2. */}
@@ -1289,7 +1359,9 @@ export function GeneratorPanel() {
           <details
             open={
               fields.targetCpa.trim() !== "" ||
-              fields.creativeNotes.trim() !== ""
+              fields.creativeNotes.trim() !== "" ||
+              fields.spendGateOverride.trim() !== "" ||
+              fields.minOutcomeCount.trim() !== ""
             }
             className="group mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] open:border-white/[0.09]"
           >
@@ -1344,6 +1416,83 @@ export function GeneratorPanel() {
                     guardrails. It is not interpreted and does not affect
                     scoring or confidence.
                   </p>
+                </div>
+              </div>
+
+              {/* Decision Criteria V2 — the user's OWN decision bars.
+                  Unlike the test-quality answers below, these genuinely
+                  participate: the gate override replaces the default
+                  evidence gate, and the outcome minimum can WITHHOLD a
+                  scaling recommendation (never fabricate one). The
+                  outcome input names the KPI's actual count (purchases
+                  or leads) and is disabled for CTR/CPC, which have no
+                  outcome count — a purchase-only figure is never
+                  presented as a universal "conversion" threshold. */}
+              <div className="mt-5 border-t border-white/[0.06] pt-4">
+                <p className={fieldLabel}>Your decision criteria (optional)</p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  Practitioners set different bars — enter yours and the
+                  report applies and labels them as your criteria instead of
+                  Debrief&rsquo;s defaults. The report always states whose
+                  bars decided.
+                </p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label htmlFor="spendGateOverride" className={fieldLabel}>
+                      Evidence gate (spend per ad)
+                    </label>
+                    <input
+                      id="spendGateOverride"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      value={fields.spendGateOverride}
+                      onChange={(e) =>
+                        updateFields({ spendGateOverride: e.target.value })
+                      }
+                      placeholder="e.g. 100"
+                      className={`mt-1.5 ${inputBase}`}
+                    />
+                    <p className="mt-1.5 text-xs text-zinc-400">
+                      An ad must spend this much before it&rsquo;s judged.
+                      Replaces the default gate (and the 3× target CPA
+                      rule) when set.
+                    </p>
+                  </div>
+                  {(() => {
+                    const nouns = outcomeNounsForKpi(fields.kpi);
+                    return (
+                      <div>
+                        <label
+                          htmlFor="minOutcomeCount"
+                          className={`${fieldLabel} ${nouns == null ? "opacity-50" : ""}`}
+                        >
+                          {nouns == null
+                            ? "Minimum results before scaling"
+                            : `Minimum ${nouns.many} before scaling`}
+                        </label>
+                        <input
+                          id="minOutcomeCount"
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          step={1}
+                          disabled={nouns == null}
+                          value={fields.minOutcomeCount}
+                          onChange={(e) =>
+                            updateFields({ minOutcomeCount: e.target.value })
+                          }
+                          placeholder="e.g. 50"
+                          className={`mt-1.5 ${inputBase} ${nouns == null ? "cursor-not-allowed opacity-50" : ""}`}
+                        />
+                        <p className="mt-1.5 text-xs text-zinc-400">
+                          {nouns == null
+                            ? `Not applicable to ${KPI_LABELS[fields.kpi]} — it has no purchase or lead count.`
+                            : `A scale-up is only recommended once the leading ad has this many ${nouns.many}. Checked against the export's own ${nouns.one} counts — if the column is missing, the report says the bar couldn't be verified instead of silently enforcing it.`}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

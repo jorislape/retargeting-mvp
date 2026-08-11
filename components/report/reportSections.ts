@@ -14,6 +14,7 @@
  */
 
 export type PerformanceSectionId =
+  | "whatChanged"
   | "executiveSummary"
   | "verdict"
   | "winners"
@@ -42,6 +43,10 @@ export interface SectionDescriptor<Id extends string> {
 }
 
 export const PERFORMANCE_SECTIONS: readonly SectionDescriptor<PerformanceSectionId>[] = [
+  /* Period Comparison V2: renders only when a previous-period file was
+     provided (memo.comparison != null) — the toggle is a no-op on
+     single-period runs, same conditional-on-data behavior as market. */
+  { id: "whatChanged", label: "What changed (period comparison)" },
   { id: "executiveSummary", label: "Executive summary" },
   { id: "verdict", label: "Verdict" },
   { id: "winners", label: "Winners" },

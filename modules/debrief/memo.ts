@@ -18,6 +18,7 @@ import {
   MemoMarketSignal,
   MemoTest,
   MemoWinnerLoserRow,
+  outcomeNounsForKpi,
   RankedAd,
 } from "./types";
 
@@ -57,18 +58,13 @@ function describeAdReason(
 }
 
 /* ---- Evidence Inputs V1: conversion visibility (display only) ----
-   The conversion noun is "purchases" for roas/cpa/purchases and "leads"
-   for leads; ctr/cpc have no conversion concept (their reliability axis
-   is clicks), so counts are never shown for them. None of this reads or
-   changes spend, the gate, median, ranking, KPI values, action, or
-   evidenceState — it only formats an already-retained count. */
-function conversionNouns(kpi: KpiKey): { one: string; many: string } | null {
-  if (kpi === "leads") return { one: "lead", many: "leads" };
-  if (kpi === "roas" || kpi === "cpa" || kpi === "purchases") {
-    return { one: "purchase", many: "purchases" };
-  }
-  return null; // ctr, cpc
-}
+   The KPI→noun mapping (purchases for roas/cpa/purchases, leads for
+   leads, none for ctr/cpc) now lives in types.ts as outcomeNounsForKpi
+   — shared with decision.ts's user-set scaling minimum (Decision
+   Criteria V2) so display and criterion can never disagree about which
+   count a KPI carries. None of this reads or changes spend, the gate,
+   median, ranking, KPI values, action, or evidenceState. */
+const conversionNouns = outcomeNounsForKpi;
 
 /** Neutral per-row conversion label ("34 purchases" / "1 lead"), or
  *  undefined when not applicable (non-purchase KPI or no count for this
@@ -1199,8 +1195,18 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       // DecisionInputContext, so `context` already carries
       // controlledTest/trackingChanged/setupChanged/objective. Feeds
       // buildLimits copy only — never the action or evidenceState.
-      context
+      context,
+      // Decision Criteria V2: the user's own scaling minimum. Unlike
+      // the framing context above, this MAY withhold a scale/shift
+      // move — see DecisionCriteria in types.ts.
+      { minOutcomeCount: context.minOutcomeCount }
     ),
+    /* Period Comparison V2: always null here — the comparison is built
+       by the route from a second, independently-analyzed export and
+       attached to the memo afterward. generateMemo stays a one-period
+       function, which is also what keeps the decision above provably
+       comparison-blind. */
+    comparison: null,
     scope: {
       product: context.product || "Your account",
       kpiLabel: KPI_LABELS[kpi],

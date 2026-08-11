@@ -19,6 +19,7 @@ npm test             # every script test in one run (list below)
 The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm test`. There is no other test runner; behavioral verification is manual against the dev server — `TESTING.md` is the checklist, and the sample dataset's expected numbers (spend gate ≈ $120.91, 11 judged / 3 set aside, per-KPI medians) are documented in `modules/debrief/sampleCsv.ts` for asserting against. Every `scripts/*.test.ts` is a plain-Node script (no Jest/Vitest) — run one directly with `node scripts/<name>.test.ts`, or via its `npm run test:<name>` alias in `package.json`:
 
 - `test:csv`, `test:watchlist`, `test:signals`, `test:signal-summary` — the debrief/competitor engine proofs (RFC 4180 escaping, watchlist sanitize/diff/format/append, signal-builder tables, signal-summary interpretation).
+- `test:compare` — Period Comparison V2 proofs: match-basis selection (Ad ID over exact name, provenance always disclosed), duplicate/missing-key exclusion (counted, never guessed, never leaked into appeared/disappeared), judged-both-periods-only deltas, KPI-polarity-aware improvement, composition caveat, period sanity warnings, a causal-vocabulary blocklist over every generated string, and a source scan pinning `compare.ts` to importing nothing but `types.ts` (the mirror-image scan — `decision.ts` never referencing the comparison — lives in `test:decision`).
 - `test:competitor-debrief` — Competitor Debrief V1 engine proofs: insufficient-evidence handling, category detection, no forbidden performance/spend claims outside the fixed caveat, and a source-scan asserting the engine imports no network/fetch code.
 - `test:ad-parser` — the labeled/plain bulk ad-example parser (block splitting, per-field extraction, duplicate detection, mode-aware completeness).
 - `test:ads-library-parser` — the native (unlabeled) Ads Library copy pipeline: the `looksLikeAdsLibraryCopy` detection heuristic, hook/benefit/proof/offer/CTA extraction from real-world-shaped samples, disclaimer-paragraph exclusion, and that labeled input always wins routing even when bullets are also present.
@@ -36,7 +37,7 @@ The optional Competitor Monitoring Beta (flag default OFF — see the fence belo
 
 This product has a hard, deliberate scope: **no auth, no user accounts, no saved history, no billing, no team workspaces, no analytics dashboards, no external AI calls, no scraping — and ADS DATA (CSVs, memos, reports, Meta tokens) is NEVER persisted server-side, in any form.** There are exactly TWO approved persistence exceptions, each with its own fenced section below: the browser-local competitor watchlist (localStorage, `modules/competitor/watchlist.ts` — user-entered competitor info and fetched public-page signal summaries only; never CSV data, memos, reports, or tokens; do not add other localStorage keys) and the flag-gated **Competitor Monitoring Beta V1** (server-side, `modules/monitoring/` — see its fence below). The whole core flow is data in → KPI + context → deterministic analysis → one-page memo on the same page — nothing else is reachable, and nothing should become reachable as a "small addition." Any further persistence is a new, explicit milestone to be requested — not something to add quietly while doing something else.
 
-The CSV (and the generated memo) must never be written to a database, a file, a cache, or a log. `app/api/debrief/route.ts` only logs structural facts on error (an error code, a row count) — never CSV rows or memo content. Keep it that way. (Structured error *responses* may echo the CSV's own header names back to the user — headers are structural and go only to the person who uploaded them; still never log them.)
+The CSV (and the generated memo) must never be written to a database, a file, a cache, or a log. `app/api/debrief/route.ts` only logs structural facts on error (an error code, a row count) — never CSV rows or memo content. Keep it that way. The optional previous-period CSV (Period Comparison V2, `previousCsv` form field) is the same data under the same rule: parsed in memory for the one request, compared, discarded — two files per request, still zero persistence; the comparison output is descriptive only ("what changed", never why) and never feeds the decision. (Structured error *responses* may echo the CSV's own header names back to the user — headers are structural and go only to the person who uploaded them; still never log them.)
 
 **Meta data source (the one approved exception to "no auth"):** the generator can also connect a Meta account via OAuth (`modules/meta/`, `app/api/meta/*`, `MetaProvider`/`MetaConnect`) and pull ad-level insights as a "virtual CSV" that feeds the identical debrief pipeline. Its constraints are part of the fence: scope is read-only `ads_read` (never widen); the access token lives only in browser memory (`MetaProvider`) and is forwarded per-request via the Authorization header — never a cookie, never storage, never a query param, never a log (the only cookie in the flow is the short-lived OAuth CSRF nonce); insights pulls set `use_unified_attribution_setting=true` so numbers match Ads Manager; the OAuth bridge (`modules/meta/bridge.ts`) posts to an exact origin and `MetaProvider` verifies `event.origin` with strict equality — no wildcards; the Graph API version is pinned in `modules/meta/graph.ts` — check deprecation runway when bumping.
 
@@ -80,8 +81,34 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # but can never change the chosen action. Imports nothing from memo.ts
                   # and takes a money formatter as an argument rather than importing
                   # format.ts, which (with the deliberate ".ts" import extensions) is
-                  # what keeps it runnable under the plain-Node test runner
-  memo.ts         # assembles the memo — templated, not an LLM call (see below)
+                  # what keeps it runnable under the plain-Node test runner.
+                  # Decision Criteria V2: buildDecision also takes an optional
+                  # DecisionCriteria — the user's OWN bars (custom evidence gate
+                  # via analysis.ts's spendGateOverride/"user_gate" basis; a
+                  # minimum purchases/leads count on the leading ad before a
+                  # scale/shift is recommended). The outcome minimum can only
+                  # WITHHOLD a budget move, never fabricate one; it applies only
+                  # when the selected KPI's own count (outcomeNounsForKpi in
+                  # types.ts — never a purchase-only "conversions"
+                  # generalization) is verifiable in the export, else an explicit
+                  # "couldn't be checked" limits line. Every decision carries
+                  # appliedCriteria labeling each bar "debrief_default" vs
+                  # "user" — defaults are never presented as universal truth
+  compare.ts      # Period Comparison V2 — "What changed" between two exports.
+                  # PURE + descriptive only: matches ads by Ad ID when both
+                  # files carry it, else exact normalized name (basis always
+                  # disclosed via matchNote, rendered visibly in the report,
+                  # not just in limits); duplicate/missing keys are excluded
+                  # AND counted, never fuzzy-matched or aggregated; deltas only
+                  # for ads judged in BOTH periods; composition/overlap/length
+                  # caveats computed, not boilerplate. NEVER read by
+                  # decision.ts (test-enforced both directions) — the Next move
+                  # stays a current-period read; the fixed caveat says so.
+                  # Type-only ".ts" imports from types.ts + injected formatters
+                  # keep it plain-Node testable (scripts/compare.test.ts)
+  memo.ts         # assembles the memo — templated, not an LLM call (see below).
+                  # generateMemo always sets comparison: null — the route builds
+                  # the comparison from the optional second file and attaches it
   marketSignals.ts# ONE keyword map (formats/hooks/offers) shared by memo generation and
                   # the generator UI: extractMarketSignals, structureMarketNotes (the
                   # local "Structure notes" reformat, idempotent, never drops a URL),
@@ -374,6 +401,19 @@ components/debrief/
                        # structured-error display with one-click KPI switch
   MetaConnect.tsx      # connect button / connected controls; checks /api/meta/config first
   Report.tsx           # the memo document; Buyer/Client view toggle is display-only.
+                       # Decision & Comparison V2: an unnumbered "What changed vs
+                       # previous period" section (comparison present + section
+                       # toggled on) renders ABOVE the Next-move card with the
+                       # match-basis provenance pill always visible; the card
+                       # itself pairs "What we know" (rationale/evidence) with
+                       # "What we don't know" (limits, auto-expanded whenever a
+                       # comparison or user criterion is in play) plus a buyer-
+                       # only "Decision bars applied" provenance list; an
+                       # optional attributed Expert-commentary block (report
+                       # customization's expertTake — session-only, never sent
+                       # to any API) renders under the card, visually distinct
+                       # and explicitly labeled as judgment, never mixed into
+                       # engine claims.
                        # Client view adds presentation-only blocks over existing memo
                        # fields (executive stat cards replacing the stat row, a
                        # prominent "What this means" box around clientSummary, a

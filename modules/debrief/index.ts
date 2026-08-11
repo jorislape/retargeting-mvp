@@ -10,7 +10,9 @@ export {
   FLAT_FIELD_DELTA_PCT,
   SCALE_TEST_MIN_DELTA_PCT,
 } from "./decision";
-export { fmtMoney } from "./format";
+export { buildComparison, COMPARISON_CAVEAT } from "./compare";
+export type { ComparisonFormatters, ComparisonPeriod } from "./compare";
+export { fmtKpiValue, fmtMoney } from "./format";
 export { generateMemo } from "./memo";
 export {
   assessMarketNotes,

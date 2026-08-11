@@ -35,6 +35,22 @@ export const HIGHER_IS_BETTER: Record<KpiKey, boolean> = {
   cpc: false,
 };
 
+/** The outcome-count noun behind a KPI: purchases for roas/cpa/
+ *  purchases, leads for leads, none for ctr/cpc (their reliability axis
+ *  is clicks, not conversions). The single source of truth for this
+ *  mapping — memo.ts (conversion display) and decision.ts (the
+ *  user-set scaling minimum, Decision Criteria V2) both read it, so
+ *  the two can never disagree about which count a KPI carries. */
+export function outcomeNounsForKpi(
+  kpi: KpiKey
+): { one: string; many: string } | null {
+  if (kpi === "leads") return { one: "lead", many: "leads" };
+  if (kpi === "roas" || kpi === "cpa" || kpi === "purchases") {
+    return { one: "purchase", many: "purchases" };
+  }
+  return null; // ctr, cpc
+}
+
 /* ------------------------------------------------------------------ */
 /* Creative Format Confirmation V1: the user can confirm each ad's     */
 /* creative format before generating, replacing the ad-name GUESS with */
@@ -121,6 +137,39 @@ export interface DecisionInputContext extends TestQualityContext {
   objective?: Objective;
 }
 
+/* ------------------------------------------------------------------ */
+/* Decision Criteria V2: the user's OWN decision bars. Deliberately     */
+/* NOT part of DecisionInputContext — that type's contract is "framing  */
+/* copy only, never the action," while these two inputs genuinely       */
+/* participate in the evidence bar and the scaling decision. Both are   */
+/* optional; both null is a complete no-op (Debrief defaults apply and  */
+/* the output is unchanged except for the always-present provenance     */
+/* list). This is NOT a rules-builder: exactly these two criteria, no   */
+/* configurable percentages, no custom formulas.                        */
+/* ------------------------------------------------------------------ */
+
+export interface DecisionCriteria {
+  /** Minimum count of the selected KPI's OWN outcome (purchases for
+   *  ROAS/CPA/Purchases, leads for Leads — see outcomeNounsForKpi)
+   *  that the leading ad must have recorded before a scale/shift
+   *  budget move is recommended. Applied ONLY when that count can
+   *  actually be verified in the export: if the count column is
+   *  absent the criterion is NOT silently enforced — an explicit
+   *  "couldn't be checked" limits line appears instead. Never
+   *  applicable to CTR/CPC (no outcome count exists); never a
+   *  purchase-only "conversions" generalization. */
+  minOutcomeCount?: number | null;
+}
+
+/** One decision bar that participated in this memo's call, with its
+ *  provenance — Debrief's default or the user's own criterion. Always
+ *  built, so every report can show WHOSE bars decided (universal
+ *  thresholds are never presented as universal truth). */
+export interface AppliedCriterion {
+  label: string;
+  source: "debrief_default" | "user";
+}
+
 /** Context the user fills in alongside the CSV — never stored. */
 export interface DebriefContext extends DecisionInputContext {
   kpi: KpiKey;
@@ -145,11 +194,24 @@ export interface DebriefContext extends DecisionInputContext {
   /** Optional pasted market/competitor notes (V1: manual input only).
    *  Directional context for the memo — never a performance claim. */
   marketContext: string;
+  /** Decision Criteria V2 — user's custom evidence gate: spend per ad
+   *  (in the account currency) an ad must reach before it's judged.
+   *  Replaces the default gate computation when set (spendGateBasis
+   *  "user_gate"); null = Debrief's default rules. */
+  spendGateOverride: number | null;
+  /** Decision Criteria V2 — see DecisionCriteria.minOutcomeCount.
+   *  null = no user minimum. */
+  minOutcomeCount: number | null;
 }
 
 /** One ad row after column resolution and metric derivation. */
 export interface ParsedAd {
   name: string;
+  /** Meta's Ad ID, when the export included an "Ad ID" column — the
+   *  reliable cross-period identifier for Period Comparison V2 (it
+   *  survives renames; names don't). null when the column is absent or
+   *  the cell is empty. Never synthesized. */
+  id?: string | null;
   spend: number;
   /** The value for the selected KPI, in that KPI's own units. */
   kpiValue: number | null;
@@ -197,10 +259,15 @@ export interface AnalysisResult {
   currency: string | null;
   dateRange: { start: string; end: string } | null;
   spendGate: number;
-  spendGateBasis: "target_cpa" | "floor_or_mean";
+  spendGateBasis: "target_cpa" | "floor_or_mean" | "user_gate";
   median: number | null;
   winners: RankedAd[];
   losers: RankedAd[];
+  /** EVERY judged ad with its delta vs the median (winners ∪ losers ∪
+   *  ads exactly at the median), not just the top-5 display slices.
+   *  Added for Period Comparison V2, which needs the full judged field
+   *  to match ads across periods. Empty when no median exists. */
+  rankedAds: RankedAd[];
   belowBenchmarkSpend: number;
   belowBenchmarkCount: number;
   hasNameSignal: boolean;
@@ -287,6 +354,66 @@ export interface MemoMarketSignal {
 }
 
 /* ------------------------------------------------------------------ */
+/* Period Comparison V2: "What changed" between two exports.           */
+/*                                                                    */
+/* Strictly descriptive — every sentence is "X moved from A to B",    */
+/* never why. Built by modules/debrief/compare.ts from two            */
+/* independently-analyzed periods; NEVER read by decision.ts (the      */
+/* Next-move call is a current-period read only — test-enforced).      */
+/* null when no previous-period file was provided, in which case the   */
+/* memo is byte-identical to a single-period run.                      */
+/* ------------------------------------------------------------------ */
+
+export type ComparisonMatchBasis = "ad_id" | "ad_name";
+
+/** One reliably-matched ad, judged in BOTH periods. Labels only —
+ *  formatted upstream so the UI/TXT never re-derive numbers. */
+export interface MemoComparisonRow {
+  name: string;
+  previousLabel: string;
+  currentLabel: string;
+  /** KPI-polarity-aware movement, e.g. "+18% (better)" / "−9% (worse)". */
+  changeLabel: string;
+  spendChangeLabel: string;
+  /** "12 → 30 purchases" when both periods carried a count. */
+  conversionChangeLabel?: string;
+}
+
+export interface MemoComparison {
+  /** How ads were matched across the two exports. Surfaced prominently
+   *  in the comparison section itself (a visible provenance line), not
+   *  only in the limits text. */
+  matchBasis: ComparisonMatchBasis;
+  /** The visible provenance sentence for matchBasis. */
+  matchNote: string;
+  periodLabel: { previous: string | null; current: string | null };
+  /** Account-level movement: benchmark, spend, judged counts, and the
+   *  improved/declined/unchanged tally. Two registers. */
+  account: { buyer: string[]; client: string[] };
+  improved: MemoComparisonRow[];
+  declined: MemoComparisonRow[];
+  /** Matched ads judged in both periods (the delta-capable set). */
+  matchedJudgedBoth: number;
+  unmatched: {
+    /** Ads excluded from one-to-one matching: their key repeats within
+     *  a period, or (in ad_id mode) the id cell is empty. Counted over
+     *  the CURRENT period; the previous period's counterparts are
+     *  excluded from appeared/disappeared too — never guessed. */
+    ambiguousOrMissingKey: number;
+    /** Matched ads judged in only one of the two periods — no delta is
+     *  computed for them (the other side is below the evidence bar). */
+    judgedOnePeriodOnly: number;
+  };
+  /** Where last period's leading ads landed this period. Two registers. */
+  persistence: { buyer: string[]; client: string[] };
+  appeared: { names: string[]; total: number };
+  disappeared: { names: string[]; total: number };
+  /** Fixed: what changed ≠ why it changed; never feeds the Next move. */
+  caveat: string;
+  limits: { buyer: string[]; client: string[] };
+}
+
+/* ------------------------------------------------------------------ */
 /* Decision-First V1: the "Next move" card                             */
 /* ------------------------------------------------------------------ */
 
@@ -343,6 +470,12 @@ export interface MemoDecision {
    *  Sourced from the first next test; the numeric reassessment trigger
    *  stays separate (`reassess`). Absent when no next test exists. */
   nextControlledTest?: { preserve: string; change: string; watch: string };
+  /** Decision Criteria V2 — the decision bars that participated in this
+   *  call, each labeled with its provenance (Debrief default vs the
+   *  user's own criterion). Always present: default thresholds are
+   *  Debrief's rules, not universal truth, and the report says whose
+   *  bars decided. Buyer-register wording; rendered in buyer view. */
+  appliedCriteria: AppliedCriterion[];
 }
 
 export interface Memo {
@@ -350,6 +483,12 @@ export interface Memo {
   /** Decision-First V1: the committed "Next move" — purely additive;
    *  no other memo field changed when this shipped. */
   decision: MemoDecision;
+  /** Period Comparison V2 — "What changed" vs an optional previous-
+   *  period export. null on single-period runs (generateMemo always
+   *  sets null; the route attaches a comparison when a previous file
+   *  was provided). NEVER an input to `decision` — the Next move is a
+   *  current-period read only. */
+  comparison: MemoComparison | null;
   tldr: string[];
   /** Plain-language verdict for the client-facing view — same facts as
    *  tldr, none of the buyer shorthand. */

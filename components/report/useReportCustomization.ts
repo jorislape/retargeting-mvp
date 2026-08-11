@@ -38,6 +38,9 @@ export interface UseReportCustomizationResult<Id extends string> {
   setReportTitle: (value: string) => void;
   setAccentId: (value: AccentId) => void;
   setDateOverride: (value: string | null) => void;
+  /** Expert Commentary V2 — identity-like field: never affects preset
+   *  matching, rendered as an attributed commentary block only. */
+  setExpertTake: (value: string) => void;
   /** Changes ONLY the report register (Buyer/Client). Per approved
    *  decision #9: does not touch sections, does not reapply mode
    *  defaults, and — because `mode` is excluded from matchesPreset —
@@ -171,6 +174,7 @@ export function useReportCustomization<Id extends string>(
     setReportTitle: (value) => setCustomization((c) => ({ ...c, reportTitle: value })),
     setAccentId: (value) => setCustomization((c) => ({ ...c, accentId: value })),
     setDateOverride: (value) => setCustomization((c) => ({ ...c, dateOverride: value })),
+    setExpertTake: (value) => setCustomization((c) => ({ ...c, expertTake: value })),
     setMode,
     toggleSection,
     setTopAdsShown,

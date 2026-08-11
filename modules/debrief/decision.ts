@@ -6,8 +6,15 @@
 // extensionless imports and is NOT directly Node-importable; that is
 // why buildDecision takes a money formatter as an argument instead of
 // importing format.ts (whose own internal import is extensionless).
-import { KPI_LABELS } from "./types.ts";
-import type { AnalysisResult, DecisionInputContext, MemoDecision, Objective } from "./types.ts";
+import { KPI_LABELS, outcomeNounsForKpi } from "./types.ts";
+import type {
+  AnalysisResult,
+  AppliedCriterion,
+  DecisionCriteria,
+  DecisionInputContext,
+  MemoDecision,
+  Objective,
+} from "./types.ts";
 
 /**
  * Decision-First V1 — the "Next move" layer.
@@ -315,18 +322,60 @@ export function buildDecision(
    *  answers and objective, forwarded to buildLimits (and, for
    *  objective="efficiency", to the scaleEligible branches below).
    *  Never affects the action or evidenceState. */
-  testQuality?: DecisionInputContext
+  testQuality?: DecisionInputContext,
+  /** Decision Criteria V2 — the user's own decision bars (see the
+   *  DecisionCriteria doc in types.ts). Unlike testQuality, these MAY
+   *  legitimately participate in the action: a user-set outcome
+   *  minimum can withhold a scale/shift recommendation. It can only
+   *  ever WITHHOLD — it never fabricates an action the data didn't
+   *  earn. Absent/null is a complete no-op on the action. */
+  criteria?: DecisionCriteria
 ): MemoDecision {
   const kpiLabel = KPI_LABELS[analysis.kpi];
   const gateLabel = money(analysis.spendGate);
+  /* Decision Criteria V2 — gate provenance, woven into the exact
+     strings that cite the gate so a user-set bar is always labeled as
+     the user's own. Buyer register carries the explicit provenance;
+     client register gets a short "the threshold you set" suffix only
+     where the gate amount is already being explained. */
+  const userGate = analysis.spendGateBasis === "user_gate";
+  const gatePhrase = userGate
+    ? `${gateLabel} spend gate you set`
+    : `${gateLabel} spend gate`;
+  const clientGateSuffix = userGate ? " — the threshold you set" : "";
   const top = analysis.winners[0] ?? null;
   const worst = analysis.losers[0] ?? null;
 
   /* ---- shared eligibility facts (null-guarded: a zero median makes
      deltaPct null, which simply disqualifies the affected rule rather
      than guessing) ---- */
-  const scaleEligible =
+  const rawScaleEligible =
     top != null && top.deltaPct != null && top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT;
+
+  /* ---- Decision Criteria V2: the user's outcome minimum. Applies
+     ONLY to spend-increasing moves (scale/shift — the discovery
+     evidence is about when practitioners scale), only when the
+     selected KPI actually has an outcome count (purchases/leads —
+     never CTR/CPC), and only when that count is verifiable in the
+     export. An absent count column never silently enforces OR ignores
+     the bar: it produces an explicit "couldn't be checked" limits
+     line and no gating. ---- */
+  const nouns = outcomeNounsForKpi(analysis.kpi);
+  const minOutcome =
+    criteria?.minOutcomeCount != null && criteria.minOutcomeCount > 0
+      ? criteria.minOutcomeCount
+      : null;
+  const topOutcomes = top?.conversions ?? null;
+  const outcomeInapplicable = minOutcome != null && nouns == null;
+  const outcomeUnverifiable =
+    minOutcome != null && nouns != null && top != null && topOutcomes == null;
+  const outcomeBlockedScale =
+    minOutcome != null &&
+    nouns != null &&
+    rawScaleEligible &&
+    topOutcomes != null &&
+    topOutcomes < minOutcome;
+  const scaleEligible = rawScaleEligible && !outcomeBlockedScale;
   const belowShare =
     analysis.judgedSpend > 0
       ? (analysis.belowBenchmarkSpend / analysis.judgedSpend) * 100
@@ -362,14 +411,80 @@ export function buildDecision(
      and spread into every return, so the action rules are untouched. ---- */
   const evidenceState = deriveEvidenceState(analysis, flatField);
   const evidenceShape = deriveEvidenceShape(analysis, flatField);
-  const limits = buildLimits(analysis, flatField, testQuality);
+  const baseLimits = buildLimits(analysis, flatField, testQuality);
+
+  /* ---- Decision Criteria V2: criterion-status lines, appended to the
+     limits so every return path carries them. Only states of the
+     user's OWN bar — never a new claim about the data. ---- */
+  const criteriaBuyer: string[] = [];
+  const criteriaClient: string[] = [];
+  if (outcomeInapplicable && minOutcome != null) {
+    criteriaBuyer.push(
+      `Your minimum-outcome criterion (${minOutcome}) doesn't apply to ${kpiLabel} — it has no purchase or lead count, so the criterion was not used.`
+    );
+    criteriaClient.push(
+      `The minimum result count you set doesn't apply to ${kpiLabel} reports, so it wasn't used here.`
+    );
+  }
+  if (outcomeUnverifiable && minOutcome != null && nouns != null) {
+    criteriaBuyer.push(
+      `Your ${minOutcome}-${nouns.one} minimum couldn't be checked — this export has no ${nouns.one} count column, so the criterion was not applied.`
+    );
+    criteriaClient.push(
+      `The minimum of ${minOutcome} ${nouns.many} you set couldn't be checked — this export doesn't include ${nouns.one} counts — so it wasn't applied.`
+    );
+  }
+  if (outcomeBlockedScale && minOutcome != null && nouns != null && top != null) {
+    criteriaBuyer.push(
+      `"${top.name}" is ${pct(top.deltaPct!)}% past the median — over the ${SCALE_TEST_MIN_DELTA_PCT}% bar — but recorded ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many}, below your ${minOutcome}-${nouns.one} minimum for a scaling decision, so no scale move is recommended.`
+    );
+    criteriaClient.push(
+      `"${top.name}" is ahead, but with ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} so far it hasn't reached the ${minOutcome} you require before scaling — so we're not increasing its budget yet.`
+    );
+  }
+  const limits = {
+    buyer: [...baseLimits.buyer, ...criteriaBuyer],
+    client: [...baseLimits.client, ...criteriaClient],
+  };
+
+  /* ---- Decision Criteria V2: the bars that participated in this
+     call, each with provenance. Always built — Debrief's defaults are
+     labeled as Debrief's rules, never presented as universal truth. ---- */
+  const appliedCriteria: AppliedCriterion[] = [
+    {
+      label: userGate
+        ? `Evidence gate: ${gateLabel} spend per ad — your criterion`
+        : analysis.spendGateBasis === "target_cpa"
+          ? `Evidence gate: ${gateLabel} spend per ad (3× your target CPA) — Debrief default rule`
+          : `Evidence gate: ${gateLabel} spend per ad — Debrief default (spend floor / half of mean spend)`,
+      source: userGate ? "user" : "debrief_default",
+    },
+    {
+      label: `Budget-move bar: top ad ≥${SCALE_TEST_MIN_DELTA_PCT}% past the median — Debrief default`,
+      source: "debrief_default",
+    },
+    {
+      label: `Cut bar: worst ad ≥${SCALE_TEST_MIN_DELTA_PCT}% behind and ≥${CUT_MIN_SPEND_SHARE_PCT}% of judged spend below the median — Debrief default`,
+      source: "debrief_default",
+    },
+    ...(minOutcome != null && nouns != null
+      ? [
+          {
+            label: `Scaling minimum: ≥${minOutcome} ${nouns.many} on the ad being scaled — your criterion`,
+            source: "user" as const,
+          },
+        ]
+      : []),
+  ];
+
   const nextControlledTest = nextTestFacts
     ? { preserve: nextTestFacts.preserve, change: nextTestFacts.change, watch: kpiLabel }
     : undefined;
-  const evidence: Pick<MemoDecision, "evidenceState" | "limits"> &
+  const evidence: Pick<MemoDecision, "evidenceState" | "limits" | "appliedCriteria"> &
     Partial<Pick<MemoDecision, "evidenceShape" | "nextControlledTest">> = {
     evidenceState,
     limits,
+    appliedCriteria,
   };
   if (evidenceShape) evidence.evidenceShape = evidenceShape;
   if (nextControlledTest) evidence.nextControlledTest = nextControlledTest;
@@ -378,7 +493,7 @@ export function buildDecision(
     ...evidence,
     action: "hold",
     holdReason: "insufficient_data",
-    headline: `Hold — ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads cleared the ${gateLabel} spend gate; this call needs ${DECISION_MIN_JUDGED}.`,
+    headline: `Hold — ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads cleared the ${gatePhrase}; this call needs ${DECISION_MIN_JUDGED}.`,
     clientHeadline:
       "Hold — most ads haven't had enough spend to judge fairly yet.",
     rationale: `Fewer than ${DECISION_MIN_JUDGED} judged ads is too thin a base for a budget or test call — any pattern at this size is as likely noise as signal.`,
@@ -389,8 +504,8 @@ export function buildDecision(
       client: ["We're not adding anything new while the data builds."],
     },
     reassess: {
-      buyer: `Reassess when ≥${DECISION_MIN_JUDGED} ads clear the ${gateLabel} spend gate.`,
-      client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have spent about ${gateLabel} each.`,
+      buyer: `Reassess when ≥${DECISION_MIN_JUDGED} ads clear the ${gatePhrase}.`,
+      client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have spent about ${gateLabel} each${clientGateSuffix}.`,
     },
   });
 
@@ -459,7 +574,11 @@ export function buildDecision(
       action: "budget",
       headline: `Cut ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
-      rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). No winner clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar, so the move is stopping the leak — not scaling.`,
+      rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${
+        outcomeBlockedScale && nouns != null
+          ? `The top ad clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar but sits below your ${minOutcome}-${nouns.one} scaling minimum, so the move is stopping the leak — not scaling.`
+          : `No winner clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar, so the move is stopping the leak — not scaling.`
+      }`,
       clientRationale: `The weakest ads are far behind the rest and are using ${pct(belowShare)}% of the budget that's had a fair chance to perform — pausing them stops the leak without touching what works.`,
       avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
       reassess,
@@ -498,16 +617,29 @@ export function buildDecision(
       action: "test",
       headline: `Run one test: ${testTitle}. Nothing has earned a budget move yet.`,
       clientHeadline: `Run one focused test next: ${testTitle}.`,
-      rationale: `Top ad ${top?.deltaPct != null ? `+${pct(top.deltaPct)}%` : "±0%"} vs the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar; below-benchmark spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. Neither clears, so the strongest evidence-backed move is a test, not a budget change.`,
+      rationale:
+        outcomeBlockedScale && nouns != null && top != null
+          ? `Top ad +${pct(top.deltaPct!)}% clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar but has ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} — below your ${minOutcome}-${nouns.one} scaling minimum; below-benchmark spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. The strongest evidence-backed move is a test, not a budget change.`
+          : `Top ad ${top?.deltaPct != null ? `+${pct(top.deltaPct)}%` : "±0%"} vs the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar; below-benchmark spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. Neither clears, so the strongest evidence-backed move is a test, not a budget change.`,
       clientRationale:
-        "No single ad is far enough ahead or behind to justify moving budget yet — the fastest path to a clear winner is one focused test.",
+        outcomeBlockedScale && nouns != null
+          ? `No ad has both a clear enough lead and the ${minOutcome} ${nouns.many} you require before scaling — the fastest path to a confident move is one focused test.`
+          : "No single ad is far enough ahead or behind to justify moving budget yet — the fastest path to a clear winner is one focused test.",
       avoidNow: {
-        buyer: [`No budget moves yet — nothing has cleared the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`],
-        client: ["We're not moving budget yet — no ad has separated enough yet."],
+        buyer: [
+          outcomeBlockedScale && nouns != null
+            ? `No budget moves yet — the leader hasn't reached your ${minOutcome}-${nouns.one} scaling minimum.`
+            : `No budget moves yet — nothing has cleared the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
+        ],
+        client: [
+          outcomeBlockedScale && nouns != null
+            ? `We're not moving budget yet — the leading ad hasn't reached the ${minOutcome} ${nouns.many} you require first.`
+            : "We're not moving budget yet — no ad has separated enough yet.",
+        ],
       },
       reassess: {
-        buyer: `Reassess when the test clears the ${gateLabel} spend gate — then judge it against the median.`,
-        client: `We'll revisit once the test has spent about ${gateLabel} — enough for a fair read.`,
+        buyer: `Reassess when the test clears the ${gatePhrase} — then judge it against the median.`,
+        client: `We'll revisit once the test has spent about ${gateLabel}${clientGateSuffix} — enough for a fair read.`,
       },
     };
   }

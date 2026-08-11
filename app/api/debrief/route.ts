@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   analyze,
   applyFormatOverrides,
+  buildComparison,
   CREATIVE_FORMAT_LABELS,
   extractAds,
+  fmtKpiValue,
+  fmtMoney,
   generateMemo,
   KPI_LABELS,
   KpiKey,
@@ -13,7 +16,9 @@ import {
   toTable,
   type CreativeFormatOverrides,
   type DebriefApiError,
+  type MemoComparison,
   type Objective,
+  type ParsedAd,
 } from "@/modules/debrief";
 
 /**
@@ -62,6 +67,114 @@ function fail(status: number, error: DebriefApiError) {
 
 const EXPORT_AT_AD_LEVEL =
   "Export ads at ad level for a date range with delivery.";
+
+/* Period Comparison V2 — validation + parse for the OPTIONAL previous-
+   period file, mirroring the primary file's checks with error titles
+   prefixed so the user knows which file failed. Kept as a separate
+   pass (a little duplication) rather than refactoring the primary
+   path: the primary flow's behavior must stay byte-identical. Read
+   into memory for this request only, like the primary CSV — never
+   stored, cached, or logged. */
+type PreviousPeriodParse =
+  | {
+      ok: true;
+      ads: ParsedAd[];
+      rows: Record<string, string>[];
+      columns: ReturnType<typeof resolveColumns>;
+    }
+  | { ok: false; status: number; error: DebriefApiError };
+
+async function parsePreviousPeriod(
+  file: File,
+  kpi: KpiKey
+): Promise<PreviousPeriodParse> {
+  const bad = (error: DebriefApiError): PreviousPeriodParse => ({
+    ok: false,
+    status: 400,
+    error,
+  });
+  if (file.size === 0) {
+    return bad({
+      title: "Previous period: empty file",
+      message: "The previous-period CSV file is empty.",
+      fix: EXPORT_AT_AD_LEVEL,
+    });
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    return bad({
+      title: "Previous period: file too large",
+      message: `The previous-period CSV is over ${MAX_FILE_BYTES / 1024 / 1024}MB.`,
+      fix: "Export a shorter date range or fewer columns from Ads Manager.",
+    });
+  }
+  let text: string;
+  try {
+    text = await file.text();
+  } catch {
+    return bad({
+      title: "Previous period: CSV could not be read",
+      message: "Debrief could not read the previous-period file as a standard CSV.",
+      fix: "Try exporting again from Meta Ads Manager as CSV, not XLSX.",
+    });
+  }
+  if (/[\u0000-\u0008\u000E-\u001F]/.test(text.slice(0, 2000))) {
+    return bad({
+      title: "Previous period: CSV could not be read",
+      message: "Debrief could not read the previous-period file as a standard CSV.",
+      fix: "Try exporting again from Meta Ads Manager as CSV, not XLSX.",
+    });
+  }
+  const matrix = parseCsv(text);
+  if (matrix.length === 0 || matrix.length - 1 > MAX_DATA_ROWS) {
+    return bad({
+      title:
+        matrix.length === 0
+          ? "Previous period: CSV could not be read"
+          : "Previous period: too many rows",
+      message:
+        matrix.length === 0
+          ? "Debrief could not read the previous-period file as a standard CSV."
+          : `The previous-period CSV has more than ${MAX_DATA_ROWS.toLocaleString()} ad rows.`,
+      fix:
+        matrix.length === 0
+          ? "Try exporting again from Meta Ads Manager as CSV, not XLSX."
+          : "Export a shorter date range, or run the comparison without it.",
+    });
+  }
+  const { headers, rows } = toTable(matrix);
+  if (headers.length === 0 || rows.length === 0) {
+    return bad({
+      title: "Previous period: no ad rows found",
+      message: "The previous-period CSV has no usable header or ad rows.",
+      fix: EXPORT_AT_AD_LEVEL,
+    });
+  }
+  const columns = resolveColumns(headers);
+  if (!columns.adName) {
+    return bad({
+      title: "Previous period: ad name column not found",
+      message: "The previous-period CSV has no Ad name / Creative name column.",
+      fix: "Export the previous period at ad level with Ad name included.",
+    });
+  }
+  const missing = requiredColumnsFor(kpi, columns);
+  if (missing.length > 0) {
+    return bad({
+      title: `Previous period: ${KPI_LABELS[kpi]} column not found`,
+      message: `The previous-period CSV does not include the columns needed for ${KPI_LABELS[kpi]} (looked for: ${missing.join(", ")}).`,
+      fix: `Export the previous period with ${missing.join(", ")} included — both files must support the same KPI.`,
+    });
+  }
+  const ads = extractAds(rows, columns, kpi);
+  if (ads.length === 0) {
+    return bad({
+      title: "Previous period: no ad rows found",
+      message: "No usable ad rows were found in the previous-period CSV.",
+      fix: EXPORT_AT_AD_LEVEL,
+    });
+  }
+  return { ok: true, ads, rows, columns };
+}
 
 export async function POST(request: NextRequest) {
   let form: FormData;
@@ -121,6 +234,38 @@ export async function POST(request: NextRequest) {
     targetCpa = parsed;
   }
 
+  /* Decision Criteria V2 — the user's own decision bars. Explicit
+     numeric inputs get the same posture as targetCpa: an invalid value
+     is a clear 400 guide, never silently ignored (the user typed a
+     criterion and deserves to know it wasn't usable). Both absent →
+     Debrief defaults, output unchanged. */
+  const gateOverrideRaw = form.get("spendGateOverride");
+  let spendGateOverride: number | null = null;
+  if (typeof gateOverrideRaw === "string" && gateOverrideRaw.trim() !== "") {
+    const parsed = Number(gateOverrideRaw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fail(400, {
+        title: "Invalid evidence gate",
+        message: "Your custom spend gate must be a positive number.",
+        fix: "Enter a positive amount (spend per ad before it's judged), or leave the field blank to use Debrief's default.",
+      });
+    }
+    spendGateOverride = parsed;
+  }
+  const minOutcomeRaw = form.get("minOutcomeCount");
+  let minOutcomeCount: number | null = null;
+  if (typeof minOutcomeRaw === "string" && minOutcomeRaw.trim() !== "") {
+    const parsed = Number(minOutcomeRaw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fail(400, {
+        title: "Invalid minimum outcome count",
+        message: "The minimum purchases/leads before scaling must be a positive number.",
+        fix: "Enter a positive whole number, or leave the field blank to skip this criterion.",
+      });
+    }
+    minOutcomeCount = Math.floor(parsed);
+  }
+
   /* Evidence Inputs V1 + Input Honesty V1 — optional self-reported
      test-quality answers and the optional structured objective. Any
      unrecognized/absent value is treated as UNANSWERED (undefined),
@@ -155,6 +300,8 @@ export async function POST(request: NextRequest) {
     trackingChanged: parseChanged(form.get("trackingChanged")),
     setupChanged: parseChanged(form.get("setupChanged")),
     objective: parseObjective(form.get("objective")),
+    spendGateOverride,
+    minOutcomeCount,
   };
 
   /* Optional creative-format confirmations (ad name → format tag).
@@ -307,9 +454,47 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  /* Period Comparison V2 — optional previous-period file. Parsed with
+     the same validation (prefixed error titles); a currency mismatch is
+     a hard refusal, since money deltas across currencies would be
+     meaningless rather than merely limited. Format confirmations apply
+     to the CURRENT file only — the Verify stage is keyed to it. */
+  const previousFileRaw = form.get("previousCsv");
+  let previous: { ads: ParsedAd[]; rows: Record<string, string>[]; columns: ReturnType<typeof resolveColumns> } | null =
+    null;
+  if (previousFileRaw instanceof File) {
+    const parsed = await parsePreviousPeriod(previousFileRaw, context.kpi);
+    if (!parsed.ok) return fail(parsed.status, parsed.error);
+    if (
+      parsed.columns.currency != null &&
+      columns.currency != null &&
+      parsed.columns.currency !== columns.currency
+    ) {
+      return fail(400, {
+        title: "Currencies don't match",
+        message: `The current file is in ${columns.currency} but the previous-period file is in ${parsed.columns.currency} — spend movements across currencies wouldn't be meaningful.`,
+        fix: "Export both periods from the same ad account with the same currency, or run the debrief without the previous-period file.",
+      });
+    }
+    previous = parsed;
+  }
+
   try {
     const analysis = analyze(ads, rows, columns, context);
-    const memo = generateMemo(analysis, context);
+    let memo = generateMemo(analysis, context);
+    if (previous) {
+      const prevAnalysis = analyze(previous.ads, previous.rows, previous.columns, context);
+      const comparison: MemoComparison = buildComparison(
+        { analysis, ads },
+        { analysis: prevAnalysis, ads: previous.ads },
+        {
+          money: (v) => fmtMoney(v, analysis.currency),
+          kpiValue: (v) => fmtKpiValue(v, context.kpi, analysis.currency),
+          kpiLabel: KPI_LABELS[context.kpi],
+        }
+      );
+      memo = { ...memo, comparison };
+    }
     return ok({ ok: true, memo });
   } catch (error) {
     console.error("debrief: analysis failed", {

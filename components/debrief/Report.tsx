@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { Memo, MemoBrief, MemoTest, MemoWinnerLoserRow } from "@/modules/debrief";
+import type {
+  Memo,
+  MemoBrief,
+  MemoComparison,
+  MemoTest,
+  MemoWinnerLoserRow,
+} from "@/modules/debrief";
 import {
   CheckIcon,
   CopyIcon,
@@ -115,6 +121,204 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
   );
 }
 
+/* Period Comparison V2 — "What changed" between the two exports.
+   Unnumbered, ABOVE the Next-move card (change is the context the
+   decision is read in), rendered only when a previous-period file was
+   provided. Strictly descriptive — the caveat and the decision card's
+   own copy both state that this never feeds the recommendation. The
+   match provenance (Ad ID vs ad name) is surfaced as a visible line at
+   the top of the section, per approved adjustment #2 — not only in the
+   limits text. */
+function WhatChangedSection({
+  comparison,
+  view,
+  topAdsShown,
+}: {
+  comparison: MemoComparison;
+  view: ReportView;
+  topAdsShown: 3 | 5;
+}) {
+  const client = view === "client";
+  const account = client ? comparison.account.client : comparison.account.buyer;
+  const persistence = client
+    ? comparison.persistence.client
+    : comparison.persistence.buyer;
+  const limits = client ? comparison.limits.client : comparison.limits.buyer;
+  const improved = comparison.improved.slice(0, topAdsShown);
+  const declined = comparison.declined.slice(0, topAdsShown);
+
+  const deltaList = (
+    rows: typeof improved,
+    tone: "win" | "loss",
+    heading: string
+  ) =>
+    rows.length > 0 && (
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          {heading}
+        </p>
+        <ul className="mt-1.5 space-y-1.5">
+          {rows.map((row) => (
+            <li
+              key={row.name}
+              className={`border-l pl-3 text-[13px] leading-relaxed ${
+                tone === "win"
+                  ? "border-emerald-400/40"
+                  : "border-red-400/40"
+              }`}
+            >
+              <span className="font-medium text-zinc-200">{row.name}</span>{" "}
+              <span className="font-mono text-[12px] tabular-nums text-zinc-400">
+                {row.previousLabel} → {row.currentLabel}
+              </span>{" "}
+              <span
+                className={`font-mono text-[12px] tabular-nums ${
+                  tone === "win" ? "text-emerald-400 print-win" : "text-red-400 print-loss"
+                }`}
+              >
+                {row.changeLabel}
+              </span>
+              {row.conversionChangeLabel && (
+                <span className="text-[12px] text-zinc-500">
+                  {" "}
+                  · {row.conversionChangeLabel}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+
+  return (
+    <section
+      aria-label="What changed vs previous period"
+      className="print-avoid-break animate-rise mt-8 rounded-xl border border-white/10 bg-white/[0.03] p-5 sm:p-6"
+    >
+      <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-300">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+        What changed vs previous period
+      </p>
+      {(comparison.periodLabel.previous || comparison.periodLabel.current) && (
+        <p className="mt-1.5 font-mono text-[11px] text-zinc-500">
+          {comparison.periodLabel.previous ?? "previous period"} →{" "}
+          {comparison.periodLabel.current ?? "current period"}
+        </p>
+      )}
+      {/* Match provenance — always visible, never buried in limits. */}
+      <p className="mt-2 inline-flex max-w-full items-baseline gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] leading-relaxed text-zinc-400">
+        <span className="shrink-0 font-semibold uppercase tracking-[0.08em] text-zinc-300">
+          {comparison.matchBasis === "ad_id" ? "Matched by Ad ID" : "Matched by ad name"}
+        </span>
+        <span className="min-w-0">{comparison.matchNote}</span>
+      </p>
+
+      <ul className="mt-4 space-y-1.5">
+        {account.map((line, i) => (
+          <li key={i} className="text-[13px] leading-relaxed text-zinc-300">
+            {line}
+          </li>
+        ))}
+      </ul>
+
+      {(improved.length > 0 || declined.length > 0) && (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {deltaList(improved, "win", client ? "Moved ahead" : "Improved")}
+          {deltaList(declined, "loss", client ? "Fell behind" : "Declined")}
+        </div>
+      )}
+
+      {persistence.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            {client ? "Last period's leaders" : "Winner persistence"}
+          </p>
+          <ul className="mt-1.5 space-y-1.5">
+            {persistence.map((line, i) => (
+              <li key={i} className="text-[13px] leading-relaxed text-zinc-400">
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(comparison.appeared.total > 0 || comparison.disappeared.total > 0) && (
+        <p className="mt-4 text-[12px] leading-relaxed text-zinc-500">
+          {comparison.appeared.total > 0 && (
+            <>
+              New this period: {comparison.appeared.names.join(", ")}
+              {comparison.appeared.total > comparison.appeared.names.length &&
+                ` and ${comparison.appeared.total - comparison.appeared.names.length} more`}
+              .{" "}
+            </>
+          )}
+          {comparison.disappeared.total > 0 && (
+            <>
+              No longer present: {comparison.disappeared.names.join(", ")}
+              {comparison.disappeared.total > comparison.disappeared.names.length &&
+                ` and ${comparison.disappeared.total - comparison.disappeared.names.length} more`}
+              .
+            </>
+          )}
+        </p>
+      )}
+
+      {limits.length > 0 && (
+        <div className="mt-4 border-t border-white/[0.08] pt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            {client ? "Worth knowing about this comparison" : "Comparison limits"}
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {limits.map((line, i) => (
+              <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="mt-4 border-t border-white/[0.08] pt-3 text-[12px] leading-relaxed text-zinc-500">
+        {comparison.caveat}
+      </p>
+    </section>
+  );
+}
+
+/* Expert Commentary V2 — the practitioner's own attributed take.
+   Visually distinct from engine sections (amber-tinted commentary
+   frame, explicit attribution line) so a reader can never mistake
+   professional judgment for something the data established. Renders
+   in both views and in print while non-empty. */
+function ExpertTakeBlock({
+  text,
+  agencyName,
+}: {
+  text: string;
+  agencyName: string;
+}) {
+  return (
+    <section
+      aria-label="Expert commentary"
+      className="print-avoid-break animate-rise mt-6 rounded-xl border border-amber-300/25 border-l-[3px] border-l-amber-300/60 bg-amber-300/[0.04] p-5 sm:p-6"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">
+        Expert commentary
+      </p>
+      <p className="mt-2 max-w-3xl whitespace-pre-line text-[13px] leading-relaxed text-zinc-200">
+        {text}
+      </p>
+      <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">
+        {agencyName.trim() !== ""
+          ? `Added by ${agencyName.trim()}`
+          : "Added by the report author"}{" "}
+        — professional judgment, not a conclusion derived from the data in
+        this report.
+      </p>
+    </section>
+  );
+}
+
 /* Decision-First V1 → Evidence-Explicit polish: the one committed call,
    directly under the masthead. Unnumbered on purpose — it sits above
    the numbered sections the way the masthead does, so nothing below
@@ -145,7 +349,21 @@ function firstClause(text: string): string {
   return idx === -1 ? text : text.slice(0, idx);
 }
 
-function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
+function DecisionCard({
+  memo,
+  view,
+  expandLimits,
+}: {
+  memo: Memo;
+  view: ReportView;
+  /** Decision & Comparison V2: when a comparison or a user-set
+   *  criterion is in play, the limits are promoted from the collapsed
+   *  <details> to an always-visible "What we don't know" list — those
+   *  runs have new caveats the reader shouldn't have to discover. A
+   *  default single-period run keeps the original collapsed disclosure
+   *  unchanged. */
+  expandLimits: boolean;
+}) {
   const d = memo.decision;
   const client = view === "client";
   const avoid = client ? d.avoidNow.client : d.avoidNow.buyer;
@@ -165,7 +383,14 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
       <p className="mt-3 max-w-3xl text-[17px] font-semibold leading-snug text-zinc-50 sm:text-[19px]">
         {client ? d.clientHeadline : d.headline}
       </p>
-      <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-zinc-300">
+      {/* Decision & Comparison V2: "What we know" labels the evidence
+          side of the card — the rationale and evidence-strength line —
+          with "What we don't know" (the limits) as its counterpart
+          below. Same content as before; the pairing is the change. */}
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+        {client ? "What the data shows" : "What we know"}
+      </p>
+      <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-zinc-300">
         {client ? d.clientRationale : d.rationale}
       </p>
       <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
@@ -177,6 +402,36 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
         {": "}
         {evidenceLine(d, memo.scope.adsJudged, view)}
       </p>
+      {/* Decision Criteria V2 — whose bars decided. Buyer view only
+          (the labels carry buyer vocabulary); user-provided criteria
+          are visually tagged so a default is never presented as the
+          user's own bar, or vice versa. */}
+      {!client && d.appliedCriteria.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            Decision bars applied
+          </summary>
+          <ul className="mt-1.5 space-y-1">
+            {d.appliedCriteria.map((criterion, i) => (
+              <li
+                key={i}
+                className="flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500"
+              >
+                <span
+                  className={`shrink-0 rounded-sm border px-1 py-px text-[9px] font-semibold uppercase tracking-[0.08em] ${
+                    criterion.source === "user"
+                      ? "border-accent/40 text-accent-soft"
+                      : "border-white/15 text-zinc-500"
+                  }`}
+                >
+                  {criterion.source === "user" ? "Yours" : "Default"}
+                </span>
+                <span className="min-w-0">{criterion.label}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {avoid.length > 0 && (
         <div className="mt-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
@@ -220,27 +475,45 @@ function DecisionCard({ memo, view }: { memo: Memo; view: ReportView }) {
       <p className="mt-4 border-t border-white/[0.08] pt-3 text-xs leading-relaxed text-zinc-400">
         {client ? d.reassess.client : d.reassess.buyer}
       </p>
-      {limits.length > 0 && (
-        // key={view}: <details>'s `open` is a native, uncontrolled DOM
-        // property — React never resets it on a normal re-render since
-        // it's never part of the rendered props. Without this key, a
-        // user who manually expands the disclosure in one view finds
-        // it still open after toggling Buyer ↔ Client (same DOM node
-        // reused). The key forces a fresh node per view, so it's always
-        // closed by default again on either side of the toggle.
-        <details key={view} className="mt-4 border-t border-white/[0.08] pt-3">
-          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-            {client ? "What we still can't conclude" : "Evidence limits"}
-          </summary>
-          <ul className="mt-2 space-y-1">
-            {limits.map((line, i) => (
-              <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
-                {line}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {limits.length > 0 &&
+        (expandLimits ? (
+          /* Decision & Comparison V2: with a comparison or user
+             criteria in play, the limits carry load-bearing caveats —
+             always visible as the "What we don't know" counterpart to
+             "What we know" above. */
+          <div className="mt-4 border-t border-white/[0.08] pt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              {client ? "What we still can't conclude" : "What we don't know"}
+            </p>
+            <ul className="mt-2 space-y-1">
+              {limits.map((line, i) => (
+                <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          // key={view}: <details>'s `open` is a native, uncontrolled DOM
+          // property — React never resets it on a normal re-render since
+          // it's never part of the rendered props. Without this key, a
+          // user who manually expands the disclosure in one view finds
+          // it still open after toggling Buyer ↔ Client (same DOM node
+          // reused). The key forces a fresh node per view, so it's always
+          // closed by default again on either side of the toggle.
+          <details key={view} className="mt-4 border-t border-white/[0.08] pt-3">
+            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              {client ? "What we still can't conclude" : "Evidence limits"}
+            </summary>
+            <ul className="mt-2 space-y-1">
+              {limits.map((line, i) => (
+                <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ))}
     </section>
   );
 }
@@ -842,7 +1115,7 @@ export function Report({
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(
-        memoToText(memo, view, customization.topAdsShown, view === "buyer" ? briefIdxs : [])
+        memoToText(memo, view, customization.topAdsShown, view === "buyer" ? briefIdxs : [], customization.expertTake)
       );
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -858,7 +1131,7 @@ export function Report({
      currently active view, same content Copy would put on the
      clipboard. */
   const handleDownload = () => {
-    const text = memoToText(memo, view, customization.topAdsShown, view === "buyer" ? briefIdxs : []);
+    const text = memoToText(memo, view, customization.topAdsShown, view === "buyer" ? briefIdxs : [], customization.expertTake);
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1126,7 +1399,34 @@ export function Report({
           )}
         </header>
 
-        <DecisionCard memo={memo} view={view} />
+        {/* Period Comparison V2 — change is the context the decision is
+            read in, so it renders above the Next-move card. Unnumbered,
+            like the card. */}
+        {memo.comparison && sections.whatChanged && (
+          <WhatChangedSection
+            comparison={memo.comparison}
+            view={view}
+            topAdsShown={customization.topAdsShown}
+          />
+        )}
+
+        <DecisionCard
+          memo={memo}
+          view={view}
+          expandLimits={
+            memo.comparison != null ||
+            memo.decision.appliedCriteria.some((c) => c.source === "user")
+          }
+        />
+
+        {/* Expert Commentary V2 — attributed judgment, never mixed with
+            engine claims. */}
+        {customization.expertTake.trim() !== "" && (
+          <ExpertTakeBlock
+            text={customization.expertTake}
+            agencyName={customization.agencyName}
+          />
+        )}
 
         {sections.executiveSummary && <ExecutiveSummary memo={memo} view={view} />}
 

@@ -128,8 +128,14 @@ export function extractAds(
       const name = columns.adName && row[columns.adName]
         ? row[columns.adName]
         : `Ad ${index + 1}`;
+      /* Period Comparison V2: keep the Ad ID cell (trimmed) when the
+         column exists — the reliable cross-period key. Never invented:
+         an empty cell stays null. */
+      const rawId = columns.adId ? row[columns.adId] : undefined;
+      const id = rawId && rawId.trim() !== "" ? rawId.trim() : null;
       return {
         name,
+        id,
         spend,
         kpiValue: kpiValueForRow(row, columns, kpi, spend),
         nameTags: extractNameTags(name),

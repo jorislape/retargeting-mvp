@@ -17,7 +17,7 @@
  */
 import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -73,6 +73,10 @@ function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
     median: 2,
     winners: [],
     losers: [],
+    /* Decision & Comparison V2: full ranked list — irrelevant to the
+       decision rules themselves (they read winners/losers), so the
+       fixtures leave it empty. */
+    rankedAds: [],
     belowBenchmarkSpend: 0,
     belowBenchmarkCount: 0,
     hasNameSignal: false,
@@ -719,6 +723,191 @@ function assertContract(d: MemoDecision, label: string) {
 
 console.log("decision (stage 1 — rules): all assertions passed");
 
+/* ============ Decision Criteria V2: user bars + provenance ============ */
+
+{
+  /* Every decision carries appliedCriteria; a default run is labeled
+     entirely as Debrief defaults — never as the user's own bars. */
+  const plain = buildDecision(
+    fixture({ winners: ads(3, 20), losers: ads(3, -20) }),
+    "Fallback test.",
+    money
+  );
+  assert.ok(plain.appliedCriteria.length >= 3, "appliedCriteria always present");
+  assert.ok(
+    plain.appliedCriteria.every((c) => c.source === "debrief_default"),
+    "default run: every bar labeled debrief_default"
+  );
+  assert.ok(
+    plain.appliedCriteria[0].label.includes("Debrief default"),
+    "gate label carries default provenance"
+  );
+
+  /* Passing no criteria and passing empty criteria are identical. */
+  const empty = buildDecision(
+    fixture({ winners: ads(3, 20), losers: ads(3, -20) }),
+    "Fallback test.",
+    money,
+    null,
+    undefined,
+    {}
+  );
+  assert.deepEqual(empty, plain, "empty criteria object is a complete no-op");
+
+  /* user_gate basis: provenance reaches the exact strings that cite
+     the gate, and the gate criterion flips to source "user". */
+  const userGateHold = buildDecision(
+    fixture({ adsJudged: 4, spendGateBasis: "user_gate" }),
+    "Some test.",
+    money
+  );
+  assert.ok(
+    userGateHold.headline.includes("spend gate you set"),
+    "user-gate headline says whose gate it is"
+  );
+  assert.equal(userGateHold.appliedCriteria[0].source, "user", "gate criterion labeled user");
+  assert.ok(
+    userGateHold.appliedCriteria[0].label.includes("your criterion"),
+    "gate label says 'your criterion'"
+  );
+  assertContract(userGateHold, "criteria:user-gate");
+
+  /* Outcome minimum below the bar WITHHOLDS the scale move (falls
+     through to test), cites the bar in limits + avoidNow, and lists
+     the user criterion. Never fabricates an action. */
+  const blockedBase = fixture({
+    winners: [{ ...ad("W", 400, 80), conversions: 3 }],
+    losers: [ad("L", 100, -10)],
+  });
+  const blocked = buildDecision(blockedBase, "Fallback test.", money, null, undefined, {
+    minOutcomeCount: 50,
+  });
+  assert.equal(blocked.action, "test", "scale withheld below the user's outcome bar → test");
+  assert.ok(
+    blocked.rationale.includes("50-purchase") || blocked.rationale.includes("50"),
+    "test rationale cites the user's bar, not a false 'nothing cleared'"
+  );
+  assert.ok(
+    !blocked.rationale.includes("Neither clears"),
+    "blocked-scale rationale never claims the % bar wasn't cleared"
+  );
+  assert.ok(
+    blocked.limits.buyer.some((l) => l.includes("below your 50-purchase minimum")),
+    "limits carry the withheld-scale explanation"
+  );
+  assert.ok(
+    blocked.avoidNow.buyer[0].includes("50-purchase"),
+    "avoidNow cites the user's minimum instead of the % bar"
+  );
+  assert.ok(
+    blocked.appliedCriteria.some(
+      (c) => c.source === "user" && c.label.includes("50 purchases")
+    ),
+    "scaling minimum listed as the user's criterion"
+  );
+  assertContract(blocked, "criteria:blocked");
+
+  /* Met bar → the scale move goes through unchanged. */
+  const met = buildDecision(
+    fixture({
+      winners: [{ ...ad("W", 400, 80), conversions: 60 }],
+      losers: [ad("L", 100, -10)],
+    }),
+    "Fallback test.",
+    money,
+    null,
+    undefined,
+    { minOutcomeCount: 50 }
+  );
+  assert.equal(met.action, "budget", "bar met → scale recommended");
+  assertContract(met, "criteria:met");
+
+  /* Unverifiable (no count column): NEVER silently enforced — the
+     action is unchanged and an explicit couldn't-check line appears. */
+  const unverifiable = buildDecision(blockedBase, "Fallback test.", money, null, undefined, {
+    minOutcomeCount: 50,
+  });
+  const noCount = buildDecision(
+    fixture({ winners: [ad("W", 400, 80)], losers: [ad("L", 100, -10)] }),
+    "Fallback test.",
+    money,
+    null,
+    undefined,
+    { minOutcomeCount: 50 }
+  );
+  assert.equal(noCount.action, "budget", "unverifiable bar never blocks the action");
+  assert.ok(
+    noCount.limits.buyer.some((l) => l.includes("couldn't be checked")),
+    "unverifiable bar produces an explicit limits line"
+  );
+  assert.ok(unverifiable.action !== noCount.action, "verified vs unverifiable differ as designed");
+
+  /* CTR has no outcome count — the criterion is inapplicable, stated,
+     and never applied (adjustment #3: no purchase-only count is ever
+     presented as a universal 'conversion' threshold). */
+  const ctr = buildDecision(
+    fixture({ kpi: "ctr", winners: [ad("W", 400, 80)], losers: [ad("L", 100, -10)] }),
+    "Fallback test.",
+    money,
+    null,
+    undefined,
+    { minOutcomeCount: 50 }
+  );
+  assert.equal(ctr.action, "budget", "inapplicable criterion never changes the action");
+  assert.ok(
+    ctr.limits.buyer.some((l) => l.includes("doesn't apply to CTR")),
+    "inapplicable criterion is stated, not silently dropped"
+  );
+  assert.ok(
+    !ctr.appliedCriteria.some((c) => c.label.toLowerCase().includes("purchases")),
+    "no purchase-count bar is listed for a KPI with no purchase count"
+  );
+
+  /* Cut still eligible while scale is blocked → cut-only branch, with
+     the honest 'clears the % bar but below your minimum' wording. */
+  const cutBlocked = buildDecision(
+    fixture({
+      winners: [{ ...ad("W", 400, 80), conversions: 3 }],
+      losers: [ad("L1", 200, -40), ad("L2", 100, -35)],
+      belowBenchmarkSpend: 300,
+      belowBenchmarkCount: 2,
+      judgedSpend: 1000,
+    }),
+    "Fallback test.",
+    money,
+    null,
+    undefined,
+    { minOutcomeCount: 50 }
+  );
+  assert.equal(cutBlocked.action, "budget", "cut side unaffected by the scaling minimum");
+  assert.ok(cutBlocked.headline.startsWith("Cut "), "cut-only variant fires");
+  assert.ok(
+    cutBlocked.rationale.includes("below your 50-purchase scaling minimum"),
+    "cut rationale never falsely claims no winner cleared the % bar"
+  );
+  assertContract(cutBlocked, "criteria:cut-blocked");
+}
+
+/* ============ Period Comparison V2: decision isolation ============ */
+
+{
+  /* Approved adjustment #1, enforced at the source level: decision.ts
+     must never read the comparison. */
+  const decisionSource = readFileSync(
+    new URL("../modules/debrief/decision.ts", import.meta.url),
+    "utf-8"
+  );
+  assert.ok(
+    !/from\s+"\.\/compare/.test(decisionSource),
+    "decision.ts never imports the comparison module"
+  );
+  assert.ok(
+    !decisionSource.includes("MemoComparison") &&
+      !decisionSource.includes("buildComparison"),
+    "decision.ts references no comparison type or builder"
+  );
+}
+
 /* ===================== Stage 2: sample-dataset pin via the real engine ===================== */
 
 {
@@ -763,12 +952,17 @@ console.log("decision (stage 1 — rules): all assertions passed");
     );
 
     // Structural additivity: decision aside, the memo's shape is unchanged.
+    // Decision & Comparison V2: `comparison` is the one new field, and on
+    // a single-period run (the sample) it MUST be null — a run without a
+    // previous file is byte-identical to the pre-feature memo apart from
+    // the additive fields themselves.
     const keys = Object.keys(memo);
     assert.deepEqual(
       keys.filter((k) => k !== "decision"),
-      ["scope", "tldr", "clientSummary", "winners", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
-      "only the additive leadingConversion field was introduced; nothing else reordered"
+      ["comparison", "scope", "tldr", "clientSummary", "winners", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
+      "only the additive comparison/leadingConversion fields exist; nothing else reordered"
     );
+    assert.equal(memo.comparison, null, "single-period run carries comparison: null");
 
     /* ---- Session 2: memoToText presentation contract ---- */
 
