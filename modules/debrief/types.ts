@@ -431,6 +431,14 @@ export interface MemoDecision {
   action: "budget" | "test" | "hold";
   /** Present only when action is "hold". */
   holdReason?: "insufficient_data" | "flat_performance";
+  /** Present only when action is "budget" — which copy variant fired
+   *  (TLDR Coherence fix): "shift" = scale + cut, "scale" = scale
+   *  only, "cut" = cut only. Lets the memo's verdict lines agree with
+   *  the committed call WITHOUT re-deriving eligibility (the exact
+   *  duplication decision.ts exists to prevent): a winner imperative
+   *  is only voiced under shift/scale, a kill imperative only under
+   *  shift/cut. */
+  budgetVariant?: "shift" | "scale" | "cut";
   headline: string;
   /** Jargon-free counterpart — no "kill/gate/benchmark/median/judged". */
   clientHeadline: string;

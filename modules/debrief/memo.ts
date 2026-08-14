@@ -15,6 +15,7 @@ import {
   KPI_LABELS,
   KpiKey,
   Memo,
+  MemoDecision,
   MemoMarketSignal,
   MemoTest,
   MemoWinnerLoserRow,
@@ -113,17 +114,31 @@ function buildRow(
   };
 }
 
-function buildTldr(analysis: AnalysisResult): string[] {
+/* TLDR Coherence fix: the verdict lines take the ALREADY-BUILT decision
+   and voice an imperative ("move budget toward it", "Kill or shrink")
+   ONLY when the committed call actually is that move — otherwise they
+   state the same facts without the instruction. The decision stays the
+   single source of truth for eligibility; this function never
+   re-derives a bar, it only reads action/budgetVariant/holdReason. */
+function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
   const { winners, losers, median, kpi, currency, belowBenchmarkSpend, belowBenchmarkCount } =
     analysis;
   const kpiLabel = KPI_LABELS[kpi];
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : null;
   const lines: string[] = [];
+  /* Winner imperative only under shift/scale; kill imperative only
+     under shift/cut — mirrors which halves of the budget move the
+     decision actually committed to. */
+  const scaleSide = decision.action === "budget" && decision.budgetVariant !== "cut";
+  const cutSide = decision.action === "budget" && decision.budgetVariant !== "scale";
 
   if (winners.length > 0) {
     const top = winners[0];
+    const topStats = `${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend`;
     lines.push(
-      `"${top.name}" is the clear winner at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend — move budget toward it.`
+      scaleSide
+        ? `"${top.name}" is the clear winner at ${topStats} — move budget toward it.`
+        : `"${top.name}" leads at ${topStats} — the strongest observed result, though it hasn't earned a budget move (see Next move).`
     );
   } else if (medianLabel) {
     lines.push(
@@ -137,18 +152,31 @@ function buildTldr(analysis: AnalysisResult): string[] {
 
   if (losers.length > 0) {
     const extra = belowBenchmarkCount - losers.length;
+    const alsoBelow = extra > 0 ? ` and ${extra} other below-benchmark ad${extra === 1 ? "" : "s"}` : "";
     lines.push(
-      `Kill or shrink "${losers[0].name}"${extra > 0 ? ` and ${extra} other below-benchmark ad${extra === 1 ? "" : "s"}` : ""} — combined ${fmtMoney(belowBenchmarkSpend, currency)} spent below the benchmark.`
+      cutSide
+        ? `Kill or shrink "${losers[0].name}"${alsoBelow} — combined ${fmtMoney(belowBenchmarkSpend, currency)} spent below the benchmark.`
+        : `"${losers[0].name}"${alsoBelow} sit${extra > 0 ? "" : "s"} below the benchmark — combined ${fmtMoney(belowBenchmarkSpend, currency)}, though no cut clears this memo's bars yet (see Next move).`
     );
   } else {
     lines.push(`No ad is clearly underperforming enough to kill outright.`);
   }
 
-  lines.push(
-    analysis.hasNameSignal
-      ? `Next: brief new creative in the format your winners share (see Patterns and Next tests below).`
-      : `Next: run the creative tests below, and start tagging ad names or creative notes so future debriefs can spot format patterns.`
-  );
+  if (decision.action === "hold" && decision.holdReason === "insufficient_data") {
+    lines.push(
+      `Next: let the current ads accrue spend until enough clear the gate — no new tests yet; rerun this debrief once they do.`
+    );
+  } else if (decision.action === "hold" && decision.holdReason === "flat_performance") {
+    lines.push(
+      `Next: no new variables yet — let the current set run; the tests below are queued for when the field separates.`
+    );
+  } else {
+    lines.push(
+      analysis.hasNameSignal
+        ? `Next: brief new creative in the format your winners share (see Patterns and Next tests below).`
+        : `Next: run the creative tests below, and start tagging ad names or creative notes so future debriefs can spot format patterns.`
+    );
+  }
 
   return lines;
 }
@@ -1010,17 +1038,24 @@ function buildAvoid(
 
 /** The verdict in client language: what happened, what it means, what
  *  we'll do — same facts as tldr, no buyer shorthand ("kill",
- *  "benchmark", "spend gate"). */
-function buildClientSummary(analysis: AnalysisResult): string[] {
+ *  "benchmark", "spend gate"). TLDR Coherence fix: like buildTldr, the
+ *  action sentences follow the committed decision — never a budget
+ *  promise the Next-move card didn't make. */
+function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): string[] {
   const { winners, losers, median, kpi, currency, belowBenchmarkSpend, belowBenchmarkCount } =
     analysis;
   const kpiLabel = KPI_LABELS[kpi];
   const lines: string[] = [];
+  const scaleSide = decision.action === "budget" && decision.budgetVariant !== "cut";
+  const cutSide = decision.action === "budget" && decision.budgetVariant !== "scale";
 
   if (winners.length > 0) {
     const top = winners[0];
+    const lead = `Your strongest ad this period was "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} — ${scaleSide ? "clearly " : ""}ahead of the account's typical result (${median != null ? fmtKpiValue(median, kpi, currency) : "n/a"}).`;
     lines.push(
-      `Your strongest ad this period was "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} — clearly ahead of the account's typical result (${median != null ? fmtKpiValue(median, kpi, currency) : "n/a"}). It earns a larger share of the budget.`
+      scaleSide
+        ? `${lead} It earns a larger share of the budget.`
+        : `${lead} It hasn't pulled far enough ahead to earn more budget yet — the next step is set out above.`
     );
   } else if (median != null) {
     lines.push(
@@ -1033,8 +1068,11 @@ function buildClientSummary(analysis: AnalysisResult): string[] {
   }
 
   if (losers.length > 0) {
+    const facts = `${fmtCount(belowBenchmarkCount)} ad${belowBenchmarkCount === 1 ? "" : "s"} performed below the account's typical result, together accounting for ${fmtMoney(belowBenchmarkSpend, currency)} of spend.`;
     lines.push(
-      `${fmtCount(belowBenchmarkCount)} ad${belowBenchmarkCount === 1 ? "" : "s"} performed below the account's typical result, together accounting for ${fmtMoney(belowBenchmarkSpend, currency)} of spend. We're reducing or pausing their budgets so that money works harder.`
+      cutSide
+        ? `${facts} We're reducing or pausing their budgets so that money works harder.`
+        : `${facts} We're keeping their budgets steady for now — the decision above explains the next step.`
     );
   } else {
     lines.push(
@@ -1042,9 +1080,19 @@ function buildClientSummary(analysis: AnalysisResult): string[] {
     );
   }
 
-  lines.push(
-    `Next, we're testing new creative built on what this data shows works — the specific tests are listed below.`
-  );
+  if (decision.action === "hold" && decision.holdReason === "insufficient_data") {
+    lines.push(
+      `Next, we're letting the data build before making changes — this report gets rerun once enough ads have had a fair read.`
+    );
+  } else if (decision.action === "hold" && decision.holdReason === "flat_performance") {
+    lines.push(
+      `Next, we're letting the current ads keep running — changing things now would be reacting to noise.`
+    );
+  } else {
+    lines.push(
+      `Next, we're testing new creative built on what this data shows works — the specific tests are listed below.`
+    );
+  }
 
   return lines;
 }
@@ -1177,10 +1225,10 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
   // Next-move decision (T1 recommends exactly nextTests[0]).
   const nextTests = buildNextTests(analysis, context);
 
-  return {
-    // Decision-First V1: purely additive — everything below this line
-    // is byte-identical to the pre-decision memo for the same input.
-    decision: buildDecision(
+  // Built BEFORE the verdict lines (TLDR Coherence fix): buildTldr and
+  // buildClientSummary read the committed decision so their imperatives
+  // can never contradict the Next-move card.
+  const decision = buildDecision(
       analysis,
       nextTests[0]?.test ?? null,
       (v) => fmtMoney(v, currency),
@@ -1200,7 +1248,10 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       // the framing context above, this MAY withhold a scale/shift
       // move — see DecisionCriteria in types.ts.
       { minOutcomeCount: context.minOutcomeCount }
-    ),
+  );
+
+  return {
+    decision,
     /* Period Comparison V2: always null here — the comparison is built
        by the route from a second, independently-analyzed export and
        attached to the memo afterward. generateMemo stays a one-period
@@ -1220,8 +1271,8 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       totalSpendLabel: fmtMoney(analysis.totalSpend, currency),
       medianLabel: median != null ? fmtKpiValue(median, kpi, currency) : "Not enough data",
     },
-    tldr: buildTldr(analysis),
-    clientSummary: buildClientSummary(analysis),
+    tldr: buildTldr(analysis, decision),
+    clientSummary: buildClientSummary(analysis, decision),
     winners: analysis.winners.map((ad) => buildRow(ad, analysis, context)),
     leadingConversion: buildLeadingConversion(analysis),
     losers: {

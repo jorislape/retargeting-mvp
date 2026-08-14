@@ -132,6 +132,7 @@ function assertContract(d: MemoDecision, label: string) {
   );
   assert.equal(d.action, "hold");
   assert.equal(d.holdReason, "insufficient_data");
+  assert.equal(d.budgetVariant, undefined, "hold carries no budgetVariant");
   assert.ok(d.headline.includes("4 of 10"), "hold headline cites the judged/analyzed counts");
   assert.ok(d.reassess.buyer.includes(`${DECISION_MIN_JUDGED}`), "reassess cites the 5-ad bar");
   assertContract(d, "H1@4");
@@ -155,6 +156,8 @@ function assertContract(d: MemoDecision, label: string) {
   const at30 = buildDecision(fixture({ ...base, winners: [ad("W", 300, 30)] }), "Fallback test.", money);
   assert.equal(at30.action, "budget", "30% exactly clears the scale bar");
   assert.ok(at30.headline.startsWith('Scale "W"'), "scale-only variant");
+  assert.equal(at30.budgetVariant, "scale", "scale-only sets budgetVariant scale");
+  assert.equal(at29.budgetVariant, undefined, "non-budget action carries no budgetVariant");
   assert.ok(at30.rationale.includes(`${SCALE_TEST_MIN_DELTA_PCT}%`), "rationale names the bar it cleared");
   assertContract(at29, "scale@29");
   assertContract(at30, "scale@30");
@@ -177,6 +180,7 @@ function assertContract(d: MemoDecision, label: string) {
   const at25 = buildDecision(mk(25), "Fallback test.", money);
   assert.equal(at25.action, "budget", "25% share exactly clears the cut bar");
   assert.ok(at25.headline.startsWith("Cut "), "cut-only variant");
+  assert.equal(at25.budgetVariant, "cut", "cut-only sets budgetVariant cut");
   assert.ok(at25.headline.includes("and 2 more"), "loser names honest about the remainder");
   assert.ok(at25.rationale.includes(`${CUT_MIN_SPEND_SHARE_PCT}`) || at25.rationale.includes("25"), "rationale carries the share");
   assertContract(at24, "cut@24");
@@ -199,6 +203,7 @@ function assertContract(d: MemoDecision, label: string) {
   );
   assert.equal(d.action, "budget");
   assert.ok(d.headline.startsWith("Shift budget from"), "shift variant when both bars clear");
+  assert.equal(d.budgetVariant, "shift", "shift sets budgetVariant shift");
   assert.ok(d.headline.includes('"Hero"') && d.clientHeadline.includes('"Hero"'), "both registers commit to the same leader");
   assert.ok(d.rationale.includes("45%") && d.rationale.includes("35%"), "rationale cites winner delta and spend share");
   assertContract(d, "shift");
@@ -1281,6 +1286,146 @@ console.log("decision (stage 1 — rules): all assertions passed");
       for (const name of memo.losers.rows.slice(0, 3).map((l: { name: string }) => l.name)) {
         assert.ok(buyer3.includes(`- ${name} |`), `buyer3 includes loser ${name}`);
         assert.ok(client3.includes(`- ${name} |`), `client3 includes loser ${name}`);
+      }
+    }
+
+    /* ---- TLDR Coherence fix: the verdict lines can never contradict
+       the committed decision. Property checked on every engine run in
+       this block, plus four crafted datasets that land on each action
+       shape. The imperatives under test:
+         buyer  "move budget toward it"   ⇔ budget shift/scale only
+         buyer  "Kill or shrink"          ⇔ budget shift/cut only
+         client "earns a larger share"    ⇔ budget shift/scale only
+         client "reducing or pausing"     ⇔ budget shift/cut only
+         "we're testing"/"run the creative tests" never under a hold. ---- */
+    {
+      type CoherenceMemo = {
+        tldr: string[];
+        clientSummary: string[];
+        decision: { action: string; budgetVariant?: string; holdReason?: string };
+      };
+      const assertCoherent = (m: CoherenceMemo, label: string) => {
+        const { action, budgetVariant } = m.decision;
+        const scaleSide = action === "budget" && budgetVariant !== "cut";
+        const cutSide = action === "budget" && budgetVariant !== "scale";
+        const tldr = m.tldr.join(" ");
+        const client = m.clientSummary.join(" ");
+        assert.equal(
+          tldr.includes("move budget toward it"),
+          scaleSide,
+          `${label}: buyer winner imperative iff shift/scale (action=${action}, variant=${budgetVariant})`
+        );
+        assert.equal(
+          tldr.includes("Kill or shrink"),
+          cutSide && m.tldr.length > 0 && !tldr.includes("No ad is clearly underperforming"),
+          `${label}: buyer kill imperative iff shift/cut`
+        );
+        assert.equal(
+          client.includes("earns a larger share of the budget"),
+          scaleSide,
+          `${label}: client budget-increase promise iff shift/scale`
+        );
+        assert.equal(
+          client.includes("reducing or pausing their budgets"),
+          cutSide && !client.includes("No ad underperformed badly enough"),
+          `${label}: client pause promise iff shift/cut`
+        );
+        if (action === "hold") {
+          assert.ok(
+            !tldr.includes("run the creative tests below"),
+            `${label}: no test imperative in TLDR under a hold`
+          );
+          assert.ok(
+            !client.includes("we're testing new creative"),
+            `${label}: no test promise in client summary under a hold`
+          );
+        }
+      };
+
+      // Positive control: the pinned sample is a budget SHIFT — both
+      // imperatives are present and correct.
+      assert.equal(memo.decision.budgetVariant, "shift", "sample decision variant is shift");
+      assert.ok(memo.tldr[0].includes("move budget toward it"), "sample TLDR keeps the winner imperative");
+      assert.ok(memo.tldr[1].startsWith("Kill or shrink"), "sample TLDR keeps the kill imperative");
+      assertCoherent(memo, "sample/shift");
+
+      // Regression: the exact bug — a winner UNDER the 30% bar with no
+      // eligible cut lands on action "test"; the old TLDR still said
+      // "move budget toward it". It must not, and the loser line must
+      // not instruct a kill either.
+      const testActionCsv =
+        "Ad name,Amount spent (USD),Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        "A,200,2.4,2026-06-01,2026-06-30\n" +
+        "B,200,2.2,2026-06-01,2026-06-30\n" +
+        "C,200,2.0,2026-06-01,2026-06-30\n" +
+        "D,200,1.9,2026-06-01,2026-06-30\n" +
+        "E,200,1.8,2026-06-01,2026-06-30\n";
+      const mTest = runEngine(testActionCsv, "roas");
+      assert.equal(mTest.decision.action, "test", "crafted dataset lands on a test action");
+      assert.ok(
+        mTest.tldr[0].includes('"A" leads at') && mTest.tldr[0].includes("hasn't earned a budget move"),
+        "test-action TLDR states the lead without the budget imperative"
+      );
+      assertCoherent(mTest, "test-action");
+
+      // Scale-only budget: winner imperative yes, kill imperative no
+      // (its losers are explicitly not cut-eligible).
+      const scaleOnlyCsv =
+        "Ad name,Amount spent (USD),Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        "A,300,3.0,2026-06-01,2026-06-30\n" +
+        "B,200,2.0,2026-06-01,2026-06-30\n" +
+        "C,200,2.0,2026-06-01,2026-06-30\n" +
+        "D,200,1.95,2026-06-01,2026-06-30\n" +
+        "E,200,1.9,2026-06-01,2026-06-30\n";
+      const mScale = runEngine(scaleOnlyCsv, "roas");
+      assert.equal(mScale.decision.action, "budget", "scale dataset lands on budget");
+      assert.equal(mScale.decision.budgetVariant, "scale", "scale-only variant");
+      assertCoherent(mScale, "scale-only");
+
+      // Cut-only budget: kill imperative yes, winner imperative no.
+      const cutOnlyCsv =
+        "Ad name,Amount spent (USD),Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        "A,200,2.2,2026-06-01,2026-06-30\n" +
+        "B,200,2.0,2026-06-01,2026-06-30\n" +
+        "C,200,2.0,2026-06-01,2026-06-30\n" +
+        "D,200,1.9,2026-06-01,2026-06-30\n" +
+        "E,400,1.2,2026-06-01,2026-06-30\n";
+      const mCut = runEngine(cutOnlyCsv, "roas");
+      assert.equal(mCut.decision.action, "budget", "cut dataset lands on budget");
+      assert.equal(mCut.decision.budgetVariant, "cut", "cut-only variant");
+      assert.ok(mCut.tldr[1].startsWith("Kill or shrink"), "cut-only keeps the kill imperative");
+      assertCoherent(mCut, "cut-only");
+
+      // Insufficient hold (4 judged ads): no imperatives anywhere, and
+      // the "Next:" lines stop promising tests the decision forbids.
+      const holdCsv =
+        "Ad name,Amount spent (USD),Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        "A,200,3.0,2026-06-01,2026-06-30\n" +
+        "B,200,2.0,2026-06-01,2026-06-30\n" +
+        "C,200,1.9,2026-06-01,2026-06-30\n" +
+        "D,200,1.2,2026-06-01,2026-06-30\n";
+      const mHold = runEngine(holdCsv, "roas");
+      assert.equal(mHold.decision.action, "hold", "4-ad dataset lands on hold");
+      assert.equal(mHold.decision.holdReason, "insufficient_data");
+      assert.ok(
+        mHold.tldr[2].includes("no new tests yet"),
+        "insufficient-hold TLDR aligns the Next line with the decision"
+      );
+      assert.ok(
+        mHold.clientSummary[2].includes("letting the data build"),
+        "insufficient-hold client summary aligns the Next line"
+      );
+      assertCoherent(mHold, "hold-insufficient");
+
+      // Coherence also holds for every other memo produced in this
+      // stage — cheap to sweep now that the property is written.
+      for (const [label, m] of [
+        ["noCount", mNoCount],
+        ["ctr", mCtr],
+        ["leads", mLeads],
+        ["metaShape", mMeta],
+      ] as const) {
+        assertCoherent(m, `sweep:${label}`);
       }
     }
   } finally {

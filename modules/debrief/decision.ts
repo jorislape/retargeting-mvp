@@ -541,6 +541,7 @@ export function buildDecision(
         ...evidence,
         limits: withEfficiencyScaleCaveat(evidence.limits, testQuality?.objective),
         action: "budget",
+        budgetVariant: "shift",
         headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
         clientHeadline: `Move budget from the weakest ads into "${top!.name}", the clear leader.`,
         rationale: `"${top!.name}" is ${pct(top!.deltaPct!)}% past the median ${kpiLabel} on ${money(top!.spend)}; ${analysis.belowBenchmarkCount} below-benchmark ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}).`,
@@ -557,6 +558,7 @@ export function buildDecision(
         ...evidence,
         limits: withEfficiencyScaleCaveat(evidence.limits, testQuality?.objective),
         action: "budget",
+        budgetVariant: "scale",
         headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% past the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,
         rationale: `"${top!.name}" leads the ${kpiLabel} median by ${pct(top!.deltaPct!)}% on ${money(top!.spend)} of spend — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move. No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`,
@@ -572,6 +574,7 @@ export function buildDecision(
     return {
       ...evidence,
       action: "budget",
+      budgetVariant: "cut",
       headline: `Cut ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
       rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${
