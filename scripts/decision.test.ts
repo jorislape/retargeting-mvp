@@ -1302,12 +1302,39 @@ console.log("decision (stage 1 — rules): all assertions passed");
       type CoherenceMemo = {
         tldr: string[];
         clientSummary: string[];
+        losers: { rows: unknown[]; killInstruction: string; clientInstruction: string };
         decision: { action: string; budgetVariant?: string; holdReason?: string };
       };
       const assertCoherent = (m: CoherenceMemo, label: string) => {
         const { action, budgetVariant } = m.decision;
         const scaleSide = action === "budget" && budgetVariant !== "cut";
         const cutSide = action === "budget" && budgetVariant !== "scale";
+
+        /* Losers Coherence fix: the section's instruction line carries
+           the cut imperative iff the committed decision contains a cut
+           (shift/cut variants) — scale-only, test, and hold get the
+           descriptive variant. Both registers. */
+        const hasLosers = m.losers.rows.length > 0;
+        assert.equal(
+          m.losers.killInstruction.startsWith("Cut spend on the ads below"),
+          cutSide && hasLosers,
+          `${label}: buyer losers instruction cuts iff the decision cuts`
+        );
+        assert.equal(
+          m.losers.clientInstruction.includes("reducing or pausing spend"),
+          cutSide && hasLosers,
+          `${label}: client losers instruction pauses iff the decision cuts`
+        );
+        if (hasLosers && !cutSide) {
+          assert.ok(
+            m.losers.killInstruction.includes("No cut clears this memo's bars yet"),
+            `${label}: non-cut buyer losers line is descriptive and defers to Next move`
+          );
+          assert.ok(
+            m.losers.clientInstruction.includes("not reducing their budgets yet"),
+            `${label}: non-cut client losers line is descriptive and defers to the decision`
+          );
+        }
         const tldr = m.tldr.join(" ");
         const client = m.clientSummary.join(" ");
         assert.equal(
@@ -1347,6 +1374,10 @@ console.log("decision (stage 1 — rules): all assertions passed");
       assert.equal(memo.decision.budgetVariant, "shift", "sample decision variant is shift");
       assert.ok(memo.tldr[0].includes("move budget toward it"), "sample TLDR keeps the winner imperative");
       assert.ok(memo.tldr[1].startsWith("Kill or shrink"), "sample TLDR keeps the kill imperative");
+      assert.ok(
+        memo.losers.killInstruction.startsWith("Cut spend on the ads below"),
+        "shift decision keeps the losers-section cut imperative"
+      );
       assertCoherent(memo, "sample/shift");
 
       // Regression: the exact bug — a winner UNDER the 30% bar with no
@@ -1380,6 +1411,10 @@ console.log("decision (stage 1 — rules): all assertions passed");
       const mScale = runEngine(scaleOnlyCsv, "roas");
       assert.equal(mScale.decision.action, "budget", "scale dataset lands on budget");
       assert.equal(mScale.decision.budgetVariant, "scale", "scale-only variant");
+      assert.ok(
+        !mScale.losers.killInstruction.startsWith("Cut spend"),
+        "scale-only decision never instructs a cut in the losers section"
+      );
       assertCoherent(mScale, "scale-only");
 
       // Cut-only budget: kill imperative yes, winner imperative no.

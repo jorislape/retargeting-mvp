@@ -1277,13 +1277,23 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     leadingConversion: buildLeadingConversion(analysis),
     losers: {
       rows: analysis.losers.map((ad) => buildRow(ad, analysis, context)),
+      /* Losers Coherence fix (same contract as buildTldr): the cut
+         imperative is voiced ONLY when the committed decision actually
+         contains a cut (budgetVariant "cut" or "shift"). Scale-only,
+         test, and hold decisions get the same facts descriptively —
+         the section never instructs a budget reduction the Next-move
+         card didn't commit to. */
       killInstruction:
         analysis.losers.length > 0
-          ? `Cut spend on the ads below and move it behind your winners. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} is going to ${fmtCount(analysis.belowBenchmarkCount)} below-benchmark ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total.`
+          ? decision.action === "budget" && decision.budgetVariant !== "scale"
+            ? `Cut spend on the ads below and move it behind your winners. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} is going to ${fmtCount(analysis.belowBenchmarkCount)} below-benchmark ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total.`
+            : `The ads below ran under the benchmark — combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} across ${fmtCount(analysis.belowBenchmarkCount)} ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total. No cut clears this memo's bars yet (see Next move).`
           : "No ad fell clearly below the benchmark this period.",
       clientInstruction:
         analysis.losers.length > 0
-          ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing under the account's typical result, and that budget moves behind the ads that are working.`
+          ? decision.action === "budget" && decision.budgetVariant !== "scale"
+            ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing under the account's typical result, and that budget moves behind the ads that are working.`
+            : `The ads below performed under the account's typical result — together ${fmtMoney(analysis.belowBenchmarkSpend, currency)} of spend. We're not reducing their budgets yet; the decision above explains the next step.`
           : "No ad underperformed badly enough to pause this period.",
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),
       setAsideNote:
