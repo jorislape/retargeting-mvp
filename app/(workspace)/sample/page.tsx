@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Report } from "@/components/debrief/Report";
+import { SAMPLE_CREATIVE_ASSETS } from "@/components/debrief/sampleCreatives";
 import { buildSampleMemo } from "@/modules/debrief/sample";
 import { ArrowIcon } from "@/components/ui/icons";
 import { btnPrimarySm } from "@/components/ui/theme";
@@ -31,7 +32,7 @@ export default function SamplePage() {
         </Link>
       </div>
 
-      <Report memo={memo} variant="sample" />
+      <Report memo={memo} variant="sample" creativeAssets={SAMPLE_CREATIVE_ASSETS} />
     </div>
   );
 }

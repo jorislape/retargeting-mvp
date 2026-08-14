@@ -7,10 +7,17 @@ import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { eyebrow, gradientText } from "@/components/ui/theme";
 
 export default function GeneratorPage() {
-  const { status, memo, generatedAt, reset } = useDebrief();
+  const { status, memo, generatedAt, reset, creativeAssets } = useDebrief();
 
   if (status === "ready" && memo) {
-    return <Report memo={memo} generatedAt={generatedAt} onNewDebrief={reset} />;
+    return (
+      <Report
+        memo={memo}
+        generatedAt={generatedAt}
+        onNewDebrief={reset}
+        creativeAssets={creativeAssets}
+      />
+    );
   }
 
   return (

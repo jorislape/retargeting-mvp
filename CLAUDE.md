@@ -19,6 +19,7 @@ npm test             # every script test in one run (list below)
 The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm test`. There is no other test runner; behavioral verification is manual against the dev server — `TESTING.md` is the checklist, and the sample dataset's expected numbers (spend gate ≈ $120.91, 11 judged / 3 set aside, per-KPI medians) are documented in `modules/debrief/sampleCsv.ts` for asserting against. Every `scripts/*.test.ts` is a plain-Node script (no Jest/Vitest) — run one directly with `node scripts/<name>.test.ts`, or via its `npm run test:<name>` alias in `package.json`:
 
 - `test:csv`, `test:watchlist`, `test:signals`, `test:signal-summary` — the debrief/competitor engine proofs (RFC 4180 escaping, watchlist sanitize/diff/format/append, signal-builder tables, signal-summary interpretation).
+- `test:creative-evidence` — Creative Evidence V1 proofs: deterministic spotlight selection (top/worst/biggest-mover, tie-to-improvement), whitespace-safe identity + duplicate-name ambiguity detection, dedupe-with-merged-roles, causal-vocabulary and client-jargon blocklists over every generated string, and the two structural isolation scans (the selection module never references assets — an image can't influence spotlight choice; `modules/debrief/` never references creative-asset machinery — images can't influence any engine result; the provider never appends assets to the API request).
 - `test:compare` — Period Comparison V2 proofs: match-basis selection (Ad ID over exact name, provenance always disclosed), duplicate/missing-key exclusion (counted, never guessed, never leaked into appeared/disappeared), judged-both-periods-only deltas, KPI-polarity-aware improvement, composition caveat, period sanity warnings, a causal-vocabulary blocklist over every generated string, and a source scan pinning `compare.ts` to importing nothing but `types.ts` (the mirror-image scan — `decision.ts` never referencing the comparison — lives in `test:decision`).
 - `test:competitor-debrief` — Competitor Debrief V1 engine proofs: insufficient-evidence handling, category detection, no forbidden performance/spend claims outside the fixed caveat, and a source-scan asserting the engine imports no network/fetch code.
 - `test:ad-parser` — the labeled/plain bulk ad-example parser (block splitting, per-field extraction, duplicate detection, mode-aware completeness).
@@ -35,7 +36,7 @@ The optional Competitor Monitoring Beta (flag default OFF — see the fence belo
 
 ## Scope fence — read before adding anything
 
-This product has a hard, deliberate scope: **no auth, no user accounts, no saved history, no billing, no team workspaces, no analytics dashboards, no external AI calls, no scraping — and ADS DATA (CSVs, memos, reports, Meta tokens) is NEVER persisted server-side, in any form.** There are exactly TWO approved persistence exceptions, each with its own fenced section below: the browser-local competitor watchlist (localStorage, `modules/competitor/watchlist.ts` — user-entered competitor info and fetched public-page signal summaries only; never CSV data, memos, reports, or tokens; do not add other localStorage keys) and the flag-gated **Competitor Monitoring Beta V1** (server-side, `modules/monitoring/` — see its fence below). The whole core flow is data in → KPI + context → deterministic analysis → one-page memo on the same page — nothing else is reachable, and nothing should become reachable as a "small addition." Any further persistence is a new, explicit milestone to be requested — not something to add quietly while doing something else.
+This product has a hard, deliberate scope: **no auth, no user accounts, no saved history, no billing, no team workspaces, no analytics dashboards, no external AI calls, no scraping — and ADS DATA (CSVs, memos, reports, Meta tokens) is NEVER persisted server-side, in any form.** Creative Evidence images (Creative Evidence V1) are ads data too: they live ONLY in browser memory (React state + object URLs), are never appended to any request, and are never persisted anywhere. There are exactly TWO approved persistence exceptions, each with its own fenced section below: the browser-local competitor watchlist (localStorage, `modules/competitor/watchlist.ts` — user-entered competitor info and fetched public-page signal summaries only; never CSV data, memos, reports, or tokens; do not add other localStorage keys) and the flag-gated **Competitor Monitoring Beta V1** (server-side, `modules/monitoring/` — see its fence below). The whole core flow is data in → KPI + context → deterministic analysis → one-page memo on the same page — nothing else is reachable, and nothing should become reachable as a "small addition." Any further persistence is a new, explicit milestone to be requested — not something to add quietly while doing something else.
 
 The CSV (and the generated memo) must never be written to a database, a file, a cache, or a log. `app/api/debrief/route.ts` only logs structural facts on error (an error code, a row count) — never CSV rows or memo content. Keep it that way. The optional previous-period CSV (Period Comparison V2, `previousCsv` form field) is the same data under the same rule: parsed in memory for the one request, compared, discarded — two files per request, still zero persistence; the comparison output is descriptive only ("what changed", never why) and never feeds the decision. (Structured error *responses* may echo the CSV's own header names back to the user — headers are structural and go only to the person who uploaded them; still never log them.)
 
@@ -397,7 +398,10 @@ components/debrief/
                        # caveat lives once in the area's intro line), stage 3 Verify =
                        # "Review creative formats" (optional per-ad format dropdowns
                        # over the client-side preview; first 25 ads + show-all; sent as
-                       # creativeFormatOverrides JSON, cleared whenever the file changes),
+                       # creativeFormatOverrides JSON, cleared whenever the file changes)
+                       # plus Creative Evidence V1's optional per-ad image attach
+                       # (browser-only, never uploaded; disabled for names appearing on
+                       # multiple rows — one image can't be tied to one row),
                        # structured-error display with one-click KPI switch
   MetaConnect.tsx      # connect button / connected controls; checks /api/meta/config first
   Report.tsx           # the memo document; Buyer/Client view toggle is display-only.
@@ -424,6 +428,30 @@ components/debrief/
                        # brief selection ("Generate creative briefs", buyer view only)
   memoToText.ts        # view-aware plain-text serialization for the Copy button; takes
                        # briefIndices so briefs are included only while shown
+  creativeEvidence.ts  # Creative Evidence V1 — PURE spotlight selection + ad-identity
+                       # helpers (normalizeAdName mirrors compare.ts's key rule;
+                       # findAmbiguousAdNames flags names on multiple rows). Selection
+                       # reads ONLY memo evidence (top winner / worst loser / biggest
+                       # comparison mover, deduped into one card with merged role
+                       # labels) — it cannot see creative assets, so an attached image
+                       # can never change which ads are spotlighted (test-enforced).
+                       # Takeaways restate already-computed ranking/movement facts;
+                       # never a causal creative claim
+  CreativeEvidenceStrip.tsx # the strip UI: up to 3 cards (creative image or a neutral
+                       # "Creative not attached" placeholder — a spotlight is never
+                       # substituted for an ad that happens to have an image), role
+                       # badges, KPI result, spend, ad name as secondary metadata,
+                       # fixed identification caveat. Renders ONLY when ≥1 creative
+                       # asset exists this session (zero assets ⇒ report identical to
+                       # pre-feature); mounted in Report.tsx between the Next-move card
+                       # and Expert commentary. Images come from DebriefProvider's
+                       # browser-only creativeAssets map (manual Verify-stage attach,
+                       # object URLs revoked on replace/remove/file-change/reset/
+                       # unmount, validated by the shared logoValidation rules) or the
+                       # bundled synthetic demo set (sampleCreatives.ts +
+                       # public/sample-creatives/ — watermarked as demo assets) for the
+                       # sample. NEVER sent to /api/debrief; the engine stays
+                       # image-blind by scan-enforced rule
 ```
 
 ### Layering rules

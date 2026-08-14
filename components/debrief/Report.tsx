@@ -19,6 +19,8 @@ import {
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
+import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
 import { computePerformanceSectionNumbers } from "@/components/report/reportNumbering";
 import { PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/report/reportSections";
 import { accentCssVars, getAccentById } from "@/components/report/reportCustomization";
@@ -1081,11 +1083,17 @@ export function Report({
   variant = "generated",
   generatedAt = null,
   onNewDebrief,
+  creativeAssets = {},
 }: {
   memo: Memo;
   variant?: "generated" | "sample";
   generatedAt?: number | null;
   onNewDebrief?: () => void;
+  /** Creative Evidence V1 — session-only creative images keyed by
+   *  normalized ad name (DebriefProvider's map for generated runs, the
+   *  bundled demo map for /sample). Presentation only: an empty map
+   *  renders the report exactly as before the feature existed. */
+  creativeAssets?: Record<string, CreativeAssetRef>;
 }) {
   /* White-label Report Customization V1A: one shared hook owns mode,
      identity fields, accent, and section visibility — session-only,
@@ -1418,6 +1426,11 @@ export function Report({
             memo.decision.appliedCriteria.some((c) => c.source === "user")
           }
         />
+
+        {/* Creative Evidence V1 — which actual ads the decision above is
+            about. Spotlights come from evidence only; renders only when
+            at least one creative image exists this session. */}
+        <CreativeEvidenceStrip memo={memo} view={view} assets={creativeAssets} />
 
         {/* Expert Commentary V2 — attributed judgment, never mixed with
             engine claims. */}

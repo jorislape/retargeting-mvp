@@ -26,6 +26,8 @@ import {
   SIGNAL_PRESETS,
   structureMarketNotes,
 } from "@/modules/debrief";
+import { findAmbiguousAdNames, normalizeAdName } from "./creativeEvidence";
+import { SAMPLE_CREATIVE_ASSETS } from "./sampleCreatives";
 import {
   appendPageSignalsToNotes,
   EMPTY_WATCHLIST_ITEM,
@@ -108,6 +110,101 @@ const PROCESSING_STEPS = [
   "Finding winners and losers",
   "Writing the debrief",
 ];
+
+/* Creative Evidence V1 — per-ad image attach cell for the Verify
+   table. Compact: a "+ Image" affordance, then thumbnail + replace/
+   remove. Validation + the object-URL lifecycle live in
+   DebriefProvider.setCreativeAsset (shared image rules, browser-only);
+   this cell owns just the hidden input and the inline error. Ads whose
+   name appears on multiple rows get an explanation instead of a
+   control — one image can't be tied to one row for them. */
+function AdImageCell({
+  adName,
+  ambiguous,
+  assetUrl,
+  assetName,
+  onSelect,
+}: {
+  adName: string;
+  ambiguous: boolean;
+  assetUrl: string | null;
+  assetName: string | null;
+  onSelect: (file: File | null) => { ok: boolean; error?: string };
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (ambiguous) {
+    return (
+      <p className="text-[11px] leading-relaxed text-zinc-500">
+        Name appears on multiple rows — one image can&rsquo;t be tied to
+        one row, so attach is unavailable.
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      {assetUrl ? (
+        <div className="flex items-center gap-2">
+          {/* Object URL — plain <img> on purpose (same precedent as
+              LogoPicker). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={assetUrl}
+            alt={`Attached creative for ${adName}`}
+            className="h-9 w-12 shrink-0 rounded border border-white/10 object-cover"
+          />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="cursor-pointer rounded-sm text-[11px] font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            Replace
+          </button>
+          <button
+            type="button"
+            aria-label={`Remove creative image for ${adName}${assetName ? ` (${assetName})` : ""}`}
+            onClick={() => {
+              onSelect(null);
+              setError(null);
+            }}
+            className="shrink-0 cursor-pointer text-zinc-500 transition hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <XIcon className="h-3 w-3" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-white/[0.09] bg-white/[0.03] px-2 py-1 text-[11px] font-medium text-zinc-400 transition hover:border-white/[0.14] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          <UploadIcon className="h-3 w-3" />
+          Image
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        className="sr-only"
+        aria-label={`Attach creative image for ${adName}`}
+        onChange={(e) => {
+          const picked = e.target.files?.[0] ?? null;
+          if (picked) {
+            const result = onSelect(picked);
+            setError(result.ok ? null : (result.error ?? "Couldn't use that file."));
+          }
+          e.target.value = "";
+        }}
+      />
+      {error && (
+        <p className="mt-1 text-[11px] leading-relaxed text-amber-300">{error}</p>
+      )}
+    </div>
+  );
+}
 
 function fmtBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -236,10 +333,13 @@ export function GeneratorPanel() {
     fields,
     competitorSources,
     formatOverrides,
+    creativeAssets,
     error,
     setFile,
     setPreviousFile,
     updateFields,
+    setCreativeAsset,
+    setSampleCreativeAssets,
     setCompetitorSources,
     setFormatOverrides,
     generate,
@@ -330,6 +430,10 @@ export function GeneratorPanel() {
      *  order — feeds the optional "Review creative formats" list.
      *  Structure only; no analysis. */
     ads: { name: string; tags: string[] }[];
+    /** Creative Evidence V1: normalized names that appear on MORE THAN
+     *  ONE row — one image can't be tied to one row for these, so the
+     *  attach control is disabled with an explanation. */
+    ambiguousNames: string[];
   } | null>(null);
   /* "Review creative formats" list expansion past the first 25 ads —
      keyed to the File object so a new file starts collapsed without an
@@ -355,14 +459,18 @@ export function GeneratorPanel() {
         const nameIdx = columns.adName ? headers.indexOf(columns.adName) : -1;
         const seen = new Set<string>();
         const ads: { name: string; tags: string[] }[] = [];
+        const allRowNames: string[] = [];
         if (nameIdx >= 0) {
           for (const row of matrix.slice(1)) {
             const name = (row[nameIdx] ?? "").trim();
-            if (name === "" || seen.has(name)) continue;
+            if (name === "") continue;
+            allRowNames.push(name);
+            if (seen.has(name)) continue;
             seen.add(name);
             ads.push({ name, tags: extractNameTags(name) });
           }
         }
+        const ambiguousNames = [...findAmbiguousAdNames(allRowNames)];
         /* Display-only extras (the API recomputes everything): spend
            column total and the file's reporting range. */
         const spendIdx = columns.spend ? headers.indexOf(columns.spend) : -1;
@@ -400,6 +508,7 @@ export function GeneratorPanel() {
           currency: columns.currency,
           dateRange,
           ads,
+          ambiguousNames,
         });
       })
       .catch(() => {
@@ -414,6 +523,8 @@ export function GeneratorPanel() {
   const preview =
     file && previewState?.forFile === file ? previewState : null;
   const previewKpiOk = preview?.kpisFound.includes(fields.kpi) ?? true;
+  /* Creative Evidence V1: names on multiple rows can't take one image. */
+  const previewAmbiguous = new Set(preview?.ambiguousNames ?? []);
 
   /* A real file download of the same synthetic dataset "Load the
      sample dataset" uses — so the expected format can be inspected
@@ -776,6 +887,11 @@ export function GeneratorPanel() {
     setFile(
       new File([SAMPLE_CSV_TEXT], SAMPLE_CSV_FILENAME, { type: "text/csv" })
     );
+    /* Creative Evidence V1: bundled demo creatives so the sample run
+       shows the strip without Meta or manual uploads. Set AFTER
+       setFile — React runs the queued updaters in order, so the
+       file-change clear happens first, then the sample map lands. */
+    setSampleCreativeAssets(SAMPLE_CREATIVE_ASSETS);
     updateFields({
       ...(fields.product.trim() === "" && { product: SAMPLE_CONTEXT.product }),
       ...(fields.offer.trim() === "" && { offer: SAMPLE_CONTEXT.offer }),
@@ -2411,7 +2527,7 @@ export function GeneratorPanel() {
               </summary>
               <div className="border-t border-white/[0.06] px-5 pb-5">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[540px] text-sm">
+                  <table className="w-full min-w-[680px] text-sm">
                     <thead>
                       <tr className="border-b border-white/10 text-left">
                         <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
@@ -2420,8 +2536,11 @@ export function GeneratorPanel() {
                         <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Detected format
                         </th>
-                        <th className="w-52 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                        <th className="w-52 py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Correct format
+                        </th>
+                        <th className="w-44 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                          Creative image (optional)
                         </th>
                       </tr>
                     </thead>
@@ -2442,7 +2561,7 @@ export function GeneratorPanel() {
                           <td className="py-2.5 pr-4 align-middle text-xs text-zinc-400">
                             {ad.tags.length > 0 ? ad.tags.join(", ") : "—"}
                           </td>
-                          <td className="py-2 align-middle">
+                          <td className="py-2 pr-4 align-middle">
                             <select
                               aria-label={`Correct format for ${ad.name}`}
                               value={formatOverrides[ad.name] ?? ""}
@@ -2470,6 +2589,15 @@ export function GeneratorPanel() {
                                 </option>
                               ))}
                             </select>
+                          </td>
+                          <td className="py-2 pl-1 align-middle">
+                            <AdImageCell
+                              adName={ad.name}
+                              ambiguous={previewAmbiguous.has(normalizeAdName(ad.name))}
+                              assetUrl={creativeAssets[normalizeAdName(ad.name)]?.url ?? null}
+                              assetName={creativeAssets[normalizeAdName(ad.name)]?.name ?? null}
+                              onSelect={(f) => setCreativeAsset(normalizeAdName(ad.name), f)}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -2509,7 +2637,10 @@ export function GeneratorPanel() {
                 <p className="mt-3 text-xs leading-relaxed text-zinc-400">
                   Auto-detected formats are used by default. Your edits
                   improve pattern wording but do not change performance
-                  numbers.
+                  numbers. Creative images are optional too: they appear in
+                  the report&rsquo;s Creative evidence section so a client can
+                  see the actual ad — they stay in this browser, are never
+                  uploaded, and never affect any number or recommendation.
                 </p>
               </div>
             </details>

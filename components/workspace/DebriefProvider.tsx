@@ -7,7 +7,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type {
@@ -17,6 +19,19 @@ import type {
   KpiKey,
   Memo,
 } from "@/modules/debrief";
+import { validateLogoFile } from "@/components/report/logoValidation";
+
+/** Creative Evidence V1 — one attached creative image, keyed by
+ *  normalized ad name. Browser-only: `url` is either an object URL
+ *  (manual attach — created/revoked here) or a same-origin public
+ *  path (the sample's bundled demo creatives). Never sent to any API,
+ *  never part of the memo — presentation over existing evidence. */
+export interface CreativeAssetRef {
+  url: string;
+  /** Original filename (manual) or a demo label (sample) — used for
+   *  alt/replace UI, never rendered as report content. */
+  name: string;
+}
 
 /* ------------------------------------------------------------------ */
 /* Session state for the generator, lifted to the workspace layout so  */
@@ -124,6 +139,11 @@ interface DebriefContextValue {
    *  Keyed to the loaded file — changing the file clears them. Sent to
    *  the API as an optional JSON field; never stored anywhere. */
   formatOverrides: CreativeFormatOverrides;
+  /** Creative Evidence V1: normalized ad name → attached creative
+   *  image. Browser-only; cleared (and object URLs revoked) whenever
+   *  the file changes, on reset, and on unmount. NEVER appended to the
+   *  /api/debrief request. */
+  creativeAssets: Record<string, CreativeAssetRef>;
   memo: Memo | null;
   error: DebriefApiError | null;
   generatedAt: number | null;
@@ -132,6 +152,14 @@ interface DebriefContextValue {
   updateFields: (patch: Partial<GeneratorFields>) => void;
   setCompetitorSources: Dispatch<SetStateAction<CompetitorSource[]>>;
   setFormatOverrides: (overrides: CreativeFormatOverrides) => void;
+  /** Attach (File), replace (File), or remove (null) one ad's creative
+   *  image. Validates via the shared image rules; returns the result so
+   *  the Verify UI can show an inline error. `key` must already be the
+   *  normalized ad name (normalizeAdName). */
+  setCreativeAsset: (key: string, file: File | null) => { ok: boolean; error?: string };
+  /** Bulk-set non-blob assets (the sample's bundled demo creatives).
+   *  Replaces the whole map; revokes any existing object URLs first. */
+  setSampleCreativeAssets: (assets: Record<string, CreativeAssetRef>) => void;
   generate: () => Promise<void>;
   clearError: () => void;
   reset: () => void;
@@ -149,13 +177,77 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
   const [formatOverrides, setFormatOverrides] =
     useState<CreativeFormatOverrides>({});
 
-  /* Format confirmations describe the loaded CSV's ads by name — a
-     different file makes them stale (or wrongly matching), so any file
-     change clears them. */
-  const setFile = useCallback((next: File | null) => {
-    setFileState(next);
-    setFormatOverrides({});
+  /* Creative Evidence V1 — attached images, keyed by normalized ad
+     name. Object URLs are tracked in a ref so every path that discards
+     an entry (replace, remove, file change, reset, unmount) revokes
+     it; sample assets are public paths (not blob:) and are skipped by
+     the revoker. */
+  const [creativeAssets, setCreativeAssetsState] = useState<
+    Record<string, CreativeAssetRef>
+  >({});
+  const creativeAssetsRef = useRef(creativeAssets);
+  useEffect(() => {
+    creativeAssetsRef.current = creativeAssets;
+  }, [creativeAssets]);
+  const revokeAsset = (asset: CreativeAssetRef | undefined) => {
+    if (asset && asset.url.startsWith("blob:")) URL.revokeObjectURL(asset.url);
+  };
+  const clearCreativeAssets = useCallback(() => {
+    for (const asset of Object.values(creativeAssetsRef.current)) revokeAsset(asset);
+    setCreativeAssetsState({});
   }, []);
+  // Unmount-only cleanup — reads the ref, so it revokes whatever is
+  // current at teardown without re-running mid-life.
+  useEffect(() => {
+    return () => {
+      for (const asset of Object.values(creativeAssetsRef.current)) revokeAsset(asset);
+    };
+  }, []);
+
+  const setCreativeAsset = useCallback(
+    (key: string, nextFile: File | null): { ok: boolean; error?: string } => {
+      if (nextFile === null) {
+        setCreativeAssetsState((prev) => {
+          revokeAsset(prev[key]);
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        return { ok: true };
+      }
+      const result = validateLogoFile(nextFile);
+      if (!result.ok) return result;
+      const url = URL.createObjectURL(nextFile);
+      setCreativeAssetsState((prev) => {
+        revokeAsset(prev[key]);
+        return { ...prev, [key]: { url, name: nextFile.name } };
+      });
+      return { ok: true };
+    },
+    []
+  );
+
+  const setSampleCreativeAssets = useCallback(
+    (assets: Record<string, CreativeAssetRef>) => {
+      setCreativeAssetsState((prev) => {
+        for (const asset of Object.values(prev)) revokeAsset(asset);
+        return { ...assets };
+      });
+    },
+    []
+  );
+
+  /* Format confirmations and attached creatives describe the loaded
+     CSV's ads by name — a different file makes them stale (or wrongly
+     matching), so any file change clears both. */
+  const setFile = useCallback(
+    (next: File | null) => {
+      setFileState(next);
+      setFormatOverrides({});
+      clearCreativeAssets();
+    },
+    [clearCreativeAssets]
+  );
   const [previousFile, setPreviousFile] = useState<File | null>(null);
   const [memo, setMemo] = useState<Memo | null>(null);
   const [error, setError] = useState<DebriefApiError | null>(null);
@@ -236,10 +328,11 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     setFields(DEFAULT_FIELDS);
     setCompetitorSources([]);
     setFormatOverrides({});
+    clearCreativeAssets();
     setMemo(null);
     setError(null);
     setGeneratedAt(null);
-  }, []);
+  }, [clearCreativeAssets]);
 
   const value = useMemo(
     () => ({
@@ -249,6 +342,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       fields,
       competitorSources,
       formatOverrides,
+      creativeAssets,
       memo,
       error,
       generatedAt,
@@ -257,11 +351,13 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       updateFields,
       setCompetitorSources,
       setFormatOverrides,
+      setCreativeAsset,
+      setSampleCreativeAssets,
       generate,
       clearError,
       reset,
     }),
-    [status, file, previousFile, fields, competitorSources, formatOverrides, memo, error, generatedAt, setFile, updateFields, generate, clearError, reset]
+    [status, file, previousFile, fields, competitorSources, formatOverrides, creativeAssets, memo, error, generatedAt, setFile, updateFields, setCreativeAsset, setSampleCreativeAssets, generate, clearError, reset]
   );
 
   return (

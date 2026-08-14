@@ -255,3 +255,38 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       commentary looks identical to pre-V2 output (decision card gains
       only the "What we know" label and collapsed "Decision bars
       applied" disclosure).
+
+## Creative Evidence V1
+
+- [ ] **Sample flow**: "Load the sample dataset" → Generate → a
+      "Creative evidence" section renders under the Next-move card with
+      two cards (Top performer = `UGC_MorningRoutine_V1` with the demo
+      UGC still, Weakest performer = `Static_StockPhoto_Generic_V1`
+      with the demo static). Both images carry the visible "SAMPLE
+      CREATIVE — DEMO ASSET" watermark. `/sample` shows the same strip.
+- [ ] **No-image flow**: upload a real CSV, attach nothing → NO
+      Creative evidence section anywhere; the report is identical to
+      pre-feature output. Decision, numbers, and evidence state match a
+      run made before attaching anything.
+- [ ] **Attach / replace / remove**: Verify stage → "+ Image" on a row
+      → thumbnail appears; Replace swaps it; ✕ removes it. A non-image
+      file (>2MB or wrong type) shows the inline error and attaches
+      nothing.
+- [ ] **Placeholder honesty**: attach an image to only ONE spotlighted
+      ad → the strip shows ALL spotlights; the un-imaged one renders
+      the dashed "Creative not attached" tile with its result intact —
+      never substituted by a different ad that has an image.
+- [ ] **Comparison mover**: run with a previous-period file and ≥1
+      attached image → a third "Biggest change vs previous period" card
+      appears; when the mover IS the top/worst ad, one card carries
+      both role badges (never the same creative twice).
+- [ ] **Duplicate names**: a CSV where one ad name appears on two rows
+      → that row's Verify cell says attach is unavailable (name on
+      multiple rows); its spotlight (if selected) shows the
+      placeholder.
+- [ ] **Views/print**: strip renders in Buyer and Client views, both
+      densities, and in print/PDF (images at fixed size, cards never
+      split across pages; caveat line present).
+- [ ] **Cleanup**: change the loaded file or click "New debrief" → all
+      attached images are gone; re-attaching works. Sample →
+      real-file swap never shows stale demo creatives.

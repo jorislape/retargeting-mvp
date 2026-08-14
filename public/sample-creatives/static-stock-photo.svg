@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="Demo creative: generic static image ad (synthetic sample asset)">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3f3f46"/>
+      <stop offset="1" stop-color="#52525b"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg2)"/>
+  <!-- abstract "generic stock photo" composition -->
+  <circle cx="322" cy="66" r="26" fill="#e4e4e7" opacity="0.5"/>
+  <path d="M0 214 L110 130 L190 192 L268 118 L400 208 L400 300 L0 300 Z" fill="#a1a1aa" opacity="0.45"/>
+  <rect x="130" y="52" width="140" height="30" rx="4" fill="#e4e4e7" opacity="0.7"/>
+  <text x="200" y="72" text-anchor="middle" font-family="ui-sans-serif,system-ui" font-size="13" font-weight="700" fill="#3f3f46">20% OFF TODAY</text>
+  <rect x="0" y="252" width="400" height="48" fill="#18181b" opacity="0.85"/>
+  <text x="200" y="272" text-anchor="middle" font-family="ui-sans-serif,system-ui" font-size="13" font-weight="700" fill="#f4f4f5">SAMPLE CREATIVE — DEMO ASSET</text>
+  <text x="200" y="289" text-anchor="middle" font-family="ui-sans-serif,system-ui" font-size="10" fill="#d4d4d8">Synthetic static-ad mockup · not a real ad or result</text>
+</svg>
