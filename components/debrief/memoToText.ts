@@ -254,7 +254,18 @@ export function memoToText(
   }
   lines.push("");
 
-  lines.push(view === "client" ? "WHAT UNDERPERFORMED" : "LOSERS / KILL LIST");
+  /* Criteria Coherence fix: "KILL LIST" naming only when the committed
+     decision actually contains a cut (shift/cut variants) — otherwise
+     the section is descriptive and the header says so. */
+  const losersCut =
+    memo.decision.action === "budget" && memo.decision.budgetVariant !== "scale";
+  lines.push(
+    view === "client"
+      ? "WHAT UNDERPERFORMED"
+      : losersCut
+        ? "LOSERS / KILL LIST"
+        : "LOSERS / BELOW BENCHMARK"
+  );
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
   loserRows.forEach((l) => {
     lines.push(

@@ -74,6 +74,43 @@ export const SUPPORTED_MIN_JUDGED = 10;
  *  simple stub. */
 export type MoneyFormatter = (value: number) => string;
 
+/**
+ * The single source of truth for "may this dataset's committed call
+ * include a scale/shift budget move?" — true exactly when buildDecision
+ * lands on the shift or scale variant: enough judged ads (H1 wouldn't
+ * fire), the top winner past the scale bar, and the move not withheld
+ * by the user's own outcome minimum (Decision Criteria V2; an
+ * unverifiable count never silently blocks, matching buildDecision).
+ *
+ * Exported for memo.ts (Criteria Coherence fix): the T3 scale test and
+ * the "don't scale anything except the leader" avoid line must agree
+ * with the committed decision, and buildNextTests runs BEFORE the
+ * decision object exists (the decision embeds the first test's title)
+ * — so the RULE is shared from here rather than re-derived in memo.ts.
+ * buildDecision itself computes scaleEligible via this function, so
+ * the two can never drift.
+ */
+export function isScaleActionSupported(
+  analysis: AnalysisResult,
+  criteria?: DecisionCriteria
+): boolean {
+  if (analysis.adsJudged < DECISION_MIN_JUDGED) return false;
+  const top = analysis.winners[0] ?? null;
+  if (top == null || top.deltaPct == null || top.deltaPct < SCALE_TEST_MIN_DELTA_PCT) {
+    return false;
+  }
+  const nouns = outcomeNounsForKpi(analysis.kpi);
+  const minOutcome =
+    criteria?.minOutcomeCount != null && criteria.minOutcomeCount > 0
+      ? criteria.minOutcomeCount
+      : null;
+  const topOutcomes = top.conversions ?? null;
+  if (minOutcome != null && nouns != null && topOutcomes != null && topOutcomes < minOutcome) {
+    return false;
+  }
+  return true;
+}
+
 function pct(value: number): number {
   return Math.round(value);
 }
@@ -375,7 +412,10 @@ export function buildDecision(
     rawScaleEligible &&
     topOutcomes != null &&
     topOutcomes < minOutcome;
-  const scaleEligible = rawScaleEligible && !outcomeBlockedScale;
+  /* Computed via the shared, exported rule so memo.ts's T3/avoid gating
+     can never drift from the decision (its adsJudged clause is
+     redundant here — H1 already returned before B1 reads this). */
+  const scaleEligible = isScaleActionSupported(analysis, criteria);
   const belowShare =
     analysis.judgedSpend > 0
       ? (analysis.belowBenchmarkSpend / analysis.judgedSpend) * 100

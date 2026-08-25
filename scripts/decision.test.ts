@@ -26,6 +26,7 @@ const require = createRequire(import.meta.url);
 import {
   buildDecision,
   buildLimits,
+  isScaleActionSupported,
   CONCENTRATION_GUARDRAIL_PCT,
   CUT_MIN_SPEND_SHARE_PCT,
   DECISION_MIN_JUDGED,
@@ -893,6 +894,54 @@ console.log("decision (stage 1 — rules): all assertions passed");
   assertContract(cutBlocked, "criteria:cut-blocked");
 }
 
+/* ============ Criteria Coherence: the shared scale-permission rule ============ */
+
+{
+  /* isScaleActionSupported is the ONE rule memo.ts's T3/avoid gating
+     shares with buildDecision — true exactly when the committed call
+     would land on the shift/scale variant. */
+  const eligible = fixture({ winners: [{ ...ad("W", 400, 80), conversions: 60 }], losers: [ad("L", 100, -10)] });
+  assert.equal(isScaleActionSupported(eligible), true, "past the bar, no criteria → supported");
+  assert.equal(
+    isScaleActionSupported(fixture({ adsJudged: 4, winners: [ad("W", 400, 80)] })),
+    false,
+    "too few judged ads → never supported (H1 would hold)"
+  );
+  assert.equal(
+    isScaleActionSupported(fixture({ winners: [ad("W", 400, 29)] })),
+    false,
+    "under the % bar → not supported"
+  );
+  assert.equal(
+    isScaleActionSupported(eligible, { minOutcomeCount: 50 }),
+    true,
+    "count 60 meets the user's 50 bar"
+  );
+  assert.equal(
+    isScaleActionSupported(
+      fixture({ winners: [{ ...ad("W", 400, 80), conversions: 3 }] }),
+      { minOutcomeCount: 50 }
+    ),
+    false,
+    "verifiable count below the user's bar withholds the move"
+  );
+  assert.equal(
+    isScaleActionSupported(fixture({ winners: [ad("W", 400, 80)] }), { minOutcomeCount: 50 }),
+    true,
+    "unverifiable count never silently blocks (matches buildDecision)"
+  );
+  /* Agreement with the actual decision on the blocked shape. */
+  const blockedDecision = buildDecision(
+    fixture({ winners: [{ ...ad("W", 400, 80), conversions: 3 }], losers: [ad("L", 100, -10)] }),
+    "Fallback test.",
+    money,
+    null,
+    undefined,
+    { minOutcomeCount: 50 }
+  );
+  assert.equal(blockedDecision.action, "test", "decision agrees: blocked → no budget move");
+}
+
 /* ============ Period Comparison V2: decision isolation ============ */
 
 {
@@ -1303,6 +1352,8 @@ console.log("decision (stage 1 — rules): all assertions passed");
         tldr: string[];
         clientSummary: string[];
         losers: { rows: unknown[]; killInstruction: string; clientInstruction: string };
+        nextTests: { test: string; why: string }[];
+        avoid: { buyer: string[]; client: string[] };
         decision: { action: string; budgetVariant?: string; holdReason?: string };
       };
       const assertCoherent = (m: CoherenceMemo, label: string) => {
@@ -1367,6 +1418,27 @@ console.log("decision (stage 1 — rules): all assertions passed");
             `${label}: no test promise in client summary under a hold`
           );
         }
+
+        /* Criteria Coherence fix: the Next-tests section may contain
+           its scale action, and the avoid section its "scale only the
+           leader" permission, exactly when the committed decision is a
+           shift/scale — never under test, hold, cut-only, or a
+           criteria-withheld scale. */
+        assert.equal(
+          m.nextTests.some((t) => t.test.startsWith("Scale ")),
+          scaleSide,
+          `${label}: T3 scale action iff the decision scales`
+        );
+        assert.equal(
+          m.avoid.buyer.some((l) => l.startsWith("Do not scale anything except")),
+          scaleSide,
+          `${label}: implied scale permission in avoid iff the decision scales`
+        );
+        assert.equal(
+          m.avoid.client.some((l) => l.includes("only increasing budget behind")),
+          scaleSide,
+          `${label}: client avoid budget-increase promise iff the decision scales`
+        );
       };
 
       // Positive control: the pinned sample is a budget SHIFT — both
@@ -1451,6 +1523,63 @@ console.log("decision (stage 1 — rules): all assertions passed");
         "insufficient-hold client summary aligns the Next line"
       );
       assertCoherent(mHold, "hold-insufficient");
+
+      /* Criteria Coherence fix — the exact reported contradiction: a
+         user minOutcomeCount blocks an otherwise scale-eligible lead.
+         The committed call is a test; T3 must not propose the scale,
+         avoid must not imply the leader is scale-approved, and the
+         TXT losers header must not say KILL LIST. */
+      const blockedScaleCsv =
+        "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        "A,300,3,5.0,2026-06-01,2026-06-30\n" +
+        "B,200,30,2.2,2026-06-01,2026-06-30\n" +
+        "C,200,30,2.0,2026-06-01,2026-06-30\n" +
+        "D,200,28,1.95,2026-06-01,2026-06-30\n" +
+        "E,200,27,1.9,2026-06-01,2026-06-30\n";
+      const mBlocked = runEngine(blockedScaleCsv, "roas", { minOutcomeCount: 50 });
+      assert.equal(mBlocked.decision.action, "test", "blocked-scale dataset lands on test");
+      assert.ok(
+        !mBlocked.nextTests.some((t: { test: string }) => t.test.startsWith("Scale ")),
+        "no Scale test proposed while the user's outcome bar withholds the move"
+      );
+      assert.ok(
+        mBlocked.nextTests[2].why.includes("doesn't commit a budget move yet"),
+        "the T3 challenger explains the withheld move honestly"
+      );
+      assert.ok(
+        mBlocked.avoid.buyer.some((l: string) => l.startsWith('Do not scale "A" yet')),
+        "avoid explicitly withholds scaling the leader"
+      );
+      assert.ok(
+        !mBlocked.avoid.buyer.some((l: string) => l.startsWith("Do not scale anything except")),
+        "avoid never implies the leader is scale-approved"
+      );
+      assertCoherent(mBlocked, "blocked-scale");
+      const mBlockedText: string = memoToText(mBlocked, "buyer", 5);
+      assert.ok(
+        mBlockedText.includes("LOSERS / BELOW BENCHMARK") && !mBlockedText.includes("KILL LIST"),
+        "non-cut TXT export drops the kill-list framing"
+      );
+      const mTestText: string = memoToText(mTest, "buyer", 5);
+      assert.ok(
+        mTestText.includes("LOSERS / BELOW BENCHMARK") && !mTestText.includes("KILL LIST"),
+        "test-action TXT export drops the kill-list framing"
+      );
+
+      /* Positive controls: real shift/scale decisions retain the scale
+         language everywhere it belongs. */
+      assert.ok(
+        memo.nextTests.some((t: { test: string }) => t.test.startsWith('Scale "UGC_MorningRoutine_V1"')),
+        "shift sample keeps the T3 scale action"
+      );
+      assert.ok(
+        memo.avoid.buyer.some((l: string) => l.startsWith("Do not scale anything except")),
+        "shift sample keeps the scale-only-the-leader line"
+      );
+      assert.ok(
+        mScale.nextTests.some((t: { test: string }) => t.test.startsWith("Scale ")),
+        "scale-only decision keeps the T3 scale action"
+      );
 
       // Coherence also holds for every other memo produced in this
       // stage — cheap to sweep now that the property is written.

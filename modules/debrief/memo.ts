@@ -1,4 +1,4 @@
-import { buildDecision, SCALE_TEST_MIN_DELTA_PCT } from "./decision";
+import { buildDecision, isScaleActionSupported, SCALE_TEST_MIN_DELTA_PCT } from "./decision";
 import {
   fmtCount,
   fmtDeltaVsMedian,
@@ -13,6 +13,7 @@ import {
   HIGHER_IS_BETTER,
   KPI_EXPLAINERS,
   KPI_LABELS,
+  DecisionCriteria,
   KpiKey,
   Memo,
   MemoDecision,
@@ -450,7 +451,15 @@ const directionFor = (tag: string | null | undefined): string[] =>
  * budget move.
  */
 
-function buildNextTests(analysis: AnalysisResult, context: DebriefContext): MemoTest[] {
+function buildNextTests(
+  analysis: AnalysisResult,
+  context: DebriefContext,
+  /** Criteria Coherence fix: the user's decision criteria, forwarded so
+   *  the T3 slot's budget action is gated by the SAME shared rule the
+   *  committed decision uses (isScaleActionSupported) — the memo can
+   *  never propose a scale the decision withholds. */
+  criteria: DecisionCriteria
+): MemoTest[] {
   const {
     winners,
     losers,
@@ -822,7 +831,13 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
   /* T3 — the ONLY slot a budget action may occupy, and only when the
      winner's lead is emphatic. Otherwise: a structured format
      challenger (creative again). */
-  const scaleJustified =
+  /* Criteria Coherence fix: the ONE budget action this section may
+     contain is gated by the shared decision rule — not by the raw %
+     bar alone. A lead past the bar whose move the committed call
+     withholds (too few judged ads, or below the user's own outcome
+     minimum) falls through to the creative challenger instead. */
+  const scaleJustified = isScaleActionSupported(analysis, criteria);
+  const leadPastBar =
     top != null && top.deltaPct != null && top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT;
   if (scaleJustified) {
     const signals = sig(
@@ -913,9 +928,11 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
     );
     tests.push({
       test: `Test ${challenger} against your ${winnerTag ? `${winnerTag.tag} ads` : "current best ad"} as the control.`,
-      why: winnerTag
-        ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive — a structured challenger shows whether the format or the message is doing the work.`
-        : `No format is clearly winning${hasNameSignal ? "" : " and names carry no format signal"} — the fastest way to a pattern is one controlled format-vs-format test.${context.creativeNotes ? ` Use your notes ("${context.creativeNotes.slice(0, 60)}…") to pick the challenger.` : ""}`,
+      why: leadPastBar
+        ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar, but this debrief doesn't commit a budget move yet (see Next move) — a structured challenger builds comparison data while that evidence firms up.`
+        : winnerTag
+          ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive — a structured challenger shows whether the format or the message is doing the work.`
+          : `No format is clearly winning${hasNameSignal ? "" : " and names carry no format signal"} — the fastest way to a pattern is one controlled format-vs-format test.${context.creativeNotes ? ` Use your notes ("${context.creativeNotes.slice(0, 60)}…") to pick the challenger.` : ""}`,
       setup: `Launch the challenger at ~${gateLabel} alongside the control, same audience and offer, until both clear the spend gate.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
@@ -955,7 +972,12 @@ function buildNextTests(analysis: AnalysisResult, context: DebriefContext): Memo
  */
 function buildAvoid(
   analysis: AnalysisResult,
-  context: DebriefContext
+  context: DebriefContext,
+  /** Criteria Coherence fix: the committed decision — the budget-
+   *  discipline lines follow it instead of re-deriving eligibility
+   *  from the raw % bar (which implied a scale was sanctioned even
+   *  when the decision withheld it). */
+  decision: MemoDecision
 ): { buyer: string[]; client: string[] } {
   const { winners, losers, median, kpi, currency, spendGate, adsSetAside } =
     analysis;
@@ -987,14 +1009,26 @@ function buildAvoid(
     }
   }
 
-  /* Budget discipline. */
+  /* Budget discipline — voiced from the committed decision, never the
+     raw % bar alone. "Scale only the leader" appears iff the decision
+     actually contains a scale/shift; a lead past the bar whose move
+     was withheld (hold, or the user's outcome minimum) gets an
+     explicit don't-scale-yet line instead of implied permission. */
+  const scaleSide = decision.action === "budget" && decision.budgetVariant !== "cut";
   if (top && top.deltaPct != null) {
-    if (top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT) {
+    if (scaleSide) {
       buyer.push(
         `Do not scale anything except "${top.name}" yet — the clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before broader budget moves.`
       );
       client.push(
         `We're only increasing budget behind "${top.name}" for now — the clearest case for more budget is the leading ad. For the remaining ads, controlled creative tests are safer than broader budget changes.`
+      );
+    } else if (top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT) {
+      buyer.push(
+        `Do not scale "${top.name}" yet — its lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar, but the committed call is not a scale move (see Next move).`
+      );
+      client.push(
+        `We're not increasing any budgets yet — including the current leader's; the decision above explains why.`
       );
     } else {
       buyer.push(
@@ -1221,9 +1255,13 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
 export function generateMemo(analysis: AnalysisResult, context: DebriefContext): Memo {
   const { kpi, currency, median } = analysis;
 
+  // Decision Criteria V2 — built once and shared by the decision, the
+  // T3 gate, and the avoid lines, so all three read the same bars.
+  const criteria: DecisionCriteria = { minOutcomeCount: context.minOutcomeCount };
+
   // Built once: the list feeds both the memo's tests section and the
   // Next-move decision (T1 recommends exactly nextTests[0]).
-  const nextTests = buildNextTests(analysis, context);
+  const nextTests = buildNextTests(analysis, context, criteria);
 
   // Built BEFORE the verdict lines (TLDR Coherence fix): buildTldr and
   // buildClientSummary read the committed decision so their imperatives
@@ -1247,7 +1285,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       // Decision Criteria V2: the user's own scaling minimum. Unlike
       // the framing context above, this MAY withhold a scale/shift
       // move — see DecisionCriteria in types.ts.
-      { minOutcomeCount: context.minOutcomeCount }
+      criteria
   );
 
   return {
@@ -1304,7 +1342,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     patterns: buildPatterns(analysis),
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
-    avoid: buildAvoid(analysis, context),
+    avoid: buildAvoid(analysis, context, decision),
     confidence: buildConfidence(analysis),
   };
 }
