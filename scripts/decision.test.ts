@@ -83,6 +83,7 @@ function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
     hasNameSignal: false,
     hasCreativeNotes: false,
     missingColumns: [],
+    duplicateAdNames: [],
     ...overrides,
   };
 }
@@ -975,7 +976,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       { cwd: join(import.meta.dirname, ".."), stdio: "pipe" }
     );
     const { buildSampleMemo } = require(join(dist, "modules/debrief/sample.js"));
-    const { memoToText } = require(join(dist, "components/debrief/memoToText.js"));
+    const { memoToText, evidenceLine } = require(join(dist, "components/debrief/memoToText.js"));
     const memo = buildSampleMemo();
 
     // The pin documented in sampleCsv.ts's invariants header.
@@ -1351,10 +1352,18 @@ console.log("decision (stage 1 — rules): all assertions passed");
       type CoherenceMemo = {
         tldr: string[];
         clientSummary: string[];
-        losers: { rows: unknown[]; killInstruction: string; clientInstruction: string };
+        winners: { name: string }[];
+        scope: { adsJudged: number };
+        losers: { rows: { name: string }[]; killInstruction: string; clientInstruction: string };
         nextTests: { test: string; why: string }[];
         avoid: { buyer: string[]; client: string[] };
-        decision: { action: string; budgetVariant?: string; holdReason?: string };
+        decision: {
+          action: string;
+          budgetVariant?: string;
+          holdReason?: string;
+          evidenceState: string;
+          evidenceShape?: string;
+        };
       };
       const assertCoherent = (m: CoherenceMemo, label: string) => {
         const { action, budgetVariant } = m.decision;
@@ -1438,6 +1447,35 @@ console.log("decision (stage 1 — rules): all assertions passed");
           m.avoid.client.some((l) => l.includes("only increasing budget behind")),
           scaleSide,
           `${label}: client avoid budget-increase promise iff the decision scales`
+        );
+
+        /* QA B1 invariant: no ad label may ever appear as both a winner
+           and a loser — duplicate-named rows are row-disambiguated
+           upstream, so a shared label here would mean the report can
+           name one identity as both source and target of a move. */
+        const winnerNames = new Set(m.winners.map((w) => w.name));
+        assert.ok(
+          m.losers.rows.every((l) => !winnerNames.has(l.name)),
+          `${label}: no label appears in both winners and losers`
+        );
+
+        /* QA C1 invariant: decisive evidence wording ("clearly pulled
+           ahead" / "clear enough difference") is voiced iff the
+           committed decision actually contains the scale/shift it
+           implies. */
+        const decisive =
+          scaleSide &&
+          m.decision.evidenceState === "supported" &&
+          m.decision.evidenceShape === "separation";
+        assert.equal(
+          evidenceLine(m.decision, m.scope.adsJudged, "buyer").includes("clearly pulled ahead"),
+          decisive,
+          `${label}: buyer decisive evidence wording iff a supported scale/shift`
+        );
+        assert.equal(
+          evidenceLine(m.decision, m.scope.adsJudged, "client").includes("clear enough difference"),
+          decisive,
+          `${label}: client decisive evidence wording iff a supported scale/shift`
         );
       };
 
@@ -1565,6 +1603,120 @@ console.log("decision (stage 1 — rules): all assertions passed");
         mTestText.includes("LOSERS / BELOW BENCHMARK") && !mTestText.includes("KILL LIST"),
         "test-action TXT export drops the kill-list framing"
       );
+
+      /* QA B1 — duplicate ad name at BOTH extremes: rows stay separate,
+         labels are row-disambiguated, and no sentence can name one
+         label as both source and target of the shift. */
+      const dupNameCsv =
+        "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        "Alpha,300,30,5.0,2026-06-01,2026-06-30\n" +
+        "Alpha,300,2,0.5,2026-06-01,2026-06-30\n" +
+        "M1,200,20,2.0,2026-06-01,2026-06-30\n" +
+        "M2,200,20,2.1,2026-06-01,2026-06-30\n" +
+        "M3,200,20,1.95,2026-06-01,2026-06-30\n" +
+        "M4,200,20,1.9,2026-06-01,2026-06-30\n";
+      const mDup = runEngine(dupNameCsv, "roas");
+      assert.equal(mDup.decision.action, "budget", "dup dataset still lands on a budget move");
+      assert.ok(
+        mDup.decision.headline.includes('into "Alpha (row 2)"'),
+        "shift target carries the row-disambiguated label"
+      );
+      assert.ok(
+        mDup.decision.headline.includes('"Alpha (row 3)"'),
+        "shift source names the loser row's label"
+      );
+      assert.ok(
+        !/from ("[^"]+").*into \1/.test(mDup.decision.headline),
+        "headline never shifts a label into itself"
+      );
+      assert.ok(
+        mDup.tldr[0].includes("Alpha (row 2)") && mDup.tldr[1].includes("Alpha (row 3)"),
+        "TLDR uses the disambiguated labels on both sides"
+      );
+      assert.ok(
+        mDup.nextTests[0].test.includes("Alpha (row 2)"),
+        "next tests reference the disambiguated winner"
+      );
+      assert.ok(
+        mDup.decision.limits.buyer.some(
+          (l: string) => l.includes('"Alpha"') && l.includes("multiple rows")
+        ) &&
+          mDup.decision.limits.client.some(
+            (l: string) => l.includes('"Alpha"') && l.includes("row number")
+          ),
+        "duplicate-name disclosure present in both registers"
+      );
+      assertCoherent(mDup, "duplicate-name");
+      // Clean files carry no duplicate machinery: no disclosure, no
+      // row-suffixed labels (byte-identity for the common case).
+      assert.ok(
+        !memo.decision.limits.buyer.some((l: string) => l.includes("multiple rows —")) &&
+          memo.winners.every((w: { name: string }) => !/\(row \d+\)$/.test(w.name)),
+        "no duplicate handling on the clean sample"
+      );
+
+      /* QA C1 — supported evidence with a modest (+21%) leader on a
+         test action: the evidence sentence no longer claims a decisive
+         leader, in either register. */
+      const modestLeadCsv =
+        "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        ["W1,200,20,2.40", "W2,200,20,2.35", "W3,200,20,2.32", "W4,200,20,2.30",
+         "M1,200,20,2.05", "M2,200,20,2.00", "M3,200,20,1.98", "M4,200,20,1.96",
+         "L1,200,20,1.70", "L2,200,20,1.68", "L3,200,20,1.66", "L4,200,20,1.62"]
+          .map((r) => `${r},2026-06-01,2026-06-30`)
+          .join("\n") + "\n";
+      const mModest = runEngine(modestLeadCsv, "roas");
+      assert.equal(mModest.decision.action, "test", "modest lead lands on test");
+      assert.equal(mModest.decision.evidenceState, "supported", "and stays supported");
+      const modestBuyerLine: string = evidenceLine(mModest.decision, mModest.scope.adsJudged, "buyer");
+      assert.ok(
+        modestBuyerLine.includes("no ad has pulled far enough ahead for a budget move"),
+        "buyer evidence line defers to the committed decision"
+      );
+      assert.ok(
+        evidenceLine(mModest.decision, mModest.scope.adsJudged, "client").includes(
+          "no single ad is far enough ahead to earn more budget yet"
+        ),
+        "client evidence line preserves the same meaning without jargon"
+      );
+      assertCoherent(mModest, "modest-lead");
+      // Positive control: the pinned shift sample keeps the decisive wording.
+      assert.ok(
+        evidenceLine(memo.decision, memo.scope.adsJudged, "buyer").includes("clearly pulled ahead"),
+        "shift sample keeps the decisive buyer evidence wording"
+      );
+
+      /* QA C3 — positive ROAS with a verifiable outcome count of ZERO
+         on the leader: a data-consistency warning appears (both
+         registers); the action itself is unchanged; absent or positive
+         counts never trigger it. */
+      const zeroCountCsv =
+        "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        "Zed,400,0,4.0,2026-06-01,2026-06-30\n" +
+        ["Z1", "Z2", "Z3", "Z4", "Z5", "Z6"]
+          .map((n) => `${n},200,10,2.0,2026-06-01,2026-06-30`)
+          .join("\n") + "\n";
+      const mZero = runEngine(zeroCountCsv, "roas");
+      assert.equal(mZero.decision.action, "budget", "warning never changes the action");
+      assert.ok(
+        mZero.decision.limits.buyer.some(
+          (l: string) => l.includes("recorded purchase count of 0") && l.includes("attribution")
+        ),
+        "buyer data-consistency warning present"
+      );
+      assert.ok(
+        mZero.decision.limits.client.some((l: string) => l.includes("0 purchases")),
+        "client data-consistency warning present"
+      );
+      assert.ok(
+        !mNoCount.decision.limits.buyer.some((l: string) => l.includes("count of 0")),
+        "absent count column never triggers a false warning"
+      );
+      assert.ok(
+        !mMeta.decision.limits.buyer.some((l: string) => l.includes("count of 0")),
+        "positive counts never trigger the warning"
+      );
+      assertCoherent(mZero, "zero-count");
 
       /* Positive controls: real shift/scale decisions retain the scale
          language everywhere it belongs. */

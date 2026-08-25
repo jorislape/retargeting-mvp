@@ -206,7 +206,19 @@ export interface DebriefContext extends DecisionInputContext {
 
 /** One ad row after column resolution and metric derivation. */
 export interface ParsedAd {
+  /** Display identity. Normally the raw ad-name cell; when the SAME
+   *  normalized name appears on multiple rows (Duplicate Identity fix),
+   *  each row's name is disambiguated deterministically as
+   *  "Name (row N)" — N being the spreadsheet row number — so no two
+   *  ads in one report ever share a label. Rows stay separate ads;
+   *  nothing is aggregated, and the export is never assumed to prove
+   *  same-name rows are the same creative. */
   name: string;
+  /** The raw ad-name cell when `name` was disambiguated (set ONLY for
+   *  duplicate-named rows). Cross-period matching (compare.ts) and
+   *  creative-format-override matching key on this, so row-position
+   *  labels can never fabricate a cross-period or override match. */
+  sourceName?: string;
   /** Meta's Ad ID, when the export included an "Ad ID" column — the
    *  reliable cross-period identifier for Period Comparison V2 (it
    *  survives renames; names don't). null when the column is absent or
@@ -273,6 +285,11 @@ export interface AnalysisResult {
   hasNameSignal: boolean;
   hasCreativeNotes: boolean;
   missingColumns: string[];
+  /** Duplicate Identity fix: the distinct RAW ad names that appear on
+   *  more than one row of the export (empty on clean files). Rows are
+   *  kept as separate ads with row-numbered labels; this list drives
+   *  the honesty disclosure in the decision's limits. */
+  duplicateAdNames: string[];
 }
 
 export interface MemoScope {

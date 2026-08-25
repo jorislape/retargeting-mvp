@@ -161,5 +161,11 @@ export function analyze(
     hasNameSignal: hasNameSignal(winnerPool, loserPool),
     hasCreativeNotes: context.creativeNotes.trim().length > 0,
     missingColumns,
+    /* Duplicate Identity fix: distinct raw names that extract.ts found
+       on multiple rows (their ads carry sourceName). Drives the limits
+       disclosure; never affects gating, ranking, or the decision. */
+    duplicateAdNames: [
+      ...new Set(ads.filter((a) => a.sourceName != null).map((a) => a.sourceName as string)),
+    ],
   };
 }

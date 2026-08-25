@@ -66,7 +66,13 @@ export interface ComparisonFormatters {
 /* Matching                                                            */
 /* ------------------------------------------------------------------ */
 
-const nameKey = (ad: ParsedAd): string => ad.name.trim().replace(/\s+/g, " ");
+/* Duplicate Identity fix: key on the RAW ad-name cell (sourceName when
+   extract.ts disambiguated a duplicate-named row's display name with a
+   "(row N)" suffix). Row positions are not stable across exports, so
+   display labels must never become match keys — and duplicated raw
+   names still land in the ambiguous bucket below, exactly as before. */
+const nameKey = (ad: ParsedAd): string =>
+  (ad.sourceName ?? ad.name).trim().replace(/\s+/g, " ");
 const idKey = (ad: ParsedAd): string | null =>
   ad.id != null && ad.id.trim() !== "" ? ad.id.trim() : null;
 
@@ -204,16 +210,23 @@ export function buildComparison(
     }
   }
 
-  const changed = deltas.filter(
-    (d) => d.pct != null && Math.abs(d.pct) >= UNCHANGED_BAND_PCT
-  );
-  const improvedAll = changed
-    .filter((d) => d.better)
-    .sort((a, b) => Math.abs(b.pct!) - Math.abs(a.pct!));
-  const declinedAll = changed
-    .filter((d) => !d.better)
-    .sort((a, b) => Math.abs(b.pct!) - Math.abs(a.pct!));
-  const unchangedCount = deltas.length - changed.length;
+  /* Zero-baseline honesty (QA C2): a previous value of 0 makes the
+     movement inexpressible as a % — but 0 → something is a real, often
+     large movement, NEVER "effectively unchanged". Such rows keep their
+     certain direction (polarity-aware `better`), render with the
+     explicit non-% change label, and are called out in the tally. */
+  const expressible = deltas.filter((d) => d.pct != null);
+  const inexpressible = deltas.filter((d) => d.pct == null);
+  const changed = expressible.filter((d) => Math.abs(d.pct!) >= UNCHANGED_BAND_PCT);
+  const improvedAll = [
+    ...changed.filter((d) => d.better).sort((a, b) => Math.abs(b.pct!) - Math.abs(a.pct!)),
+    ...inexpressible.filter((d) => d.better),
+  ];
+  const declinedAll = [
+    ...changed.filter((d) => !d.better).sort((a, b) => Math.abs(b.pct!) - Math.abs(a.pct!)),
+    ...inexpressible.filter((d) => !d.better),
+  ];
+  const unchangedCount = expressible.length - changed.length;
 
   const toRow = (d: Delta): MemoComparisonRow => {
     const sign = d.better ? "+" : "−";
@@ -292,11 +305,15 @@ export function buildComparison(
     `Total spend went from ${fmt.money(prevSpend)} to ${fmt.money(currSpend)}${spendPctLabel}.`
   );
   if (deltas.length > 0) {
+    const zeroBaseNote =
+      inexpressible.length > 0
+        ? ` ${inexpressible.length === 1 ? "One movement is" : `${inexpressible.length} movements are`} from a previous value of zero, so no % can be shown for ${inexpressible.length === 1 ? "it" : "them"}.`
+        : "";
     accountBuyer.push(
-      `Of ${deltas.length} ad${deltas.length === 1 ? "" : "s"} judged in both periods: ${improvedAll.length} improved, ${declinedAll.length} declined, ${unchangedCount} effectively unchanged (<${UNCHANGED_BAND_PCT}% move).`
+      `Of ${deltas.length} ad${deltas.length === 1 ? "" : "s"} judged in both periods: ${improvedAll.length} improved, ${declinedAll.length} declined, ${unchangedCount} effectively unchanged (<${UNCHANGED_BAND_PCT}% move).${zeroBaseNote}`
     );
     accountClient.push(
-      `Of the ${deltas.length} ad${deltas.length === 1 ? "" : "s"} we can compare fairly across both periods, ${improvedAll.length} improved and ${declinedAll.length} declined.`
+      `Of the ${deltas.length} ad${deltas.length === 1 ? "" : "s"} we can compare fairly across both periods, ${improvedAll.length} improved and ${declinedAll.length} declined.${zeroBaseNote}`
     );
   } else {
     accountBuyer.push(

@@ -48,14 +48,31 @@ export function evidenceLine(
   }
   // supported
   const flat = decision.evidenceShape === "flatness";
+  /* Evidence-Wording Coherence (QA C1): "pulled ahead" language is only
+     voiced when the committed decision actually contains a scale/shift.
+     A supported-but-modest separation (leader under the budget bar, or
+     a cut-only move) states the separation without implying a decisive
+     leader — the same card's rationale says the opposite, and the two
+     must agree. Wording only; evidenceState itself is unchanged. */
+  const scaleSide =
+    decision.action === "budget" && decision.budgetVariant !== "cut";
   if (client) {
-    return flat
-      ? "Strong — the current results consistently show that no ad is clearly ahead yet."
-      : "Strong — the available results show a clear enough difference to support this direction.";
+    if (flat) {
+      return "Strong — the current results consistently show that no ad is clearly ahead yet.";
+    }
+    return scaleSide
+      ? "Strong — the available results show a clear enough difference to support this direction."
+      : "Strong — the results separate clearly, though no single ad is far enough ahead to earn more budget yet.";
   }
-  return flat
-    ? `Strong support from this dataset — no ad separated meaningfully across ${adsJudged} judged ads.`
-    : `Strong support from this dataset — one ad clearly pulled ahead across ${adsJudged} judged ads.`;
+  if (flat) {
+    return `Strong support from this dataset — no ad separated meaningfully across ${adsJudged} judged ads.`;
+  }
+  if (scaleSide) {
+    return `Strong support from this dataset — one ad clearly pulled ahead across ${adsJudged} judged ads.`;
+  }
+  return decision.action === "budget"
+    ? `Strong support from this dataset — the field separates clearly at the weak end across ${adsJudged} judged ads, though no ad has pulled far enough ahead to scale.`
+    : `Strong support from this dataset — the field separates clearly across ${adsJudged} judged ads, though no ad has pulled far enough ahead for a budget move.`;
 }
 
 /** Plain-text serialization for the copy/share button — same content

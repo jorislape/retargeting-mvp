@@ -122,7 +122,7 @@ export function extractAds(
   columns: ColumnMap,
   kpi: KpiKey
 ): ParsedAd[] {
-  return rows
+  const ads = rows
     .map((row, index) => {
       const spend = columns.spend ? (parseNumericCell(row[columns.spend]) ?? 0) : 0;
       const name = columns.adName && row[columns.adName]
@@ -140,9 +140,37 @@ export function extractAds(
         kpiValue: kpiValueForRow(row, columns, kpi, spend),
         nameTags: extractNameTags(name),
         conversions: conversionsForRow(row, columns, kpi),
+        /* Spreadsheet row number (header = row 1) — used only for the
+           duplicate-name display label below. */
+        fileRow: index + 2,
       };
     })
     .filter((ad) => ad.spend > 0 || ad.kpiValue != null); // drop fully-blank rows
+
+  /* Duplicate Identity fix: the same normalized name on multiple rows
+     is NOT proof of one creative (the same name routinely appears
+     across ad sets with very different results). Rows stay separate
+     ads; each duplicate's display name gains a deterministic,
+     client-readable "(row N)" suffix so no report sentence can ever
+     name the same label as both winner and loser. The raw name is
+     preserved in sourceName for cross-period and override matching —
+     row positions are NOT stable across exports, so labels must never
+     become match keys. Files without duplicates are byte-identical to
+     before this fix. */
+  const normalize = (name: string) => name.trim().replace(/\s+/g, " ");
+  const counts = new Map<string, number>();
+  for (const ad of ads) {
+    const key = normalize(ad.name);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return ads.map(({ fileRow, ...ad }) => {
+    if ((counts.get(normalize(ad.name)) ?? 0) <= 1) return ad;
+    return {
+      ...ad,
+      name: `${ad.name.trim()} (row ${fileRow})`,
+      sourceName: ad.name,
+    };
+  });
 }
 
 /**
@@ -162,7 +190,12 @@ export function applyFormatOverrides(
   return ads.map((ad) => {
     // The generator's confirmation list shows trimmed names; extraction
     // keeps the raw cell — accept either so a padded cell still matches.
-    const format = overrides[ad.name] ?? overrides[ad.name.trim()];
+    // Duplicate-named rows carry their raw name in sourceName (the
+    // display name has a "(row N)" suffix the user never typed); the
+    // one override then applies to every row sharing the name, exactly
+    // as before the Duplicate Identity fix.
+    const raw = ad.sourceName ?? ad.name;
+    const format = overrides[raw] ?? overrides[raw.trim()];
     if (!format || !(format in CREATIVE_FORMAT_LABELS)) return ad;
     return { ...ad, nameTags: [format], formatConfirmed: true };
   });

@@ -106,6 +106,7 @@ function period(
       hasNameSignal: false,
       hasCreativeNotes: false,
       missingColumns: [],
+      duplicateAdNames: [],
     },
   };
 }
@@ -207,6 +208,56 @@ function allStrings(cmp: MemoComparison): string[] {
   assert.equal(convMissing.improved[0].conversionChangeLabel, undefined);
 }
 
+/* ===================== zero-baseline movements (QA C2) ===================== */
+
+{
+  // Previous value 0 → current positive: a REAL movement with a certain
+  // direction, inexpressible as a % — never "effectively unchanged".
+  const zeroUp = buildComparison(
+    period([{ name: "A", kpiValue: 2 }, { name: "B", kpiValue: 1.5 }]),
+    period([{ name: "A", kpiValue: 0 }, { name: "B", kpiValue: 1 }]),
+    fmt
+  );
+  assert.equal(zeroUp.improved.length, 2, "0 → 2 lands in improved (polarity: higher better)");
+  assert.ok(
+    zeroUp.improved.some((r) => r.name === "A" && r.changeLabel.includes("not expressible as a %")),
+    "zero-baseline row carries the explicit non-% change label"
+  );
+  assert.ok(
+    zeroUp.account.buyer.some((l) => l.includes("0 effectively unchanged")),
+    "zero-baseline mover never counted as effectively unchanged"
+  );
+  assert.ok(
+    zeroUp.account.buyer.some((l) => l.includes("previous value of zero")),
+    "buyer tally names the zero baseline"
+  );
+  assert.ok(
+    zeroUp.account.client.some((l) => l.includes("previous value of zero")),
+    "client tally names the zero baseline"
+  );
+
+  // Polarity preserved: CPA (lower better) 0 → 20 is a decline.
+  const zeroCpa = buildComparison(
+    period([{ name: "A", kpiValue: 20 }, { name: "B", kpiValue: 10 }], { kpi: "cpa" }),
+    period([{ name: "A", kpiValue: 0 }, { name: "B", kpiValue: 10 }], { kpi: "cpa" }),
+    { ...fmt, kpiLabel: "CPA" }
+  );
+  assert.equal(zeroCpa.declined.length, 1, "CPA 0 → 20 lands in declined");
+  assert.equal(zeroCpa.declined[0].name, "A");
+
+  // Normal percentage deltas are untouched by the new bucketing.
+  const normal = buildComparison(
+    period([{ name: "A", kpiValue: 3 }, { name: "B", kpiValue: 1 }]),
+    period([{ name: "A", kpiValue: 2 }, { name: "B", kpiValue: 2 }]),
+    fmt
+  );
+  assert.ok(normal.improved[0].changeLabel.includes("+50%"), "expressible deltas keep % labels");
+  assert.ok(
+    !normal.account.buyer.some((l) => l.includes("previous value of zero")),
+    "no zero-baseline clause without a zero baseline"
+  );
+}
+
 /* ===================== duplicate/missing keys: excluded, counted, never guessed ===================== */
 
 {
@@ -253,6 +304,35 @@ function allStrings(cmp: MemoComparison): string[] {
   assert.equal(missingId.unmatched.ambiguousOrMissingKey, 1, "current B has no id");
   assert.equal(missingId.matchedJudgedBoth, 1, "only A matches by id");
   assert.equal(missingId.appeared.total, 0, "an id-less row never reads as 'new'");
+}
+
+/* ===================== row-label identity never fabricates a match (QA B1) ===================== */
+
+{
+  // Duplicate-named rows arrive with row-disambiguated display names
+  // and the raw name in sourceName. Matching MUST key on the raw name
+  // (row positions aren't stable across exports) — so both rows stay
+  // ambiguous and excluded, exactly like before the display change.
+  const cur = period([
+    { name: "Alpha (row 2)", kpiValue: 3 },
+    { name: "Alpha (row 5)", kpiValue: 1 },
+    { name: "Solo", kpiValue: 2 },
+  ]);
+  cur.ads[0].sourceName = "Alpha";
+  cur.ads[1].sourceName = "Alpha";
+  for (const a of cur.analysis.rankedAds) if (a.name.startsWith("Alpha")) a.sourceName = "Alpha";
+  const prev = period([
+    { name: "Alpha (row 3)", kpiValue: 2 },
+    { name: "Alpha (row 7)", kpiValue: 2 },
+    { name: "Solo", kpiValue: 2 },
+  ]);
+  prev.ads[0].sourceName = "Alpha";
+  prev.ads[1].sourceName = "Alpha";
+  for (const a of prev.analysis.rankedAds) if (a.name.startsWith("Alpha")) a.sourceName = "Alpha";
+  const cmp = buildComparison(cur, prev, fmt);
+  assert.equal(cmp.matchedJudgedBoth, 1, "only Solo matches — row labels never pair up");
+  assert.equal(cmp.unmatched.ambiguousOrMissingKey, 2, "both duplicate rows counted ambiguous");
+  assert.equal(cmp.appeared.total, 0, "row-labeled duplicates never read as new ads");
 }
 
 /* ===================== judged-both-periods-only deltas ===================== */

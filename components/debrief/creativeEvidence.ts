@@ -189,11 +189,22 @@ export function selectSpotlights(source: SpotlightSource): Spotlight[] {
 
   /* Dedupe by identity: same ad in multiple roles → ONE card carrying
      every earned role label, keeping the earliest (strongest) role's
-     card content and position. Never the same creative twice. */
+     card content and position. Never the same creative twice — and
+     never a Top-performer card that is also the Weakest performer:
+     that combination can only arise from a name-identity collision
+     (two different ads sharing a label), so those cards stay separate
+     rather than pretending one creative did both (QA B1 guard; memo
+     rows are row-disambiguated upstream, this is belt-and-braces). */
   const byKey = new Map<string, Spotlight>();
   const deduped: Spotlight[] = [];
+  const conflicting = (a: SpotlightRole, b: SpotlightRole) =>
+    (a === "top" && b === "worst") || (a === "worst" && b === "top");
   for (const spotlight of spotlights) {
     const existing = byKey.get(spotlight.assetKey);
+    if (existing && existing.roles.some((r) => conflicting(r, spotlight.role))) {
+      deduped.push(spotlight);
+      continue;
+    }
     if (existing) {
       existing.roles.push(spotlight.role);
       /* A merged mover contributes its movement context to the card

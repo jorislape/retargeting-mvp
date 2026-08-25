@@ -163,6 +163,27 @@ function source(overrides: Partial<SpotlightSource> = {}): SpotlightSource {
 }
 
 {
+  // QA B1 guard: Top performer and Weakest performer are NEVER merged
+  // into one card — identical labels there can only mean a name-identity
+  // collision (memo rows are row-disambiguated upstream; this is the
+  // component-level backstop). The legitimate merge (top + mover, same
+  // ad across periods) still works — asserted in the dedupe block above.
+  const collision = selectSpotlights(
+    source({
+      winners: [row("Alpha")],
+      loserRows: [{ ...row("Alpha"), valueLabel: "0.50x", vsMedianLabel: "-75% vs median" }],
+    })
+  );
+  assert.equal(collision.length, 2, "colliding top/worst stay separate cards");
+  for (const s of collision) {
+    assert.ok(
+      !(s.roles.includes("top") && s.roles.includes("worst")),
+      "no card ever carries both Top performer and Weakest performer"
+    );
+  }
+}
+
+{
   // Determinism + asset-independence: same source → identical output,
   // and the module has no way to receive assets (type has no such
   // field; source scan below proves no import sneaks one in).

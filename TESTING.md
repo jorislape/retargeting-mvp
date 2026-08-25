@@ -281,9 +281,12 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       appears; when the mover IS the top/worst ad, one card carries
       both role badges (never the same creative twice).
 - [ ] **Duplicate names**: a CSV where one ad name appears on two rows
-      → that row's Verify cell says attach is unavailable (name on
-      multiple rows); its spotlight (if selected) shows the
-      placeholder.
+      → the report labels them "Name (row N)" everywhere (decision,
+      TLDR, tables, tests), a limits line discloses the shared name,
+      no sentence names one label as both winner and loser, Creative
+      Evidence never merges Top + Weakest into one card, and the
+      Verify cell says attach is unavailable (name on multiple rows) —
+      spotlights for those rows show the placeholder.
 - [ ] **Views/print**: strip renders in Buyer and Client views, both
       densities, and in print/PDF (images at fixed size, cards never
       split across pages; caveat line present).

@@ -223,6 +223,19 @@ export function buildLimits(
     );
     client.push("The file didn't include ad names, so ads are shown generically.");
   }
+  /* Duplicate Identity fix: same-name rows are separate ads, labeled by
+     row number — disclosed plainly, since the export doesn't establish
+     whether they are the same creative. */
+  if (analysis.duplicateAdNames.length > 0) {
+    const quoted = analysis.duplicateAdNames.map((n) => `"${n}"`).join(", ");
+    const plural = analysis.duplicateAdNames.length > 1;
+    buyer.push(
+      `${plural ? "Ad names" : "The ad name"} ${quoted} appear${plural ? "" : "s"} on multiple rows — each row is treated as a separate ad and labeled by its row number. The export doesn't establish whether same-name rows are the same creative.`
+    );
+    client.push(
+      `Some ads in the file share the same name (${quoted}). Each row is shown separately with its row number, since the file doesn't say whether they're actually the same ad.`
+    );
+  }
   if (analysis.missingColumns.includes("Reporting date range")) {
     buyer.push(
       "No reporting date range in the export — all rows are treated as one period, so time-based shifts are invisible."
@@ -480,6 +493,30 @@ export function buildDecision(
     );
     criteriaClient.push(
       `"${top.name}" is ahead, but with ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} so far it hasn't reached the ${minOutcome} you require before scaling — so we're not increasing its budget yet.`
+    );
+  }
+  /* Outcome-Consistency warning (QA C3): a positive outcome-based KPI
+     on the leading ad alongside a verifiable outcome count of ZERO is
+     internally inconsistent source data (the KPI and count columns can
+     use different attribution or reporting settings). Disclosed as a
+     verify-before-acting caveat — never a claim the export is wrong,
+     and never a change to the action. Purchases/Leads KPIs can't
+     trigger this (their KPI value IS the count). */
+  const outcomeInconsistent =
+    nouns != null &&
+    top != null &&
+    topOutcomes != null &&
+    topOutcomes === 0 &&
+    typeof top.kpiValue === "number" &&
+    top.kpiValue > 0 &&
+    analysis.kpi !== "purchases" &&
+    analysis.kpi !== "leads";
+  if (outcomeInconsistent && nouns != null && top != null) {
+    criteriaBuyer.push(
+      `"${top.name}" shows a positive ${kpiLabel} but a recorded ${nouns.one} count of 0 — the ${kpiLabel} and ${nouns.one}-count columns may use different attribution or reporting settings. Verify the numbers before acting on this ad.`
+    );
+    criteriaClient.push(
+      `"${top.name}" shows results but a recorded count of 0 ${nouns.many} — the file's columns may be measuring differently, so it's worth double-checking this ad's numbers before acting.`
     );
   }
   const limits = {

@@ -59,6 +59,10 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # generic "spend" alias never resolves into ROAS-shaped headers —
                   # a spend-less CSV must error, not silently misuse the ROAS column
   extract.ts      # raw rows -> ParsedAd[], KPI value derivation, ad-name tag extraction,
+                  # duplicate-identity handling (same normalized name on multiple rows ⇒
+                  # rows stay SEPARATE ads, display names get a deterministic "(row N)"
+                  # suffix, raw name kept in sourceName for cross-period/override
+                  # matching — labels are never match keys; a limits line discloses it),
                   # applyFormatOverrides (Creative Format Confirmation V1: user-confirmed
                   # formats replace the ad-name tag GUESS and set formatConfirmed — they
                   # feed pattern/test/brief wording only, never spend/KPI/gate/ranking;
