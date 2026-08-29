@@ -1911,6 +1911,22 @@ console.log("decision (stage 1 — rules): all assertions passed");
       );
       assert.equal(mThin.decision.evidenceState, "limited", "thin leader volume caps evidence at limited");
       assert.equal(mThin.decision.action, mThick.decision.action, "volume qualification never changes the action");
+      /* Caveats coherence: a bound qualifier IS a caveat — the "no
+         caveats apply" fallback can never render beside it. Clean runs
+         (thick volume, full window, nothing set aside) keep the
+         fallback. */
+      assert.ok(
+        !mThin.confidence.notes.some((n: string) => n.includes("no caveats apply")),
+        "thin volume: the no-caveats fallback cannot appear"
+      );
+      assert.ok(
+        mThin.confidence.notes.some((n: string) => n.includes("noise floor")),
+        "thin volume is itself listed under caveats"
+      );
+      assert.ok(
+        mThick.confidence.notes.some((n: string) => n.includes("no caveats apply")),
+        "clean control keeps the normal no-material-caveat fallback"
+      );
       assertCoherent(mThin, "ev2:thin");
       assertCoherent(mThick, "ev2:thick");
 
@@ -1931,6 +1947,14 @@ console.log("decision (stage 1 — rules): all assertions passed");
         "30-day control draws no window limit"
       );
       assert.equal(mShort.decision.action, mThick.decision.action, "window never changes the action");
+      assert.ok(
+        !mShort.confidence.notes.some((n: string) => n.includes("no caveats apply")),
+        "short window: the no-caveats fallback cannot appear"
+      );
+      assert.ok(
+        mShort.confidence.notes.some((n: string) => n.includes("day-to-day swings")),
+        "short window is itself listed under caveats"
+      );
       assertCoherent(mShort, "ev2:short-window");
 
       /* Cross-period consistency: TXT parity at the evidence line, both

@@ -1,9 +1,11 @@
 import {
+  analysisWindowDays,
   buildDecision,
   isOutcomeVolumeBelowFloor,
   isScaleActionSupported,
   MIN_OUTCOMES_FOR_SUPPORTED,
   SCALE_TEST_MIN_DELTA_PCT,
+  SHORT_WINDOW_DAYS,
 } from "./decision";
 import {
   fmtCount,
@@ -1149,6 +1151,12 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
   const { adsJudged, adsSetAside, adsAnalyzed, winners, losers, median, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
     analysis;
   const notes: string[] = [];
+  /* Evidence Confidence V2 (hoisted — also drives the level cap below):
+     when the volume floor or short-window qualifier binds, that fact IS
+     a caveat, so it joins the notes and the "no caveats apply" fallback
+     below structurally cannot fire alongside it. */
+  const volumeBelowFloor = isOutcomeVolumeBelowFloor(analysis);
+  const windowDays = analysisWindowDays(analysis);
 
   if (adsSetAside > 0) {
     notes.push(
@@ -1164,12 +1172,22 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
   if (median == null) {
     notes.push("Not enough ads passed the spend gate to compute a reliable benchmark.");
   }
+  if (volumeBelowFloor && winners[0]?.conversions != null) {
+    const n = Math.round(winners[0].conversions);
+    notes.push(
+      `The leading ad has ${n} recorded result${n === 1 ? "" : "s"} — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-result noise floor, so thin outcome volume is the main caveat on this read.`
+    );
+  }
+  if (windowDays != null && windowDays < SHORT_WINDOW_DAYS) {
+    notes.push(
+      `This export covers ${windowDays} day${windowDays === 1 ? "" : "s"} — short windows weigh day-to-day swings more heavily.`
+    );
+  }
 
   /* Evidence Confidence V2: the SAME noise floor that caps the evidence
      label also caps confidence at medium — one consistent story; "high
-     confidence" can never sit beside a thin-outcome-volume limit. Uses
-     the shared decision.ts rule so the two can't drift. */
-  const volumeBelowFloor = isOutcomeVolumeBelowFloor(analysis);
+     confidence" can never sit beside a thin-outcome-volume limit
+     (volumeBelowFloor hoisted above, where it also feeds the notes). */
   let level: "high" | "medium" | "low" = "high";
   if (median == null || adsJudged < 5 || (winners.length === 0 && losers.length === 0)) {
     level = "low";
