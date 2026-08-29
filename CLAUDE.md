@@ -98,7 +98,20 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # generalization) is verifiable in the export, else an explicit
                   # "couldn't be checked" limits line. Every decision carries
                   # appliedCriteria labeling each bar "debrief_default" vs
-                  # "user" — defaults are never presented as universal truth
+                  # "user" — defaults are never presented as universal truth.
+                  # Evidence Confidence V2: MIN_OUTCOMES_FOR_SUPPORTED (10) is a
+                  # deliberately minimal NOISE FLOOR — a supported-shape read
+                  # whose leading ad has a VERIFIABLE outcome count under it
+                  # caps at "limited" (and memo.ts caps confidence at medium via
+                  # the same shared isOutcomeVolumeBelowFloor rule); unverifiable
+                  # counts never cap (missing ≠ zero) but a supported read then
+                  # says the volume couldn't be checked. SHORT_WINDOW_DAYS (7):
+                  # shorter parsed windows draw a stability limits line
+                  # (analysisWindowDays — inclusive, unparseable → null, never
+                  # guessed). All of it qualifies the evidence LABEL/copy only —
+                  # the action never changes, and the floor is never presented
+                  # as a practitioner judgment bar (the limits line hands that
+                  # judgment to the user's own minOutcomeCount)
   compare.ts      # Period Comparison V2 — "What changed" between two exports.
                   # PURE + descriptive only: matches ads by Ad ID when both
                   # files carry it, else exact normalized name (basis always
@@ -110,7 +123,12 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # decision.ts (test-enforced both directions) — the Next move
                   # stays a current-period read; the fixed caveat says so.
                   # Type-only ".ts" imports from types.ts + injected formatters
-                  # keep it plain-Node testable (scripts/compare.test.ts)
+                  # keep it plain-Node testable (scripts/compare.test.ts).
+                  # Evidence Confidence V2: also computes leaderConsistency —
+                  # where THIS period's leader stood last period (led_both /
+                  # lead_is_new / honest can't-read states), rendered as context
+                  # beside the decision card's evidence line + in TXT; never an
+                  # input to the decision or evidenceState
   memo.ts         # assembles the memo — templated, not an LLM call (see below).
                   # generateMemo always sets comparison: null — the route builds
                   # the comparison from the optional second file and attaches it

@@ -1,4 +1,10 @@
-import { buildDecision, isScaleActionSupported, SCALE_TEST_MIN_DELTA_PCT } from "./decision";
+import {
+  buildDecision,
+  isOutcomeVolumeBelowFloor,
+  isScaleActionSupported,
+  MIN_OUTCOMES_FOR_SUPPORTED,
+  SCALE_TEST_MIN_DELTA_PCT,
+} from "./decision";
 import {
   fmtCount,
   fmtDeltaVsMedian,
@@ -1159,6 +1165,11 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
     notes.push("Not enough ads passed the spend gate to compute a reliable benchmark.");
   }
 
+  /* Evidence Confidence V2: the SAME noise floor that caps the evidence
+     label also caps confidence at medium — one consistent story; "high
+     confidence" can never sit beside a thin-outcome-volume limit. Uses
+     the shared decision.ts rule so the two can't drift. */
+  const volumeBelowFloor = isOutcomeVolumeBelowFloor(analysis);
   let level: "high" | "medium" | "low" = "high";
   if (median == null || adsJudged < 5 || (winners.length === 0 && losers.length === 0)) {
     level = "low";
@@ -1167,7 +1178,8 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
     winners.length < 3 ||
     losers.length < 3 ||
     missingColumns.length > 0 ||
-    !hasNameSignal
+    !hasNameSignal ||
+    volumeBelowFloor
   ) {
     level = "medium";
   }
@@ -1219,6 +1231,11 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
     if (!hasNameSignal) {
       reasons.push(
         "No clear ad-name pattern — the judgement leans on numbers alone."
+      );
+    }
+    if (volumeBelowFloor && winners[0]?.conversions != null) {
+      reasons.push(
+        `The leading ad has ${Math.round(winners[0].conversions)} recorded result${Math.round(winners[0].conversions) === 1 ? "" : "s"} — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-result noise floor, so confidence stays at medium while volume builds.`
       );
     }
     if (topPct != null && topPct < 30) {

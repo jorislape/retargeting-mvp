@@ -69,6 +69,49 @@ export const SCALE_TEST_MIN_DELTA_PCT = 30;
  *  soften). Evidence-Explicit Decision V1. */
 export const SUPPORTED_MIN_JUDGED = 10;
 
+/* ------------------------------------------------------------------ */
+/* Evidence Confidence V2                                              */
+/* ------------------------------------------------------------------ */
+
+/** Conservative NOISE FLOOR for the evidence label (Evidence
+ *  Confidence V2): when the leading ad's outcome count is verifiable
+ *  and below this, the dataset's evidence is never labeled strongly
+ *  supported — it caps at "limited". DELIBERATELY minimal, far below
+ *  the 30–50-outcome judgment bars practitioners describe: this is
+ *  "too few results to call anything strong", not a scaling judgment.
+ *  It never changes the action (contrast with the USER'S own
+ *  minOutcomeCount, a decision criterion that may withhold a scale),
+ *  and an unverifiable count never triggers it — missing counts are
+ *  never treated as zero. */
+export const MIN_OUTCOMES_FOR_SUPPORTED = 10;
+
+/** Analysis windows shorter than this many days (inclusive) draw an
+ *  explicit stability limit (Evidence Confidence V2): short periods
+ *  are dominated by day-to-day swings. Copy only — never the action. */
+export const SHORT_WINDOW_DAYS = 7;
+
+/** True when the evidence noise floor binds: the selected KPI has an
+ *  outcome concept, a top winner exists, its count is VERIFIABLE in
+ *  the export, and that count is under MIN_OUTCOMES_FOR_SUPPORTED.
+ *  Shared by deriveEvidenceState (label cap), buildConfidence's cap
+ *  in memo.ts, and the limits copy — one rule, no drift. */
+export function isOutcomeVolumeBelowFloor(analysis: AnalysisResult): boolean {
+  if (outcomeNounsForKpi(analysis.kpi) == null) return false;
+  const top = analysis.winners[0] ?? null;
+  if (top == null || top.conversions == null) return false;
+  return top.conversions < MIN_OUTCOMES_FOR_SUPPORTED;
+}
+
+/** Inclusive day count of the analysis window, or null when the range
+ *  is missing or unparseable (never guessed). Exported for tests. */
+export function analysisWindowDays(analysis: AnalysisResult): number | null {
+  if (!analysis.dateRange) return null;
+  const start = Date.parse(analysis.dateRange.start);
+  const end = Date.parse(analysis.dateRange.end);
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1;
+}
+
 /** Injected money formatter: (value) => "$1,234.56"-style label.
  *  memo.ts binds fmtMoney with the account currency; tests pass a
  *  simple stub. */
@@ -155,10 +198,17 @@ export function deriveEvidenceState(
 
   const enoughSample = adsJudged >= SUPPORTED_MIN_JUDGED;
   const complete = missingColumns.length === 0;
-  if (enoughSample && complete) {
-    if (flatField) return "supported"; // supported flatness — no group requirement
-    if (winners.length >= 3 && losers.length >= 3) return "supported"; // supported separation
-  }
+  const shapeSupported =
+    enoughSample &&
+    complete &&
+    (flatField || (winners.length >= 3 && losers.length >= 3));
+  /* Evidence Confidence V2: a structurally supported read still caps at
+     "limited" when the leading ad's VERIFIABLE outcome count sits under
+     the conservative noise floor — separation built on a handful of
+     results is not "strongly supported". Unverifiable counts never cap
+     (missing is never treated as zero), and the action is untouched
+     (evidenceState is a label, not a rule input). */
+  if (shapeSupported && !isOutcomeVolumeBelowFloor(analysis)) return "supported";
   return "limited";
 }
 
@@ -261,6 +311,20 @@ export function buildLimits(
     );
     client.push(
       `Fewer than ${SUPPORTED_MIN_JUDGED} ads had enough spend to compare, so more spend could still change the picture.`
+    );
+  }
+
+  /* Evidence Confidence V2 — short-window stability. Uses the export's
+     own parsed range; a missing or unparseable range adds nothing here
+     (the missing-range line above already covers absence). Copy only —
+     never the action. */
+  const windowDays = analysisWindowDays(analysis);
+  if (windowDays != null && windowDays < SHORT_WINDOW_DAYS) {
+    buyer.push(
+      `This export covers ${windowDays} day${windowDays === 1 ? "" : "s"} — short windows are dominated by day-to-day swings, so treat movements in this read as less stable than a longer period would show.`
+    );
+    client.push(
+      `This report covers ${windowDays} day${windowDays === 1 ? "" : "s"} of data — short periods swing more from day to day, so the picture is less settled than a longer one would be.`
     );
   }
 
@@ -495,6 +559,43 @@ export function buildDecision(
       `"${top.name}" is ahead, but with ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} so far it hasn't reached the ${minOutcome} you require before scaling — so we're not increasing its budget yet.`
     );
   }
+  /* Evidence Confidence V2 — outcome-volume visibility. When the noise
+     floor binds and the user set no bar of their own, say plainly why
+     the evidence label stays limited and hand the judgment back to the
+     user's own criterion (the floor is Debrief's minimal bar, never a
+     practitioner judgment threshold). When the user DID set a bar,
+     their criterion's own line above already carries the volume story. */
+  if (
+    isOutcomeVolumeBelowFloor(analysis) &&
+    minOutcome == null &&
+    nouns != null &&
+    top != null &&
+    topOutcomes != null
+  ) {
+    criteriaBuyer.push(
+      `The leading ad has ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} behind its lead — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-${nouns.one} noise floor this read requires before labeling evidence strongly supported. That floor is deliberately minimal (many practitioners want 30–50 before acting); set your own minimum in the generator to enforce a stricter bar.`
+    );
+    criteriaClient.push(
+      `The leading ad has ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} so far — too few results for a strong read, so the evidence is treated as limited while volume builds.`
+    );
+  }
+  /* Evidence Confidence V2 — a structurally strong read whose outcome
+     volume CANNOT be checked says so, instead of implying the volume
+     was verified. Missing counts are never treated as zero. */
+  if (
+    evidenceState === "supported" &&
+    nouns != null &&
+    top != null &&
+    topOutcomes == null
+  ) {
+    criteriaBuyer.push(
+      `Evidence here is based on relative separation — this export carries no ${nouns.one} counts, so the outcome volume behind the lead couldn't be checked.`
+    );
+    criteriaClient.push(
+      `This export doesn't include ${nouns.one} counts, so the number of results behind the leading ad couldn't be checked.`
+    );
+  }
+
   /* Outcome-Consistency warning (QA C3): a positive outcome-based KPI
      on the leading ad alongside a verifiable outcome count of ZERO is
      internally inconsistent source data (the KPI and count columns can
@@ -537,11 +638,19 @@ export function buildDecision(
       source: userGate ? "user" : "debrief_default",
     },
     {
+      label: `Minimum sample: ≥${DECISION_MIN_JUDGED} judged ads before any call — Debrief default`,
+      source: "debrief_default",
+    },
+    {
       label: `Budget-move bar: top ad ≥${SCALE_TEST_MIN_DELTA_PCT}% past the median — Debrief default`,
       source: "debrief_default",
     },
     {
       label: `Cut bar: worst ad ≥${SCALE_TEST_MIN_DELTA_PCT}% behind and ≥${CUT_MIN_SPEND_SHARE_PCT}% of judged spend below the median — Debrief default`,
+      source: "debrief_default",
+    },
+    {
+      label: `Flat-field band: every judged ad within ±${FLAT_FIELD_DELTA_PCT}% of the median reads as noise, not signal — Debrief default`,
       source: "debrief_default",
     },
     ...(minOutcome != null && nouns != null

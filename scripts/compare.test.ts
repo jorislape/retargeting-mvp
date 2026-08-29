@@ -120,6 +120,8 @@ function allStrings(cmp: MemoComparison): string[] {
     ...cmp.declined.flatMap((r) => [r.name, r.changeLabel, r.spendChangeLabel, r.conversionChangeLabel ?? ""]),
     ...cmp.persistence.buyer,
     ...cmp.persistence.client,
+    cmp.leaderConsistency?.buyer ?? "",
+    cmp.leaderConsistency?.client ?? "",
     ...cmp.limits.buyer,
     ...cmp.limits.client,
     cmp.caveat,
@@ -405,6 +407,70 @@ function allStrings(cmp: MemoComparison): string[] {
     none.account.buyer.some((l) => l.includes("No individual ad could be reliably matched")),
     "zero-match case stated, not hidden"
   );
+}
+
+/* ===================== leader consistency (Evidence Confidence V2) ===================== */
+
+{
+  // Current leader was above the previous period's own median → led_both.
+  const ledBoth = buildComparison(
+    period([{ name: "Champ", kpiValue: 5 }, { name: "B", kpiValue: 2 }, { name: "C", kpiValue: 1 }]),
+    period([{ name: "Champ", kpiValue: 4 }, { name: "B", kpiValue: 2 }, { name: "C", kpiValue: 1 }]),
+    fmt
+  );
+  assert.equal(ledBoth.leaderConsistency?.status, "led_both");
+  assert.ok(ledBoth.leaderConsistency!.buyer.includes("also above the median last period"));
+  assert.ok(ledBoth.leaderConsistency!.client.includes("ahead of the typical result last period too"));
+
+  // Leader was below the previous median → lead_is_new.
+  const newLead = buildComparison(
+    period([{ name: "Champ", kpiValue: 5 }, { name: "B", kpiValue: 2 }, { name: "C", kpiValue: 1 }]),
+    period([{ name: "Champ", kpiValue: 1 }, { name: "B", kpiValue: 3 }, { name: "C", kpiValue: 2 }]),
+    fmt
+  );
+  assert.equal(newLead.leaderConsistency?.status, "lead_is_new");
+  assert.ok(newLead.leaderConsistency!.buyer.includes("its lead is new"));
+
+  // Matched but not judged previously → honest can't-read state.
+  const unjudgedPrev = buildComparison(
+    period([{ name: "Champ", kpiValue: 5 }, { name: "B", kpiValue: 2 }, { name: "C", kpiValue: 1 }]),
+    period([{ name: "Champ" }, { name: "B", kpiValue: 3 }, { name: "C", kpiValue: 2 }]),
+    fmt
+  );
+  assert.equal(unjudgedPrev.leaderConsistency?.status, "not_judged_previously");
+  assert.ok(unjudgedPrev.leaderConsistency!.buyer.includes("can't be read"));
+
+  // Absent from the previous export → not_matched.
+  const absentPrev = buildComparison(
+    period([{ name: "Champ", kpiValue: 5 }, { name: "B", kpiValue: 2 }, { name: "C", kpiValue: 1 }]),
+    period([{ name: "B", kpiValue: 3 }, { name: "C", kpiValue: 2 }]),
+    fmt
+  );
+  assert.equal(absentPrev.leaderConsistency?.status, "not_matched");
+
+  // Ambiguous (duplicate-name) leader → not_matched, never guessed.
+  const ambiguousLeader = buildComparison(
+    period([{ name: "Champ", kpiValue: 5 }, { name: "Champ", kpiValue: 4 }, { name: "C", kpiValue: 1 }]),
+    period([{ name: "Champ", kpiValue: 3 }, { name: "C", kpiValue: 2 }]),
+    fmt
+  );
+  assert.equal(ambiguousLeader.leaderConsistency?.status, "not_matched");
+
+  // No current winner (single judged ad at the median) → null.
+  const noWinner = buildComparison(
+    period([{ name: "Solo", kpiValue: 2 }]),
+    period([{ name: "Solo", kpiValue: 2 }]),
+    fmt
+  );
+  assert.equal(noWinner.leaderConsistency, null);
+
+  // Client register of the consistency strings stays jargon-free.
+  for (const cmp of [ledBoth, newLead, unjudgedPrev, absentPrev]) {
+    const text = cmp.leaderConsistency!.client.toLowerCase();
+    for (const word of ["judged", "median", "spend gate", "benchmark"]) {
+      assert.ok(!text.includes(word), `client consistency must not contain "${word}"`);
+    }
+  }
 }
 
 /* ===================== winner persistence ===================== */

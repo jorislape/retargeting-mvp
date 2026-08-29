@@ -293,3 +293,24 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] **Cleanup**: change the loaded file or click "New debrief" → all
       attached images are gone; re-attaching works. Sample →
       real-file swap never shows stale demo creatives.
+
+## Evidence Confidence V2
+
+- [ ] **Thin outcome volume**: a full-sample CSV whose leading ad has
+      <10 purchases → Evidence reads "Directional…" (not strong),
+      confidence caps at Medium with a noise-floor reason, and "What we
+      don't know" explains the floor + points to setting your own
+      minimum. Same CSV with 40+ purchases → Supported/High. The
+      recommendation itself is identical in both runs.
+- [ ] **Short window**: a 3-day export adds the "short windows are
+      dominated by day-to-day swings" limit (client: "less settled");
+      a 30-day export doesn't; the action is unchanged.
+- [ ] **No count column**: a supported ROAS run without a Purchases
+      column says outcome volume "couldn't be checked" — never treated
+      as zero, evidence not downgraded.
+- [ ] **Consistency line**: a two-period run shows "Consistency:" (client:
+      "Across periods:") under the Evidence line on the Next-move card —
+      led-both / lead-is-new / can't-be-read wording matching the data;
+      absent on single-period runs; visible in Copy/TXT at the same spot.
+- [ ] **Decision bars applied** now lists the minimum-sample and
+      flat-field-band defaults alongside the existing bars.

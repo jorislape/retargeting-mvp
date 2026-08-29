@@ -24,9 +24,13 @@ import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
 import {
+  analysisWindowDays,
   buildDecision,
   buildLimits,
+  isOutcomeVolumeBelowFloor,
   isScaleActionSupported,
+  MIN_OUTCOMES_FOR_SUPPORTED,
+  SHORT_WINDOW_DAYS,
   CONCENTRATION_GUARDRAIL_PCT,
   CUT_MIN_SPEND_SHARE_PCT,
   DECISION_MIN_JUDGED,
@@ -715,7 +719,9 @@ function assertContract(d: MemoDecision, label: string) {
   const learning = buildDecision(separation, "T", money, null, { objective: "learning" });
   assert.equal(learning.action, noObjective.action, "objective=learning must not change action");
   assert.equal(learning.limits.buyer.length, noObjective.limits.buyer.length + 1, "learning adds exactly one caveat");
-  assert.ok(learning.limits.buyer[learning.limits.buyer.length - 1].includes("learning phase"), "learning caveat present");
+  // (presence, not position — Evidence Confidence V2 may append its own
+  // unverifiable-count line after the objective caveats)
+  assert.ok(learning.limits.buyer.some((l) => l.includes("learning phase")), "learning caveat present");
 
   // Client register stays jargon-clean across every objective caveat.
   for (const objective of ["efficiency", "growth", "learning"] as const) {
@@ -893,6 +899,170 @@ console.log("decision (stage 1 — rules): all assertions passed");
     "cut rationale never falsely claims no winner cleared the % bar"
   );
   assertContract(cutBlocked, "criteria:cut-blocked");
+}
+
+/* ============ Evidence Confidence V2: noise floor + window ============ */
+
+{
+  /* A structurally supported dataset: 12 judged, complete columns,
+     3 winners / 3 losers. Only the leader's verifiable outcome count
+     varies below. */
+  const supportedShape = (conversions: number | null | undefined) =>
+    fixture({
+      adsJudged: 12,
+      winners: [
+        { ...ad("W", 400, 80), conversions },
+        ad("W2", 200, 20),
+        ad("W3", 200, 18),
+      ],
+      losers: [ad("L1", 200, -20), ad("L2", 200, -18), ad("L3", 200, -16)],
+    });
+
+  /* Floor boundaries on the shared rule and on the state itself. */
+  assert.equal(isOutcomeVolumeBelowFloor(supportedShape(9)), true, "9 outcomes: below the floor");
+  assert.equal(isOutcomeVolumeBelowFloor(supportedShape(10)), false, "10 outcomes: at the floor — not below");
+  assert.equal(isOutcomeVolumeBelowFloor(supportedShape(11)), false, "11 outcomes: above the floor");
+  assert.equal(
+    isOutcomeVolumeBelowFloor(supportedShape(undefined)),
+    false,
+    "unverifiable count never triggers the floor — missing is never zero"
+  );
+  assert.equal(
+    isOutcomeVolumeBelowFloor(fixture({ kpi: "ctr", winners: [{ ...ad("W", 400, 80), conversions: 2 }] })),
+    false,
+    "CTR has no outcome concept — the floor never applies"
+  );
+  assert.equal(
+    isOutcomeVolumeBelowFloor(fixture({ winners: [] })),
+    false,
+    "no top winner — the floor never applies"
+  );
+
+  assert.equal(deriveEvidenceState(supportedShape(9), false), "limited", "supported shape caps at limited under the floor");
+  assert.equal(deriveEvidenceState(supportedShape(10), false), "supported", "at the floor stays supported");
+  assert.equal(deriveEvidenceState(supportedShape(undefined), false), "supported", "unverifiable count never caps");
+
+  /* The floor is Debrief's evidence LABEL bar; the user's
+     minOutcomeCount is a decision criterion. They stay distinct:
+     40 outcomes with a user bar of 50 withholds the SCALE but the
+     evidence stays supported (40 ≥ the 10 floor). */
+  const withheld = buildDecision(supportedShape(40), "Fallback test.", money, null, undefined, {
+    minOutcomeCount: 50,
+  });
+  assert.equal(withheld.action, "test", "user bar withholds the scale");
+  assert.equal(withheld.evidenceState, "supported", "…while the evidence label stays supported");
+
+  /* Action invariance: only the outcome volume differs → the ACTION is
+     identical; only the evidence label and limits change. */
+  const thin = buildDecision(supportedShape(8), "Fallback test.", money);
+  const thick = buildDecision(supportedShape(40), "Fallback test.", money);
+  assert.equal(thin.action, thick.action, "volume qualification never changes the action");
+  assert.equal(thin.action, "budget", "both land on the scale move");
+  assert.equal(thin.evidenceState, "limited", "thin volume: evidence limited");
+  assert.equal(thick.evidenceState, "supported", "thick volume: evidence supported");
+  assert.ok(
+    thin.limits.buyer.some((l) => l.includes("noise floor") && l.includes("set your own minimum")),
+    "thin volume draws the floor disclosure and hands judgment to the user's own bar"
+  );
+  assert.ok(
+    thin.limits.client.some((l) => l.includes("too few results")),
+    "client register carries the same fact without jargon"
+  );
+  assert.ok(
+    !thick.limits.buyer.some((l) => l.includes("noise floor")),
+    "no floor line when volume clears it"
+  );
+  /* With a user bar set, the user's own line carries the volume story —
+     no duplicate floor line. */
+  const thinWithBar = buildDecision(supportedShape(8), "Fallback test.", money, null, undefined, {
+    minOutcomeCount: 50,
+  });
+  assert.ok(
+    !thinWithBar.limits.buyer.some((l) => l.includes("noise floor")),
+    "user bar set: floor line yields to the user's criterion line"
+  );
+  assert.ok(
+    thinWithBar.limits.buyer.some((l) => l.includes("below your 50-purchase minimum")),
+    "…which is present"
+  );
+
+  /* Unverifiable counts on a supported read say so explicitly. */
+  const unverifiable = buildDecision(supportedShape(undefined), "Fallback test.", money);
+  assert.equal(unverifiable.evidenceState, "supported");
+  assert.ok(
+    unverifiable.limits.buyer.some((l) => l.includes("couldn't be checked")),
+    "supported-without-verifiable-counts states the volume couldn't be checked"
+  );
+
+  /* appliedCriteria now discloses the judged-count and flat-band
+     defaults alongside the existing bars. */
+  assert.ok(
+    thick.appliedCriteria.some((c) => c.label.includes("Minimum sample") && c.source === "debrief_default"),
+    "minimum-sample default disclosed"
+  );
+  assert.ok(
+    thick.appliedCriteria.some((c) => c.label.includes("Flat-field band") && c.source === "debrief_default"),
+    "flat-band default disclosed"
+  );
+}
+
+{
+  /* Window semantics: inclusive day count; missing/invalid never guessed. */
+  assert.equal(analysisWindowDays(fixture({ dateRange: null })), null);
+  assert.equal(
+    analysisWindowDays(fixture({ dateRange: { start: "junk", end: "2026-06-05" } })),
+    null,
+    "unparseable start → null"
+  );
+  assert.equal(
+    analysisWindowDays(fixture({ dateRange: { start: "2026-06-05", end: "2026-06-01" } })),
+    null,
+    "end before start → null"
+  );
+  assert.equal(
+    analysisWindowDays(fixture({ dateRange: { start: "2026-06-01", end: "2026-06-01" } })),
+    1,
+    "single-day export is 1 day inclusive"
+  );
+  assert.equal(
+    analysisWindowDays(fixture({ dateRange: { start: "2026-06-01", end: "2026-06-07" } })),
+    7,
+    "inclusive count"
+  );
+
+  const windowLimits = (start: string, end: string) =>
+    buildLimits(fixture({ dateRange: { start, end } }), false);
+  assert.ok(
+    windowLimits("2026-06-01", "2026-06-06").buyer.some((l) => l.includes("6 days") && l.includes("less stable")),
+    `${SHORT_WINDOW_DAYS - 1}-day window draws the stability limit`
+  );
+  assert.ok(
+    !windowLimits("2026-06-01", "2026-06-07").buyer.some((l) => l.includes("less stable")),
+    "7-day window draws no stability limit (boundary)"
+  );
+  assert.ok(
+    windowLimits("2026-06-01", "2026-06-06").client.some((l) => l.includes("less settled")),
+    "client register carries the window fact"
+  );
+  assert.ok(
+    !buildLimits(fixture({ dateRange: { start: "junk", end: "junk" } }), false).buyer.some((l) =>
+      l.includes("less stable")
+    ),
+    "invalid dates: no window line, no crash"
+  );
+  /* Window qualification never changes the action. */
+  const shortRun = buildDecision(
+    fixture({ winners: ads(3, 20), losers: ads(3, -20), dateRange: { start: "2026-06-01", end: "2026-06-03" } }),
+    "Fallback test.",
+    money
+  );
+  const longRun = buildDecision(
+    fixture({ winners: ads(3, 20), losers: ads(3, -20), dateRange: { start: "2026-06-01", end: "2026-06-30" } }),
+    "Fallback test.",
+    money
+  );
+  assert.equal(shortRun.action, longRun.action, "window qualification never changes the action");
+  assert.equal(MIN_OUTCOMES_FOR_SUPPORTED, 10, "documented floor value");
 }
 
 /* ============ Criteria Coherence: the shared scale-permission rule ============ */
@@ -1717,6 +1887,97 @@ console.log("decision (stage 1 — rules): all assertions passed");
         "positive counts never trigger the warning"
       );
       assertCoherent(mZero, "zero-count");
+
+      /* Evidence Confidence V2 — full-engine proofs. */
+      const evRow = (n: string, tag: string, p: number, r: number) =>
+        `${tag}_${n},200,${p},${r},2026-06-01,2026-06-30`;
+      const evCsv = (topPurchases: number) =>
+        "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        [
+          evRow("W1", "ugc", topPurchases, 2.42), evRow("W2", "ugc", 20, 2.36), evRow("W3", "ugc", 20, 2.3),
+          evRow("W4", "ugc", 20, 2.28), evRow("W5", "ugc", 20, 2.26),
+          evRow("M1", "mid", 20, 2.0),
+          evRow("L1", "static", 20, 1.74), evRow("L2", "static", 20, 1.7), evRow("L3", "static", 20, 1.66),
+          evRow("L4", "static", 20, 1.62), evRow("L5", "static", 20, 1.58),
+        ].join("\n") + "\n";
+      const mThin = runEngine(evCsv(5), "roas");
+      const mThick = runEngine(evCsv(40), "roas");
+      assert.equal(mThick.confidence.level, "high", "control: thick volume reaches high confidence");
+      assert.equal(mThick.decision.evidenceState, "supported", "control: thick volume is supported");
+      assert.equal(mThin.confidence.level, "medium", "thin leader volume caps confidence at medium");
+      assert.ok(
+        mThin.confidence.reasons.some((r: string) => r.includes("noise floor")),
+        "confidence reason names the floor"
+      );
+      assert.equal(mThin.decision.evidenceState, "limited", "thin leader volume caps evidence at limited");
+      assert.equal(mThin.decision.action, mThick.decision.action, "volume qualification never changes the action");
+      assertCoherent(mThin, "ev2:thin");
+      assertCoherent(mThick, "ev2:thick");
+
+      /* Short window, real engine: 3-day export draws the stability
+         limit; the 30-day control doesn't; action identical. */
+      const shortCsv = evCsv(40).replaceAll("2026-06-30", "2026-06-03");
+      const mShort = runEngine(shortCsv, "roas");
+      assert.ok(
+        mShort.decision.limits.buyer.some((l: string) => l.includes("3 days") && l.includes("less stable")),
+        "3-day export draws the buyer stability limit"
+      );
+      assert.ok(
+        mShort.decision.limits.client.some((l: string) => l.includes("less settled")),
+        "…and the client equivalent"
+      );
+      assert.ok(
+        !mThick.decision.limits.buyer.some((l: string) => l.includes("less stable")),
+        "30-day control draws no window limit"
+      );
+      assert.equal(mShort.decision.action, mThick.decision.action, "window never changes the action");
+      assertCoherent(mShort, "ev2:short-window");
+
+      /* Cross-period consistency: TXT parity at the evidence line, both
+         registers, from a hand-built comparison (memoToText reads
+         memo.comparison — the decision block above it is untouched). */
+      const consistencyStub = {
+        matchBasis: "ad_name" as const,
+        matchNote: "Ads matched by exact ad name — Ad ID wasn't present in both exports. A renamed ad appears as one removed and one new ad.",
+        periodLabel: { previous: "2026-05-01 – 2026-05-31", current: "2026-06-01 – 2026-06-30" },
+        account: { buyer: [], client: [] },
+        improved: [],
+        declined: [],
+        matchedJudgedBoth: 1,
+        unmatched: { ambiguousOrMissingKey: 0, judgedOnePeriodOnly: 0 },
+        persistence: { buyer: [], client: [] },
+        leaderConsistency: {
+          status: "led_both" as const,
+          buyer: 'the current leader "UGC_MorningRoutine_V1" was also above the median last period.',
+          client: '"UGC_MorningRoutine_V1" was ahead of the typical result last period too.',
+        },
+        appeared: { names: [], total: 0 },
+        disappeared: { names: [], total: 0 },
+        caveat: "This section shows what changed between the two exports — it does not establish why anything changed, and it never feeds the Next-move recommendation, which is based on the current period only.",
+        limits: { buyer: [], client: [] },
+      };
+      const memoWithCmp = { ...memo, comparison: consistencyStub };
+      const cmpBuyerText: string = memoToText(memoWithCmp, "buyer", 5);
+      const cmpClientText: string = memoToText(memoWithCmp, "client", 3);
+      assert.ok(
+        cmpBuyerText.includes("Consistency: the current leader"),
+        "buyer TXT carries the consistency line at the evidence position"
+      );
+      assert.ok(
+        cmpClientText.includes("Across periods:") &&
+          cmpClientText.includes("ahead of the typical result last period too"),
+        "client TXT carries the jargon-free consistency line"
+      );
+      assert.ok(
+        !buyerText.includes("Consistency:"),
+        "single-period runs carry no consistency line"
+      );
+      // The comparison stub changed NOTHING about the decision block.
+      assert.ok(
+        cmpBuyerText.includes(memo.decision.headline) &&
+          cmpBuyerText.includes(memo.decision.rationale),
+        "comparison context never alters the serialized decision"
+      );
 
       /* Positive controls: real shift/scale decisions retain the scale
          language everywhere it belongs. */

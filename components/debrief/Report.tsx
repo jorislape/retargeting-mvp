@@ -404,6 +404,21 @@ function DecisionCard({
         {": "}
         {evidenceLine(d, memo.scope.adsJudged, view)}
       </p>
+      {/* Evidence Confidence V2 — cross-period consistency of the
+          current leader, sourced from memo.comparison (presentation
+          context only; the decision and evidenceState above remain
+          comparison-blind — isolation is test-enforced). */}
+      {memo.comparison?.leaderConsistency && (
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-400">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            {client ? "Across periods" : "Consistency"}
+          </span>
+          {": "}
+          {client
+            ? memo.comparison.leaderConsistency.client
+            : memo.comparison.leaderConsistency.buyer}
+        </p>
+      )}
       {/* Decision Criteria V2 — whose bars decided. Buyer view only
           (the labels carry buyer vocabulary); user-provided criteria
           are visually tagged so a default is never presented as the

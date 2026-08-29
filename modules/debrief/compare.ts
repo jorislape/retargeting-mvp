@@ -385,6 +385,47 @@ export function buildComparison(
     }
   }
 
+  /* ---- Evidence Confidence V2: current-leader consistency ----
+     Where did THIS period's leader stand last period? Descriptive
+     context for the evidence claim — computed here (comparison side)
+     so decision.ts stays comparison-blind; each period is judged
+     against its OWN benchmark. Honest "can't be read" states for
+     unmatched/ambiguous/unjudged leaders — never a guess. */
+  const currentTop = current.analysis.winners[0] ?? null;
+  let leaderConsistency: MemoComparison["leaderConsistency"] = null;
+  if (currentTop != null) {
+    const label = `"${currentTop.name}"`;
+    const topKey = usable(currentTop);
+    if (topKey == null || !matchedKeys.has(topKey)) {
+      leaderConsistency = {
+        status: "not_matched",
+        buyer: `the current leader ${label} can't be matched to the previous period (absent, or not one-to-one matchable), so cross-period consistency can't be read.`,
+        client: `${label} isn't in the previous period's data in a way that can be matched, so its lead can't be compared across periods.`,
+      };
+    } else {
+      const prevRead = prevJudged.get(topKey);
+      if (!prevRead) {
+        leaderConsistency = {
+          status: "not_judged_previously",
+          buyer: `the current leader ${label} didn't clear the evidence gate last period, so cross-period consistency can't be read.`,
+          client: `${label} didn't have enough spend last period for a fair read, so its lead can't be compared across periods.`,
+        };
+      } else if (prevRead.deltaFromMedian > 0) {
+        leaderConsistency = {
+          status: "led_both",
+          buyer: `the current leader ${label} was also above the median last period.`,
+          client: `${label} was ahead of the typical result last period too.`,
+        };
+      } else {
+        leaderConsistency = {
+          status: "lead_is_new",
+          buyer: `the current leader ${label} was at or below the median last period — its lead is new this period.`,
+          client: `${label} wasn't ahead last period — its lead is new this period.`,
+        };
+      }
+    }
+  }
+
   /* ---- limits (computed, not boilerplate) ---- */
   const limitsBuyer: string[] = [];
   const limitsClient: string[] = [];
@@ -481,6 +522,7 @@ export function buildComparison(
       judgedOnePeriodOnly,
     },
     persistence: { buyer: persistenceBuyer, client: persistenceClient },
+    leaderConsistency,
     appeared: {
       names: appearedNames.slice(0, MAX_NAME_LIST),
       total: appearedNames.length,

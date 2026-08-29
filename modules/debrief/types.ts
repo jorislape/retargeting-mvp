@@ -425,6 +425,18 @@ export interface MemoComparison {
   persistence: { buyer: string[]; client: string[] };
   appeared: { names: string[]; total: number };
   disappeared: { names: string[]; total: number };
+  /** Evidence Confidence V2 — cross-period consistency of the CURRENT
+   *  leader, computed comparison-side and rendered as CONTEXT beside
+   *  the evidence claim. Strictly descriptive (above/below the
+   *  previous period's own benchmark, or honestly unreadable); NEVER
+   *  an input to the decision or evidenceState — the comparison→
+   *  decision isolation is unchanged and test-enforced. null when the
+   *  current period has no top winner. */
+  leaderConsistency: {
+    status: "led_both" | "lead_is_new" | "not_judged_previously" | "not_matched";
+    buyer: string;
+    client: string;
+  } | null;
   /** Fixed: what changed ≠ why it changed; never feeds the Next move. */
   caveat: string;
   limits: { buyer: string[]; client: string[] };

@@ -185,6 +185,18 @@ export function memoToText(
   lines.push(
     `${view === "client" ? "How sure we are" : "Evidence"}: ${evidenceLine(d, scope.adsJudged, view)}`
   );
+  /* Evidence Confidence V2 — cross-period consistency context, same
+     position as the on-screen card (comparison-sourced; decision and
+     evidenceState stay comparison-blind). */
+  if (memo.comparison?.leaderConsistency) {
+    lines.push(
+      `${view === "client" ? "Across periods" : "Consistency"}: ${
+        view === "client"
+          ? memo.comparison.leaderConsistency.client
+          : memo.comparison.leaderConsistency.buyer
+      }`
+    );
+  }
   /* Decision Criteria V2 — whose bars decided (buyer view only; labels
      carry buyer vocabulary). [yours] vs [default] mirrors the card. */
   if (view === "buyer" && d.appliedCriteria.length > 0) {
