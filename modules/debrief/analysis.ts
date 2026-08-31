@@ -131,6 +131,11 @@ export function analyze(
   const loserPool = ranked
     .filter((a) => a.deltaFromMedian < 0)
     .sort((a, b) => a.deltaFromMedian - b.deltaFromMedian);
+  /* Spend Allocation V1: the third bucket rankedAds' own doc comment
+     already names ("winners ∪ losers ∪ ads exactly at the median") but
+     never aggregates. Same classification the winner/loser pools
+     already use — no new decision logic, just the mirrored sum. */
+  const atPool = ranked.filter((a) => a.deltaFromMedian === 0);
 
   const winners = winnerPool.slice(0, MAX_WINNERS_LOSERS);
   const losers = loserPool.slice(0, MAX_WINNERS_LOSERS);
@@ -158,6 +163,10 @@ export function analyze(
     rankedAds: ranked,
     belowBenchmarkSpend: loserPool.reduce((sum, a) => sum + a.spend, 0),
     belowBenchmarkCount: loserPool.length,
+    aboveBenchmarkSpend: winnerPool.reduce((sum, a) => sum + a.spend, 0),
+    aboveBenchmarkCount: winnerPool.length,
+    atBenchmarkSpend: atPool.reduce((sum, a) => sum + a.spend, 0),
+    atBenchmarkCount: atPool.length,
     hasNameSignal: hasNameSignal(winnerPool, loserPool),
     hasCreativeNotes: context.creativeNotes.trim().length > 0,
     missingColumns,

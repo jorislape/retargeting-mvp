@@ -84,6 +84,10 @@ function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
     rankedAds: [],
     belowBenchmarkSpend: 0,
     belowBenchmarkCount: 0,
+    aboveBenchmarkSpend: 0,
+    aboveBenchmarkCount: 0,
+    atBenchmarkSpend: 0,
+    atBenchmarkCount: 0,
     hasNameSignal: false,
     hasCreativeNotes: false,
     missingColumns: [],
@@ -1177,15 +1181,14 @@ console.log("decision (stage 1 — rules): all assertions passed");
     );
 
     // Structural additivity: decision aside, the memo's shape is unchanged.
-    // Decision & Comparison V2: `comparison` is the one new field, and on
-    // a single-period run (the sample) it MUST be null — a run without a
-    // previous file is byte-identical to the pre-feature memo apart from
-    // the additive fields themselves.
+    // Decision & Comparison V2 added `comparison`; Spend Allocation V1
+    // added `spendAllocation` (right after it, matching generateMemo's
+    // own field order) — both purely additive, nothing else reordered.
     const keys = Object.keys(memo);
     assert.deepEqual(
       keys.filter((k) => k !== "decision"),
-      ["comparison", "scope", "tldr", "clientSummary", "winners", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
-      "only the additive comparison/leadingConversion fields exist; nothing else reordered"
+      ["comparison", "spendAllocation", "scope", "tldr", "clientSummary", "winners", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
+      "only the additive comparison/spendAllocation/leadingConversion fields exist; nothing else reordered"
     );
     assert.equal(memo.comparison, null, "single-period run carries comparison: null");
 

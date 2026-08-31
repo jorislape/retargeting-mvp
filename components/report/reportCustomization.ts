@@ -108,6 +108,9 @@ export interface PresetSnapshot<SectionId extends string> {
   /** Performance Ranking V2. Presentation-only and opt-in at the report
    * call site; generic reports carry the inert default without rendering it. */
   showRankingChart: boolean;
+  /** Spend Allocation V1. Same opt-in-at-the-call-site pattern as
+   *  showRankingChart above. */
+  showSpendAllocationChart: boolean;
 }
 
 /** The starting mode a preset applies the moment it's selected — kept
@@ -168,6 +171,9 @@ export interface ReportCustomization<SectionId extends string> {
   colorMode: ColorMode;
   /** Whether the Performance report renders its benchmark-distance chart. */
   showRankingChart: boolean;
+  /** Whether the Performance report renders its judged-spend allocation
+   *  chart. */
+  showSpendAllocationChart: boolean;
   /** Derived, not independently settable — see derivePreset. Tracks
    *  which named preset (if any) the current presentation fields still
    *  match; "custom" once any of them diverge. */
@@ -205,6 +211,7 @@ export function createDefaultCustomization<Id extends string>(
     density: "standard",
     colorMode: "color",
     showRankingChart: true,
+    showSpendAllocationChart: true,
     /* Placeholder — useReportCustomization's initializer immediately
        recomputes this via derivePreset() against whatever preset table
        (if any) the caller supplied. Kept here only so this function
@@ -217,7 +224,8 @@ export function createDefaultCustomization<Id extends string>(
 /**
  * Report Foundation V1 — does `customization` still match `snapshot`
  * exactly? Compares ONLY the presentation fields a preset defines
- * (sections/topAdsShown/density/colorMode/showRankingChart) — deliberately NEVER `mode`
+ * (sections/topAdsShown/density/colorMode/showRankingChart/
+ * showSpendAllocationChart) — deliberately NEVER `mode`
  * (previewing the other register doesn't "leave" a preset) and NEVER
  * any identity/branding field (those aren't part of what a preset
  * means). Pure — no state, safe to call on every render.
@@ -231,7 +239,8 @@ export function matchesPreset<Id extends string>(
     customization.topAdsShown !== snapshot.topAdsShown ||
     customization.density !== snapshot.density ||
     customization.colorMode !== snapshot.colorMode ||
-    customization.showRankingChart !== snapshot.showRankingChart
+    customization.showRankingChart !== snapshot.showRankingChart ||
+    customization.showSpendAllocationChart !== snapshot.showSpendAllocationChart
   ) {
     return false;
   }

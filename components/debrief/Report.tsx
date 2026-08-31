@@ -28,6 +28,7 @@ import { useReportCustomization } from "@/components/report/useReportCustomizati
 import { ReportCustomizationPanel } from "@/components/report/ReportCustomizationPanel";
 import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
+import { SpendAllocationChart } from "./SpendAllocationChart";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -1528,6 +1529,16 @@ export function Report({
           />
         )}
 
+        {/* Spend Allocation V1 — complements Performance Ranking (which
+            ads) rather than repeating it (where the money is). Always
+            the FULL judged pool — deliberately independent of
+            customization.topAdsShown / sections.winners /
+            sections.underperformers, which only slice the row-level
+            detail below. */}
+        {customization.showSpendAllocationChart && (
+          <SpendAllocationChart allocation={memo.spendAllocation} view={view} />
+        )}
+
         {/* ---- Winners / What worked ---- */}
         {sections.winners && (
         <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.winners))}>
@@ -1886,6 +1897,7 @@ export function Report({
         modeReadout={{ internal: "Buyer", client: "Client" }}
         presetOptions={PERFORMANCE_PRESET_OPTIONS}
         showRankingChartControl
+        showSpendAllocationChartControl
       />
     </div>
   );

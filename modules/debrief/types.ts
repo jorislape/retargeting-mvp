@@ -282,6 +282,20 @@ export interface AnalysisResult {
   rankedAds: RankedAd[];
   belowBenchmarkSpend: number;
   belowBenchmarkCount: number;
+  /** Spend Allocation V1 — mirrors belowBenchmarkSpend/Count exactly,
+   *  summed over the full winnerPool (deltaFromMedian > 0), never just
+   *  the display-truncated `winners` slice. */
+  aboveBenchmarkSpend: number;
+  aboveBenchmarkCount: number;
+  /** Spend Allocation V1 — judged ads exactly at the median
+   *  (deltaFromMedian === 0): neither a winner nor a loser under the
+   *  existing strict >/< pools, but real judged spend that belongs
+   *  nowhere else. Structurally guaranteed to be non-empty whenever
+   *  adsJudged is odd (median() then returns one judged ad's own
+   *  value). Summed over the full judged set, same discipline as
+   *  above/belowBenchmarkSpend. */
+  atBenchmarkSpend: number;
+  atBenchmarkCount: number;
   hasNameSignal: boolean;
   hasCreativeNotes: boolean;
   missingColumns: string[];
@@ -319,6 +333,64 @@ export interface MemoWinnerLoserRow {
    *  KPIs when the CSV carried a count column. Display only — never a
    *  quality judgment, never estimated. Absent otherwise. */
   conversionLabel?: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Spend Allocation V1 — "where is judged spend sitting relative to the */
+/* benchmark?" Complements Performance Ranking (which ads) rather than  */
+/* repeating it (where the money is). Purely descriptive: never read by */
+/* decision.ts, never independently determines the recommended action, */
+/* and always reflects the FULL judged pool — independent of           */
+/* customization.topAdsShown, which only slices what Performance        */
+/* Ranking / Winners / Underperformers display.                         */
+/* ------------------------------------------------------------------ */
+
+/** One of the three judged-spend segments. Canonical order is always
+ *  below -> at -> above (see components/debrief/spendAllocationMath.ts,
+ *  which independently encodes the same order for the pure geometry
+ *  layer — the two must stay in sync, but memo.ts cannot import from
+ *  components/, so the order is intentionally duplicated rather than
+ *  shared). Only segments with count > 0 are ever present; an empty
+ *  group is omitted, never rendered as a fake zero-width segment. */
+export interface MemoSpendAllocationSegment {
+  id: "below" | "at" | "above";
+  count: number;
+  spend: number;
+  spendLabel: string;
+  /** Rounded for display only ("35%") — never the source of bar
+   *  geometry, which SpendAllocationChart recomputes from spend and
+   *  judgedSpend directly so a rounded label can never distort the
+   *  true proportional width. */
+  shareLabel: string;
+}
+
+/** Set-aside spend, disclosed separately from the 100%-of-judged-spend
+ *  bar and denominated against TOTAL spend — never judged spend — so
+ *  the two percentages can never be misread as sharing one base.
+ *  Present only when at least one ad was set aside. */
+export interface MemoSpendAllocationSetAside {
+  count: number;
+  spend: number;
+  spendLabel: string;
+  /** Rounded share of TOTAL spend, display only. */
+  shareOfTotalLabel: string;
+  note: { buyer: string; client: string };
+}
+
+/** Spend Allocation V1's memo-level fact sheet. null when there is no
+ *  judged spend to show (judgedSpend <= 0) — the same "nothing to
+ *  render" discipline PerformanceRankingChart already follows for an
+ *  empty row set. */
+export interface MemoSpendAllocation {
+  judgedSpend: number;
+  judgedSpendLabel: string;
+  totalSpend: number;
+  totalSpendLabel: string;
+  /** Below -> at -> above, count > 0 only. */
+  segments: MemoSpendAllocationSegment[];
+  setAside: MemoSpendAllocationSetAside | null;
+  headline: { buyer: string; client: string };
+  caveat: { buyer: string; client: string };
 }
 
 /** A hand-off-ready creative brief for one next test. Generated
@@ -529,6 +601,9 @@ export interface Memo {
    *  was provided). NEVER an input to `decision` — the Next move is a
    *  current-period read only. */
   comparison: MemoComparison | null;
+  /** Spend Allocation V1 — purely additive; null when there's no judged
+   *  spend to show. */
+  spendAllocation: MemoSpendAllocation | null;
   tldr: string[];
   /** Plain-language verdict for the client-facing view — same facts as
    *  tldr, none of the buyer shorthand. */

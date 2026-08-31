@@ -247,6 +247,31 @@ export function memoToText(
   );
   lines.push("");
 
+  /* Spend Allocation V1 — one additive, factual line: where judged
+     spend sits relative to the benchmark, plus set-aside as a separate
+     clause (never folded into the same percentage base — the same rule
+     the on-screen chart follows). Uses "median" and runs it through
+     clientizeText via c() for the client view, matching how the rest
+     of this file derives client wording rather than hand-duplicating a
+     second copy of "median" -> "typical result". Omitted entirely when
+     there's no judged spend (memo.spendAllocation is null). */
+  if (memo.spendAllocation) {
+    const sa = memo.spendAllocation;
+    const findSeg = (id: "above" | "at" | "below") => sa.segments.find((s) => s.id === id);
+    const above = findSeg("above");
+    const at = findSeg("at");
+    const below = findSeg("below");
+    const parts: string[] = [];
+    if (above) parts.push(`${above.shareLabel} above median`);
+    if (at) parts.push(`${at.shareLabel} at median`);
+    if (below) parts.push(`${below.shareLabel} below median`);
+    if (parts.length > 0) {
+      const setAsidePart = sa.setAside ? `; ${sa.setAside.spendLabel} set aside` : "";
+      lines.push(c(`Spend allocation: ${parts.join(", ")}${setAsidePart}.`));
+      lines.push("");
+    }
+  }
+
   // Report Foundation V1: the same topAdsShown value the on-screen
   // report is using, in both views — no more view-specific hardcoding.
   const winnerRows = memo.winners.slice(0, topAdsShown);

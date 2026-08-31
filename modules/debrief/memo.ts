@@ -26,6 +26,9 @@ import {
   Memo,
   MemoDecision,
   MemoMarketSignal,
+  MemoSpendAllocation,
+  MemoSpendAllocationSegment,
+  MemoSpendAllocationSetAside,
   MemoTest,
   MemoWinnerLoserRow,
   outcomeNounsForKpi,
@@ -1288,6 +1291,121 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
   return { level, notes, reasons: reasons.slice(0, 4), clientWhy };
 }
 
+/**
+ * Spend Allocation V1 — "where is judged spend sitting relative to the
+ * benchmark?" Purely presentational templating over facts analysis.ts
+ * already computed (aboveBenchmarkSpend/Count, atBenchmarkSpend/Count,
+ * belowBenchmarkSpend/Count, judgedSpend, totalSpend) — no new
+ * classification, no decision logic, and this function is never read
+ * by decision.ts. null when there's no judged spend to show, mirroring
+ * PerformanceRankingChart's "nothing to render" discipline for an empty
+ * row set.
+ */
+function buildSpendAllocation(analysis: AnalysisResult): MemoSpendAllocation | null {
+  const {
+    judgedSpend,
+    totalSpend,
+    currency,
+    adsSetAside,
+    aboveBenchmarkSpend,
+    aboveBenchmarkCount,
+    atBenchmarkSpend,
+    atBenchmarkCount,
+    belowBenchmarkSpend,
+    belowBenchmarkCount,
+  } = analysis;
+
+  if (judgedSpend <= 0) return null;
+
+  const roundPct = (value: number) => Math.round(value);
+  /* Raw share, only ever used to build the rounded DISPLAY label here —
+     SpendAllocationChart recomputes the true, unrounded proportional
+     bar geometry itself from spend/judgedSpend, so a rounded label can
+     never become the source of the chart's width. */
+  const shareOf = (spend: number, base: number) => (base > 0 ? (spend / base) * 100 : 0);
+
+  /* Canonical order: below -> at -> above. Independently duplicated in
+     components/debrief/spendAllocationMath.ts (memo.ts cannot import
+     from components/) — see that file's own doc comment. */
+  const segmentDefs: { id: "below" | "at" | "above"; count: number; spend: number }[] = [
+    { id: "below", count: belowBenchmarkCount, spend: belowBenchmarkSpend },
+    { id: "at", count: atBenchmarkCount, spend: atBenchmarkSpend },
+    { id: "above", count: aboveBenchmarkCount, spend: aboveBenchmarkSpend },
+  ];
+  const segments: MemoSpendAllocationSegment[] = segmentDefs
+    .filter((s) => s.count > 0)
+    .map((s) => ({
+      id: s.id,
+      count: s.count,
+      spend: s.spend,
+      spendLabel: fmtMoney(s.spend, currency),
+      shareLabel: `${roundPct(shareOf(s.spend, judgedSpend))}%`,
+    }));
+
+  const setAsideSpend = totalSpend - judgedSpend;
+  const setAside: MemoSpendAllocationSetAside | null =
+    adsSetAside > 0
+      ? {
+          count: adsSetAside,
+          spend: setAsideSpend,
+          spendLabel: fmtMoney(setAsideSpend, currency),
+          shareOfTotalLabel: `${roundPct(shareOf(setAsideSpend, totalSpend))}%`,
+          note: {
+            buyer: `${fmtMoney(setAsideSpend, currency)} (${adsSetAside} ad${adsSetAside === 1 ? "" : "s"}, ${roundPct(shareOf(setAsideSpend, totalSpend))}% of total spend) not yet judged — too little spend to draw a conclusion either way.`,
+            client: `${fmtMoney(setAsideSpend, currency)} hasn't spent enough yet to include in this read.`,
+          },
+        }
+      : null;
+
+  /* Headline: above clause first, then below (mirrors the approved
+     example wording) — each clause only appears when that side has
+     judged spend, so the sentence never claims a 0% side. The neutral
+     segment is shown in the bar/segment labels but not narrated here,
+     matching the approved example. All-neutral (no above, no below) is
+     the one shape that needs its own sentence entirely. */
+  const aboveShare = shareOf(aboveBenchmarkSpend, judgedSpend);
+  const belowShare = shareOf(belowBenchmarkSpend, judgedSpend);
+  const buyerClauses: string[] = [];
+  const clientClauses: string[] = [];
+  if (aboveBenchmarkCount > 0) {
+    buyerClauses.push(
+      `${roundPct(aboveShare)}% of judged spend (${fmtMoney(aboveBenchmarkSpend, currency)}) sits behind ${aboveBenchmarkCount} above-benchmark ad${aboveBenchmarkCount === 1 ? "" : "s"}`
+    );
+    clientClauses.push(
+      `${roundPct(aboveShare)}% of this period's working budget went to ads beating the typical result`
+    );
+  }
+  if (belowBenchmarkCount > 0) {
+    buyerClauses.push(
+      `${roundPct(belowShare)}% of judged spend (${fmtMoney(belowBenchmarkSpend, currency)}) sits behind ${belowBenchmarkCount} below-benchmark ad${belowBenchmarkCount === 1 ? "" : "s"}`
+    );
+    clientClauses.push(`${roundPct(belowShare)}% went to ads below it`);
+  }
+
+  const headlineBuyer =
+    buyerClauses.length > 0
+      ? `${buyerClauses.join("; ")}.`
+      : `All judged spend (${fmtMoney(judgedSpend, currency)}) sits at the median — no ad separated above or below.`;
+  const headlineClient =
+    clientClauses.length > 0
+      ? `${clientClauses.join("; ")}.`
+      : `All of this period's working budget (${fmtMoney(judgedSpend, currency)}) sits at the account's typical result — no ad pulled ahead or behind.`;
+
+  return {
+    judgedSpend,
+    judgedSpendLabel: fmtMoney(judgedSpend, currency),
+    totalSpend,
+    totalSpendLabel: fmtMoney(totalSpend, currency),
+    segments,
+    setAside,
+    headline: { buyer: headlineBuyer, client: headlineClient },
+    caveat: {
+      buyer: "This shows how judged spend is currently split relative to the median — descriptive only, and it doesn't independently determine the recommended action.",
+      client: "This shows how this period's budget split relative to the typical result — it doesn't decide what happens next on its own.",
+    },
+  };
+}
+
 export function generateMemo(analysis: AnalysisResult, context: DebriefContext): Memo {
   const { kpi, currency, median } = analysis;
 
@@ -1332,6 +1450,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
        function, which is also what keeps the decision above provably
        comparison-blind. */
     comparison: null,
+    spendAllocation: buildSpendAllocation(analysis),
     scope: {
       product: context.product || "Your account",
       kpiLabel: KPI_LABELS[kpi],

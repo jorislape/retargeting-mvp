@@ -249,6 +249,13 @@ body {
   body .chart-bar-loss {
     border-color: #b91c1c !important;
   }
+  /* Spend Allocation V1's neutral (at-median) segment — same gray
+     already used for print-neutral's left rails, applied to a full
+     border instead so the segment stays distinct once the flatten
+     rule above removes its on-screen fill. */
+  body .chart-bar-neutral {
+    border-color: #a1a1aa !important;
+  }
   body .print-neutral {
     border-left-color: #a1a1aa !important;
   }

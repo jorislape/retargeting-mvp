@@ -103,6 +103,12 @@ function period(
       rankedAds,
       belowBenchmarkSpend: losers.reduce((s, a) => s + a.spend, 0),
       belowBenchmarkCount: losers.length,
+      aboveBenchmarkSpend: winners.reduce((s, a) => s + a.spend, 0),
+      aboveBenchmarkCount: winners.length,
+      atBenchmarkSpend: rankedAds
+        .filter((a) => a.deltaFromMedian === 0)
+        .reduce((s, a) => s + a.spend, 0),
+      atBenchmarkCount: rankedAds.filter((a) => a.deltaFromMedian === 0).length,
       hasNameSignal: false,
       hasCreativeNotes: false,
       missingColumns: [],
