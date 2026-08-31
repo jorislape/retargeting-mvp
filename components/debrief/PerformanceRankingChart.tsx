@@ -78,25 +78,27 @@ export function PerformanceRankingChart({
             : chartRow.row.vsMedianLabel;
           return (
             <li key={`${chartRow.row.name}-${index}`} className="print-avoid-break min-w-0">
-              <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px] leading-snug">
+              <p className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-0.5 text-[12px] leading-snug">
                 <span className="min-w-0 break-words font-medium text-zinc-200">
                   {chartRow.row.name}
                 </span>
-                <span className="shrink-0 font-mono font-semibold tabular-nums text-zinc-100">
-                  {chartRow.row.valueLabel}
-                </span>
-                <span
-                  className={`shrink-0 font-mono text-[11px] tabular-nums ${
-                    better
-                      ? "print-win text-emerald-400"
-                      : worse
-                        ? "print-loss text-red-400"
-                        : "text-zinc-400"
-                  }`}
-                >
-                  {density === "compact"
-                    ? referenceLabel
-                    : `(${referenceLabel})`}
+                <span className="flex shrink-0 items-baseline gap-x-2">
+                  <span className="font-mono font-semibold tabular-nums text-zinc-100">
+                    {chartRow.row.valueLabel}
+                  </span>
+                  <span
+                    className={`font-mono text-[11px] tabular-nums ${
+                      better
+                        ? "print-win text-emerald-400"
+                        : worse
+                          ? "print-loss text-red-400"
+                          : "text-zinc-400"
+                    }`}
+                  >
+                    {density === "compact"
+                      ? referenceLabel
+                      : `(${referenceLabel})`}
+                  </span>
                 </span>
               </p>
 
