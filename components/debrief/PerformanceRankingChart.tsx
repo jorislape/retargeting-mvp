@@ -33,8 +33,8 @@ export function PerformanceRankingChart({
   const maxMagnitude = maxRankingMagnitude(rows);
   const referenceName = client ? "Typical result" : "Median";
   const caveat = client
-    ? "This shows distance from the account's typical result. It does not by itself say what to increase or reduce, what caused the result, or what will happen next."
-    : "Distance from this dataset's median is descriptive evidence, not an instruction to scale or cut and not a causal, profitability, significance, or future-performance claim.";
+    ? "This shows distance from the account's typical result — not why it happened, what happens next, or what to do about it on its own."
+    : "Distance from the median is descriptive evidence — not causal, not a future-performance claim, and not by itself the reason for the recommended action.";
 
   return (
     <section
@@ -59,7 +59,16 @@ export function PerformanceRankingChart({
         </p>
       </div>
 
-      <ul className="mt-5 space-y-3">
+      <div
+        aria-hidden="true"
+        className="mt-5 flex items-center text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-600"
+      >
+        <span className="print-loss flex-1 text-red-400">Worse</span>
+        <span className="print-accent shrink-0 px-2 text-zinc-500">{referenceName}</span>
+        <span className="print-win flex-1 text-right text-emerald-400">Better</span>
+      </div>
+
+      <ul className="mt-2 space-y-3">
         {rows.map((chartRow, index) => {
           const width = rankingBarWidth(chartRow, maxMagnitude);
           const better = chartRow.direction === "better";
@@ -70,7 +79,7 @@ export function PerformanceRankingChart({
           return (
             <li key={`${chartRow.row.name}-${index}`} className="print-avoid-break min-w-0">
               <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px] leading-snug">
-                <span className="min-w-0 flex-1 break-words font-medium text-zinc-200">
+                <span className="min-w-0 break-words font-medium text-zinc-200">
                   {chartRow.row.name}
                 </span>
                 <span className="shrink-0 font-mono font-semibold tabular-nums text-zinc-100">
