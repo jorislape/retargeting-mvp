@@ -64,6 +64,9 @@ export function PerformanceRankingChart({
           const width = rankingBarWidth(chartRow, maxMagnitude);
           const better = chartRow.direction === "better";
           const worse = chartRow.direction === "worse";
+          const referenceLabel = client
+            ? clientizeText(chartRow.row.vsMedianLabel)
+            : chartRow.row.vsMedianLabel;
           return (
             <li key={`${chartRow.row.name}-${index}`} className="print-avoid-break min-w-0">
               <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px] leading-snug">
@@ -83,8 +86,8 @@ export function PerformanceRankingChart({
                   }`}
                 >
                   {density === "compact"
-                    ? clientizeText(chartRow.row.vsMedianLabel)
-                    : `(${clientizeText(chartRow.row.vsMedianLabel)})`}
+                    ? referenceLabel
+                    : `(${referenceLabel})`}
                 </span>
               </p>
 
