@@ -54,7 +54,7 @@ export function SpendAllocationChart({
           >
             Spend allocation
           </p>
-          <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-400">
+          <p className="mt-1 max-w-xl text-[13px] font-medium leading-relaxed text-zinc-300">
             {client ? allocation.headline.client : allocation.headline.buyer}
           </p>
         </div>
@@ -102,15 +102,18 @@ export function SpendAllocationChart({
         ))}
       </ul>
 
+      {/* Set-aside + caveat read as one quiet honesty footer, visually
+          separated from the chart's own detail (segment labels) above
+          it — grouped tightly with each other when both are present. */}
       {allocation.setAside && (
-        <p className="mt-3 max-w-3xl text-[11px] leading-relaxed text-zinc-500">
+        <p className="mt-4 max-w-3xl text-[11px] leading-relaxed text-zinc-500">
           {client ? allocation.setAside.note.client : allocation.setAside.note.buyer}
         </p>
       )}
 
       <p
         id="spend-allocation-caveat"
-        className="mt-4 max-w-3xl text-[10px] leading-relaxed text-zinc-500"
+        className={`${allocation.setAside ? "mt-1.5" : "mt-4"} max-w-3xl text-[10px] leading-relaxed text-zinc-500`}
       >
         {client ? allocation.caveat.client : allocation.caveat.buyer}
       </p>

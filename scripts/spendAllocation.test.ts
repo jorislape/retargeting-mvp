@@ -143,15 +143,31 @@ function assertClose(actual: number, expected: number, message: string, toleranc
     // segment carries the set-aside id.
     assert.ok(!sa.segments.some((s: { id: string }) => s.id !== "below" && s.id !== "at" && s.id !== "above"));
 
-    // Headline mentions both numbers, in both registers.
-    assert.ok(sa.headline.buyer.includes("56%") && sa.headline.buyer.includes("35%"), "buyer headline states both shares");
-    assert.ok(sa.headline.client.includes("56%") && sa.headline.client.includes("35%"), "client headline states both shares");
+    // Copy Hierarchy Polish: ONE short clause — the below-benchmark
+    // share only. No above (56%) figure, no dollar amount, no ad count
+    // — those live in the segment labels below, not repeated here.
+    assert.equal(sa.headline.buyer, "35% of judged spend sits behind below-benchmark ads.");
+    assert.equal(sa.headline.client, "35% of this period's working budget went to ads below the typical result.");
+    assert.ok(!sa.headline.buyer.includes("56%"), "buyer headline never restates the above-side share");
+    assert.ok(!sa.headline.client.includes("56%"), "client headline never restates the above-side share");
+    assert.ok(!/\$/.test(sa.headline.buyer), "buyer headline carries no dollar amount");
+    assert.ok(!/\d+\s+ads?\b/.test(sa.headline.buyer), "buyer headline carries no ad count");
     assert.ok(!sa.headline.client.includes("benchmark"), "client headline stays jargon-free");
     assert.ok(!sa.headline.client.includes("median"), "client headline never says 'median'");
-    for (const word of ["waste", "wasted", "should", "cut", "kill", "scale"]) {
+    for (const word of ["waste", "wasted", "inefficient", "bad", "should", "cut", "kill", "shift", "scale", "concerning"]) {
       assert.ok(!sa.headline.buyer.toLowerCase().includes(word), `buyer headline never implies "${word}"`);
       assert.ok(!sa.headline.client.toLowerCase().includes(word), `client headline never implies "${word}"`);
     }
+
+    // Copy Hierarchy Polish: shortened caveat, exact approved wording.
+    assert.equal(
+      sa.caveat.buyer,
+      "Allocation is descriptive and does not determine the recommended action on its own."
+    );
+    assert.equal(
+      sa.caveat.client,
+      "This shows where the budget landed; it does not decide what happens next on its own."
+    );
 
     // TXT export carries one additive, factual line.
     const { memoToText } = require(join(dist, "components/debrief/memoToText.js"));
@@ -250,6 +266,10 @@ function assertClose(actual: number, expected: number, message: string, toleranc
       assert.ok(!m.spendAllocation.segments.some((s: { id: string }) => s.id === "below"), "below segment omitted, not zero-width");
       assert.ok(m.spendAllocation.segments.some((s: { id: string }) => s.id === "at"), "at segment present");
       assert.ok(m.spendAllocation.segments.some((s: { id: string }) => s.id === "above"), "above segment present");
+      // No losers -> the headline falls back to the above-side clause
+      // (the only story left to tell), never the all-neutral sentence.
+      assert.equal(m.spendAllocation.headline.buyer, "15% of judged spend sits behind above-benchmark ads.");
+      assert.ok(!m.spendAllocation.headline.buyer.includes("$"), "above-only headline still carries no dollar amount");
     }
 
     // No winners: [1,5,5,5,5] -> median = sorted[2] = 5. Four ads sit
@@ -264,10 +284,9 @@ function assertClose(actual: number, expected: number, message: string, toleranc
       assert.equal(analysis.aboveBenchmarkCount, 0, "no ad sits above the median in this fixture");
       reconciles(analysis);
       assert.ok(!m.spendAllocation.segments.some((s: { id: string }) => s.id === "above"), "above segment omitted, not zero-width");
-      assert.ok(
-        !m.spendAllocation.headline.buyer.includes("no ad separated above or below"),
-        "a present below segment produces a real headline clause, not the all-neutral fallback"
-      );
+      // A present below segment always wins the headline (even with no
+      // above segment) — never the all-neutral fallback sentence.
+      assert.equal(m.spendAllocation.headline.buyer, "25% of judged spend sits behind below-benchmark ads.");
       assert.ok(m.spendAllocation.headline.buyer.includes("below-benchmark"), "headline states the below-benchmark clause");
     }
 
@@ -284,12 +303,14 @@ function assertClose(actual: number, expected: number, message: string, toleranc
       reconciles(analysis);
       assert.equal(m.spendAllocation.segments.length, 1, "only the neutral segment renders");
       assert.equal(m.spendAllocation.segments[0].id, "at");
-      assert.ok(
-        m.spendAllocation.headline.buyer.includes("sits at the median — no ad separated above or below"),
+      assert.equal(
+        m.spendAllocation.headline.buyer,
+        "All judged spend sits at the median this period.",
         "all-neutral fixture uses the dedicated fallback headline"
       );
-      assert.ok(
-        m.spendAllocation.headline.client.includes("sits at the account's typical result"),
+      assert.equal(
+        m.spendAllocation.headline.client,
+        "All of this period's working budget sits at the account's typical result.",
         "all-neutral client fallback headline"
       );
     }

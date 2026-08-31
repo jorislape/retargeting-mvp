@@ -1357,39 +1357,30 @@ function buildSpendAllocation(analysis: AnalysisResult): MemoSpendAllocation | n
         }
       : null;
 
-  /* Headline: above clause first, then below (mirrors the approved
-     example wording) — each clause only appears when that side has
-     judged spend, so the sentence never claims a 0% side. The neutral
-     segment is shown in the bar/segment labels but not narrated here,
-     matching the approved example. All-neutral (no above, no below) is
-     the one shape that needs its own sentence entirely. */
+  /* Headline: ONE short sentence — the single most decision-relevant
+     descriptive tension, never a repeat of what the segment labels
+     already show in full detail (exact %, $, and count). Below-
+     benchmark spend leads when it exists (the same figure decision.ts's
+     own rationale already leads with for a cut-eligible read); when
+     there are no losers, the above side is the only story left to
+     tell; an entirely flat/neutral field gets its own short sentence.
+     Every branch states at most one share — never both, never a dollar
+     amount, never a count — so nothing here duplicates the segment
+     labels or the "Judged spend: $X" figure already shown above it. */
   const aboveShare = shareOf(aboveBenchmarkSpend, judgedSpend);
   const belowShare = shareOf(belowBenchmarkSpend, judgedSpend);
-  const buyerClauses: string[] = [];
-  const clientClauses: string[] = [];
-  if (aboveBenchmarkCount > 0) {
-    buyerClauses.push(
-      `${roundPct(aboveShare)}% of judged spend (${fmtMoney(aboveBenchmarkSpend, currency)}) sits behind ${aboveBenchmarkCount} above-benchmark ad${aboveBenchmarkCount === 1 ? "" : "s"}`
-    );
-    clientClauses.push(
-      `${roundPct(aboveShare)}% of this period's working budget went to ads beating the typical result`
-    );
-  }
+  let headlineBuyer: string;
+  let headlineClient: string;
   if (belowBenchmarkCount > 0) {
-    buyerClauses.push(
-      `${roundPct(belowShare)}% of judged spend (${fmtMoney(belowBenchmarkSpend, currency)}) sits behind ${belowBenchmarkCount} below-benchmark ad${belowBenchmarkCount === 1 ? "" : "s"}`
-    );
-    clientClauses.push(`${roundPct(belowShare)}% went to ads below it`);
+    headlineBuyer = `${roundPct(belowShare)}% of judged spend sits behind below-benchmark ads.`;
+    headlineClient = `${roundPct(belowShare)}% of this period's working budget went to ads below the typical result.`;
+  } else if (aboveBenchmarkCount > 0) {
+    headlineBuyer = `${roundPct(aboveShare)}% of judged spend sits behind above-benchmark ads.`;
+    headlineClient = `${roundPct(aboveShare)}% of this period's working budget went to ads beating the typical result.`;
+  } else {
+    headlineBuyer = "All judged spend sits at the median this period.";
+    headlineClient = "All of this period's working budget sits at the account's typical result.";
   }
-
-  const headlineBuyer =
-    buyerClauses.length > 0
-      ? `${buyerClauses.join("; ")}.`
-      : `All judged spend (${fmtMoney(judgedSpend, currency)}) sits at the median — no ad separated above or below.`;
-  const headlineClient =
-    clientClauses.length > 0
-      ? `${clientClauses.join("; ")}.`
-      : `All of this period's working budget (${fmtMoney(judgedSpend, currency)}) sits at the account's typical result — no ad pulled ahead or behind.`;
 
   return {
     judgedSpend,
@@ -1400,8 +1391,8 @@ function buildSpendAllocation(analysis: AnalysisResult): MemoSpendAllocation | n
     setAside,
     headline: { buyer: headlineBuyer, client: headlineClient },
     caveat: {
-      buyer: "This shows how judged spend is currently split relative to the median — descriptive only, and it doesn't independently determine the recommended action.",
-      client: "This shows how this period's budget split relative to the typical result — it doesn't decide what happens next on its own.",
+      buyer: "Allocation is descriptive and does not determine the recommended action on its own.",
+      client: "This shows where the budget landed; it does not decide what happens next on its own.",
     },
   };
 }
