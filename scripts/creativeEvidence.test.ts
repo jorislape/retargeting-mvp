@@ -27,7 +27,7 @@ import {
 import type { MemoWinnerLoserRow } from "../modules/debrief/types.ts";
 
 function row(name: string, valueLabel = "4.62× ROAS", vsMedianLabel = "+100% vs median", spendLabel = "$428.60"): MemoWinnerLoserRow {
-  return { name, valueLabel, vsMedianLabel, spendLabel, reason: "Metrics only — angle unknown." };
+  return { name, valueLabel, vsMedianLabel, deltaPct: 100, spendLabel, reason: "Metrics only — angle unknown." };
 }
 
 function source(overrides: Partial<SpotlightSource> = {}): SpotlightSource {

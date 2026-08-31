@@ -178,6 +178,7 @@ import {
   assert.equal(def.topAdsShown, 5);
   assert.equal(def.density, "standard");
   assert.equal(def.colorMode, "color");
+  assert.equal(def.showRankingChart, true);
 }
 
 /* ======================= Report Foundation V1 ======================= */
@@ -192,6 +193,7 @@ import {
     topAdsShown: 5,
     density: "standard",
     colorMode: "color",
+    showRankingChart: true,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -211,6 +213,7 @@ import {
     topAdsShown: 3,
     density: "standard",
     colorMode: "color",
+    showRankingChart: true,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -230,6 +233,7 @@ import {
     topAdsShown: 3,
     density: "compact",
     colorMode: "color",
+    showRankingChart: true,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -249,6 +253,7 @@ import {
     topAdsShown: 5,
     density: "compact",
     colorMode: "grayscale",
+    showRankingChart: true,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -304,6 +309,7 @@ function customization(
     topAdsShown: 5,
     density: "standard",
     colorMode: "color",
+    showRankingChart: true,
     preset: "buyer",
     ...overrides,
   };
@@ -319,6 +325,7 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
   assert.ok(!matchesPreset(customization({ topAdsShown: 3 }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "topAdsShown divergence breaks the match");
   assert.ok(!matchesPreset(customization({ density: "compact" }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "density divergence breaks the match");
   assert.ok(!matchesPreset(customization({ colorMode: "grayscale" }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "colorMode divergence breaks the match");
+  assert.ok(!matchesPreset(customization({ showRankingChart: false }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "chart visibility divergence breaks the match");
   assert.ok(
     !matchesPreset(
       customization({ sections: { ...base.sections, patterns: false } }),
@@ -391,6 +398,11 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
     "colorMode divergence -> custom"
   );
   assert.equal(
+    derivePreset(customization({ showRankingChart: false }), PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS),
+    "custom",
+    "chart visibility divergence -> custom"
+  );
+  assert.equal(
     derivePreset(
       customization({ sections: { ...customization().sections, confidence: false } }),
       PERFORMANCE_PRESETS,
@@ -406,6 +418,8 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
   assert.equal(derivePreset(drifted, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "custom");
   const restored = { ...drifted, topAdsShown: 5 as const };
   assert.equal(derivePreset(restored, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "buyer", "returning to the exact snapshot restores the preset name");
+  const chartRestored = { ...customization({ showRankingChart: false }), showRankingChart: true };
+  assert.equal(derivePreset(chartRestored, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "buyer", "restoring chart visibility restores the preset name");
 
   // Test req #4: mode switching alone never changes the preset name.
   const clientPreviewOfBuyer = customization({ mode: "client" });
@@ -436,6 +450,19 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
   assert.equal(competitorDefault.topAdsShown, 5);
   assert.equal(competitorDefault.density, "standard");
   assert.equal(competitorDefault.colorMode, "color");
+  assert.equal(competitorDefault.showRankingChart, true);
+}
+
+{
+  const reportSrc = readFileSync(new URL("../components/debrief/Report.tsx", import.meta.url), "utf-8");
+  assert.ok(/customization\.showRankingChart\s*&&[\s\S]{0,100}<PerformanceRankingChart/.test(reportSrc));
+  assert.ok(reportSrc.includes("winners={sections.winners ? memo.winners.slice(0, customization.topAdsShown) : []}"));
+  assert.ok(reportSrc.includes("losers={sections.underperformers ? memo.losers.rows.slice(0, customization.topAdsShown) : []}"));
+  const competitorSrc = readFileSync(new URL("../components/competitorDebrief/CompetitorDebriefResult.tsx", import.meta.url), "utf-8");
+  assert.ok(!competitorSrc.includes("PerformanceRankingChart"));
+  assert.ok(!competitorSrc.includes("showRankingChartControl"));
+  const textSrc = readFileSync(new URL("../components/debrief/memoToText.ts", import.meta.url), "utf-8");
+  assert.ok(!textSrc.includes("showRankingChart"), "TXT export remains presentation-independent");
 }
 
 {

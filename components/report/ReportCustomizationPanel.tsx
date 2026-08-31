@@ -29,6 +29,7 @@ export function ReportCustomizationPanel<Id extends string>({
   defaultTitlePlaceholder,
   modeReadout,
   presetOptions,
+  showRankingChartControl,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,6 +53,8 @@ export function ReportCustomizationPanel<Id extends string>({
    *  option here — it's a derived readout, shown when the current
    *  state matches none of the listed presets. */
   presetOptions?: readonly { id: Exclude<PresetId, "custom">; label: string }[];
+  /** Only Performance opts in; other report types never show an inert control. */
+  showRankingChartControl?: boolean;
 }) {
   const { customization } = actions;
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
@@ -356,6 +359,23 @@ export function ReportCustomizationPanel<Id extends string>({
                     always stay.
                   </p>
                 </div>
+
+                {showRankingChartControl && (
+                  <div>
+                    <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={customization.showRankingChart}
+                        onChange={(event) => actions.setShowRankingChart(event.target.checked)}
+                        className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-accent"
+                      />
+                      <span className={fieldLabel}>Performance ranking chart</span>
+                    </label>
+                    <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                      Shows the same visible judged ads relative to the median. It does not make a recommendation.
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <span className={`${fieldLabel} mb-1.5 block`}>Sections</span>

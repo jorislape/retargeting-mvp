@@ -27,6 +27,7 @@ import { accentCssVars, getAccentById } from "@/components/report/reportCustomiz
 import { useReportCustomization } from "@/components/report/useReportCustomization";
 import { ReportCustomizationPanel } from "@/components/report/ReportCustomizationPanel";
 import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
+import { PerformanceRankingChart } from "./PerformanceRankingChart";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -1514,6 +1515,19 @@ export function Report({
         </section>
         )}
 
+        {/* Main analytical proof layer: the exact visible judged rows below,
+            placed after the committed decision/evidence and before detail. */}
+        {customization.showRankingChart && (
+          <PerformanceRankingChart
+            winners={sections.winners ? memo.winners.slice(0, customization.topAdsShown) : []}
+            losers={sections.underperformers ? memo.losers.rows.slice(0, customization.topAdsShown) : []}
+            kpiLabel={memo.scope.kpiLabel}
+            medianLabel={memo.scope.medianLabel}
+            view={view}
+            density={customization.density}
+          />
+        )}
+
         {/* ---- Winners / What worked ---- */}
         {sections.winners && (
         <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.winners))}>
@@ -1871,6 +1885,7 @@ export function Report({
         defaultTitlePlaceholder={memo.scope.product}
         modeReadout={{ internal: "Buyer", client: "Client" }}
         presetOptions={PERFORMANCE_PRESET_OPTIONS}
+        showRankingChartControl
       />
     </div>
   );

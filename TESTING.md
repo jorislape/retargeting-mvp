@@ -155,6 +155,10 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 
 ## Report
 
+- [ ] **Performance ranking**: the chart appears after the decision/evidence summary and before detailed winner/underperformer rows; the sample shows 5 winners extending right and 5 underperformers extending left around the median, with KPI and vs-median labels matching the rows exactly.
+- [ ] **Ranking honesty**: no scale/cut language or decision thresholds appear in the chart; Buyer says Median, Client says Typical result, and each view carries its non-action/non-causal caveat.
+- [ ] **Ranking customization/print**: Customize report → Advanced can hide the chart (preset becomes Custom) and restore it; long names remain readable at mobile width; print/PDF keeps the center axis, solid winner borders, dashed loser borders, and direct labels legible.
+
 - [ ] **Next tests are creative-first**: at least 2 of the 3 tests are
       creative/angle iterations naming specific ads; a "Scale budget"
       test appears ONLY when the top winner is ≥30% past the median

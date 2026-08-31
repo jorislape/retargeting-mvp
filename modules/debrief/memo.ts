@@ -117,6 +117,7 @@ function buildRow(
     name: ad.name,
     valueLabel: fmtKpiValue(ad.kpiValue as number, analysis.kpi, analysis.currency),
     vsMedianLabel: fmtDeltaVsMedian(ad.deltaFromMedian, ad.deltaPct),
+    deltaPct: ad.deltaPct,
     spendLabel: fmtMoney(ad.spend, analysis.currency),
     reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
     conversionLabel: conversionLabelFor(ad, analysis.kpi),

@@ -241,6 +241,14 @@ body {
     color: #b91c1c !important;
     border-left-color: #b91c1c !important;
   }
+
+  /* Full-border chart marks stay distinct when print backgrounds are off. */
+  body .chart-bar-win {
+    border-color: #047857 !important;
+  }
+  body .chart-bar-loss {
+    border-color: #b91c1c !important;
+  }
   body .print-neutral {
     border-left-color: #a1a1aa !important;
   }

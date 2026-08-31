@@ -105,6 +105,9 @@ export interface PresetSnapshot<SectionId extends string> {
   topAdsShown: TopAdsShown;
   density: Density;
   colorMode: ColorMode;
+  /** Performance Ranking V2. Presentation-only and opt-in at the report
+   * call site; generic reports carry the inert default without rendering it. */
+  showRankingChart: boolean;
 }
 
 /** The starting mode a preset applies the moment it's selected — kept
@@ -163,6 +166,8 @@ export interface ReportCustomization<SectionId extends string> {
    *  unaffected either way: Print / Save PDF always uses the existing
    *  @media print stylesheet, which this field has never touched. */
   colorMode: ColorMode;
+  /** Whether the Performance report renders its benchmark-distance chart. */
+  showRankingChart: boolean;
   /** Derived, not independently settable — see derivePreset. Tracks
    *  which named preset (if any) the current presentation fields still
    *  match; "custom" once any of them diverge. */
@@ -199,6 +204,7 @@ export function createDefaultCustomization<Id extends string>(
     topAdsShown: 5,
     density: "standard",
     colorMode: "color",
+    showRankingChart: true,
     /* Placeholder — useReportCustomization's initializer immediately
        recomputes this via derivePreset() against whatever preset table
        (if any) the caller supplied. Kept here only so this function
@@ -211,7 +217,7 @@ export function createDefaultCustomization<Id extends string>(
 /**
  * Report Foundation V1 — does `customization` still match `snapshot`
  * exactly? Compares ONLY the presentation fields a preset defines
- * (sections/topAdsShown/density/colorMode) — deliberately NEVER `mode`
+ * (sections/topAdsShown/density/colorMode/showRankingChart) — deliberately NEVER `mode`
  * (previewing the other register doesn't "leave" a preset) and NEVER
  * any identity/branding field (those aren't part of what a preset
  * means). Pure — no state, safe to call on every render.
@@ -224,7 +230,8 @@ export function matchesPreset<Id extends string>(
   if (
     customization.topAdsShown !== snapshot.topAdsShown ||
     customization.density !== snapshot.density ||
-    customization.colorMode !== snapshot.colorMode
+    customization.colorMode !== snapshot.colorMode ||
+    customization.showRankingChart !== snapshot.showRankingChart
   ) {
     return false;
   }

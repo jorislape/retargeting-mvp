@@ -309,6 +309,9 @@ export interface MemoWinnerLoserRow {
   name: string;
   valueLabel: string;
   vsMedianLabel: string;
+  /** Raw, polarity-corrected distance used only for presentation geometry.
+   * Positive is better and negative is worse for every KPI. */
+  deltaPct: number | null;
   spendLabel: string;
   reason: string;
   /** Evidence Inputs V1: neutral conversion count for this ad
