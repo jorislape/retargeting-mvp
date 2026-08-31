@@ -52,6 +52,7 @@ export interface UseReportCustomizationResult<Id extends string> {
   setDensity: (value: Density) => void;
   setShowRankingChart: (value: boolean) => void;
   setShowSpendAllocationChart: (value: boolean) => void;
+  setShowMovementChart: (value: boolean) => void;
   /** No `setColorMode` — colorMode is an internal, preset-scoped field
    *  only (see reportCustomization.ts). It's never user-toggleable
    *  directly; the only way it changes is via setPreset applying a
@@ -166,6 +167,16 @@ export function useReportCustomization<Id extends string>(
     [presets, sectionIds]
   );
 
+  const setShowMovementChart = useCallback(
+    (value: boolean) => {
+      setCustomization((c) => {
+        const next = { ...c, showMovementChart: value };
+        return { ...next, preset: derivePreset(next, presets, sectionIds) };
+      });
+    },
+    [presets, sectionIds]
+  );
+
   const setPreset = useCallback(
     (id: Exclude<PresetId, "custom">) => {
       const snapshot = presets?.[id];
@@ -179,6 +190,7 @@ export function useReportCustomization<Id extends string>(
         colorMode: snapshot.colorMode,
         showRankingChart: snapshot.showRankingChart,
         showSpendAllocationChart: snapshot.showSpendAllocationChart,
+        showMovementChart: snapshot.showMovementChart,
         preset: id,
       }));
     },
@@ -205,6 +217,7 @@ export function useReportCustomization<Id extends string>(
     setDensity,
     setShowRankingChart,
     setShowSpendAllocationChart,
+    setShowMovementChart,
     setPreset,
     setAgencyLogoFile,
     reset,

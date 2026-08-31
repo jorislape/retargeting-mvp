@@ -29,6 +29,7 @@ import { ReportCustomizationPanel } from "@/components/report/ReportCustomizatio
 import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
+import { MovementChart } from "./MovementChart";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -1539,6 +1540,19 @@ export function Report({
           <SpendAllocationChart allocation={memo.spendAllocation} view={view} />
         )}
 
+        {/* Movement V1 — ranked KPI movement between the two periods,
+            for ads honestly comparable in both. Conditional on
+            memo.comparison existing (a single-period run never
+            renders this at all) and independent of the existing
+            "What changed vs previous period" prose section above the
+            Next-move card — that section owns the full narrative;
+            this chart owns ranked magnitude only, and reuses its
+            already-composed sentences/counts rather than generating
+            new analytical prose. */}
+        {customization.showMovementChart && (
+          <MovementChart comparison={memo.comparison} view={view} topAdsShown={customization.topAdsShown} />
+        )}
+
         {/* ---- Winners / What worked ---- */}
         {sections.winners && (
         <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.winners))}>
@@ -1898,6 +1912,7 @@ export function Report({
         presetOptions={PERFORMANCE_PRESET_OPTIONS}
         showRankingChartControl
         showSpendAllocationChartControl
+        showMovementChartControl
       />
     </div>
   );

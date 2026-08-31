@@ -469,6 +469,22 @@ export interface MemoComparisonRow {
   spendChangeLabel: string;
   /** "12 → 30 purchases" when both periods carried a count. */
   conversionChangeLabel?: string;
+  /** Movement V1 — the same raw values compare.ts already computes
+   *  internally, exposed for chart geometry. Never recomputed
+   *  elsewhere; MovementChart/movementChartMath consume these
+   *  directly rather than parsing the formatted labels above. */
+  prevValue: number;
+  currValue: number;
+  /** Polarity-corrected % change vs the previous value (same
+   *  convention as RankedAd.deltaPct — positive always means
+   *  "better" for the KPI's own polarity); null when the previous
+   *  value was 0 — not expressible as a %, see compare.ts's
+   *  zero-baseline handling. */
+  pct: number | null;
+  /** True when this movement is in the KPI's own "better" direction.
+   *  Set even when pct is null — a zero-baseline row still has a
+   *  known, polarity-correct direction. */
+  better: boolean;
 }
 
 export interface MemoComparison {
@@ -482,6 +498,13 @@ export interface MemoComparison {
   /** Account-level movement: benchmark, spend, judged counts, and the
    *  improved/declined/unchanged tally. Two registers. */
   account: { buyer: string[]; client: string[] };
+  /** Movement V1 — the account-level median/benchmark movement
+   *  sentence, named explicitly so a consumer (MovementChart) doesn't
+   *  depend on account[0]'s position as an implicit contract. Same
+   *  text as account.buyer[0]/account.client[0] — both are set from
+   *  the same local variable in compare.ts, so this is a presentation
+   *  convenience, never a second source of truth. */
+  medianMovement: { buyer: string; client: string };
   improved: MemoComparisonRow[];
   declined: MemoComparisonRow[];
   /** Matched ads judged in both periods (the delta-capable set). */

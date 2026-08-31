@@ -88,6 +88,13 @@ function source(overrides: Partial<SpotlightSource> = {}): SpotlightSource {
     currentLabel: "3.00",
     changeLabel,
     spendChangeLabel: "$100.00 → $150.00",
+    // Movement V1 fields — irrelevant to spotlight-selection logic
+    // (which reads name/changeLabel only), so a plausible placeholder
+    // consistent with changeLabel's own "(better)"/"(worse)" suffix.
+    prevValue: 2,
+    currValue: 3,
+    pct: 20,
+    better: changeLabel.includes("(better)"),
   });
   const declinedWins = selectSpotlights(
     source({
@@ -148,6 +155,10 @@ function source(overrides: Partial<SpotlightSource> = {}): SpotlightSource {
             currentLabel: "4.00",
             changeLabel: "+100% (better)",
             spendChangeLabel: "$100.00 → $200.00",
+            prevValue: 2,
+            currValue: 4,
+            pct: 100,
+            better: true,
           },
         ],
         declined: [],

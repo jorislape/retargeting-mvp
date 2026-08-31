@@ -111,6 +111,9 @@ export interface PresetSnapshot<SectionId extends string> {
   /** Spend Allocation V1. Same opt-in-at-the-call-site pattern as
    *  showRankingChart above. */
   showSpendAllocationChart: boolean;
+  /** Movement V1. Same opt-in-at-the-call-site pattern as
+   *  showRankingChart above. */
+  showMovementChart: boolean;
 }
 
 /** The starting mode a preset applies the moment it's selected — kept
@@ -174,6 +177,12 @@ export interface ReportCustomization<SectionId extends string> {
   /** Whether the Performance report renders its judged-spend allocation
    *  chart. */
   showSpendAllocationChart: boolean;
+  /** Whether the Performance report renders its ranked period-movement
+   *  chart. Independent of sections.whatChanged (which toggles the
+   *  existing "What changed vs previous period" prose section) —
+   *  turning either off never implicitly disables the other. Only ever
+   *  relevant when memo.comparison exists; otherwise both are inert. */
+  showMovementChart: boolean;
   /** Derived, not independently settable — see derivePreset. Tracks
    *  which named preset (if any) the current presentation fields still
    *  match; "custom" once any of them diverge. */
@@ -212,6 +221,7 @@ export function createDefaultCustomization<Id extends string>(
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     /* Placeholder — useReportCustomization's initializer immediately
        recomputes this via derivePreset() against whatever preset table
        (if any) the caller supplied. Kept here only so this function
@@ -225,7 +235,7 @@ export function createDefaultCustomization<Id extends string>(
  * Report Foundation V1 — does `customization` still match `snapshot`
  * exactly? Compares ONLY the presentation fields a preset defines
  * (sections/topAdsShown/density/colorMode/showRankingChart/
- * showSpendAllocationChart) — deliberately NEVER `mode`
+ * showSpendAllocationChart/showMovementChart) — deliberately NEVER `mode`
  * (previewing the other register doesn't "leave" a preset) and NEVER
  * any identity/branding field (those aren't part of what a preset
  * means). Pure — no state, safe to call on every render.
@@ -240,7 +250,8 @@ export function matchesPreset<Id extends string>(
     customization.density !== snapshot.density ||
     customization.colorMode !== snapshot.colorMode ||
     customization.showRankingChart !== snapshot.showRankingChart ||
-    customization.showSpendAllocationChart !== snapshot.showSpendAllocationChart
+    customization.showSpendAllocationChart !== snapshot.showSpendAllocationChart ||
+    customization.showMovementChart !== snapshot.showMovementChart
   ) {
     return false;
   }

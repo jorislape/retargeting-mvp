@@ -196,6 +196,7 @@ import {
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -217,6 +218,7 @@ import {
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -238,6 +240,7 @@ import {
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -259,6 +262,7 @@ import {
     colorMode: "grayscale",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -316,6 +320,7 @@ function customization(
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     preset: "buyer",
     ...overrides,
   };
@@ -333,6 +338,7 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
   assert.ok(!matchesPreset(customization({ colorMode: "grayscale" }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "colorMode divergence breaks the match");
   assert.ok(!matchesPreset(customization({ showRankingChart: false }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "chart visibility divergence breaks the match");
   assert.ok(!matchesPreset(customization({ showSpendAllocationChart: false }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "spend allocation chart visibility divergence breaks the match");
+  assert.ok(!matchesPreset(customization({ showMovementChart: false }), PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS), "movement chart visibility divergence breaks the match");
   assert.ok(
     !matchesPreset(
       customization({ sections: { ...base.sections, patterns: false } }),
@@ -415,6 +421,11 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
     "spend allocation chart visibility divergence -> custom"
   );
   assert.equal(
+    derivePreset(customization({ showMovementChart: false }), PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS),
+    "custom",
+    "movement chart visibility divergence -> custom"
+  );
+  assert.equal(
     derivePreset(
       customization({ sections: { ...customization().sections, confidence: false } }),
       PERFORMANCE_PRESETS,
@@ -437,6 +448,11 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
     showSpendAllocationChart: true,
   };
   assert.equal(derivePreset(allocationChartRestored, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "buyer", "restoring spend allocation chart visibility restores the preset name");
+  const movementChartRestored = {
+    ...customization({ showMovementChart: false }),
+    showMovementChart: true,
+  };
+  assert.equal(derivePreset(movementChartRestored, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "buyer", "restoring movement chart visibility restores the preset name");
 
   // Test req #4: mode switching alone never changes the preset name.
   const clientPreviewOfBuyer = customization({ mode: "client" });
@@ -469,6 +485,7 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
   assert.equal(competitorDefault.colorMode, "color");
   assert.equal(competitorDefault.showRankingChart, true);
   assert.equal(competitorDefault.showSpendAllocationChart, true);
+  assert.equal(competitorDefault.showMovementChart, true);
 }
 
 {
@@ -477,14 +494,25 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
   assert.ok(reportSrc.includes("winners={sections.winners ? memo.winners.slice(0, customization.topAdsShown) : []}"));
   assert.ok(reportSrc.includes("losers={sections.underperformers ? memo.losers.rows.slice(0, customization.topAdsShown) : []}"));
   assert.ok(/customization\.showSpendAllocationChart\s*&&[\s\S]{0,100}<SpendAllocationChart/.test(reportSrc));
+  assert.ok(/customization\.showMovementChart\s*&&[\s\S]{0,150}<MovementChart/.test(reportSrc));
+  // showMovementChart and sections.whatChanged are wired independently
+  // — neither's mount condition references the other's flag.
+  assert.ok(
+    !/customization\.showMovementChart[\s\S]{0,10}sections\.whatChanged/.test(reportSrc) &&
+      !/sections\.whatChanged[\s\S]{0,10}customization\.showMovementChart/.test(reportSrc),
+    "showMovementChart's own mount condition never references sections.whatChanged"
+  );
   const competitorSrc = readFileSync(new URL("../components/competitorDebrief/CompetitorDebriefResult.tsx", import.meta.url), "utf-8");
   assert.ok(!competitorSrc.includes("PerformanceRankingChart"));
   assert.ok(!competitorSrc.includes("showRankingChartControl"));
   assert.ok(!competitorSrc.includes("SpendAllocationChart"));
   assert.ok(!competitorSrc.includes("showSpendAllocationChartControl"));
+  assert.ok(!competitorSrc.includes("MovementChart"));
+  assert.ok(!competitorSrc.includes("showMovementChartControl"));
   const textSrc = readFileSync(new URL("../components/debrief/memoToText.ts", import.meta.url), "utf-8");
   assert.ok(!textSrc.includes("showRankingChart"), "TXT export remains presentation-independent");
   assert.ok(!textSrc.includes("showSpendAllocationChart"), "TXT export remains presentation-independent for spend allocation too");
+  assert.ok(!textSrc.includes("showMovementChart"), "TXT export remains presentation-independent for movement too");
   const chartSrc = readFileSync(new URL("../components/debrief/PerformanceRankingChart.tsx", import.meta.url), "utf-8");
   assert.ok(
     /const referenceLabel = client\s*\? clientizeText\(chartRow\.row\.vsMedianLabel\)\s*:\s*chartRow\.row\.vsMedianLabel/.test(chartSrc),

@@ -31,6 +31,7 @@ export function ReportCustomizationPanel<Id extends string>({
   presetOptions,
   showRankingChartControl,
   showSpendAllocationChartControl,
+  showMovementChartControl,
 }: {
   open: boolean;
   onClose: () => void;
@@ -58,6 +59,8 @@ export function ReportCustomizationPanel<Id extends string>({
   showRankingChartControl?: boolean;
   /** Same opt-in pattern as showRankingChartControl above. */
   showSpendAllocationChartControl?: boolean;
+  /** Same opt-in pattern as showRankingChartControl above. */
+  showMovementChartControl?: boolean;
 }) {
   const { customization } = actions;
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
@@ -393,6 +396,23 @@ export function ReportCustomizationPanel<Id extends string>({
                     </label>
                     <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
                       Shows where judged spend sits relative to the median. It does not make a recommendation.
+                    </p>
+                  </div>
+                )}
+
+                {showMovementChartControl && (
+                  <div>
+                    <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={customization.showMovementChart}
+                        onChange={(event) => actions.setShowMovementChart(event.target.checked)}
+                        className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-accent"
+                      />
+                      <span className={fieldLabel}>Movement chart</span>
+                    </label>
+                    <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                      Shows ranked ad movement between two periods, when a previous-period file was uploaded. It does not make a recommendation.
                     </p>
                   </div>
                 )}

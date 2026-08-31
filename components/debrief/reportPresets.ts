@@ -50,6 +50,7 @@ export const PERFORMANCE_PRESETS: Record<
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     sections: createDefaultSections(PERFORMANCE_SECTION_IDS),
   },
   client: {
@@ -59,6 +60,7 @@ export const PERFORMANCE_PRESETS: Record<
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     sections: clientSections,
   },
   executive: {
@@ -68,6 +70,7 @@ export const PERFORMANCE_PRESETS: Record<
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     sections: { ...clientSections, underperformers: false },
   },
   print: {
@@ -77,6 +80,7 @@ export const PERFORMANCE_PRESETS: Record<
     colorMode: "grayscale",
     showRankingChart: true,
     showSpendAllocationChart: true,
+    showMovementChart: true,
     sections: createDefaultSections(PERFORMANCE_SECTION_IDS),
   },
 };

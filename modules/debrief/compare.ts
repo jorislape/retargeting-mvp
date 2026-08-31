@@ -240,6 +240,12 @@ export function buildComparison(
           ? `${magnitude} (${d.better ? "better" : "worse"})`
           : `from ${fmt.kpiValue(d.prevValue)} — change not expressible as a %`,
       spendChangeLabel: `${fmt.money(d.pair.previous.spend)} → ${fmt.money(d.pair.current.spend)}`,
+      /* Movement V1: expose the same raw values already computed
+         above — never a second computation. */
+      prevValue: d.prevValue,
+      currValue: d.currValue,
+      pct: d.pct,
+      better: d.better,
     };
     if (
       nouns != null &&
@@ -256,6 +262,14 @@ export function buildComparison(
   const accountClient: string[] = [];
   const prevMedian = previous.analysis.median;
   const currMedian = current.analysis.median;
+  /* Movement V1: hoisted into named variables (rather than pushed
+     directly) so the identical sentence can ALSO be exposed as
+     medianMovement below — a named field instead of a consumer
+     depending on account[0]'s position. accountBuyer/accountClient
+     still receive the exact same string, in the same position, as
+     before this change. */
+  let medianMovementBuyer: string;
+  let medianMovementClient: string;
   if (prevMedian != null && currMedian != null) {
     const medianPct = betterPct(prevMedian, currMedian, higherBetter);
     const direction =
@@ -270,14 +284,10 @@ export function buildComparison(
         : medianPct === 0
           ? " (unchanged)"
           : "";
-    accountBuyer.push(
-      `Median ${fmt.kpiLabel} moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${pctLabel}.`
-    );
-    accountClient.push(
-      `The account's typical ${fmt.kpiLabel} result moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${
-        direction === "unchanged" ? "" : ` — ${direction} than last period`
-      }.`
-    );
+    medianMovementBuyer = `Median ${fmt.kpiLabel} moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${pctLabel}.`;
+    medianMovementClient = `The account's typical ${fmt.kpiLabel} result moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${
+      direction === "unchanged" ? "" : ` — ${direction} than last period`
+    }.`;
   } else {
     const missing =
       prevMedian == null && currMedian == null
@@ -285,13 +295,11 @@ export function buildComparison(
         : prevMedian == null
           ? "the previous period"
           : "the current period";
-    accountBuyer.push(
-      `No benchmark could be computed for ${missing} (too few judged ads) — account-level movement is limited to spend and counts.`
-    );
-    accountClient.push(
-      `There wasn't enough qualifying data in ${missing} to compare typical results — the comparison covers spend and ad counts.`
-    );
+    medianMovementBuyer = `No benchmark could be computed for ${missing} (too few judged ads) — account-level movement is limited to spend and counts.`;
+    medianMovementClient = `There wasn't enough qualifying data in ${missing} to compare typical results — the comparison covers spend and ad counts.`;
   }
+  accountBuyer.push(medianMovementBuyer);
+  accountClient.push(medianMovementClient);
   const prevSpend = previous.analysis.totalSpend;
   const currSpend = current.analysis.totalSpend;
   const spendPct =
@@ -514,6 +522,7 @@ export function buildComparison(
       current: currRange ? `${currRange.start} – ${currRange.end}` : null,
     },
     account: { buyer: accountBuyer, client: accountClient },
+    medianMovement: { buyer: medianMovementBuyer, client: medianMovementClient },
     improved: improvedAll.slice(0, MAX_DELTA_ROWS).map(toRow),
     declined: declinedAll.slice(0, MAX_DELTA_ROWS).map(toRow),
     matchedJudgedBoth: deltas.length,
