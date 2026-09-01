@@ -364,11 +364,15 @@ export function memoToText(
   memo.nextTests.forEach((t, i) => {
     lines.push(`${i + 1}. ${c(t.test)}`);
     if (t.briefReadiness) {
+      // "Early signal" (not "Directional") is the rendered label for
+      // state "directional" — matches Report.tsx's TestRow badge;
+      // avoids colliding in the exported text with the Decision Card's
+      // dataset-level "Evidence: Directional — ..." line.
       const label =
         t.briefReadiness.state === "ready"
           ? "Ready"
           : t.briefReadiness.state === "directional"
-            ? "Directional"
+            ? "Early signal"
             : "Not enough evidence";
       lines.push(`   Brief readiness: ${label}`);
       if (t.briefReadiness.state !== "ready") {

@@ -997,8 +997,14 @@ function TestRow({
         </div>
         {/* Evidence Sufficiency V1 — present only for tests claiming an
             observed win/loss pattern (T1/T2). A small, quiet badge, not
-            a second headline: Ready/Directional/Not enough evidence,
-            same color scale as the Decision Card's evidence line. */}
+            a second headline: Ready/Early signal/Not enough evidence,
+            same color scale as the Decision Card's evidence line.
+            "Early signal" (not "Directional") is the rendered label for
+            state "directional" — the internal state name is unchanged,
+            this is display-only, chosen so this per-test badge can't be
+            mistaken for the Decision Card's dataset-level "Evidence:
+            Directional — ..." line, a different question answered in
+            words that happened to collide. */}
         {test.briefReadiness && (
           <p
             className={`mt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${READINESS_COLOR[test.briefReadiness.state]}`}
@@ -1006,7 +1012,7 @@ function TestRow({
             {test.briefReadiness.state === "ready"
               ? "Ready"
               : test.briefReadiness.state === "directional"
-                ? "Directional"
+                ? "Early signal"
                 : "Not enough evidence"}
           </p>
         )}
