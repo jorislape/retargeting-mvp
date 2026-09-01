@@ -50,6 +50,10 @@ export interface GeneratorFields {
    *  fallback ("the current offer"). Never interpreted. */
   offer: string;
   targetCpa: string;
+  /** Define/Context Foundation V1 — the ROAS analog to targetCpa.
+   *  Display + success-criterion wording only; never feeds the spend
+   *  gate. Empty = not supplied. */
+  targetRoas: string;
   creativeNotes: string;
   /** Optional pasted market/competitor notes — never required. */
   marketContext: string;
@@ -71,6 +75,14 @@ export interface GeneratorFields {
      Empty = Debrief defaults. */
   spendGateOverride: string;
   minOutcomeCount: string;
+  /* Evidence Sufficiency V1 — Brief Readiness's own two criteria.
+     Separate from minOutcomeCount above (a different question — is an
+     observed win/loss worth briefing creative against, not whether
+     the scale/shift budget action fires). Empty = Debrief's own
+     disclosed practitioner-informed default applies, never a silent
+     no-op the way an empty minOutcomeCount is. */
+  minBriefOutcomeCount: string;
+  minLossSpendMultiple: string;
 }
 
 /* Competitor sources are an input aid for the market-notes field, not
@@ -88,6 +100,7 @@ const DEFAULT_FIELDS: GeneratorFields = {
   product: "",
   offer: "",
   targetCpa: "",
+  targetRoas: "",
   creativeNotes: "",
   marketContext: "",
   controlledTest: "",
@@ -96,6 +109,8 @@ const DEFAULT_FIELDS: GeneratorFields = {
   objective: "",
   spendGateOverride: "",
   minOutcomeCount: "",
+  minBriefOutcomeCount: "",
+  minLossSpendMultiple: "",
 };
 
 /* The engine is deterministic and fast (~50ms); a sub-100ms flash of
@@ -269,6 +284,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     body.append("product", fields.product);
     body.append("offer", fields.offer);
     if (fields.targetCpa.trim() !== "") body.append("targetCpa", fields.targetCpa);
+    if (fields.targetRoas.trim() !== "") body.append("targetRoas", fields.targetRoas);
     body.append("creativeNotes", fields.creativeNotes);
     body.append("marketContext", fields.marketContext);
     // Evidence Inputs V1: send test-quality answers only when the user
@@ -285,6 +301,13 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     }
     if (fields.minOutcomeCount.trim() !== "") {
       body.append("minOutcomeCount", fields.minOutcomeCount);
+    }
+    // Evidence Sufficiency V1: same "send only when set" contract.
+    if (fields.minBriefOutcomeCount.trim() !== "") {
+      body.append("minBriefOutcomeCount", fields.minBriefOutcomeCount);
+    }
+    if (fields.minLossSpendMultiple.trim() !== "") {
+      body.append("minLossSpendMultiple", fields.minLossSpendMultiple);
     }
     // Period Comparison V2: the optional previous-period file.
     if (previousFile) body.append("previousCsv", previousFile);

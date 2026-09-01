@@ -14,6 +14,7 @@ import {
   fmtMoney,
 } from "./format";
 import { assessMarketNotes, extractMarketSignals, MARKET_SIGNALS_DISCLOSURE } from "./marketSignals";
+import { deriveLossConfidenceReadiness, deriveSignalVolumeReadiness } from "./briefReadiness";
 import {
   AnalysisResult,
   CREATIVE_FORMAT_LABELS,
@@ -493,6 +494,30 @@ function buildNextTests(
   const worst = losers[0] ?? null; // losers arrive sorted worst-first
   const winnerTag = dominantTag(winners);
 
+  /* Evidence Sufficiency V1 — Brief Readiness. Computed once (per test
+     slot, not per branch) and attached only to T1 (winner-iteration)
+     and T2 (loser-rebuild) below — the two slots that actually claim
+     an observed win/loss pattern is worth briefing creative against.
+     T3 never carries this: its scale branch is a budget-elasticity
+     test (no new creative claimed), and its fallback branches propose
+     a fresh, not-yet-observed format/offer — neither makes the kind of
+     claim brief readiness qualifies. Decision-blind and comparison-
+     blind by construction — briefReadiness.ts reads only AnalysisResult
+     facts, never memo.comparison. */
+  const outcomeNouns = outcomeNounsForKpi(kpi);
+  const winnerReadiness = deriveSignalVolumeReadiness(
+    analysis,
+    criteria,
+    outcomeNouns?.one ?? "result",
+    outcomeNouns?.many ?? "results"
+  );
+  const loserReadiness = deriveLossConfidenceReadiness(
+    analysis,
+    context.targetCpa,
+    criteria,
+    (v) => fmtMoney(v, currency)
+  );
+
   /* Market context (when pasted) may REFRAME a test — own performance
      data stays the primary signal, and every market-informed line says
      so. Null when the field was left empty, in which case every branch
@@ -541,9 +566,11 @@ function buildNextTests(
   const successMetric =
     kpi === "cpa" && context.targetCpa != null
       ? `CPA below your ${fmtMoney(context.targetCpa, currency)} target once the ~${gateLabel} spend gate is cleared.`
-      : kpi === "ctr"
-        ? `CTR above ${typicalLabel} once the ~${gateLabel} spend gate is cleared, without cost per click worsening materially.`
-        : `${kpiLabel} ${HIGHER_IS_BETTER[kpi] ? "above" : "below"} ${typicalLabel} once the ~${gateLabel} spend gate is cleared.`;
+      : kpi === "roas" && context.targetRoas != null
+        ? `ROAS above your ${context.targetRoas.toFixed(2)}x target once the ~${gateLabel} spend gate is cleared.`
+        : kpi === "ctr"
+          ? `CTR above ${typicalLabel} once the ~${gateLabel} spend gate is cleared, without cost per click worsening materially.`
+          : `${kpiLabel} ${HIGHER_IS_BETTER[kpi] ? "above" : "below"} ${typicalLabel} once the ~${gateLabel} spend gate is cleared.`;
   /* Creative / brand constraints the user typed (tone, geo, claims to
      avoid, required offer language). Surfaced as a brief guardrail so
      the hand-off respects them — never touches scoring, ranking, or the
@@ -598,6 +625,8 @@ function buildNextTests(
       setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each clears the spend gate. Change only the opening 3 seconds / first frame between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
       signals,
+      hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, we expect at least one variant to beat ${medianLabel} — because "${top.name}" already leads this dataset at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend.`,
+      briefReadiness: winnerReadiness ?? undefined,
       brief: {
         title: founderLed
           ? `Founder-led variant of the "${top.name}" angle`
@@ -652,6 +681,7 @@ function buildNextTests(
       setup: `Matched budget (~${gateLabel} per ad), same audience and placement across all three, so the angle is the only variable.`,
       winningLooksLike: `At least one angle clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
+      hypothesis: `If we run three deliberately different angles at matched budget while holding audience, placement, and offer constant, we expect at least one to clear ${gateLabel} spend and beat ${medianLabel} — because no ad in the current dataset has separated from the median yet, so the next signal has to come from a new angle, not more spend behind an existing one.`,
       brief: {
         title: "Angle exploration: problem-led vs social-proof vs offer-led",
         objective: `Find a first winning angle — nothing beat ${typicalLabel} this period, so the account needs new direction, not iteration.`,
@@ -699,6 +729,8 @@ function buildNextTests(
         setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateLabel} with the same audience, placement, and offer — creative is the only change.`,
         winningLooksLike: `The rebuild beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} and closes to within 20% of ${medianLabel}.`,
         signals,
+        hypothesis: `If we rebuild "${worst.name}" leading with the problem instead of the discount, while holding the offer, audience, and placement constant, we expect it to close toward ${medianLabel} — because the current version ran ${worstStats}, and an offer-led opening on a discount ad is a common reason a discount alone isn't earning attention.`,
+        briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `Problem-first rebuild of "${worst.name}"`,
           objective:
@@ -738,6 +770,8 @@ function buildNextTests(
         setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateLabel}, same audience and offer.`,
         winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
         signals,
+        hypothesis: `If we reshoot "${worst.name}"'s message as ${winnerTag.tag} while holding the message, audience, and offer constant, we expect it to approach ${medianLabel} — because ${winnerTag.tag} ads already hold ${winnerTag.count}/${winners.length} winner slots in this dataset, while the loser ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)} on ${fmtMoney(worst.spend, currency)} spend.`,
+        briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `${winnerTag.tag} reshoot of "${worst.name}"`,
           objective:
@@ -777,6 +811,8 @@ function buildNextTests(
         setup: `Reduce the original's spend. One rebuild at ~${gateLabel}, changing only the hook — same body, audience, and offer.`,
         winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
         signals,
+        hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, we expect it to clearly beat ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} — because at ${worstStats} it's the account's weakest judged ad, and a rebuild is the cheapest way to learn whether the angle itself is the problem or just the hook.`,
+        briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `Hook rebuild of "${worst.name}"`,
           objective:
@@ -816,6 +852,7 @@ function buildNextTests(
       setup: `One challenger, one control, matched budget (~${gateLabel} each), same audience and offer.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
+      hypothesis: `If we test ${challenger} against the current best ad at matched budget while holding message, audience, and offer constant, we expect the challenger to clear ${gateLabel} spend and beat ${medianLabel} — because no ad is clearly failing this period, so the next signal has to come from a controlled format comparison rather than fixing a loser.`,
       brief: {
         title: `Format challenger: ${challenger}`,
         objective:
@@ -858,10 +895,11 @@ function buildNextTests(
     );
     tests.push({
       test: `Scale "${top.name}" daily budget by 25–50%.`,
-      why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} vs median on ${fmtMoney(top.spend, currency)} already spent. The clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before making broader budget moves.`,
+      why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} on ${fmtMoney(top.spend, currency)} already spent. The clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before making broader budget moves.`,
       setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
       winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
       signals,
+      hypothesis: `If we raise "${top.name}"'s daily budget 25–50% while holding its creative, audience, and placements constant, we expect ${kpiLabel} to stay within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} — because it already leads this dataset ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} on ${fmtMoney(top.spend, currency)} of real spend, past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`,
       brief: {
         title: `Scale readiness: "${top.name}"`,
         objective: `Learn whether the winner holds its ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} at 25–50% higher spend.`,
@@ -903,6 +941,7 @@ function buildNextTests(
       setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it clears the spend gate.`,
       winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
       signals,
+      hypothesis: `If we swap only the offer to a bundle while holding "${top.name}"'s creative and audience constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because bundle offers repeat in your market notes (directional) and the angle already leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel}, making an offer swap the cheapest adaptation to test.`,
       brief: {
         title: `Bundle offer variant of "${top.name}"`,
         objective:
@@ -948,6 +987,7 @@ function buildNextTests(
       setup: `Launch the challenger at ~${gateLabel} alongside the control, same audience and offer, until both clear the spend gate.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
+      hypothesis: `If we launch ${challenger} at matched budget alongside the current control while holding audience and offer constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because ${leadPastBar ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar but this debrief isn't committing a budget move on it yet, so a structured challenger builds comparison data while that evidence firms up` : winnerTag ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive enough to say the format itself is the reason` : "no format is clearly winning yet, so a controlled comparison is the fastest way to a real pattern"}.`,
       brief: {
         title: `Format challenger: ${challenger}`,
         objective:
@@ -1402,7 +1442,11 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
 
   // Decision Criteria V2 — built once and shared by the decision, the
   // T3 gate, and the avoid lines, so all three read the same bars.
-  const criteria: DecisionCriteria = { minOutcomeCount: context.minOutcomeCount };
+  const criteria: DecisionCriteria = {
+    minOutcomeCount: context.minOutcomeCount,
+    minBriefOutcomeCount: context.minBriefOutcomeCount,
+    minLossSpendMultiple: context.minLossSpendMultiple,
+  };
 
   // Built once: the list feeds both the memo's tests section and the
   // Next-move decision (T1 recommends exactly nextTests[0]).

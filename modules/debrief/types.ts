@@ -159,6 +159,24 @@ export interface DecisionCriteria {
    *  applicable to CTR/CPC (no outcome count exists); never a
    *  purchase-only "conversions" generalization. */
   minOutcomeCount?: number | null;
+  /** Evidence Sufficiency V1 — Brief Readiness (winner side): minimum
+   *  outcome count on the LEADING ad before its observed win is treated
+   *  as established enough to brief creative against. Deliberately a
+   *  SEPARATE field from minOutcomeCount above (which gates the
+   *  scale/shift BUDGET action and has no default — null there means
+   *  "no gate at all"). This field always has an effective bar: unset
+   *  falls back to Debrief's own disclosed, practitioner-informed
+   *  default (BRIEF_READY_MIN_OUTCOMES in briefReadiness.ts), never a
+   *  silent no-op. See modules/debrief/briefReadiness.ts. */
+  minBriefOutcomeCount?: number | null;
+  /** Evidence Sufficiency V1 — Brief Readiness (loser side): minimum
+   *  multiple of the ad's cost target (or, when no target CPA is given,
+   *  a disclosed proxy — this account's own evidence gate) the ad must
+   *  have spent before its underperformance is treated as confident
+   *  rather than possibly under-tested. Also always has an effective
+   *  bar when unset (Debrief's own disclosed default). See
+   *  modules/debrief/briefReadiness.ts. */
+  minLossSpendMultiple?: number | null;
 }
 
 /** One decision bar that participated in this memo's call, with its
@@ -185,6 +203,14 @@ export interface DebriefContext extends DecisionInputContext {
    *  offer"). */
   offer: string;
   targetCpa: number | null;
+  /** Define/Context Foundation V1 — the ROAS analog to targetCpa.
+   *  Display + success-criterion wording only (kpi === "roas" branch of
+   *  buildNextTests' successMetric) — deliberately NEVER feeds the
+   *  spend gate (unlike targetCpa's 3× rule): converting a ROAS target
+   *  into an implied spend/cost figure would require price/AOV data
+   *  this app never collects, so that formula would not be honest.
+   *  null = not supplied. */
+  targetRoas: number | null;
   /** Copied into the report and creative briefs as the user's own
    *  guardrails, and quoted verbatim in one row-reason line — never
    *  interpreted, and its mere presence no longer affects confidence
@@ -202,6 +228,12 @@ export interface DebriefContext extends DecisionInputContext {
   /** Decision Criteria V2 — see DecisionCriteria.minOutcomeCount.
    *  null = no user minimum. */
   minOutcomeCount: number | null;
+  /** Evidence Sufficiency V1 — see DecisionCriteria.minBriefOutcomeCount.
+   *  null = Debrief's disclosed default applies. */
+  minBriefOutcomeCount: number | null;
+  /** Evidence Sufficiency V1 — see DecisionCriteria.minLossSpendMultiple.
+   *  null = Debrief's disclosed default applies. */
+  minLossSpendMultiple: number | null;
 }
 
 /** One ad row after column resolution and metric derivation. */
@@ -417,6 +449,34 @@ export interface MemoBrief {
   basisNote: string;
 }
 
+/* ------------------------------------------------------------------ */
+/* Evidence Sufficiency + Brief Readiness V1                           */
+/*                                                                    */
+/* A SEPARATE question from evidenceState (whole-dataset decision      */
+/* readiness) and confidence.level (whole-dataset trust): "is THIS     */
+/* specific observed win/loss strong enough to responsibly brief       */
+/* creative against?" Computed per test in modules/debrief/            */
+/* briefReadiness.ts — a dedicated, decision-blind module. Winner-side */
+/* and loser-side use genuinely different rules (outcome COUNT vs      */
+/* spend MULTIPLE — see that file). NEVER read by decision.ts, NEVER   */
+/* changes evidenceState/confidence.level/the committed action —       */
+/* isolation is test-enforced the same way compare.ts/decision.ts is.  */
+/* ------------------------------------------------------------------ */
+
+export type BriefReadinessState = "ready" | "directional" | "insufficient";
+
+/** Per-test evidence-sufficiency read. Two registers, like the rest of
+ *  the memo; `criterion` always states whose bar decided (Debrief's
+ *  disclosed default or the user's own), mirroring AppliedCriterion —
+ *  universal thresholds are never presented as universal truth here
+ *  either. */
+export interface MemoBriefReadiness {
+  state: BriefReadinessState;
+  buyer: string;
+  client: string;
+  criterion: AppliedCriterion;
+}
+
 export interface MemoTest {
   test: string;
   why: string;
@@ -427,6 +487,21 @@ export interface MemoTest {
    *  Never invented — only signals the data actually shows. Rendered
    *  as "Signals used" (buyer) / "Why this test" (client). */
   signals: string[];
+  /** Evidence Sufficiency V1 — the missing link in the traceability
+   *  chain (Observed signal -> Hypothesis -> Variable changed ->
+   *  Controls -> Success criterion). basedOn/change/keepConstant/
+   *  successMetric already covered the other four; this states the
+   *  hypothesis explicitly rather than leaving it implicit in `why`.
+   *  Deterministic, templated from the same facts as the rest of the
+   *  test — never a causal claim, always "if X, we expect Y, because
+   *  signal S already observed in this dataset." */
+  hypothesis: string;
+  /** Present only for tests that claim an observed winning or losing
+   *  PATTERN worth briefing (T1 winner-iteration, T2 loser-rebuild).
+   *  Absent for tests that don't make that claim (budget-elasticity
+   *  tests, fresh unobserved format/offer challengers) — brief
+   *  readiness has nothing to qualify there. */
+  briefReadiness?: MemoBriefReadiness;
   brief: MemoBrief;
 }
 

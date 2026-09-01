@@ -69,6 +69,7 @@ export const SAMPLE_CONTEXT: DebriefContext = {
   product: "Lumen Skincare — Vitamin C Serum",
   offer: "20% off first order",
   targetCpa: null,
+  targetRoas: null,
   creativeNotes:
     "UGC_* and Testimonial_* ads are creator-shot; Static_* and ProductShot_* are designed statics; *_Video_* are edited brand cuts.",
   marketContext:
@@ -78,4 +79,12 @@ export const SAMPLE_CONTEXT: DebriefContext = {
      (budget shift) is unchanged. */
   spendGateOverride: null,
   minOutcomeCount: null,
+  /* Evidence Sufficiency V1: the sample also runs on Debrief's own
+     disclosed brief-readiness defaults (50 outcomes / 2x spend
+     multiple) — no user override, so the pinned sample readiness
+     states (winner "directional" at 34 purchases, loser "insufficient"
+     with no target CPA set) are the deterministic, asserted result of
+     those defaults alone. */
+  minBriefOutcomeCount: null,
+  minLossSpendMultiple: null,
 };

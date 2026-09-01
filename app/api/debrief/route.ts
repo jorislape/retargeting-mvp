@@ -234,6 +234,23 @@ export async function POST(request: NextRequest) {
     targetCpa = parsed;
   }
 
+  /* Define/Context Foundation V1 — the ROAS analog to targetCpa.
+     Display + success-criterion wording only; never feeds the spend
+     gate (see targetRoas's doc comment in types.ts for why). */
+  const targetRoasRaw = form.get("targetRoas");
+  let targetRoas: number | null = null;
+  if (typeof targetRoasRaw === "string" && targetRoasRaw.trim() !== "") {
+    const parsed = Number(targetRoasRaw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fail(400, {
+        title: "Invalid target ROAS",
+        message: "Target ROAS must be a positive number.",
+        fix: "Enter a positive number (e.g. 3 for 3x), or leave the field blank.",
+      });
+    }
+    targetRoas = parsed;
+  }
+
   /* Decision Criteria V2 — the user's own decision bars. Explicit
      numeric inputs get the same posture as targetCpa: an invalid value
      is a clear 400 guide, never silently ignored (the user typed a
@@ -266,6 +283,40 @@ export async function POST(request: NextRequest) {
     minOutcomeCount = Math.floor(parsed);
   }
 
+  /* Evidence Sufficiency V1 — Brief Readiness's own two criteria.
+     Deliberately separate fields from spendGateOverride/minOutcomeCount
+     above (see DecisionCriteria's doc comments in types.ts): these gate
+     a different question (is this observed win/loss worth briefing
+     creative against, not whether the budget action fires) and, unlike
+     minOutcomeCount, always have an effective bar — an unset value
+     falls back to Debrief's own disclosed default rather than a no-op. */
+  const minBriefOutcomeRaw = form.get("minBriefOutcomeCount");
+  let minBriefOutcomeCount: number | null = null;
+  if (typeof minBriefOutcomeRaw === "string" && minBriefOutcomeRaw.trim() !== "") {
+    const parsed = Number(minBriefOutcomeRaw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fail(400, {
+        title: "Invalid brief-readiness outcome minimum",
+        message: "The minimum results before briefing a winning pattern must be a positive number.",
+        fix: "Enter a positive whole number, or leave the field blank to use Debrief's default.",
+      });
+    }
+    minBriefOutcomeCount = Math.floor(parsed);
+  }
+  const minLossSpendMultipleRaw = form.get("minLossSpendMultiple");
+  let minLossSpendMultiple: number | null = null;
+  if (typeof minLossSpendMultipleRaw === "string" && minLossSpendMultipleRaw.trim() !== "") {
+    const parsed = Number(minLossSpendMultipleRaw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fail(400, {
+        title: "Invalid loss-confidence spend multiple",
+        message: "The spend multiple before confidently calling a loss must be a positive number.",
+        fix: "Enter a positive number (e.g. 2 for 2x), or leave the field blank to use Debrief's default.",
+      });
+    }
+    minLossSpendMultiple = parsed;
+  }
+
   /* Evidence Inputs V1 + Input Honesty V1 — optional self-reported
      test-quality answers and the optional structured objective. Any
      unrecognized/absent value is treated as UNANSWERED (undefined),
@@ -291,6 +342,7 @@ export async function POST(request: NextRequest) {
     product: String(form.get("product") ?? "").trim().slice(0, 200),
     offer: String(form.get("offer") ?? "").trim().slice(0, 200),
     targetCpa,
+    targetRoas,
     creativeNotes: String(form.get("creativeNotes") ?? "").trim().slice(0, 1000),
     /* Optional pasted market/competitor notes — directional context for
        the memo only. Read into memory for this request like the rest of
@@ -302,6 +354,8 @@ export async function POST(request: NextRequest) {
     objective: parseObjective(form.get("objective")),
     spendGateOverride,
     minOutcomeCount,
+    minBriefOutcomeCount,
+    minLossSpendMultiple,
   };
 
   /* Optional creative-format confirmations (ad name → format tag).
