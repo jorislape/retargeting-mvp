@@ -114,6 +114,22 @@ function conversionsForRow(
   }
 }
 
+/** Evidence Diagnostic V1: raw upstream funnel fields, captured on
+ *  EVERY ad regardless of the selected KPI — unlike ctr/cpc, which are
+ *  only derived when the KPI itself is ctr/cpc, these are read for
+ *  every row so evidenceDiagnostic.ts can walk them for whichever ad
+ *  needs them. Never estimated: a missing column or unparseable cell
+ *  stays null, never 0. */
+function upstreamFieldsForRow(row: Record<string, string>, columns: ColumnMap) {
+  return {
+    impressions: columns.impressions ? parseNumericCell(row[columns.impressions]) : null,
+    linkClicks: columns.linkClicks ? parseNumericCell(row[columns.linkClicks]) : null,
+    addToCart: columns.addToCart ? parseNumericCell(row[columns.addToCart]) : null,
+    contentViews: columns.contentViews ? parseNumericCell(row[columns.contentViews]) : null,
+    cpm: columns.cpm ? parseNumericCell(row[columns.cpm]) : null,
+  };
+}
+
 /** Converts raw CSV rows into ParsedAd[]. Rows with no ad-name column
  *  get a positional fallback label so the flow still works, but the
  *  caller should surface that as a confidence note. */
@@ -140,6 +156,7 @@ export function extractAds(
         kpiValue: kpiValueForRow(row, columns, kpi, spend),
         nameTags: extractNameTags(name),
         conversions: conversionsForRow(row, columns, kpi),
+        ...upstreamFieldsForRow(row, columns),
         /* Spreadsheet row number (header = row 1) — used only for the
            duplicate-name display label below. */
         fileRow: index + 2,

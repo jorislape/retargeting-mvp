@@ -274,6 +274,19 @@ export interface ParsedAd {
    *  count column resolved. NEVER estimated, and never read by the spend
    *  gate, median, ranking, or any KPI value — display only. */
   conversions?: number | null;
+  /** Evidence Diagnostic V1 — raw upstream funnel fields, captured on
+   *  EVERY ad regardless of the selected KPI (unlike ctr/cpc, which are
+   *  only derived when the KPI itself is ctr/cpc). Never estimated,
+   *  never fed to the spend gate, median, ranking, or any KPI value —
+   *  read only by modules/debrief/evidenceDiagnostic.ts. null when the
+   *  source column is absent or the cell is blank/unparseable. */
+  impressions?: number | null;
+  linkClicks?: number | null;
+  addToCart?: number | null;
+  contentViews?: number | null;
+  /** Meta's own reported CPM — read verbatim, never derived from
+   *  spend/impressions. */
+  cpm?: number | null;
 }
 
 export type GateReason = "judged" | "below_spend_gate" | "no_kpi_value";
@@ -486,6 +499,74 @@ export interface MemoBriefReadiness {
   disclosureNote?: string;
 }
 
+/* ------------------------------------------------------------------ */
+/* Evidence Diagnostic V1                                              */
+/*                                                                    */
+/* A THIRD question, distinct from evidenceState (whole-dataset        */
+/* decision readiness) and Brief Readiness (per-test brief-worthiness): */
+/* "the primary KPI's own outcome evidence is too thin to trust — what  */
+/* upstream funnel signal, already in this export, is worth inspecting  */
+/* next?" Computed per-ad in modules/debrief/evidenceDiagnostic.ts — a  */
+/* dedicated, decision-blind module bounded to exactly ONE ad           */
+/* (analysis.winners[0], the same ad T1 anchors). NEVER read by         */
+/* decision.ts, NEVER changes evidenceState/confidence.level/Brief      */
+/* Readiness/the committed action — isolation is test-enforced the same */
+/* way briefReadiness.ts/compare.ts are. Buyer-only by design: this is  */
+/* mechanical funnel-cost reasoning, not client vocabulary.             */
+/* ------------------------------------------------------------------ */
+
+export type EvidenceDiagnosticRungId =
+  | "add_to_cart"
+  | "content_view"
+  | "ctr"
+  | "cpm";
+
+/** The single upstream signal the diagnostic surfaces — the FIRST
+ *  ladder rung with both a valid value for this ad and a valid
+ *  account-relative median from OTHER comparable judged ads. No
+ *  materiality cutoff: whatever that first comparable rung shows is
+ *  reported as-is, whether the delta is 1% or 80%. Framed strictly as
+ *  "worth inspecting" — never good/bad/strong/weak/unusual, and never
+ *  polarity-corrected into "better/worse" (a raw magnitude/direction
+ *  fact only; the reader draws their own conclusion). */
+export interface EvidenceDiagnosticFinding {
+  rungId: EvidenceDiagnosticRungId;
+  /** "Add-to-cart cost", "Content view cost", "CTR", "CPM". */
+  label: string;
+  valueLabel: string;
+  medianLabel: string;
+  /** Signed raw % difference vs the median (ad value vs median value) —
+   *  positive = above the median, negative = below. NOT polarity-
+   *  corrected; this is a direction/magnitude fact, not a verdict. null
+   *  when the median is 0 (not expressible as a %) — see
+   *  EvidenceDiagnosticFinding zero-baseline handling in
+   *  evidenceDiagnostic.ts. */
+  deltaPct: number | null;
+  buyer: string;
+}
+
+export interface MemoEvidenceDiagnostic {
+  /** Why the diagnostic fired for this ad — mirrors the activation
+   *  trigger (§1 of the contract): a verifiable count under the shared
+   *  noise floor, or an unverifiable (missing) count. Missing ≠ zero:
+   *  "unverifiable" is never treated as "thin". */
+  trigger: "thin_volume" | "unverifiable_volume";
+  /** Present when a comparable upstream rung was found; the ladder
+   *  walk stops at the FIRST one — never a full rung-by-rung report. */
+  finding: EvidenceDiagnosticFinding | null;
+  /** True when every ladder rung was skipped (column absent for this
+   *  ad, or no OTHER judged ad has a comparable value) and no finding
+   *  could be produced — the explicit, honest "could not evaluate"
+   *  state, distinct from "nothing unusual was found" (finding !=
+   *  null covers that; there is no third "checked and it was fine"
+   *  state in V1, since the first comparable rung is always surfaced
+   *  as-is with no materiality judgment). */
+  noComparableEvidence: boolean;
+  /** One summary sentence, buyer-only — covers either the finding or
+   *  the could-not-evaluate state. Never rendered in client view. */
+  buyer: string;
+}
+
 export interface MemoTest {
   test: string;
   why: string;
@@ -511,6 +592,11 @@ export interface MemoTest {
    *  tests, fresh unobserved format/offer challengers) — brief
    *  readiness has nothing to qualify there. */
   briefReadiness?: MemoBriefReadiness;
+  /** Evidence Diagnostic V1 — present ONLY on T1 (the winner-iteration
+   *  test) when analysis.winners[0]'s own outcome evidence is thin or
+   *  unverifiable. Bounded to at most one ad per report; never present
+   *  on any other test. Buyer-only, decision-blind. */
+  evidenceDiagnostic?: MemoEvidenceDiagnostic;
   brief: MemoBrief;
 }
 

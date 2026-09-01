@@ -15,6 +15,7 @@ import {
 } from "./format";
 import { assessMarketNotes, extractMarketSignals, MARKET_SIGNALS_DISCLOSURE } from "./marketSignals";
 import { deriveLossConfidenceReadiness, deriveSignalVolumeReadiness } from "./briefReadiness";
+import { deriveEvidenceDiagnostic } from "./evidenceDiagnostic";
 import {
   AnalysisResult,
   CREATIVE_FORMAT_LABELS,
@@ -518,6 +519,15 @@ function buildNextTests(
     (v) => fmtMoney(v, currency)
   );
 
+  /* Evidence Diagnostic V1 — bounded to T1 only (analysis.winners[0],
+     the same ad T1 anchors). A third, decision-blind question distinct
+     from Brief Readiness above: not "is this observed win strong
+     enough to brief against" but "the primary KPI's own evidence on
+     this ad is too thin to trust — what upstream signal, already in
+     this export, is worth inspecting?" Buyer-only by design; see
+     evidenceDiagnostic.ts for the full contract. */
+  const evidenceDiagnostic = deriveEvidenceDiagnostic(analysis, (v) => fmtMoney(v, currency));
+
   /* Market context (when pasted) may REFRAME a test — own performance
      data stays the primary signal, and every market-informed line says
      so. Null when the field was left empty, in which case every branch
@@ -627,6 +637,7 @@ function buildNextTests(
       signals,
       hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, we expect at least one variant to beat ${medianLabel} — because "${top.name}" already leads this dataset at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend.`,
       briefReadiness: winnerReadiness ?? undefined,
+      evidenceDiagnostic: evidenceDiagnostic ?? undefined,
       brief: {
         title: founderLed
           ? `Founder-led variant of the "${top.name}" angle`

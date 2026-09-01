@@ -76,6 +76,16 @@ const ALIASES = {
   costPerLead: ["cost per lead"],
   reportingStarts: ["reporting starts"],
   reportingEnds: ["reporting ends"],
+  /* Evidence Diagnostic V1: upstream funnel signals, resolved the same
+     way as every other alias here but never required — a CSV without
+     these columns is a complete no-op for the diagnostic (see
+     modules/debrief/evidenceDiagnostic.ts), never an error. */
+  addToCart: ["website adds to cart", "adds to cart", "add to cart"],
+  contentViews: ["website content views", "content views"],
+  /* Meta's own reported CPM column — read verbatim, never derived from
+     spend/impressions, so there is never a second, competing CPM
+     definition alongside whatever Ads Manager itself computed. */
+  cpm: ["cpm cost per 1 000 impressions", "cpm"],
 } as const;
 
 export interface ColumnMap {
@@ -96,6 +106,10 @@ export interface ColumnMap {
   costPerLead: string | null;
   reportingStarts: string | null;
   reportingEnds: string | null;
+  /** Evidence Diagnostic V1 — optional upstream funnel columns. */
+  addToCart: string | null;
+  contentViews: string | null;
+  cpm: string | null;
   /** 3-letter currency code pulled from the spend header, if present. */
   currency: string | null;
 }
@@ -126,6 +140,9 @@ export function resolveColumns(headers: string[]): ColumnMap {
     costPerLead: findHeader(headers, ALIASES.costPerLead),
     reportingStarts: findHeader(headers, ALIASES.reportingStarts),
     reportingEnds: findHeader(headers, ALIASES.reportingEnds),
+    addToCart: findHeader(headers, ALIASES.addToCart),
+    contentViews: findHeader(headers, ALIASES.contentViews),
+    cpm: findHeader(headers, ALIASES.cpm),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
   };
 }
