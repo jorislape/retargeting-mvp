@@ -382,6 +382,10 @@ export function memoToText(
       }
     }
     lines.push(`   Why: ${c(t.why)}`);
+    // Evidence Diagnostic V1 — buyer-only, never rendered in client TXT.
+    if (view !== "client" && t.evidenceDiagnostic) {
+      lines.push(`   Evidence diagnostic: ${c(t.evidenceDiagnostic.buyer)}`);
+    }
     lines.push(`   Hypothesis: ${c(t.hypothesis)}`);
     lines.push(`   ${view === "client" ? "How" : "Setup"}: ${c(t.setup)}`);
     lines.push(`   ${view === "client" ? "Success looks like" : "Winning looks like"}: ${c(t.winningLooksLike)}`);

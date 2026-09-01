@@ -1037,6 +1037,24 @@ function TestRow({
                 </dd>
               </div>
             )}
+          {/* Evidence Diagnostic V1 — buyer-only, decision-blind, bounded
+              to T1. A different question from the "Evidence check" row
+              above: not "is this observed win brief-worthy" but "the
+              primary KPI's own evidence here is thin — what upstream
+              signal, already in this export, is worth inspecting?" No
+              color, no state badge — deliberately plain-text like Why/
+              Setup/Hypothesis, so it never reads as a third traffic-
+              light score. Never rendered in client view. */}
+          {view !== "client" && test.evidenceDiagnostic && (
+            <div>
+              <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                Evidence diagnostic{" "}
+              </dt>
+              <dd className="print-kv-value inline break-words">
+                {test.evidenceDiagnostic.buyer}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Hypothesis{" "}
