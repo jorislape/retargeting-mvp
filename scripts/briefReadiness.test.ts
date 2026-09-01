@@ -209,6 +209,24 @@ function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
   );
   assert.equal(r?.state, "ready");
   assert.ok(/already (requires|assured)/i.test(r!.buyer), "explicitly discloses the gate already assures this multiple");
+  // The disclosure must also be exposed as its own field — Report.tsx's
+  // "ready" tests are otherwise terse-badge-only, so without a distinct
+  // field this exact caveat (the one case where "ready" is automatic by
+  // construction, not earned) would never reach the rendered report.
+  assert.ok(r!.disclosureNote && /already (requires|assured)/i.test(r!.disclosureNote));
+}
+{
+  // Same target-CPA-basis "ready" case, but the bar was cleared by
+  // genuinely high spend rather than gate construction (spendGateBasis
+  // stays the account default) -> no disclosure needed, none present.
+  const r = deriveLossConfidenceReadiness(
+    fixture({ losers: [ad("L", 500, -40)] }),
+    100,
+    undefined,
+    money
+  );
+  assert.equal(r?.state, "ready");
+  assert.equal(r!.disclosureNote, undefined);
 }
 {
   // No target CPA: proxy basis (spend / spendGate), capped at

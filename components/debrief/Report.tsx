@@ -1017,16 +1017,20 @@ function TestRow({
             </dt>
             <dd className="print-kv-value inline break-words">{c(test.why)}</dd>
           </div>
-          {test.briefReadiness && test.briefReadiness.state !== "ready" && (
-            <div>
-              <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-                {view === "client" ? "Worth knowing " : "Evidence check "}
-              </dt>
-              <dd className="print-kv-value inline break-words">
-                {c(view === "client" ? test.briefReadiness.client : test.briefReadiness.buyer)}
-              </dd>
-            </div>
-          )}
+          {test.briefReadiness &&
+            (test.briefReadiness.state !== "ready" ||
+              (view !== "client" && test.briefReadiness.disclosureNote)) && (
+              <div>
+                <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                  {view === "client" ? "Worth knowing " : "Evidence check "}
+                </dt>
+                <dd className="print-kv-value inline break-words">
+                  {test.briefReadiness.state !== "ready"
+                    ? c(view === "client" ? test.briefReadiness.client : test.briefReadiness.buyer)
+                    : c(test.briefReadiness.disclosureNote ?? "")}
+                </dd>
+              </div>
+            )}
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Hypothesis{" "}

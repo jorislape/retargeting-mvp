@@ -373,6 +373,8 @@ export function memoToText(
       lines.push(`   Brief readiness: ${label}`);
       if (t.briefReadiness.state !== "ready") {
         lines.push(`   ${view === "client" ? "Worth knowing" : "Evidence check"}: ${c(view === "client" ? t.briefReadiness.client : t.briefReadiness.buyer)}`);
+      } else if (view !== "client" && t.briefReadiness.disclosureNote) {
+        lines.push(`   Evidence check: ${c(t.briefReadiness.disclosureNote)}`);
       }
     }
     lines.push(`   Why: ${c(t.why)}`);

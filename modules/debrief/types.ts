@@ -475,6 +475,15 @@ export interface MemoBriefReadiness {
   buyer: string;
   client: string;
   criterion: AppliedCriterion;
+  /** Buyer-only mechanical caveat for a "ready" loser-side read whose
+   *  bar was cleared automatically by construction (this account's
+   *  spend gate is already 3×target CPA), not by spend genuinely
+   *  above the loss-confidence bar. Set ONLY on that one path — every
+   *  other "ready" read has nothing mechanical to disclose, so this
+   *  stays undefined and the terse state badge is the whole story.
+   *  Never rendered in client view (mechanical gate/spend-multiple
+   *  reasoning is buyer vocabulary). */
+  disclosureNote?: string;
 }
 
 export interface MemoTest {

@@ -195,6 +195,7 @@ export function deriveLossConfidenceReadiness(
         buyer: `Ready — "${worst.name}" has spent ${multiple.toFixed(1)}× your ${money(targetCpa)} target CPA, past the ${bar}× bar this read uses before calling underperformance confident (${isUserBar ? "your criterion" : "Debrief default"}).${gateNote}`,
         client: `"${worst.name}" has had a fair amount of spend relative to your cost target without turning around — we're confident this is a real underperformance, not noise.`,
         criterion,
+        disclosureNote: gateNote ? gateNote.trim() : undefined,
       };
     }
     return {
