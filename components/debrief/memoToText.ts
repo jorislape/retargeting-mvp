@@ -363,7 +363,20 @@ export function memoToText(
   lines.push(view === "client" ? "WHAT WE'LL TEST NEXT" : "NEXT 3 TESTS");
   memo.nextTests.forEach((t, i) => {
     lines.push(`${i + 1}. ${c(t.test)}`);
+    if (t.briefReadiness) {
+      const label =
+        t.briefReadiness.state === "ready"
+          ? "Ready"
+          : t.briefReadiness.state === "directional"
+            ? "Directional"
+            : "Not enough evidence";
+      lines.push(`   Brief readiness: ${label}`);
+      if (t.briefReadiness.state !== "ready") {
+        lines.push(`   ${view === "client" ? "Worth knowing" : "Evidence check"}: ${c(view === "client" ? t.briefReadiness.client : t.briefReadiness.buyer)}`);
+      }
+    }
     lines.push(`   Why: ${c(t.why)}`);
+    lines.push(`   Hypothesis: ${c(t.hypothesis)}`);
     lines.push(`   ${view === "client" ? "How" : "Setup"}: ${c(t.setup)}`);
     lines.push(`   ${view === "client" ? "Success looks like" : "Winning looks like"}: ${c(t.winningLooksLike)}`);
     if (t.signals.length > 0) {

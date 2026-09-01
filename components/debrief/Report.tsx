@@ -345,6 +345,16 @@ const EVIDENCE_COLOR: Record<Memo["decision"]["evidenceState"], string> = {
   insufficient: "text-red-400",
 };
 
+/* Evidence Sufficiency V1 — Brief Readiness's own color scale, kept
+   visually distinct in MEANING from EVIDENCE_COLOR above even though
+   the palette is shared: this is "is this specific observation worth
+   briefing," not "is this dataset's decision supported." */
+const READINESS_COLOR: Record<"ready" | "directional" | "insufficient", string> = {
+  ready: "text-emerald-400",
+  directional: "text-amber-300",
+  insufficient: "text-red-400",
+};
+
 /** Card-only truncation: keeps "Preserve" compact by dropping any
  *  explanatory clause after the first em dash. The stored value on
  *  MemoDecision is untouched, and text export (memoToText.ts) always
@@ -422,6 +432,34 @@ function DecisionCard({
             : memo.comparison.leaderConsistency.buyer}
         </p>
       )}
+      {/* Evidence Sufficiency V1 — a strong budget decision may coexist
+          with a creative pattern that isn't durable-established yet.
+          Renders ONLY when the committed call actually moves budget
+          toward the leader (never a cut, which doesn't rest on the
+          winner's pattern at all) AND that leader's own brief-readiness
+          hasn't cleared "ready" — surfacing the split explicitly rather
+          than letting the confident budget headline imply the creative
+          claim is equally proven. Reuses T1's own already-computed
+          readiness sentence verbatim (never a second, competing
+          explanation of the same fact). decision.ts stays fully
+          unaware this line exists — briefReadiness is read from
+          memo.nextTests, never fed back into `d`. */}
+      {d.action === "budget" &&
+        d.budgetVariant !== "cut" &&
+        memo.nextTests[0]?.briefReadiness &&
+        memo.nextTests[0].briefReadiness.state !== "ready" && (
+          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-400">
+            <span
+              className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${READINESS_COLOR[memo.nextTests[0].briefReadiness.state]}`}
+            >
+              {client ? "Creative pattern" : "Brief readiness"}
+            </span>
+            {": "}
+            {client
+              ? memo.nextTests[0].briefReadiness.client
+              : memo.nextTests[0].briefReadiness.buyer}
+          </p>
+        )}
       {/* Decision Criteria V2 — whose bars decided. Buyer view only
           (the labels carry buyer vocabulary); user-provided criteria
           are visually tagged so a default is never presented as the
@@ -878,6 +916,16 @@ function ClientTestCards({ tests }: { tests: MemoTest[] }) {
           <p className="mt-3 break-words text-[13px] font-semibold leading-snug text-zinc-100">
             {clientizeText(test.test)}
           </p>
+          {/* Evidence Sufficiency V1 — same plain-language readiness
+              read as the buyer badge, jargon-free by construction
+              (MemoBriefReadiness.client never uses buyer vocabulary).
+              Quiet, not a second headline; omitted entirely once the
+              signal is fully established. */}
+          {test.briefReadiness && test.briefReadiness.state !== "ready" && (
+            <p className="mt-2 break-words text-xs leading-relaxed text-zinc-400">
+              {test.briefReadiness.client}
+            </p>
+          )}
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             Why it&apos;s worth testing
           </p>
@@ -920,9 +968,9 @@ function TestRow({
         T{index + 1}
       </span>
       <div className="min-w-0">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <p
-            className={`text-base font-semibold leading-snug tracking-tight transition ${
+            className={`min-w-0 break-words text-base font-semibold leading-snug tracking-tight transition ${
               view === "buyer" && checked
                 ? "text-zinc-500 line-through decoration-zinc-600"
                 : "text-zinc-50"
@@ -947,24 +995,55 @@ function TestRow({
             </button>
           )}
         </div>
+        {/* Evidence Sufficiency V1 — present only for tests claiming an
+            observed win/loss pattern (T1/T2). A small, quiet badge, not
+            a second headline: Ready/Directional/Not enough evidence,
+            same color scale as the Decision Card's evidence line. */}
+        {test.briefReadiness && (
+          <p
+            className={`mt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${READINESS_COLOR[test.briefReadiness.state]}`}
+          >
+            {test.briefReadiness.state === "ready"
+              ? "Ready"
+              : test.briefReadiness.state === "directional"
+                ? "Directional"
+                : "Not enough evidence"}
+          </p>
+        )}
         <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Why{" "}
             </dt>
-            <dd className="print-kv-value inline">{c(test.why)}</dd>
+            <dd className="print-kv-value inline break-words">{c(test.why)}</dd>
+          </div>
+          {test.briefReadiness && test.briefReadiness.state !== "ready" && (
+            <div>
+              <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                {view === "client" ? "Worth knowing " : "Evidence check "}
+              </dt>
+              <dd className="print-kv-value inline break-words">
+                {c(view === "client" ? test.briefReadiness.client : test.briefReadiness.buyer)}
+              </dd>
+            </div>
+          )}
+          <div>
+            <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Hypothesis{" "}
+            </dt>
+            <dd className="print-kv-value inline break-words">{c(test.hypothesis)}</dd>
           </div>
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "How " : "Setup "}
             </dt>
-            <dd className="print-kv-value inline">{c(test.setup)}</dd>
+            <dd className="print-kv-value inline break-words">{c(test.setup)}</dd>
           </div>
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "Success = " : "Win = "}
             </dt>
-            <dd className="print-kv-value inline">{c(test.winningLooksLike)}</dd>
+            <dd className="print-kv-value inline break-words">{c(test.winningLooksLike)}</dd>
           </div>
         </dl>
         {/* The receipts: which signals produced this recommendation. */}
@@ -983,7 +1062,7 @@ function TestRow({
                     aria-hidden="true"
                     className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
                   />
-                  {c(signal)}
+                  <span className="min-w-0 break-words">{c(signal)}</span>
                 </li>
               ))}
             </ul>

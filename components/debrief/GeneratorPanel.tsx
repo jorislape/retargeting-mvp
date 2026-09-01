@@ -1475,9 +1475,12 @@ export function GeneratorPanel() {
           <details
             open={
               fields.targetCpa.trim() !== "" ||
+              fields.targetRoas.trim() !== "" ||
               fields.creativeNotes.trim() !== "" ||
               fields.spendGateOverride.trim() !== "" ||
-              fields.minOutcomeCount.trim() !== ""
+              fields.minOutcomeCount.trim() !== "" ||
+              fields.minBriefOutcomeCount.trim() !== "" ||
+              fields.minLossSpendMultiple.trim() !== ""
             }
             className="group mt-4 rounded-xl border border-white/[0.07] bg-white/[0.04] open:border-white/[0.09]"
           >
@@ -1492,7 +1495,7 @@ export function GeneratorPanel() {
                 Add targets or brand constraints only when they matter for
                 this debrief.
               </p>
-              <div className="mt-3 grid gap-4 sm:grid-cols-3">
+              <div className="mt-3 grid gap-4 sm:grid-cols-4">
                 <div>
                   <label htmlFor="targetCpa" className={fieldLabel}>
                     Target CPA
@@ -1511,6 +1514,28 @@ export function GeneratorPanel() {
                   />
                   <p className="mt-1.5 text-xs text-zinc-400">
                     Sharpens the spend gate when set.
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="targetRoas" className={fieldLabel}>
+                    Target ROAS
+                  </label>
+                  <input
+                    id="targetRoas"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.1"
+                    value={fields.targetRoas}
+                    onChange={(e) =>
+                      updateFields({ targetRoas: e.target.value })
+                    }
+                    placeholder="3"
+                    className={`mt-1.5 ${inputBase}`}
+                  />
+                  <p className="mt-1.5 text-xs text-zinc-400">
+                    Used in this report&rsquo;s success criteria when ranking
+                    by ROAS. Never affects the spend gate.
                   </p>
                 </div>
                 <div className="sm:col-span-2">
@@ -1609,6 +1634,88 @@ export function GeneratorPanel() {
                       </div>
                     );
                   })()}
+                </div>
+              </div>
+
+              {/* Evidence Sufficiency V1 — a SEPARATE pair of criteria
+                  from the decision bars above: these never touch which
+                  action is recommended (scale/shift/cut/hold). They
+                  qualify whether an already-observed win or loss is
+                  strong enough to responsibly brief creative against —
+                  a different question, kept visually distinct so the
+                  two are never mistaken for one setting. Both always
+                  have an effective bar (Debrief's own disclosed,
+                  practitioner-informed default) even when left blank —
+                  unlike the decision criteria above, empty here is
+                  never a no-op. */}
+              <div className="mt-5 border-t border-white/[0.06] pt-4">
+                <p className={fieldLabel}>Brief readiness (optional)</p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  Separate from the decision above: how much evidence you
+                  want before treating an observed win or loss as strong
+                  enough to brief creative against. Debrief starts from a
+                  practitioner-informed default — not a scientific
+                  threshold — and always states whose bar applied.
+                </p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  {(() => {
+                    const nouns = outcomeNounsForKpi(fields.kpi);
+                    return (
+                      <div>
+                        <label
+                          htmlFor="minBriefOutcomeCount"
+                          className={`${fieldLabel} ${nouns == null ? "opacity-50" : ""}`}
+                        >
+                          {nouns == null
+                            ? "Minimum results before briefing a win"
+                            : `Minimum ${nouns.many} before briefing a win`}
+                        </label>
+                        <input
+                          id="minBriefOutcomeCount"
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          step={1}
+                          disabled={nouns == null}
+                          value={fields.minBriefOutcomeCount}
+                          onChange={(e) =>
+                            updateFields({ minBriefOutcomeCount: e.target.value })
+                          }
+                          placeholder="Debrief default: 50"
+                          className={`mt-1.5 ${inputBase} ${nouns == null ? "cursor-not-allowed opacity-50" : ""}`}
+                        />
+                        <p className="mt-1.5 text-xs text-zinc-400">
+                          {nouns == null
+                            ? `Not applicable to ${KPI_LABELS[fields.kpi]} — it has no purchase or lead count.`
+                            : `Below this, the leading ad's win reads as directional or not-enough-evidence rather than an established pattern. Debrief's own starting point (50) is based on practitioner methodology, not a universal rule.`}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                  <div>
+                    <label htmlFor="minLossSpendMultiple" className={fieldLabel}>
+                      Spend multiple before confirming a loss
+                    </label>
+                    <input
+                      id="minLossSpendMultiple"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.1"
+                      value={fields.minLossSpendMultiple}
+                      onChange={(e) =>
+                        updateFields({ minLossSpendMultiple: e.target.value })
+                      }
+                      placeholder="Debrief default: 2"
+                      className={`mt-1.5 ${inputBase}`}
+                    />
+                    <p className="mt-1.5 text-xs text-zinc-400">
+                      Multiple of target CPA (or, with no target CPA set,
+                      this account&rsquo;s own evidence gate) the worst ad
+                      must have spent before its underperformance reads as
+                      confident rather than possibly under-tested.
+                    </p>
+                  </div>
                 </div>
               </div>
 
