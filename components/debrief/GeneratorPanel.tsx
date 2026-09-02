@@ -1303,6 +1303,21 @@ export function GeneratorPanel() {
                 </div>
                 <div>
                   <p className="font-semibold text-zinc-200">
+                    Optional — deeper evidence
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] leading-relaxed text-zinc-400">
+                    Adds to cart · Content views · CPM (cost per 1,000
+                    impressions)
+                  </p>
+                  <p className="mt-1 text-zinc-400">
+                    Not required. When purchases or leads are still thin,
+                    including these lets Debrief point to where a
+                    performance signal is showing up earlier in the funnel
+                    instead of only at the final outcome.
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-200">
                     Supported KPI aliases
                   </p>
                   <dl className="mt-1 space-y-1">
