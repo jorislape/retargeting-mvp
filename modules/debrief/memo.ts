@@ -518,6 +518,28 @@ function buildNextTests(
     criteria,
     (v) => fmtMoney(v, currency)
   );
+  /* Hypothesis Framing Coherence V1 — reads ONLY the already-computed
+     Brief Readiness state above; no new evidence calculation, no
+     duplicated threshold. "ready" (or no readiness attached at all —
+     T3's budget-elasticity test and the fresh-challenger fallbacks
+     never claim an observed creative pattern, so there's nothing to
+     soften) keeps every hypothesis's confident "we expect X" phrasing
+     unchanged. "directional"/"insufficient" swap the expectation
+     clause to explicitly provisional "we want to test whether X"
+     phrasing on T1/T2's hypotheses ONLY — the sentence's own epistemic
+     claim then matches the evidence already computed for it, instead
+     of reading identically strong regardless. Structurally, whenever
+     Evidence Diagnostic fires for the winner, winnerThin is already
+     true by construction (deriveSignalVolumeReadiness's own floor/
+     null-count rules never return "ready" under either of Evidence
+     Diagnostic's activation conditions) — so this alone already keeps
+     the hypothesis coherent with Evidence Diagnostic's presence too,
+     without a second, redundant check. Never touches the committed
+     decision, the underlying facts, or the "because" clause that
+     follows each expectation — that clause states an observed fact
+     either way, not a confidence claim. */
+  const winnerThin = winnerReadiness != null && winnerReadiness.state !== "ready";
+  const loserThin = loserReadiness != null && loserReadiness.state !== "ready";
 
   /* Evidence Diagnostic V1 — bounded to T1 only (analysis.winners[0],
      the same ad T1 anchors). A third, decision-blind question distinct
@@ -635,7 +657,7 @@ function buildNextTests(
       setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each clears the spend gate. Change only the opening 3 seconds / first frame between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
       signals,
-      hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, we expect at least one variant to beat ${medianLabel} — because "${top.name}" already leads this dataset at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend.`,
+      hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" already leads this dataset at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend.`,
       briefReadiness: winnerReadiness ?? undefined,
       evidenceDiagnostic: evidenceDiagnostic ?? undefined,
       brief: {
@@ -740,7 +762,7 @@ function buildNextTests(
         setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateLabel} with the same audience, placement, and offer — creative is the only change.`,
         winningLooksLike: `The rebuild beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} and closes to within 20% of ${medianLabel}.`,
         signals,
-        hypothesis: `If we rebuild "${worst.name}" leading with the problem instead of the discount, while holding the offer, audience, and placement constant, we expect it to close toward ${medianLabel} — because the current version ran ${worstStats}, and an offer-led opening on a discount ad is a common reason a discount alone isn't earning attention.`,
+        hypothesis: `If we rebuild "${worst.name}" leading with the problem instead of the discount, while holding the offer, audience, and placement constant, ${loserThin ? "we want to test whether it closes toward" : "we expect it to close toward"} ${medianLabel} — because the current version ran ${worstStats}, and an offer-led opening on a discount ad is a common reason a discount alone isn't earning attention.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `Problem-first rebuild of "${worst.name}"`,
@@ -781,7 +803,7 @@ function buildNextTests(
         setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateLabel}, same audience and offer.`,
         winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
         signals,
-        hypothesis: `If we reshoot "${worst.name}"'s message as ${winnerTag.tag} while holding the message, audience, and offer constant, we expect it to approach ${medianLabel} — because ${winnerTag.tag} ads already hold ${winnerTag.count}/${winners.length} winner slots in this dataset, while the loser ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)} on ${fmtMoney(worst.spend, currency)} spend.`,
+        hypothesis: `If we reshoot "${worst.name}"'s message as ${winnerTag.tag} while holding the message, audience, and offer constant, ${loserThin ? "we want to test whether it approaches" : "we expect it to approach"} ${medianLabel} — because ${winnerTag.tag} ads already hold ${winnerTag.count}/${winners.length} winner slots in this dataset, while the loser ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)} on ${fmtMoney(worst.spend, currency)} spend.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `${winnerTag.tag} reshoot of "${worst.name}"`,
@@ -822,7 +844,7 @@ function buildNextTests(
         setup: `Reduce the original's spend. One rebuild at ~${gateLabel}, changing only the hook — same body, audience, and offer.`,
         winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
         signals,
-        hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, we expect it to clearly beat ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} — because at ${worstStats} it's the account's weakest judged ad, and a rebuild is the cheapest way to learn whether the angle itself is the problem or just the hook.`,
+        hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, ${loserThin ? "we want to test whether it clearly beats" : "we expect it to clearly beat"} ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} — because at ${worstStats} it's the account's weakest judged ad, and a rebuild is the cheapest way to learn whether the angle itself is the problem or just the hook.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `Hook rebuild of "${worst.name}"`,
@@ -905,15 +927,15 @@ function buildNextTests(
       `The lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`
     );
     tests.push({
-      test: `Scale "${top.name}" daily budget by 25–50%.`,
+      test: `Scale "${top.name}" daily budget by a single moderate step.`,
       why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} on ${fmtMoney(top.spend, currency)} already spent. The clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before making broader budget moves.`,
       setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
       winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
       signals,
-      hypothesis: `If we raise "${top.name}"'s daily budget 25–50% while holding its creative, audience, and placements constant, we expect ${kpiLabel} to stay within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} — because it already leads this dataset ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} on ${fmtMoney(top.spend, currency)} of real spend, past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`,
+      hypothesis: `If we raise "${top.name}"'s daily budget by a single moderate step while holding its creative, audience, and placements constant, we expect ${kpiLabel} to stay within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} — because it already leads this dataset ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} on ${fmtMoney(top.spend, currency)} of real spend, past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`,
       brief: {
         title: `Scale readiness: "${top.name}"`,
-        objective: `Learn whether the winner holds its ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} at 25–50% higher spend.`,
+        objective: `Learn whether the winner holds its ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} at a moderately higher spend level.`,
         basedOn: signals,
         concept:
           "No new creative launches — this is a budget-elasticity test. Prepare (don't launch) two refresh openings so a fatigue dip can be answered fast once the window closes.",
@@ -924,7 +946,7 @@ function buildNextTests(
         ],
         assetDirection: [
           `No edits to "${top.name}" while measuring — creative, audience, and placements stay frozen.`,
-          "Raise the budget in one step (25–50%), then hold 5–7 days.",
+          "Raise the budget in a single moderate step, then hold 5–7 days.",
           "Watch frequency and early-drop-off for fatigue signals.",
           "Produce both refresh openings now; launch only after the window closes.",
         ],
