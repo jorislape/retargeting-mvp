@@ -513,19 +513,29 @@ function DecisionCard({
             Next controlled test
           </p>
           <dl className="mt-1.5 space-y-1 text-[13px] leading-relaxed text-zinc-300">
+            {/* Report Density & Sequencing Coherence V1 — 320px overflow
+                root cause: these three <dd> elements carried no classes
+                at all inside a `flex gap-2` row, so each defaulted to
+                the flexbox min-width:auto footgun (a flex child refuses
+                to shrink below its content's natural width unless told
+                to). A long ad name in "Preserve" was enough to force
+                the row — and the whole page — wider than a 320px
+                viewport. min-w-0 break-words is the same fix already
+                applied everywhere else long text sits in a flex row in
+                this file (TestRow, AdTable, WhatChangedSection). */}
             <div className="flex gap-2">
               <dt className="shrink-0 font-medium text-zinc-500">
                 {client ? "Keep the same" : "Preserve"}
               </dt>
-              <dd>{cz(firstClause(d.nextControlledTest.preserve))}</dd>
+              <dd className="min-w-0 break-words">{cz(firstClause(d.nextControlledTest.preserve))}</dd>
             </div>
             <div className="flex gap-2">
               <dt className="shrink-0 font-medium text-zinc-500">Change</dt>
-              <dd>{cz(d.nextControlledTest.change)}</dd>
+              <dd className="min-w-0 break-words">{cz(d.nextControlledTest.change)}</dd>
             </div>
             <div className="flex gap-2">
               <dt className="shrink-0 font-medium text-zinc-500">Watch</dt>
-              <dd>{cz(d.nextControlledTest.watch)}</dd>
+              <dd className="min-w-0 break-words">{cz(d.nextControlledTest.watch)}</dd>
             </div>
           </dl>
         </div>
@@ -1023,38 +1033,71 @@ function TestRow({
             </dt>
             <dd className="print-kv-value inline break-words">{c(test.why)}</dd>
           </div>
-          {test.briefReadiness &&
-            (test.briefReadiness.state !== "ready" ||
-              (view !== "client" && test.briefReadiness.disclosureNote)) && (
+        </dl>
+        {/* Report Density & Sequencing Coherence V1 — Brief Readiness's
+            explanation and Evidence Diagnostic's finding are still two
+            fully independent, separately-derived facts (nothing here
+            changes briefReadiness.ts's or evidenceDiagnostic.ts's
+            output, and their own copy is untouched) — only their
+            PRESENTATION is grouped, buyer view only, under one shared
+            "Evidence" label with the same border-l/pl-3 nested-detail
+            treatment "Signals used" already uses elsewhere in this
+            component, rather than inventing a new visual pattern. Client
+            view is UNTOUCHED below (Evidence Diagnostic never reaches
+            it; Brief Readiness's single "Worth knowing" row renders
+            exactly as before, byte-for-byte, since there is nothing to
+            group there — the density problem this solves is buyer-only
+            by construction). */}
+        {view === "client" ? (
+          test.briefReadiness && test.briefReadiness.state !== "ready" && (
+            <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
               <div>
                 <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-                  {view === "client" ? "Worth knowing " : "Evidence check "}
+                  Worth knowing{" "}
                 </dt>
                 <dd className="print-kv-value inline break-words">
-                  {test.briefReadiness.state !== "ready"
-                    ? c(view === "client" ? test.briefReadiness.client : test.briefReadiness.buyer)
-                    : c(test.briefReadiness.disclosureNote ?? "")}
+                  {c(test.briefReadiness.client)}
                 </dd>
               </div>
-            )}
-          {/* Evidence Diagnostic V1 — buyer-only, decision-blind, bounded
-              to T1. A different question from the "Evidence check" row
-              above: not "is this observed win brief-worthy" but "the
-              primary KPI's own evidence here is thin — what upstream
-              signal, already in this export, is worth inspecting?" No
-              color, no state badge — deliberately plain-text like Why/
-              Setup/Hypothesis, so it never reads as a third traffic-
-              light score. Never rendered in client view. */}
-          {view !== "client" && test.evidenceDiagnostic && (
-            <div>
-              <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-                Evidence diagnostic{" "}
-              </dt>
-              <dd className="print-kv-value inline break-words">
-                {test.evidenceDiagnostic.buyer}
-              </dd>
-            </div>
-          )}
+            </dl>
+          )
+        ) : (
+          (test.briefReadiness &&
+            (test.briefReadiness.state !== "ready" || test.briefReadiness.disclosureNote)) ||
+          test.evidenceDiagnostic
+        ) && (
+          <div className="print-accent-border mt-2.5 border-l border-white/10 pl-3">
+            <p className="print-kv-label text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              Evidence
+            </p>
+            <dl className="mt-1.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
+              {test.briefReadiness &&
+                (test.briefReadiness.state !== "ready" || test.briefReadiness.disclosureNote) && (
+                  <div>
+                    <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                      Readiness{" "}
+                    </dt>
+                    <dd className="print-kv-value inline break-words">
+                      {test.briefReadiness.state !== "ready"
+                        ? test.briefReadiness.buyer
+                        : (test.briefReadiness.disclosureNote ?? "")}
+                    </dd>
+                  </div>
+                )}
+              {test.evidenceDiagnostic && (
+                <div>
+                  <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                    Diagnostic{" "}
+                  </dt>
+                  <dd className="print-kv-value inline break-words">
+                    {test.evidenceDiagnostic.buyer}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        )}
+        <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Hypothesis{" "}
@@ -1543,6 +1586,22 @@ export function Report({
           />
         )}
 
+        {/* Report Density & Sequencing Coherence V1 — Movement moved
+            here, directly beside What Changed (same comparison
+            narrative, same question: "what moved and by how much").
+            Previously sat after Verdict/Performance Ranking/Spend
+            Allocation, separated from What Changed by several unrelated
+            sections despite answering the same question from the same
+            data. Gating is unchanged and stays fully independent of
+            What Changed's own toggle (sections.whatChanged) — only
+            customization.showMovementChart, and MovementChart's own
+            internal "no comparison, no render" check, same as before
+            this move. No comparison data still renders nothing; no
+            chart math, copy, or comparison logic changed. */}
+        {customization.showMovementChart && (
+          <MovementChart comparison={memo.comparison} view={view} topAdsShown={customization.topAdsShown} />
+        )}
+
         <DecisionCard
           memo={memo}
           view={view}
@@ -1645,19 +1704,6 @@ export function Report({
             detail below. */}
         {customization.showSpendAllocationChart && (
           <SpendAllocationChart allocation={memo.spendAllocation} view={view} />
-        )}
-
-        {/* Movement V1 — ranked KPI movement between the two periods,
-            for ads honestly comparable in both. Conditional on
-            memo.comparison existing (a single-period run never
-            renders this at all) and independent of the existing
-            "What changed vs previous period" prose section above the
-            Next-move card — that section owns the full narrative;
-            this chart owns ranked magnitude only, and reuses its
-            already-composed sentences/counts rather than generating
-            new analytical prose. */}
-        {customization.showMovementChart && (
-          <MovementChart comparison={memo.comparison} view={view} topAdsShown={customization.topAdsShown} />
         )}
 
         {/* ---- Winners / What worked ---- */}
