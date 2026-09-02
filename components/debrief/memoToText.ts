@@ -9,14 +9,27 @@ export type ReportView = "buyer" | "client";
 /** The client view never says "median" or "spend gate" — swap the
  *  buyer terms for plain-English equivalents at render time, so the
  *  engine keeps one canonical string and the buyer view is untouched.
- *  Idempotent; applied only when rendering/serializing client view. */
+ *  Idempotent; applied only when rendering/serializing client view.
+ *
+ *  Report Density & Sequencing Coherence V1: "judged ad(s)" — the bare
+ *  internal category noun-phrase (an ad's own status: cleared the
+ *  spend gate or not) — is added narrowly, word-boundary-anchored to
+ *  the exact two-word sequence, never the verb phrase "judge fairly"
+ *  the rules above already produce, which stays untouched and correct
+ *  as plain English on its own. Reuses that same "enough spend to
+ *  judge fairly" vocabulary rather than inventing a new phrase, so a
+ *  reader encounters one consistent way of saying this across the
+ *  whole client report. This is a narrow, fixed addition to an
+ *  existing small rule table — not a general jargon-rewriting system. */
 export function clientizeText(text: string): string {
   return text
     .replace(/clears the spend gate/g, "has enough spend to judge fairly")
     .replace(/clear the spend gate/g, "have enough spend to judge fairly")
     .replace(/spend gate/g, "spend needed to judge fairly")
     .replace(/\bmedian (ROAS|CPA|CTR|CPC|Leads|Purchases)\b/g, "typical $1")
-    .replace(/\bmedian\b/g, "typical result");
+    .replace(/\bmedian\b/g, "typical result")
+    .replace(/\bjudged ads\b/g, "ads with enough spend to judge fairly")
+    .replace(/\bjudged ad\b/g, "ad with enough spend to judge fairly");
 }
 
 /**

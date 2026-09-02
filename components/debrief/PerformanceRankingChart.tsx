@@ -51,7 +51,16 @@ export function PerformanceRankingChart({
             Performance ranking
           </p>
           <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-            Displayed judged ads relative to one shared reference point
+            {/* Report Density & Sequencing Coherence V1 — this caption is
+                a hardcoded string, not a memo field, so it never passed
+                through clientizeText(): the bare "judged ads" phrase
+                reached client output unconverted. Client drops the
+                qualifier rather than restating "enough spend to judge
+                fairly" here — that's already established elsewhere in
+                the client report (masthead stat, Confidence section). */}
+            {client
+              ? "Displayed ads relative to one shared reference point"
+              : "Displayed judged ads relative to one shared reference point"}
           </p>
         </div>
         <p className="print-accent text-[11px] text-zinc-400">
