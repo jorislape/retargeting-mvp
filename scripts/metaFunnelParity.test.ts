@@ -322,7 +322,7 @@ WorstAd,380.00,2,1.20,60,150,1.40,16.00,48000,672`;
 
     // Winner-row inputs Evidence Diagnostic actually reads must match
     // exactly between the two ingestion paths.
-    const pick = (w: any) => ({
+    const pick = (w: Record<string, unknown>) => ({
       name: w.name,
       spend: w.spend,
       kpiValue: w.kpiValue,
