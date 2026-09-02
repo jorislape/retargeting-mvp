@@ -34,6 +34,16 @@ export interface AdInsightRow {
   costPerLead: string;
   dateStart: string;
   dateStop: string;
+  /** Meta's own reported CPM — read verbatim, never derived from
+   *  spend/impressions (Meta Funnel-Column Parity V1). */
+  cpm: string;
+  /** Upstream funnel signals (Meta Funnel-Column Parity V1) — the same
+   *  optional evidence Evidence Diagnostic V1 already reads from a
+   *  manually uploaded CSV via modules/debrief/columns.ts's addToCart/
+   *  contentViews aliases. Empty string = absent, same as every other
+   *  field here. */
+  addToCart: string;
+  contentViews: string;
 }
 
 /** last_7d…last_90d are native Graph API date_preset values; the two

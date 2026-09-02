@@ -181,7 +181,7 @@ interface ActionEntry {
   value?: string;
 }
 
-interface RawInsightRow {
+export interface RawInsightRow {
   ad_name?: string;
   spend?: string;
   impressions?: string;
@@ -192,6 +192,9 @@ interface RawInsightRow {
   action_values?: ActionEntry[];
   purchase_roas?: ActionEntry[];
   cost_per_action_type?: ActionEntry[];
+  /** Meta's own reported Cost per 1,000 Impressions — a plain numeric
+   *  field like spend/impressions, not an actions entry. */
+  cpm?: string;
   account_currency?: string;
   date_start?: string;
   date_stop?: string;
@@ -200,12 +203,29 @@ interface RawInsightRow {
 /** With unified attribution, omni_* is the cross-channel total Ads
  *  Manager shows; the pixel-specific types are fallbacks for older
  *  accounts. First present key wins. */
-const PURCHASE_KEYS = [
+export const PURCHASE_KEYS = [
   "omni_purchase",
   "purchase",
   "offsite_conversion.fb_pixel_purchase",
 ];
-const LEAD_KEYS = ["lead", "offsite_conversion.fb_pixel_lead"];
+export const LEAD_KEYS = ["lead", "offsite_conversion.fb_pixel_lead"];
+/** Same "first present key wins" fallback ladder as PURCHASE_KEYS,
+ *  applied to the add-to-cart action (Meta Funnel-Column Parity V1):
+ *  omni_add_to_cart is the cross-channel unified-attribution total,
+ *  add_to_cart/offsite_conversion.fb_pixel_add_to_cart are pixel-only
+ *  fallbacks for older accounts. Never summed — one ad won't double-
+ *  count the same add-to-cart under two action_type variants. */
+export const ADD_TO_CART_KEYS = [
+  "omni_add_to_cart",
+  "add_to_cart",
+  "offsite_conversion.fb_pixel_add_to_cart",
+];
+/** Same ladder, applied to the view-content action. */
+export const CONTENT_VIEW_KEYS = [
+  "omni_view_content",
+  "view_content",
+  "offsite_conversion.fb_pixel_view_content",
+];
 
 function pickAction(
   entries: ActionEntry[] | undefined,
@@ -217,6 +237,31 @@ function pickAction(
     if (hit?.value != null) return hit.value;
   }
   return "";
+}
+
+/** Pure raw-row -> AdInsightRow mapping, extracted from fetchAdInsights
+ *  so it's directly testable without a network call (Meta Funnel-Column
+ *  Parity V1). Behavior-identical to the inline map it replaces. */
+export function mapInsightRow(r: RawInsightRow): AdInsightRow {
+  return {
+    adName: r.ad_name ?? "",
+    spend: r.spend ?? "",
+    impressions: r.impressions ?? "",
+    linkClicks: r.inline_link_clicks ?? "",
+    ctr: r.inline_link_click_ctr ?? "",
+    cpc: r.cost_per_inline_link_click ?? "",
+    purchases: pickAction(r.actions, PURCHASE_KEYS),
+    purchaseValue: pickAction(r.action_values, PURCHASE_KEYS),
+    purchaseRoas: pickAction(r.purchase_roas, PURCHASE_KEYS),
+    costPerPurchase: pickAction(r.cost_per_action_type, PURCHASE_KEYS),
+    leads: pickAction(r.actions, LEAD_KEYS),
+    costPerLead: pickAction(r.cost_per_action_type, LEAD_KEYS),
+    dateStart: r.date_start ?? "",
+    dateStop: r.date_stop ?? "",
+    cpm: r.cpm ?? "",
+    addToCart: pickAction(r.actions, ADD_TO_CART_KEYS),
+    contentViews: pickAction(r.actions, CONTENT_VIEW_KEYS),
+  };
 }
 
 export interface InsightsResult {
@@ -238,6 +283,28 @@ function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Exact fields requested from /insights. "actions" already carries
+ *  add-to-cart/view-content action types alongside purchases/leads —
+ *  no separate action-type field exists to request. "cpm" is the only
+ *  addition needed for Meta Funnel-Column Parity V1 (Cost per 1,000
+ *  Impressions ships as its own plain field, not an actions entry). */
+export const INSIGHTS_FIELDS = [
+  "ad_name",
+  "spend",
+  "impressions",
+  "inline_link_clicks",
+  "inline_link_click_ctr",
+  "cost_per_inline_link_click",
+  "actions",
+  "action_values",
+  "purchase_roas",
+  "cost_per_action_type",
+  "cpm",
+  "account_currency",
+  "date_start",
+  "date_stop",
+] as const;
+
 export async function fetchAdInsights(
   accessToken: string,
   accountId: string,
@@ -248,21 +315,7 @@ export async function fetchAdInsights(
     // REQUIRED: makes pulled conversions/ROAS follow each ad set's
     // unified attribution setting, so numbers match Ads Manager.
     use_unified_attribution_setting: "true",
-    fields: [
-      "ad_name",
-      "spend",
-      "impressions",
-      "inline_link_clicks",
-      "inline_link_click_ctr",
-      "cost_per_inline_link_click",
-      "actions",
-      "action_values",
-      "purchase_roas",
-      "cost_per_action_type",
-      "account_currency",
-      "date_start",
-      "date_stop",
-    ].join(","),
+    fields: INSIGHTS_FIELDS.join(","),
     limit: String(INSIGHTS_PAGE_SIZE),
   });
 
@@ -301,22 +354,7 @@ export async function fetchAdInsights(
     if (url && raw.length >= MAX_INSIGHTS_ROWS) truncated = true;
   }
 
-  const rows: AdInsightRow[] = raw.map((r) => ({
-    adName: r.ad_name ?? "",
-    spend: r.spend ?? "",
-    impressions: r.impressions ?? "",
-    linkClicks: r.inline_link_clicks ?? "",
-    ctr: r.inline_link_click_ctr ?? "",
-    cpc: r.cost_per_inline_link_click ?? "",
-    purchases: pickAction(r.actions, PURCHASE_KEYS),
-    purchaseValue: pickAction(r.action_values, PURCHASE_KEYS),
-    purchaseRoas: pickAction(r.purchase_roas, PURCHASE_KEYS),
-    costPerPurchase: pickAction(r.cost_per_action_type, PURCHASE_KEYS),
-    leads: pickAction(r.actions, LEAD_KEYS),
-    costPerLead: pickAction(r.cost_per_action_type, LEAD_KEYS),
-    dateStart: r.date_start ?? "",
-    dateStop: r.date_stop ?? "",
-  }));
+  const rows: AdInsightRow[] = raw.map(mapInsightRow);
 
   return {
     rows,

@@ -13,6 +13,9 @@ const base: Omit<AdInsightRow, "adName" | "spend" | "purchaseRoas" | "purchaseVa
   costPerLead: "",
   dateStart: "2026-06-03",
   dateStop: "2026-07-02",
+  addToCart: "",
+  contentViews: "",
+  cpm: "",
 };
 
 const rows: AdInsightRow[] = [

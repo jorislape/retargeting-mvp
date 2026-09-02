@@ -18,7 +18,15 @@ import type { AdInsightRow } from "./types.ts";
 
 /** Headers are chosen to hit modules/debrief/columns.ts alias matching
  *  exactly — including the "(CUR)" suffix on spend, which is where the
- *  debrief engine reads the account currency from. */
+ *  debrief engine reads the account currency from.
+ *
+ *  Meta Funnel-Column Parity V1 appends "Adds to cart" / "Content
+ *  views" / "CPM (cost per 1,000 impressions)" at the end — additive
+ *  only, existing columns keep their position, name, and meaning.
+ *  Each new header normalizes to an alias columns.ts already resolves
+ *  (addToCart/contentViews/cpm, added for Evidence Diagnostic V1's CSV
+ *  path but never previously reachable via the Meta path), so no
+ *  change to columns.ts is needed or made. */
 const HEADERS = (currency: string) =>
   [
     "Ad name",
@@ -35,6 +43,9 @@ const HEADERS = (currency: string) =>
     "Cost per lead",
     "Reporting starts",
     "Reporting ends",
+    "Adds to cart",
+    "Content views",
+    "CPM (cost per 1,000 impressions)",
   ] as const;
 
 export function escapeCsvField(value: string): string {
@@ -64,6 +75,9 @@ export function insightsToCsv(rows: AdInsightRow[], currency: string): string {
         row.costPerLead,
         row.dateStart,
         row.dateStop,
+        row.addToCart,
+        row.contentViews,
+        row.cpm,
       ]
         .map(escapeCsvField)
         .join(",")
