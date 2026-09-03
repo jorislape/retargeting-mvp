@@ -22,10 +22,10 @@ import {
 export const metadata = {
   // { absolute } bypasses the root layout's "%s · Debrief" template —
   // this title already carries the brand, so template + this would
-  // double up to "...decision · Debrief".
-  title: { absolute: "Debrief — Your Meta Ads data, turned into a decision" },
+  // double up to "...know what to do · Debrief".
+  title: { absolute: "Debrief — Know what to do with your Meta Ads data" },
   description:
-    "Upload a CSV or pull data from Meta, add market / competitor signals if useful, and get a buyer memo, client-ready report, next creative tests, and creative briefs. No login. Your ads data is never stored on our servers.",
+    "One CSV or Meta connection in. One committed recommendation out — budget move, creative test, or hold — with the evidence stated next to it every time. No login. Ads data is never stored server-side.",
   alternates: { canonical: "/" },
 };
 
@@ -150,6 +150,34 @@ function MiniClientReport() {
   );
 }
 
+/* One real, deterministic shape a "Next move" can take when the evidence
+   is too thin for a stronger call — a "hold," not a scale/cut dressed up
+   as confident. Real field labels (Evidence, Criteria) from the actual
+   report, not invented marketing terms. */
+function MiniEvidenceCard() {
+  return (
+    <div className="rounded-lg border border-white/[0.09] bg-panel p-3.5 shadow-[0_16px_32px_-16px_rgba(0,0,0,0.7)] transition motion-safe:duration-200 motion-safe:hover:-translate-y-1">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          Next move
+        </p>
+        <span className="h-1 w-6 rounded-full bg-amber-400/60" aria-hidden="true" />
+      </div>
+      <p className="mt-2 text-[11px] font-medium leading-snug text-zinc-200">
+        Hold — too few ads have cleared the spend gate to call a winner yet.
+      </p>
+      <div className="mt-2.5 space-y-1.5">
+        <div className="border-l-2 border-amber-400/60 py-0.5 pl-2 text-[9px] font-medium text-zinc-400">
+          Evidence: limited — 3 of 5 ads judged so far
+        </div>
+        <div className="border-l-2 border-white/15 py-0.5 pl-2 text-[9px] font-medium text-zinc-400">
+          Criteria: Debrief default — your own target CPA would override it
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
     <div>
@@ -163,21 +191,16 @@ export default function HomePage() {
           For media buyers and lean marketing teams
         </p>
         <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl">
-          Your Meta Ads data,{" "}
-          <span className={gradientText}>turned into a decision</span> — in
-          two minutes.
+          Know what to do with your Meta Ads data — and{" "}
+          <span className={gradientText}>
+            when the evidence isn&apos;t strong enough
+          </span>{" "}
+          to act on yet.
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-[15px] leading-relaxed text-zinc-400">
-          Upload a CSV or pull data from Meta. Add market / competitor
-          signals if useful. Get a buyer memo, client-ready report, next
-          creative tests, and creative briefs. No login. No dashboard.
-        </p>
-        {/* Honest differentiation, secondary to the headline — stated
-            once on this page. */}
-        <p className="mx-auto mt-4 max-w-xl text-[13px] leading-relaxed text-zinc-400">
-          AI can generate an analysis. Debrief structures the full workflow
-          from Meta Ads data to a consistent buyer memo, client report, next
-          tests, and creative briefs.
+          One CSV or Meta connection in. One committed recommendation out —
+          budget move, creative test, or hold — with the evidence stated
+          next to it every time.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:mt-6">
           <Link href="/generator" className={`btn-sheen ${btnPrimary}`}>
@@ -185,30 +208,10 @@ export default function HomePage() {
             <ArrowIcon className="h-4 w-4" />
           </Link>
           <Link href="/sample" className={btnSecondaryMd}>
-            View sample report
+            See a sample report
           </Link>
         </div>
-        <p className="mt-3.5 text-[13px] text-zinc-400 lg:mt-3">
-          No CSV ready?{" "}
-          <Link
-            href="/sample"
-            className="rounded-sm font-medium text-accent-soft underline decoration-accent/40 underline-offset-2 transition hover:decoration-accent"
-          >
-            Start with the sample report
-          </Link>{" "}
-          — see a full debrief before uploading anything.
-        </p>
-        <p className="mt-2 text-[13px] text-zinc-400 lg:mt-1.5">
-          Want to check a competitor instead?{" "}
-          <Link
-            href="/competitor-debrief"
-            className="rounded-sm font-medium text-accent-soft underline decoration-accent/40 underline-offset-2 transition hover:decoration-accent"
-          >
-            Try the competitor debrief
-          </Link>
-          .
-        </p>
-        <p className="mt-2.5 text-xs text-zinc-400">
+        <p className="mt-3.5 text-xs text-zinc-400 lg:mt-3">
           No login required. Ads data is never stored server-side. Optional read-only Meta connection.
         </p>
 
@@ -317,6 +320,52 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ---- Evidence honesty: why trust the call ---- */}
+      <section className="mt-16" aria-label="Why trust the recommendation">
+        <BlurFade>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            Why trust the call
+          </p>
+          <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
+            Every recommendation states how sure it is
+          </h2>
+        </BlurFade>
+        <div className="mt-5 grid gap-5 sm:grid-cols-2 sm:items-center">
+          <BlurFade delay={0.07}>
+            <MiniEvidenceCard />
+          </BlurFade>
+          <BlurFade delay={0.14}>
+            <p className="text-sm leading-relaxed text-zinc-400">
+              Debrief can recommend a budget move, a creative test, or
+              simply holding — depending on what the data actually
+              supports. When there isn&apos;t enough evidence yet, it says
+              so instead of forcing a confident-sounding call, and it
+              always states whether a bar is Debrief&apos;s own default or
+              a target you set yourself.
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+              The same account and the same criteria always produce the
+              same recommendation — no model to re-prompt, no run-to-run
+              drift.{" "}
+              <Link
+                href="/how-it-works"
+                className="rounded-sm font-medium text-accent-soft underline decoration-accent/40 underline-offset-2 transition hover:decoration-accent"
+              >
+                See the exact rules
+              </Link>{" "}
+              or{" "}
+              <Link
+                href="/vs-chatgpt"
+                className="rounded-sm font-medium text-accent-soft underline decoration-accent/40 underline-offset-2 transition hover:decoration-accent"
+              >
+                how this compares to asking ChatGPT
+              </Link>
+              .
+            </p>
+          </BlurFade>
+        </div>
+      </section>
+
       {/* ---- The problem ---- */}
       <section
         className="animate-rise mx-auto mt-16 max-w-2xl text-center"
@@ -377,6 +426,22 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* ---- Founding path: restrained, agency-only, not competing with
+          the primary "Debrief your ads" CTA above or below it. ---- */}
+      <p
+        className="animate-rise mt-10 text-center text-[13px] text-zinc-400"
+        style={{ animationDelay: "270ms" }}
+      >
+        Running paid media for clients?{" "}
+        <Link
+          href="/founding"
+          className="rounded-sm font-medium text-accent-soft underline decoration-accent/40 underline-offset-2 transition hover:decoration-accent"
+        >
+          See the founding agency program
+        </Link>
+        .
+      </p>
 
       {/* ---- Final CTA ---- */}
       <section
