@@ -316,7 +316,7 @@ function buildMarketSignal(
     );
   } else if (top && signals.has("bundle")) {
     bullets.push(
-      `Worth testing: "${top.name}"'s winning angle with a bundle offer variant.`
+      `Worth testing: "${top.name}"'s leading angle with a bundle offer variant.`
     );
   } else if (top && signals.formats.length > 0) {
     bullets.push(
@@ -754,7 +754,7 @@ function buildNextTests(
       );
       tests.push({
         test: `Rebuild "${worst.name}" so the hook leads with the problem and the discount becomes the closer.`,
-        why: `An offer-led ad running ${worstStats} means the discount alone isn't earning attention — the opening has to sell the problem before the price can close.${
+        why: `An offer-led ad running ${worstStats} suggests the discount alone isn't earning attention — worth testing whether leading with the problem lets the price close instead.${
           problemFirst
             ? " Problem-first hooks also repeat in your market notes — an observed pattern worth adapting to your own claim, not copying."
             : ""
@@ -969,7 +969,7 @@ function buildNextTests(
       "Market notes mention bundle offers — directional."
     );
     tests.push({
-      test: `Test "${top.name}"'s winning angle with a bundle offer variant (market signal).`,
+      test: `Test "${top.name}"'s leading angle with a bundle offer variant (market signal).`,
       why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already leading at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
       setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it clears the spend gate.`,
       winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
