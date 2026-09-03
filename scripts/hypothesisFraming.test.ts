@@ -301,6 +301,81 @@ WorstAd,380.00,10,2.90`;
     }
   }
 
+  /* ===================== J. Causal-Wording Coherence V1 ===================== */
+  // T2's discount/promo branch (worst ad's name matches the discount/
+  // promo tag) plus a moderate (non-scale-eligible) winner with market
+  // notes mentioning "bundle" — reaches T3's bundle-offer branch and
+  // buildMarketSignal's own bundle bullet in the same run, exercising
+  // all three sites this fix touched.
+  const discountCsv = `Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend)
+TopWinner,500.00,20,3.00
+MidAd,450.00,15,2.80
+LowAd,400.00,12,2.60
+LowerAd,390.00,10,2.50
+Discount_Generic_20Off,380.00,3,1.20`;
+  {
+    const memo = runCsv(discountCsv, { marketContext: "Bundle offers are common in this market." });
+
+    // T2 — discount/promo branch: the mechanism is now a hypothesis,
+    // not settled causation; the fact (spend/ROAS) is still stated.
+    const t2 = memo.nextTests[1];
+    assert.match(t2.test, /Discount_Generic_20Off/, "fixture exercises the discount/promo T2 branch");
+    assert.ok(
+      !t2.why.includes("means the discount alone"),
+      "the old unhedged causal claim is gone from why"
+    );
+    assert.ok(
+      !t2.why.includes("has to sell the problem"),
+      "the old prescriptive-as-fact clause is gone from why"
+    );
+    assert.match(
+      t2.why,
+      /worth testing whether leading with the problem lets the price close/,
+      "the mechanism is now explicitly framed as something to test, not a known cause"
+    );
+    assert.match(
+      t2.why,
+      /suggests the discount alone isn't earning attention/,
+      "the observed-data framing is hedged (suggests), not asserted (means)"
+    );
+    // The hypothesis field was already correct and stays untouched.
+    assert.match(
+      t2.hypothesis,
+      /a common reason a discount alone isn't earning attention/,
+      "T2's hypothesis field is unchanged — it was already correctly hedged"
+    );
+    assertNoOverclaim(t2.why, "J: T2 discount/promo why");
+    assertNoOverclaim(t2.hypothesis, "J: T2 discount/promo hypothesis");
+
+    // T3 — bundle-offer branch: "leading angle", never "winning angle".
+    const t3 = memo.nextTests[2];
+    assert.match(t3.test, /leading angle with a bundle offer variant/, "T3 bundle test uses 'leading angle'");
+    const t3Text = JSON.stringify(t3);
+    assert.ok(!t3Text.toLowerCase().includes("winning angle"), "no 'winning angle' anywhere in the T3 bundle test object");
+
+    // buildMarketSignal's own bundle bullet: same normalization.
+    assert.ok(memo.marketSignal, "market signal present for this fixture");
+    const bundleBullet = memo.marketSignal!.bullets.find((b: string) => b.includes("bundle offer variant"));
+    assert.ok(bundleBullet, "bundle bullet present");
+    assert.match(bundleBullet!, /leading angle with a bundle offer variant/, "market-signal bundle bullet uses 'leading angle'");
+    assert.ok(
+      !memo.marketSignal!.bullets.some((b: string) => b.toLowerCase().includes("winning angle")),
+      "no 'winning angle' anywhere in market-signal bullets"
+    );
+
+    // Decision / Brief Readiness / Evidence Diagnostic: unaffected by a
+    // wording-only change to why/test strings this milestone touched.
+    // The cut fires on the LOSER's own bars (spend share, delta) —
+    // independent of scaleJustified (the WINNER's bar), which is why
+    // T3 still reaches the bundle branch above despite this being a
+    // "budget" decision: T3's own gate is scaleJustified specifically,
+    // not decision.action generally.
+    assert.equal(memo.decision.action, "budget");
+    assert.equal(memo.decision.budgetVariant, "cut", "cut-only — the winner's own lead never clears the scale bar");
+    assert.equal(memo.nextTests[0].briefReadiness.state, "directional", "20 purchases: past the floor, under the 50-bar");
+    assert.equal(memo.nextTests[0].evidenceDiagnostic, undefined, "20 purchases clears the diagnostic's own floor");
+  }
+
   console.log("hypothesisFraming: all proofs passed");
 } finally {
   rmSync(dist, { recursive: true, force: true });
