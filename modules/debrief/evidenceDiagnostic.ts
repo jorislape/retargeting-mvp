@@ -225,9 +225,19 @@ export function deriveEvidenceDiagnostic(
     if (finding != null) break;
   }
 
+  /* Provenance Coherence V1: the thin_volume branch now names the
+     floor number and attributes it, mirroring the exact "minimal
+     noise floor ... Debrief default, not a universal threshold" idiom
+     decision.ts's own limits copy and briefReadiness.ts's buyer copy
+     already use for this identical constant — so a reader who sees
+     the diagnostic in isolation (its own card, own TXT line) doesn't
+     have to cross-reference the decision card to learn "too few" is
+     Debrief's own minimal bar, not a practitioner or industry number.
+     unverifiable_volume is untouched: that branch is about a missing
+     column, not a threshold, so no floor applies to attribute. */
   const triggerClause =
     trigger === "thin_volume"
-      ? `"${top.name}" has too few recorded ${outcomeNounsForKpi(analysis.kpi)!.many} (${top.conversions}) to trust this KPI reading on its own.`
+      ? `"${top.name}" has ${top.conversions} recorded ${outcomeNounsForKpi(analysis.kpi)!.many} — under this read's minimal ${MIN_OUTCOMES_FOR_SUPPORTED}-${outcomeNounsForKpi(analysis.kpi)!.one} noise floor (Debrief default, not a universal threshold), too few to trust this KPI reading on its own.`
       : `This export has no verifiable ${outcomeNounsForKpi(analysis.kpi)!.one} count for "${top.name}", so this KPI reading can't be fully verified.`;
 
   const buyer =
