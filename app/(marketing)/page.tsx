@@ -190,7 +190,14 @@ export default function HomePage() {
           />
           For media buyers and lean marketing teams
         </p>
-        <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl">
+        {/* Homepage Positioning & Conversion V1: the approved headline is
+            materially longer than the copy it replaced, and at 320px it
+            wrapped to 7 lines at the previous text-4xl base, pushing
+            both CTAs to/past the fold. This is a presentation-only fix
+            — one step down at the un-prefixed (sub-640px) size, with
+            sm:/lg: untouched — not a copy change; not one word of the
+            approved headline moved. */}
+        <h1 className="mx-auto mt-5 max-w-2xl text-3xl font-semibold leading-[1.15] tracking-tight text-white sm:text-4xl lg:text-5xl">
           Know what to do with your Meta Ads data — and{" "}
           <span className={gradientText}>
             when the evidence isn&apos;t strong enough
