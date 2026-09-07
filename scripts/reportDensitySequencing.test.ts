@@ -150,9 +150,16 @@ WorstAd,380.00,5,1.20`;
     const spendAllocationIdx = src.indexOf("<SpendAllocationChart");
 
     assert.ok(whatChangedIdx > 0 && movementIdx > 0 && decisionCardIdx > 0);
+    // Report Decision Primacy V1 superseded this milestone's own
+    // "What Changed -> Movement -> Next Move" placement (live QA
+    // measured ~1408px of scroll before the decision whenever a
+    // previous-period file was attached) — Next Move now leads, with
+    // What Changed and Movement immediately underneath, in that same
+    // relative order to each other. See scripts/reportDecisionPrimacy
+    // .test.ts for that milestone's own dedicated ordering proof.
     assert.ok(
-      whatChangedIdx < movementIdx && movementIdx < decisionCardIdx,
-      "What Changed -> Movement -> Next Move ordering"
+      decisionCardIdx < whatChangedIdx && whatChangedIdx < movementIdx,
+      "Next Move -> What Changed -> Movement ordering"
     );
     // Only one <MovementChart mount exists — it moved, it didn't duplicate.
     assert.equal((src.match(/<MovementChart/g) ?? []).length, 1);
