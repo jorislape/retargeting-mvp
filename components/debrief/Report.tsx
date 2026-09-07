@@ -386,6 +386,46 @@ function DecisionCard({
   // nextControlledTest is a single register; clientize defensively in
   // the client view so a future test string can't leak buyer jargon.
   const cz = (text: string) => (client ? clientizeText(text) : text);
+  /* Print Disclosure Correctness V1 — Chrome silently omits a closed
+     native <details>'s content from PDF output, and no author CSS
+     override can force it (empirically confirmed: even a scoped
+     `display: block !important` on `> *:not(summary)` fails, in this
+     app and in a bare, dependency-free isolation test — this is a
+     browser rendering behavior, not a stylesheet specificity issue).
+     Each disclosure below is therefore rendered TWICE from the exact
+     same JSX value: once inside the (print-hidden) interactive
+     <details> for screen, once inside a plain .print-only block for
+     export — never two separately-written lists that could drift. */
+  const appliedCriteriaList = (
+    <ul className="mt-1.5 space-y-1">
+      {d.appliedCriteria.map((criterion, i) => (
+        <li
+          key={i}
+          className="flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500"
+        >
+          <span
+            className={`shrink-0 rounded-sm border px-1 py-px text-[9px] font-semibold uppercase tracking-[0.08em] ${
+              criterion.source === "user"
+                ? "border-accent/40 text-accent-soft"
+                : "border-white/15 text-zinc-500"
+            }`}
+          >
+            {criterion.source === "user" ? "Yours" : "Default"}
+          </span>
+          <span className="min-w-0">{criterion.label}</span>
+        </li>
+      ))}
+    </ul>
+  );
+  const limitsList = (
+    <ul className="mt-2 space-y-1">
+      {limits.map((line, i) => (
+        <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
+          {line}
+        </li>
+      ))}
+    </ul>
+  );
   return (
     <section
       aria-label="Next move"
@@ -465,30 +505,23 @@ function DecisionCard({
           are visually tagged so a default is never presented as the
           user's own bar, or vice versa. */}
       {!client && d.appliedCriteria.length > 0 && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-            Decision bars applied
-          </summary>
-          <ul className="mt-1.5 space-y-1">
-            {d.appliedCriteria.map((criterion, i) => (
-              <li
-                key={i}
-                className="flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500"
-              >
-                <span
-                  className={`shrink-0 rounded-sm border px-1 py-px text-[9px] font-semibold uppercase tracking-[0.08em] ${
-                    criterion.source === "user"
-                      ? "border-accent/40 text-accent-soft"
-                      : "border-white/15 text-zinc-500"
-                  }`}
-                >
-                  {criterion.source === "user" ? "Yours" : "Default"}
-                </span>
-                <span className="min-w-0">{criterion.label}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
+        <>
+          <details className="print-hidden mt-3">
+            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Decision bars applied
+            </summary>
+            {appliedCriteriaList}
+          </details>
+          {/* Print-only mirror of the disclosure above — see this
+              function's own doc comment. The <details> itself is
+              print-hidden, so the two never both render at once. */}
+          <div className="print-only mt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Decision bars applied
+            </p>
+            {appliedCriteriaList}
+          </div>
+        </>
       )}
       {avoid.length > 0 && (
         <div className="mt-4">
@@ -562,25 +595,31 @@ function DecisionCard({
             </ul>
           </div>
         ) : (
-          // key={view}: <details>'s `open` is a native, uncontrolled DOM
-          // property — React never resets it on a normal re-render since
-          // it's never part of the rendered props. Without this key, a
-          // user who manually expands the disclosure in one view finds
-          // it still open after toggling Buyer ↔ Client (same DOM node
-          // reused). The key forces a fresh node per view, so it's always
-          // closed by default again on either side of the toggle.
-          <details key={view} className="mt-4 border-t border-white/[0.08] pt-3">
-            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-              {client ? "What we still can't conclude" : "Evidence limits"}
-            </summary>
-            <ul className="mt-2 space-y-1">
-              {limits.map((line, i) => (
-                <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </details>
+          <>
+            {/* key={view}: <details>'s `open` is a native, uncontrolled
+                DOM property — React never resets it on a normal
+                re-render since it's never part of the rendered props.
+                Without this key, a user who manually expands the
+                disclosure in one view finds it still open after
+                toggling Buyer ↔ Client (same DOM node reused). The key
+                forces a fresh node per view, so it's always closed by
+                default again on either side of the toggle. */}
+            <details key={view} className="print-hidden mt-4 border-t border-white/[0.08] pt-3">
+              <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                {client ? "What we still can't conclude" : "Evidence limits"}
+              </summary>
+              {limitsList}
+            </details>
+            {/* Print-only mirror — see this function's own doc comment.
+                The <details> above is print-hidden, so the two never
+                both render at once. */}
+            <div className="print-only mt-4 border-t border-white/[0.08] pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                {client ? "What we still can't conclude" : "Evidence limits"}
+              </p>
+              {limitsList}
+            </div>
+          </>
         ))}
     </section>
   );
