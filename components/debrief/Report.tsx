@@ -26,7 +26,7 @@ import { PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/repo
 import { accentCssVars, getAccentById } from "@/components/report/reportCustomization";
 import { useReportCustomization } from "@/components/report/useReportCustomization";
 import { ReportCustomizationPanel } from "@/components/report/ReportCustomizationPanel";
-import { PERFORMANCE_INITIAL_OVERRIDES, PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
+import { PERFORMANCE_MODE_DEFAULTS, PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
 import { MovementChart } from "./MovementChart";
@@ -1274,7 +1274,7 @@ export function Report({
   const customizationActions = useReportCustomization(
     PERFORMANCE_SECTION_IDS,
     PERFORMANCE_PRESETS,
-    PERFORMANCE_INITIAL_OVERRIDES
+    PERFORMANCE_MODE_DEFAULTS
   );
   const { customization } = customizationActions;
   const [panelOpen, setPanelOpen] = useState(false);

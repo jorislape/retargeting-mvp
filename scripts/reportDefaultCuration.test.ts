@@ -1,167 +1,262 @@
 /**
- * Report Default Curation V1 — proofs.
+ * Report Default Curation V1 ("D′") — proofs.
  *
- * Presentation-only milestone: changes ONLY the *initial* visibility a
- * Performance report starts with (createDefaultCustomization's own
- * output is untouched; see reportCustomization.ts's doc comment on
- * that function). Two distinct delivery mechanisms, per the
- * architecture finding this milestone's own report documents:
+ * Supersedes this file's own V1 version: mode-aware canonical defaults
+ * with a computed pristine check, replacing the V1 "Client curated
+ * defaults are only reachable via the named preset" limitation.
  *
- *  - Buyer's curated defaults: an additive, optional overlay
- *    (InitialCustomizationOverrides) applied ONLY at first mount and
- *    by reset() — see useReportCustomization.ts's buildInitialCustomization.
- *    Report.tsx always mounts in "internal"/Buyer mode, so this is the
- *    one register with a true "first render" to hook into.
- *  - Client's curated defaults: delivered via the pre-existing
- *    "client" NAMED PRESET's snapshot instead, since a bare
- *    Buyer -> Client mode switch on an untouched report must NOT
- *    silently change section visibility (approved decision #9 —
- *    reconfirmed below). A fresh report's first Client-tab click
- *    shows Buyer's now-curated set unless "Client summary" is
- *    explicitly selected; that is a deliberate, documented limit of
- *    this approach, not an oversight.
+ * Core rule (see reportCustomization.ts's ModeDefaults/applySnapshot
+ * doc comments and useReportCustomization.ts's setMode): switching
+ * register compares the state being LEFT against its OWN canonical
+ * default (PERFORMANCE_MODE_DEFAULTS[mode]) via the existing
+ * matchesPreset. If it still matches exactly (nothing manually
+ * touched), the destination register's own canonical default is
+ * applied too. The instant any field diverges, mode switching falls
+ * back to approved decision #9's original, unconditional behavior:
+ * only `mode` changes, every manual value survives exactly.
  *
- * Same source-scan-plus-pure-logic approach as
- * reportDecisionPrimacy.test.ts: this codebase has no component-render
- * harness, and useReportCustomization.ts itself isn't plain-Node
- * importable (it pulls in "react" via an extensionless import chain —
- * see its own header comment), so the merge algorithm is exercised
- * here as an independent-oracle transcription against the same
- * plain-Node-importable pieces (createDefaultCustomization,
- * PERFORMANCE_INITIAL_OVERRIDES, derivePreset) it's built from, plus a
- * source-scan confirming the hook's actual implementation matches.
+ * No new stored state (no dirty flag, no per-field provenance, no
+ * separate per-mode buckets) — pristine-ness is recomputed from live
+ * values every call via matchesPreset/applySnapshot/derivePreset, the
+ * same three pure functions setPreset and buildInitialCustomization
+ * already use. useReportCustomization.ts itself isn't plain-Node
+ * importable (it pulls in "react" via an extensionless import chain),
+ * so the hook's own orchestration is exercised here as a `simulateX`
+ * transcription built from the REAL, directly-importable primitives
+ * (matchesPreset/applySnapshot/derivePreset/createDefaultCustomization),
+ * with a source-scan (item J below) confirming the transcription still
+ * matches the hook's actual implementation.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  applySnapshot,
   createDefaultCustomization,
   derivePreset,
   matchesPreset,
+  type ModeDefaults,
+  type PresetDefinition,
+  type PresetId,
+  type ReportCustomization,
+  type ReportMode,
 } from "../components/report/reportCustomization.ts";
 import { PERFORMANCE_SECTION_IDS } from "../components/report/reportSections.ts";
-import { PERFORMANCE_INITIAL_OVERRIDES, PERFORMANCE_PRESETS } from "../components/debrief/reportPresets.ts";
+import { PERFORMANCE_MODE_DEFAULTS, PERFORMANCE_PRESETS } from "../components/debrief/reportPresets.ts";
 
 const ROOT = join(import.meta.dirname, "..");
+type Id = (typeof PERFORMANCE_SECTION_IDS)[number];
 
-/* ============== 1. Fresh Buyer default set (regression #1) ============== */
-{
-  // Transcribes buildInitialCustomization's own merge (verified against
-  // its real implementation via source-scan in section 5 below).
+/* ===================== Oracle: mirrors the real hook exactly ===================== */
+
+function buildInitialCustomization(modeDefaults: ModeDefaults<Id> | undefined): ReportCustomization<Id> {
   const base = createDefaultCustomization(PERFORMANCE_SECTION_IDS);
-  const freshBuyer = {
-    ...base,
-    ...PERFORMANCE_INITIAL_OVERRIDES,
-    sections: { ...base.sections, ...PERFORMANCE_INITIAL_OVERRIDES.sections },
-  };
+  const snapshot = modeDefaults?.[base.mode];
+  const merged = snapshot ? applySnapshot(base, snapshot) : base;
+  return { ...merged, preset: derivePreset(merged, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS) };
+}
 
-  // DEFAULT ON
-  for (const id of ["whatChanged", "executiveSummary", "winners", "underperformers", "nextTests", "creativeBriefs", "confidence", "signOff"] as const) {
-    assert.equal(freshBuyer.sections[id], true, `Buyer default: ${id} must be ON`);
+function simulateSetMode(
+  c: ReportCustomization<Id>,
+  mode: ReportMode,
+  modeDefaults: ModeDefaults<Id> | undefined
+): ReportCustomization<Id> {
+  const leavingDefault = modeDefaults?.[c.mode];
+  const isPristine = leavingDefault ? matchesPreset(c, leavingDefault, PERFORMANCE_SECTION_IDS) : false;
+  const destinationDefault = isPristine ? modeDefaults?.[mode] : undefined;
+  if (!destinationDefault) return { ...c, mode };
+  const next = applySnapshot(c, destinationDefault);
+  return { ...next, mode, preset: derivePreset(next, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS) };
+}
+
+function simulateSetPreset(c: ReportCustomization<Id>, snapshot: PresetDefinition<Id>, id: Exclude<PresetId, "custom">) {
+  return { ...applySnapshot(c, snapshot), mode: snapshot.mode, preset: id };
+}
+
+function simulateReset(modeDefaults: ModeDefaults<Id> | undefined): ReportCustomization<Id> {
+  return buildInitialCustomization(modeDefaults);
+}
+
+/* ===================== 1. Canonical Buyer defaults ===================== */
+{
+  const buyer = PERFORMANCE_MODE_DEFAULTS.internal!;
+  assert.equal(buyer.sections.verdict, false, "Buyer canonical: Verdict OFF");
+  assert.equal(buyer.sections.patterns, false, "Buyer canonical: Patterns OFF");
+  assert.equal(buyer.showRankingChart, false, "Buyer canonical: Performance Ranking OFF");
+  assert.equal(buyer.showMovementChart, false, "Buyer canonical: Movement Chart OFF");
+  assert.equal(buyer.showSpendAllocationChart, true, "Buyer canonical: Spend Allocation ON");
+  for (const id of ["winners", "underperformers", "nextTests", "confidence"] as const) {
+    assert.equal(buyer.sections[id], true, `Buyer canonical: ${id} ON`);
   }
-  assert.equal(freshBuyer.showSpendAllocationChart, true, "Buyer default: Spend Allocation must be ON");
+  console.log("reportDefaultCuration: canonical Buyer defaults match the approved spec");
+}
 
-  // DEFAULT OFF
-  assert.equal(freshBuyer.sections.verdict, false, "Buyer default: Verdict must be OFF");
-  assert.equal(freshBuyer.sections.patterns, false, "Buyer default: Patterns must be OFF");
-  assert.equal(freshBuyer.showRankingChart, false, "Buyer default: Performance Ranking must be OFF");
-  assert.equal(freshBuyer.showMovementChart, false, "Buyer default: Movement Chart must be OFF");
+/* ===================== 2. Canonical Client defaults ===================== */
+{
+  const client = PERFORMANCE_MODE_DEFAULTS.client!;
+  // One source of truth: Client's canonical default IS PERFORMANCE_PRESETS.client
+  // (same object reference), not a second, independently-maintained definition.
+  assert.equal(client, PERFORMANCE_PRESETS.client, "Client canonical default is PERFORMANCE_PRESETS.client itself");
 
-  // Fresh mount still starts in Buyer/"internal" mode — unchanged.
+  assert.equal(client.sections.verdict, true, "Client canonical: Verdict ON");
+  assert.equal(client.showRankingChart, true, "Client canonical: Performance Ranking ON");
+  assert.equal(client.showMovementChart, false, "Client canonical: Movement Chart OFF");
+  assert.equal(client.sections.confidence, true, "Client canonical: Confidence ON");
+  assert.equal(client.showSpendAllocationChart, true, "Client canonical: Spend Allocation ON");
+  for (const id of ["winners", "underperformers", "nextTests"] as const) {
+    assert.equal(client.sections[id], true, `Client canonical: ${id} ON`);
+  }
+  console.log("reportDefaultCuration: canonical Client defaults match the approved spec");
+}
+
+/* ===================== A. Fresh Buyer -> Client ===================== */
+{
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
   assert.equal(freshBuyer.mode, "internal");
 
-  console.log("reportDefaultCuration: fresh Buyer default set matches the approved spec");
+  const afterSwitch = simulateSetMode(freshBuyer, "client", PERFORMANCE_MODE_DEFAULTS);
+  assert.equal(afterSwitch.mode, "client");
+  assert.equal(afterSwitch.sections.verdict, true, "A: Verdict ON after switching to Client");
+  assert.equal(afterSwitch.showRankingChart, true, "A: Ranking ON after switching to Client");
+  assert.equal(afterSwitch.showMovementChart, false, "A: Movement OFF after switching to Client");
+  assert.equal(afterSwitch.sections.confidence, true, "A: Confidence ON after switching to Client");
+  assert.deepEqual(afterSwitch.sections, PERFORMANCE_MODE_DEFAULTS.client!.sections, "A: sections exactly match Client's canonical default");
+  assert.equal(afterSwitch.preset, "client", "A: preset label correctly reads 'client' (bonus over V1, which read 'custom' here)");
+
+  console.log("reportDefaultCuration: A. fresh Buyer -> Client applies Client canonical defaults");
 }
 
-/* == 2. Fresh Client default set, via the "client" preset (regression #1) == */
+/* ===================== B. Fresh Buyer -> Client -> Buyer (round trip) ===================== */
 {
-  // Per the architecture finding: no clean initial-mount path exists
-  // for Client (mode always starts "internal"), so its curated
-  // defaults are delivered via the existing named preset instead.
-  const p = PERFORMANCE_PRESETS.client;
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
+  const toClient = simulateSetMode(freshBuyer, "client", PERFORMANCE_MODE_DEFAULTS);
+  const backToBuyer = simulateSetMode(toClient, "internal", PERFORMANCE_MODE_DEFAULTS);
 
-  for (const id of ["whatChanged", "executiveSummary", "verdict", "winners", "underperformers", "nextTests", "confidence", "signOff"] as const) {
-    assert.equal(p.sections[id], true, `Client default (preset): ${id} must be ON`);
-  }
-  assert.equal(p.showRankingChart, true, "Client default: Performance Ranking must be ON");
-  assert.equal(p.showSpendAllocationChart, true, "Client default: Spend Allocation must be ON");
+  assert.equal(backToBuyer.mode, "internal");
+  assert.deepEqual(backToBuyer.sections, freshBuyer.sections, "B: sections round-trip byte-identical");
+  assert.equal(backToBuyer.showRankingChart, freshBuyer.showRankingChart);
+  assert.equal(backToBuyer.showSpendAllocationChart, freshBuyer.showSpendAllocationChart);
+  assert.equal(backToBuyer.showMovementChart, freshBuyer.showMovementChart);
+  assert.equal(backToBuyer.preset, freshBuyer.preset, "B: preset label also round-trips ('custom', Buyer canonical != 'buyer' preset)");
 
-  // DEFAULT OFF: Movement Chart only.
-  assert.equal(p.showMovementChart, false, "Client default: Movement Chart must be OFF");
-
-  console.log("reportDefaultCuration: 'client' preset matches the approved Client default set");
+  console.log("reportDefaultCuration: B. fresh Buyer -> Client -> Buyer round-trips exactly");
 }
 
-/* ===== 3-10. Individually-named regression-proof items, cross-referenced ===== */
+/* ===================== C. Buyer manual change -> Client ===================== */
 {
-  const base = createDefaultCustomization(PERFORMANCE_SECTION_IDS);
-  const freshBuyer = {
-    ...base,
-    ...PERFORMANCE_INITIAL_OVERRIDES,
-    sections: { ...base.sections, ...PERFORMANCE_INITIAL_OVERRIDES.sections },
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
+  // Manually toggle Verdict on — this is exactly what toggleSection does
+  // (touch one field, recompute the derived preset label).
+  const manuallyTouched: ReportCustomization<Id> = {
+    ...freshBuyer,
+    sections: { ...freshBuyer.sections, verdict: true },
   };
-  const freshClient = PERFORMANCE_PRESETS.client;
+  const touchedWithPreset = { ...manuallyTouched, preset: derivePreset(manuallyTouched, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS) };
 
-  assert.equal(freshBuyer.showMovementChart, false, "#3 Movement Chart OFF — Buyer");
-  assert.equal(freshClient.showMovementChart, false, "#3 Movement Chart OFF — Client");
-  assert.equal(freshBuyer.sections.patterns, false, "#4 Buyer Patterns OFF");
-  assert.equal(freshBuyer.showRankingChart, false, "#5 Buyer Performance Ranking OFF");
-  assert.equal(freshClient.showRankingChart, true, "#6 Client Performance Ranking ON");
-  assert.equal(freshBuyer.sections.verdict, false, "#7 Buyer Verdict OFF");
-  assert.equal(freshClient.sections.verdict, true, "#8 Client Verdict ON");
-  assert.equal(freshBuyer.showSpendAllocationChart, true, "#9 Spend Allocation ON — Buyer");
-  assert.equal(freshClient.showSpendAllocationChart, true, "#9 Spend Allocation ON — Client");
-  for (const id of ["winners", "underperformers", "nextTests", "confidence"] as const) {
-    assert.equal(freshBuyer.sections[id], true, `#10 ${id} ON — Buyer`);
-    assert.equal(freshClient.sections[id], true, `#10 ${id} ON — Client`);
-  }
+  const afterSwitch = simulateSetMode(touchedWithPreset, "client", PERFORMANCE_MODE_DEFAULTS);
+  assert.equal(afterSwitch.mode, "client", "C: mode changes");
+  assert.deepEqual(afterSwitch.sections, touchedWithPreset.sections, "C: every manual section value preserved exactly");
+  assert.equal(afterSwitch.showRankingChart, touchedWithPreset.showRankingChart, "C: showRankingChart preserved (untouched but frozen alongside the touched field)");
+  assert.equal(afterSwitch.showMovementChart, touchedWithPreset.showMovementChart, "C: showMovementChart preserved");
+  assert.equal(afterSwitch.preset, touchedWithPreset.preset, "C: preset label unaffected by the mode switch itself");
 
-  console.log("reportDefaultCuration: items #3-#10 confirmed");
+  console.log("reportDefaultCuration: C. a Buyer manual change survives switching to Client — only mode changes");
 }
 
-/* == 11. Manual toggle survives Buyer/Client switch — mechanism proof == */
+/* ===================== D. Client canonical -> manual change -> Buyer ===================== */
 {
-  const hookSrc = readFileSync(join(ROOT, "components/report/useReportCustomization.ts"), "utf8");
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
+  const client = simulateSetMode(freshBuyer, "client", PERFORMANCE_MODE_DEFAULTS);
+  assert.deepEqual(client.sections, PERFORMANCE_MODE_DEFAULTS.client!.sections, "D setup: Client starts at its own canonical state");
 
-  // setMode's body must still be exactly the untouched approved-decision
-  // #9 form: it may only ever assign `mode`, never read initialOverrides,
-  // presets, or sections. This is what makes "switching Buyer/Client
-  // never resets manual customization" true by construction.
-  const setModeMatch = hookSrc.match(/const setMode = useCallback\(\(mode: ReportMode\) => \{([\s\S]*?)\}, \[\]\);/);
-  assert.ok(setModeMatch, "setMode found with an empty dependency array (still reads no external state)");
-  const setModeBody = setModeMatch![1];
-  assert.equal(setModeBody.trim(), "setCustomization((c) => ({ ...c, mode }));", "setMode touches only the mode field");
-  assert.ok(!setModeBody.includes("initialOverrides"), "setMode never reads initialOverrides");
-  assert.ok(!setModeBody.includes("presets"), "setMode never reads presets");
-  assert.ok(!setModeBody.includes("sections"), "setMode never touches sections");
+  // Manually turn Movement Chart on (default off for Client).
+  const manuallyTouched: ReportCustomization<Id> = { ...client, showMovementChart: true };
+  const touchedWithPreset = { ...manuallyTouched, preset: derivePreset(manuallyTouched, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS) };
 
-  // buildInitialCustomization (this milestone's new merge) must be
-  // reachable ONLY from the lazy useState initializer and reset() —
-  // never from setMode, never from any per-render code path.
-  assert.equal((hookSrc.match(/function buildInitialCustomization/g) ?? []).length, 1, "exactly one definition");
-  // Definition line has a generic (<Id extends string>) between the
-  // name and "(", so this pattern only matches invocations, not the
-  // definition — expect exactly 2: the useState initializer and reset().
-  const callSites = [...hookSrc.matchAll(/buildInitialCustomization\(/g)].length;
-  assert.equal(callSites, 2, "buildInitialCustomization invoked exactly twice: the lazy useState initializer and reset()");
+  const afterSwitch = simulateSetMode(touchedWithPreset, "internal", PERFORMANCE_MODE_DEFAULTS);
+  assert.equal(afterSwitch.mode, "internal", "D: mode changes");
+  assert.equal(afterSwitch.showMovementChart, true, "D: the manually-touched field survives");
+  assert.deepEqual(afterSwitch.sections, touchedWithPreset.sections, "D: every section value preserved exactly");
+  assert.equal(afterSwitch.showRankingChart, touchedWithPreset.showRankingChart, "D: untouched fields also stay frozen, not reset to Buyer's own default");
 
-  const useStateBlock = hookSrc.slice(hookSrc.indexOf("const [customization, setCustomization]"), hookSrc.indexOf("const logoUrlRef"));
-  assert.ok(useStateBlock.includes("buildInitialCustomization(sectionIds, presets, initialOverrides)"), "lazy initializer uses buildInitialCustomization");
-
-  const resetBlock = hookSrc.slice(hookSrc.indexOf("const reset = useCallback"), hookSrc.indexOf("return {\n    customization,"));
-  assert.ok(resetBlock.includes("buildInitialCustomization(sectionIds, presets, initialOverrides)"), "reset() uses buildInitialCustomization");
-  assert.ok(!resetBlock.includes("mode:"), "reset() never pins a specific mode — it re-derives the full base object, preserving whichever mode buildInitialCustomization/createDefaultCustomization produces");
-
-  console.log("reportDefaultCuration: setMode isolation + buildInitialCustomization wiring confirmed (item #11)");
+  console.log("reportDefaultCuration: D. a Client manual change survives switching to Buyer — only mode changes");
 }
 
-/* == 12. Enabling a default-off section manually still renders it == */
+/* ===================== E. Apply Client summary preset -> Buyer ===================== */
+{
+  // Common case: Buyer was never separately touched before applying the
+  // preset. Client's PRESET snapshot IS Client's canonical default (same
+  // object — see test 2), so the resulting state is pristine relative to
+  // modeDefaults.client, and switching back finds Buyer still pristine
+  // too (nothing ever touched it) -> Buyer's own canonical default.
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
+  const clientPresetApplied = simulateSetPreset(freshBuyer, PERFORMANCE_PRESETS.client, "client");
+  assert.equal(clientPresetApplied.preset, "client");
+  assert.deepEqual(clientPresetApplied.sections, PERFORMANCE_MODE_DEFAULTS.client!.sections);
+
+  const backToBuyer = simulateSetMode(clientPresetApplied, "internal", PERFORMANCE_MODE_DEFAULTS);
+  assert.equal(backToBuyer.mode, "internal");
+  assert.deepEqual(
+    backToBuyer.sections,
+    PERFORMANCE_MODE_DEFAULTS.internal!.sections,
+    "E: Buyer's own canonical default is applied, not a memory of 'before the preset' (there is none in a flat, single-object model)"
+  );
+  assert.equal(backToBuyer.preset, "custom", "E: Buyer canonical != 'buyer' preset, so this reads 'custom', matching test A/B's behavior");
+
+  // Documented, honest edge case: if Buyer WAS manually touched before
+  // ever applying the Client preset, that touch is NOT remembered —
+  // applying a preset overwrites the one shared state object, exactly
+  // as it already did before this milestone (setPreset was never
+  // register-scoped). D' adds no new memory; it only adds the narrow
+  // "was the state I'm leaving still pristine" check.
+  const buyerTouchedFirst: ReportCustomization<Id> = {
+    ...freshBuyer,
+    sections: { ...freshBuyer.sections, verdict: true },
+  };
+  const clientPresetOverwrites = simulateSetPreset(buyerTouchedFirst, PERFORMANCE_PRESETS.client, "client");
+  const backToBuyerAfterOverwrite = simulateSetMode(clientPresetOverwrites, "internal", PERFORMANCE_MODE_DEFAULTS);
+  assert.equal(
+    backToBuyerAfterOverwrite.sections.verdict,
+    false,
+    "E (edge case): Buyer's earlier manual touch is NOT restored — the preset already overwrote it, pre-existing behavior unrelated to D'"
+  );
+
+  console.log("reportDefaultCuration: E. Client summary preset -> Buyer documented and confirmed");
+}
+
+/* ===================== F. Reset while Buyer ===================== */
+{
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
+  const touched: ReportCustomization<Id> = { ...freshBuyer, sections: { ...freshBuyer.sections, verdict: true } };
+  const afterReset = simulateReset(PERFORMANCE_MODE_DEFAULTS);
+
+  assert.equal(afterReset.mode, "internal");
+  assert.deepEqual(afterReset.sections, PERFORMANCE_MODE_DEFAULTS.internal!.sections, "F: Reset returns Buyer's canonical default");
+  assert.notDeepEqual(afterReset.sections, touched.sections, "F: Reset actually discards the manual touch (sanity check on the fixture)");
+
+  console.log("reportDefaultCuration: F. Reset while Buyer returns Buyer canonical defaults");
+}
+
+/* ===================== G. Reset while Client ===================== */
+{
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
+  const client = simulateSetMode(freshBuyer, "client", PERFORMANCE_MODE_DEFAULTS);
+  const afterReset = simulateReset(PERFORMANCE_MODE_DEFAULTS);
+
+  // Unchanged pre-existing behavior (not something this task should
+  // change): Reset always returns to Buyer/internal, regardless of
+  // which register was active when it was clicked.
+  assert.equal(afterReset.mode, "internal", "G: Reset while Client still forces mode back to internal — pre-existing, unchanged");
+  assert.deepEqual(afterReset.sections, PERFORMANCE_MODE_DEFAULTS.internal!.sections, "G: Reset returns Buyer's canonical default even from Client");
+  assert.notEqual(client.mode, afterReset.mode, "G: sanity check — Reset actually changed the register back from Client");
+
+  console.log("reportDefaultCuration: G. Reset while Client returns to Buyer canonical defaults (unchanged pre-existing behavior)");
+}
+
+/* ===================== H. Default-off sections can be manually enabled and render ===================== */
 {
   const reportSrc = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
 
-  // Every render gate this milestone's defaults touch still reads LIVE
-  // state (sections.x / customization.showXChart), not a hardcoded
-  // constant — proving toggling still works normally once curated off.
   assert.match(reportSrc, /\{sections\.verdict\s*&&/, "Verdict gate reads live sections.verdict");
   assert.match(reportSrc, /sections\.patterns\s*&&\s*!client/, "Patterns gate reads live sections.patterns");
   assert.match(reportSrc, /\{customization\.showRankingChart\s*&&/, "Ranking chart gate reads live customization.showRankingChart");
@@ -169,14 +264,25 @@ const ROOT = join(import.meta.dirname, "..");
   assert.match(reportSrc, /\{customization\.showSpendAllocationChart\s*&&/, "Spend Allocation gate reads live customization.showSpendAllocationChart");
   assert.match(reportSrc, /\{sections\.confidence\s*&&/, "Confidence gate reads live sections.confidence");
 
-  console.log("reportDefaultCuration: default-off sections still gate on live toggle state (item #12)");
+  // Manually enabling every default-off Buyer field (toggleSection /
+  // setShowXChart semantics — direct field overwrite) renders true.
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
+  const manuallyRestored: ReportCustomization<Id> = {
+    ...freshBuyer,
+    sections: { ...freshBuyer.sections, verdict: true, patterns: true },
+    showRankingChart: true,
+    showMovementChart: true,
+  };
+  assert.equal(manuallyRestored.sections.verdict, true);
+  assert.equal(manuallyRestored.sections.patterns, true);
+  assert.equal(manuallyRestored.showRankingChart, true);
+  assert.equal(manuallyRestored.showMovementChart, true);
+
+  console.log("reportDefaultCuration: H. default-off sections still gate on live toggle state and can be manually restored");
 }
 
-/* == 13. Existing presets still behave as intended, isolation-checked == */
+/* ===================== I. Buyer analysis preset restores the fuller config ===================== */
 {
-  // buyer/executive/print presets are untouched by this milestone —
-  // pinned exactly (mirrors, doesn't replace, the full 4-preset pin in
-  // reportCustomization.test.ts).
   assert.deepEqual(PERFORMANCE_PRESETS.buyer, {
     mode: "internal",
     topAdsShown: 5,
@@ -197,52 +303,42 @@ const ROOT = join(import.meta.dirname, "..");
       confidence: true,
       signOff: true,
     },
-  }, "Buyer analysis preset unchanged — it stays the full 'everything visible' option");
+  }, "I: 'Buyer analysis' preset unchanged — stays the full 'everything visible' option, distinct from the curated canonical default");
 
-  assert.equal(PERFORMANCE_PRESETS.executive.sections.confidence, false, "Executive's own confidence behavior unchanged (does not inherit Client's confidence:true fix)");
-  assert.equal(PERFORMANCE_PRESETS.executive.showMovementChart, true, "Executive's own movement-chart behavior unchanged");
-  assert.equal(PERFORMANCE_PRESETS.print.showMovementChart, true, "Print-friendly unchanged");
-  assert.equal(PERFORMANCE_PRESETS.print.sections.confidence, true, "Print-friendly unchanged");
-
-  // matchesPreset/derivePreset mechanism itself is untouched — a fresh
-  // Buyer report (now curated) no longer coincidentally matches the
-  // "buyer" preset's full snapshot, and correctly derives "custom"
-  // rather than silently mislabeling itself.
-  const base = createDefaultCustomization(PERFORMANCE_SECTION_IDS);
-  const freshBuyer = {
-    ...base,
-    ...PERFORMANCE_INITIAL_OVERRIDES,
-    sections: { ...base.sections, ...PERFORMANCE_INITIAL_OVERRIDES.sections },
-  };
-  assert.equal(
-    derivePreset(freshBuyer, PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS),
-    "custom",
-    "the new curated fresh-Buyer state no longer matches the (unchanged, fuller) 'buyer' preset — correctly reads 'custom', not a stale label"
-  );
-  assert.ok(!matchesPreset(freshBuyer, PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS));
-
-  // Selecting "Buyer analysis" from a curated fresh report still
-  // restores every default-off section — capability preserved.
-  const restored = { ...freshBuyer, ...PERFORMANCE_PRESETS.buyer };
+  const freshBuyer = buildInitialCustomization(PERFORMANCE_MODE_DEFAULTS);
+  const restored = simulateSetPreset(freshBuyer, PERFORMANCE_PRESETS.buyer, "buyer");
   assert.ok(matchesPreset(restored, PERFORMANCE_PRESETS.buyer, PERFORMANCE_SECTION_IDS));
   assert.equal(restored.sections.verdict, true);
   assert.equal(restored.sections.patterns, true);
   assert.equal(restored.showRankingChart, true);
   assert.equal(restored.showMovementChart, true);
+  assert.equal(restored.preset, "buyer");
 
-  console.log("reportDefaultCuration: existing presets behave as intended, unaffected by the new defaults (item #13)");
+  console.log("reportDefaultCuration: I. 'Buyer analysis' preset still restores the fuller all-on Buyer configuration");
 }
 
-/* == 14. No out-of-scope engine logic changed — import isolation scan == */
+/* ===================== J. setMode's real implementation matches the oracle ===================== */
 {
-  // This milestone's entire surface (reportCustomization.ts,
-  // useReportCustomization.ts, reportPresets.ts, Report.tsx's call
-  // site) touches presentation-layer defaults only. Proving none of
-  // the files this milestone edited import anything from modules/
-  // (the engine) makes "decision/comparison output is unaffected" true
-  // by construction, rather than merely re-asserted — decision/
-  // comparison byte-identity itself is already covered on every test
-  // run by reportDecisionPrimacy.test.ts.
+  const hookSrc = readFileSync(join(ROOT, "components/report/useReportCustomization.ts"), "utf8");
+
+  const setModeMatch = hookSrc.match(/const setMode = useCallback\(\s*\(mode: ReportMode\) => \{([\s\S]*?)\},\s*\[modeDefaults, presets, sectionIds\]\s*\);/);
+  assert.ok(setModeMatch, "setMode found with the expected [modeDefaults, presets, sectionIds] dependency array");
+  const setModeBody = setModeMatch![1];
+
+  assert.match(setModeBody, /matchesPreset\(c, leavingDefault, sectionIds\)/, "setMode uses matchesPreset for the pristine check, not a hand-rolled comparison");
+  assert.match(setModeBody, /applySnapshot\(c, destinationDefault\)/, "setMode uses applySnapshot to apply the destination default");
+  assert.match(setModeBody, /derivePreset\(next, presets, sectionIds\)/, "setMode recomputes the preset label after a pristine switch");
+  assert.match(setModeBody, /if \(!destinationDefault\) return \{ \.\.\.c, mode \};/, "setMode falls back to changing ONLY mode when not pristine (or no destination default) — approved decision #9's guarantee, preserved");
+
+  // No stored dirty flag / provenance field anywhere in this file.
+  assert.ok(!/customized\s*:/.test(hookSrc), "no dirty/customized boolean field introduced");
+  assert.ok(!/provenance/i.test(hookSrc), "no per-field provenance tracking introduced");
+
+  console.log("reportDefaultCuration: J. setMode's real implementation matches the tested oracle exactly");
+}
+
+/* ===================== K. No out-of-scope engine logic changed ===================== */
+{
   const editedFiles = [
     "components/report/reportCustomization.ts",
     "components/report/useReportCustomization.ts",
@@ -253,7 +349,7 @@ const ROOT = join(import.meta.dirname, "..");
     assert.ok(!/from\s+["'][^"']*modules\//.test(src), `${file} must not import from modules/ (the engine)`);
   }
 
-  console.log("reportDefaultCuration: customization-layer files import nothing from modules/ — engine output unaffected by construction (item #14)");
+  console.log("reportDefaultCuration: K. customization-layer files import nothing from modules/ — engine output unaffected by construction");
 }
 
 console.log("reportDefaultCuration: all assertions passed");

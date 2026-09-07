@@ -124,23 +124,54 @@ export interface PresetDefinition<SectionId extends string> extends PresetSnapsh
 }
 
 /**
- * Report Default Curation V1 — an optional, additive overlay applied
- * ONCE, at the moment a report's customization state is first created
- * (the lazy useState initializer and reset() in
- * useReportCustomization.ts), never on a mode switch. Deliberately NOT
- * a PresetSnapshot: a preset is a named, explicitly-chosen full
- * configuration a user can return to at any time (see setPreset); this
- * is just "what the very first render of createDefaultCustomization
- * should look like" for a given report type, so every field is
- * optional and only the fields that diverge from the all-visible
- * default need to be listed. `sections` is a partial map for the same
- * reason — omitted ids simply keep createDefaultSections' `true`.
+ * Report Default Curation V1 (mode-aware defaults, V2 — "D′"): one
+ * canonical PresetSnapshot per register, used for TWO purposes:
+ *  1. the true initial mount always starts in "internal"/Buyer mode,
+ *     so modeDefaults.internal seeds that first render (see
+ *     useReportCustomization.ts's buildInitialCustomization);
+ *  2. a pristine-aware setMode: switching register re-derives the
+ *     destination register's own canonical defaults ONLY when the
+ *     state being left still exactly matches ITS OWN canonical
+ *     default (via matchesPreset) — i.e. only when nothing has been
+ *     manually touched yet. The instant any field diverges, mode
+ *     switching goes back to changing ONLY `mode` (approved decision
+ *     #9's guarantee, preserved exactly, now conditional rather than
+ *     unconditional).
+ *
+ * Deliberately a FULL PresetSnapshot per mode (not a partial overlay
+ * like the V1 InitialCustomizationOverrides this replaces) — a
+ * complete snapshot is what matchesPreset needs to do the pristine
+ * comparison, and it lets a mode's entry simply BE an existing named
+ * preset's snapshot (e.g. Client's canonical default can point
+ * directly at PERFORMANCE_PRESETS.client — one source of truth, not
+ * two definitions that could drift). Optional per mode: a report type
+ * with no modeDefaults (Competitor Debrief) gets a setMode that
+ * behaves exactly as before this milestone — mode-only, always.
  */
-export interface InitialCustomizationOverrides<Id extends string> {
-  sections?: Partial<Record<Id, boolean>>;
-  showRankingChart?: boolean;
-  showSpendAllocationChart?: boolean;
-  showMovementChart?: boolean;
+export type ModeDefaults<Id extends string> = Partial<Record<ReportMode, PresetSnapshot<Id>>>;
+
+/**
+ * Overwrites exactly the presentation fields a PresetSnapshot defines
+ * (sections + topAdsShown/density/colorMode + the 3 chart flags) —
+ * never `mode`, never `preset`, never any identity/branding field.
+ * Shared by setPreset, buildInitialCustomization, and the pristine
+ * branch of setMode, so there is exactly one place this 7-field
+ * overwrite is written.
+ */
+export function applySnapshot<Id extends string>(
+  customization: ReportCustomization<Id>,
+  snapshot: PresetSnapshot<Id>
+): ReportCustomization<Id> {
+  return {
+    ...customization,
+    sections: { ...snapshot.sections },
+    topAdsShown: snapshot.topAdsShown,
+    density: snapshot.density,
+    colorMode: snapshot.colorMode,
+    showRankingChart: snapshot.showRankingChart,
+    showSpendAllocationChart: snapshot.showSpendAllocationChart,
+    showMovementChart: snapshot.showMovementChart,
+  };
 }
 
 export type TopAdsShown = 3 | 5;

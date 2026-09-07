@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  applySnapshot,
   createDefaultCustomization,
   derivePreset,
+  matchesPreset,
   type AccentId,
   type Density,
-  type InitialCustomizationOverrides,
+  type ModeDefaults,
   type PresetDefinition,
   type PresetId,
   type ReportCustomization,
@@ -34,25 +36,24 @@ import { validateLogoFile } from "./logoValidation";
  */
 
 /**
- * Report Default Curation V1: `initialOverrides` is optional and
+ * Report Default Curation V1 ("D′"): `modeDefaults` is optional and
  * report-type-specific (e.g. components/debrief/reportPresets.ts's
- * PERFORMANCE_INITIAL_OVERRIDES) — applied ONLY when this state is
- * first created (the lazy useState initializer below) and by reset().
- * setMode() never reads it, so switching Buyer/Client never re-applies
- * or reverts to it — that would reintroduce the exact "mode switch
- * resets customization" regression approved decision #9 removed.
+ * PERFORMANCE_MODE_DEFAULTS) — one canonical PresetSnapshot per
+ * register. Used here to seed the true initial mount (always
+ * "internal"/Buyer — see createDefaultCustomization), and by setMode
+ * below to re-derive a register's own canonical defaults ONLY while
+ * the state being left is still pristine (see setMode's own doc
+ * comment). Never touched by any per-field setter — manual
+ * customization always wins.
  */
 function buildInitialCustomization<Id extends string>(
   sectionIds: readonly Id[],
   presets: Partial<Record<Exclude<PresetId, "custom">, PresetDefinition<Id>>> | undefined,
-  initialOverrides: InitialCustomizationOverrides<Id> | undefined
+  modeDefaults: ModeDefaults<Id> | undefined
 ): ReportCustomization<Id> {
   const base = createDefaultCustomization(sectionIds);
-  const merged: ReportCustomization<Id> = {
-    ...base,
-    ...initialOverrides,
-    sections: { ...base.sections, ...initialOverrides?.sections },
-  };
+  const snapshot = modeDefaults?.[base.mode];
+  const merged = snapshot ? applySnapshot(base, snapshot) : base;
   return { ...merged, preset: derivePreset(merged, presets, sectionIds) };
 }
 export interface UseReportCustomizationResult<Id extends string> {
@@ -65,11 +66,15 @@ export interface UseReportCustomizationResult<Id extends string> {
   /** Expert Commentary V2 — identity-like field: never affects preset
    *  matching, rendered as an attributed commentary block only. */
   setExpertTake: (value: string) => void;
-  /** Changes ONLY the report register (Buyer/Client). Per approved
-   *  decision #9: does not touch sections, does not reapply mode
-   *  defaults, and — because `mode` is excluded from matchesPreset —
-   *  never changes the current preset name. Switching Buyer/Client is
-   *  previewing the other register, not customizing the report. */
+  /** Changes the report register (Buyer/Client) — pristine-aware
+   *  (Report Default Curation V1 "D′"): if the state being left still
+   *  exactly matches that register's OWN canonical default (nothing
+   *  manually touched), the destination register's own canonical
+   *  default is applied too; otherwise ONLY `mode` changes, per
+   *  approved decision #9, and every manual customization is
+   *  preserved exactly. Either way `mode` itself is excluded from
+   *  matchesPreset, so switching alone never invents a preset match
+   *  it shouldn't. */
   setMode: (value: ReportMode) => void;
   toggleSection: (id: Id) => void;
   setTopAdsShown: (value: TopAdsShown) => void;
@@ -96,10 +101,10 @@ export interface UseReportCustomizationResult<Id extends string> {
 export function useReportCustomization<Id extends string>(
   sectionIds: readonly Id[],
   presets?: Partial<Record<Exclude<PresetId, "custom">, PresetDefinition<Id>>>,
-  initialOverrides?: InitialCustomizationOverrides<Id>
+  modeDefaults?: ModeDefaults<Id>
 ): UseReportCustomizationResult<Id> {
   const [customization, setCustomization] = useState<ReportCustomization<Id>>(() =>
-    buildInitialCustomization(sectionIds, presets, initialOverrides)
+    buildInitialCustomization(sectionIds, presets, modeDefaults)
   );
   const logoUrlRef = useRef<string | null>(null);
 
@@ -134,12 +139,32 @@ export function useReportCustomization<Id extends string>(
     [revokeCurrentLogo]
   );
 
-  // Report Foundation V1: mode changes ONLY the register — no section
-  // reset, no preset invalidation (mode is excluded from
-  // matchesPreset), matching approved decision #9 exactly.
-  const setMode = useCallback((mode: ReportMode) => {
-    setCustomization((c) => ({ ...c, mode }));
-  }, []);
+  // Report Default Curation V1 ("D′"): pristine-aware mode switch.
+  // Compare the state being LEFT against ITS OWN canonical default
+  // (modeDefaults[c.mode]) via the existing matchesPreset — if nothing
+  // has been manually touched, it's safe to also apply the
+  // destination register's own canonical default. The instant any
+  // field diverges, this falls back to approved decision #9's
+  // original, unconditional behavior: mode changes, nothing else
+  // does. No stored "dirty" flag — pristine-ness is recomputed from
+  // live values every call, so it can never drift out of sync with
+  // reality, and it costs nothing for report types with no
+  // modeDefaults (Competitor Debrief): the lookup is undefined, so
+  // isPristine is always false and this degrades to the pre-existing
+  // mode-only behavior exactly.
+  const setMode = useCallback(
+    (mode: ReportMode) => {
+      setCustomization((c) => {
+        const leavingDefault = modeDefaults?.[c.mode];
+        const isPristine = leavingDefault ? matchesPreset(c, leavingDefault, sectionIds) : false;
+        const destinationDefault = isPristine ? modeDefaults?.[mode] : undefined;
+        if (!destinationDefault) return { ...c, mode };
+        const next = applySnapshot(c, destinationDefault);
+        return { ...next, mode, preset: derivePreset(next, presets, sectionIds) };
+      });
+    },
+    [modeDefaults, presets, sectionIds]
+  );
 
   const toggleSection = useCallback(
     (id: Id) => {
@@ -206,25 +231,21 @@ export function useReportCustomization<Id extends string>(
       const snapshot = presets?.[id];
       if (!snapshot) return; // no snapshot defined for this report type — no-op, never throws
       setCustomization((c) => ({
-        ...c,
+        ...applySnapshot(c, snapshot),
         mode: snapshot.mode,
-        sections: { ...snapshot.sections },
-        topAdsShown: snapshot.topAdsShown,
-        density: snapshot.density,
-        colorMode: snapshot.colorMode,
-        showRankingChart: snapshot.showRankingChart,
-        showSpendAllocationChart: snapshot.showSpendAllocationChart,
-        showMovementChart: snapshot.showMovementChart,
         preset: id,
       }));
     },
     [presets]
   );
 
+  // Report Default Curation V1: reset semantics are unchanged by "D′" —
+  // always back to the true initial mount (Buyer/internal + its own
+  // canonical default), regardless of which register was active.
   const reset = useCallback(() => {
     revokeCurrentLogo();
-    setCustomization(buildInitialCustomization(sectionIds, presets, initialOverrides));
-  }, [sectionIds, presets, initialOverrides, revokeCurrentLogo]);
+    setCustomization(buildInitialCustomization(sectionIds, presets, modeDefaults));
+  }, [sectionIds, presets, modeDefaults, revokeCurrentLogo]);
 
   return {
     customization,

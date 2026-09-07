@@ -5,7 +5,7 @@
 import {
   createDefaultSections,
   applyModeDefaults,
-  type InitialCustomizationOverrides,
+  type ModeDefaults,
   type PresetDefinition,
   type PresetId,
 } from "../report/reportCustomization.ts";
@@ -100,30 +100,41 @@ export const PERFORMANCE_PRESETS: Record<
 };
 
 /**
- * Report Default Curation V1 — the approved fresh-report starting
- * point. Report.tsx always mounts in "internal"/Buyer mode (see
- * useReportCustomization's initialOverrides parameter), so this is
- * effectively "Buyer's curated defaults." Distinct from the "buyer"
- * NAMED PRESET above, which deliberately stays the fuller "everything
- * visible" option a user can still explicitly restore via Customize ->
- * Buyer analysis — this is only what the report shows before any
- * interaction at all (and what Reset returns to).
+ * Report Default Curation V1 ("D′") — one canonical PresetSnapshot per
+ * register. Two jobs: seeds the true initial mount (Report.tsx always
+ * mounts in "internal"/Buyer mode, so only the `internal` entry is
+ * ever used for that), and drives useReportCustomization's
+ * pristine-aware setMode — a mode switch re-derives the destination
+ * register's own entry here ONLY while the register being left still
+ * exactly matches ITS OWN entry (nothing manually touched yet).
  *
- * Client's own curated starting point has no equivalent clean
- * initial-mount path: mode always starts "internal," and a first
- * Buyer -> Client tab switch must not silently change section
- * visibility (approved decision #9 — see setMode's doc comment in
- * useReportCustomization.ts). It's instead reached via the "client"
- * preset above, which this milestone updated to match the approved
- * Client default set.
+ * `internal`'s sections are deliberately its OWN definition, distinct
+ * from the "buyer" NAMED PRESET above — that preset stays the fuller
+ * "everything visible" option a user can still explicitly restore via
+ * Customize -> Buyer analysis; this is what a fresh (or still-
+ * pristine) Buyer register shows before any interaction. `client`
+ * points directly at PERFORMANCE_PRESETS.client — Client's canonical
+ * default and the "Client summary" preset are the SAME approved
+ * configuration, so this is one source of truth, not two definitions
+ * that could drift apart.
  */
-export const PERFORMANCE_INITIAL_OVERRIDES: InitialCustomizationOverrides<PerformanceSectionId> = {
-  sections: {
-    verdict: false,
-    patterns: false,
+const BUYER_CANONICAL_SECTIONS: Record<PerformanceSectionId, boolean> = {
+  ...createDefaultSections(PERFORMANCE_SECTION_IDS),
+  verdict: false,
+  patterns: false,
+};
+
+export const PERFORMANCE_MODE_DEFAULTS: ModeDefaults<PerformanceSectionId> = {
+  internal: {
+    topAdsShown: 5,
+    density: "standard",
+    colorMode: "color",
+    showRankingChart: false,
+    showSpendAllocationChart: true,
+    showMovementChart: false,
+    sections: BUYER_CANONICAL_SECTIONS,
   },
-  showRankingChart: false,
-  showMovementChart: false,
+  client: PERFORMANCE_PRESETS.client,
 };
 
 export const PRESET_LABELS: Record<Exclude<PresetId, "custom">, string> = {
