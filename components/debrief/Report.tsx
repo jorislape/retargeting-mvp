@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type {
   Memo,
   MemoBrief,
@@ -972,6 +972,18 @@ function TestRow({
   /* Client view gets the plain-English register; buyer untouched. */
   const c = (text: string) =>
     view === "client" ? clientizeText(text) : text;
+  /* Next Tests Setup/Signals Progressive Disclosure V1 — local, per-row
+     state only (a fresh useState per TestRow instance, one per test),
+     never lifted to DebriefProvider/Memo/report customization/URL/
+     storage. Expanding T1 cannot affect T2/T3 by construction: each is
+     a separate component instance with its own state. Setup and
+     Signals used stay in the DOM at all times — collapsed is a CSS
+     `hidden` class toggle, never a conditional unmount — so print
+     (via .print-force-block, globals.css) and Copy/Export TXT (which
+     reads memo.nextTests directly, never the DOM — see memoToText.ts)
+     are both completely unaffected by this screen-only state. */
+  const [setupExpanded, setSetupExpanded] = useState(false);
+  const setupDetailsId = useId();
   return (
     <li className="print-avoid-break grid grid-cols-[2.75rem_1fr] gap-x-3 py-5 sm:gap-x-4">
       <span className="pt-0.5 font-mono text-sm font-semibold text-accent-soft">
@@ -1106,39 +1118,62 @@ function TestRow({
           </div>
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-              {view === "client" ? "How " : "Setup "}
-            </dt>
-            <dd className="print-kv-value inline break-words">{c(test.setup)}</dd>
-          </div>
-          <div>
-            <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "Success = " : "Win = "}
             </dt>
             <dd className="print-kv-value inline break-words">{c(test.winningLooksLike)}</dd>
           </div>
         </dl>
-        {/* The receipts: which signals produced this recommendation. */}
-        {test.signals.length > 0 && (
-          <div className="print-accent-border mt-3 border-l border-white/10 pl-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-              {view === "client" ? "Why it's worth testing" : "Signals used"}
-            </p>
-            <ul className="mt-1.5 space-y-1">
-              {test.signals.map((signal, i) => (
-                <li
-                  key={i}
-                  className="flex gap-2 text-xs leading-relaxed text-zinc-400"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
-                  />
-                  <span className="min-w-0 break-words">{c(signal)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {/* Next Tests Setup/Signals Progressive Disclosure V1 — Setup
+            and Signals used are real implementation detail / evidence
+            provenance, not first-pass reasoning (Why/Hypothesis/Win/
+            Evidence already cover that). Screen-collapsed by default,
+            one click away, never removed: the wrapper below stays
+            mounted at all times — collapsing is a `hidden` class
+            toggle, not a conditional render — and .print-force-block
+            (globals.css) forces it visible in print regardless of
+            on-screen state. The toggle button itself is .print-hidden
+            so it never appears in the printed/exported document. */}
+        <button
+          type="button"
+          aria-expanded={setupExpanded}
+          aria-controls={setupDetailsId}
+          onClick={() => setSetupExpanded((v) => !v)}
+          className="print-hidden mt-2.5 cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400 transition-colors hover:text-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-carbon"
+        >
+          {setupExpanded ? "Hide setup details" : "Show setup details"}
+        </button>
+        <div id={setupDetailsId} className={`print-force-block ${setupExpanded ? "block" : "hidden"}`}>
+          <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
+            <div>
+              <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                {view === "client" ? "How " : "Setup "}
+              </dt>
+              <dd className="print-kv-value inline break-words">{c(test.setup)}</dd>
+            </div>
+          </dl>
+          {/* The receipts: which signals produced this recommendation. */}
+          {test.signals.length > 0 && (
+            <div className="print-accent-border mt-3 border-l border-white/10 pl-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                {view === "client" ? "Why it's worth testing" : "Signals used"}
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {test.signals.map((signal, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-2 text-xs leading-relaxed text-zinc-400"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
+                    />
+                    <span className="min-w-0 break-words">{c(signal)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     </li>
   );

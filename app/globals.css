@@ -214,6 +214,20 @@ body {
   .print-only {
     display: block !important;
   }
+  /* Next Tests Setup/Signals Progressive Disclosure V1 — the inverse
+     problem from .print-hidden/.print-only above: content that stays
+     in the DOM at all times and is hidden on SCREEN only via a plain
+     `hidden` utility class toggled by local component state (never
+     conditionally unmounted, so print always has it to render). A
+     closed native <details> was ruled out here — empirically confirmed
+     (see the pre-existing DecisionCard "Decision bars applied" block)
+     to omit its content from Chrome's PDF output entirely. `!important`
+     wins over the screen-only `hidden` utility (plain `display: none`,
+     no !important) regardless of which one was added to the element
+     last. */
+  .print-force-block {
+    display: block !important;
+  }
   body {
     background: #ffffff !important;
   }
