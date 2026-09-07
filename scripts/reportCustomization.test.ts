@@ -211,6 +211,10 @@ import {
     },
   });
 
+  // Report Default Curation V1: Client keeps Confidence visible
+  // (showMovementChart: false, sections.confidence: true) — the
+  // approved Client default set now matches this preset's own
+  // snapshot. Every other field is the pre-existing, unchanged value.
   assert.deepEqual(p.client, {
     mode: "client",
     topAdsShown: 3,
@@ -218,7 +222,7 @@ import {
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
-    showMovementChart: true,
+    showMovementChart: false,
     sections: {
       whatChanged: true,
       executiveSummary: true,
@@ -228,7 +232,7 @@ import {
       patterns: false,
       nextTests: true,
       creativeBriefs: false,
-      confidence: false,
+      confidence: true,
       signOff: true,
     },
   });
@@ -371,7 +375,12 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
   assert.equal(derivePreset(customization(), PERFORMANCE_PRESETS, PERFORMANCE_SECTION_IDS), "buyer");
   assert.equal(
     derivePreset(
-      customization({ mode: "client", topAdsShown: 3, sections: PERFORMANCE_PRESETS.client.sections }),
+      customization({
+        mode: "client",
+        topAdsShown: 3,
+        showMovementChart: false,
+        sections: PERFORMANCE_PRESETS.client.sections,
+      }),
       PERFORMANCE_PRESETS,
       PERFORMANCE_SECTION_IDS
     ),
