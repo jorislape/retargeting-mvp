@@ -26,7 +26,7 @@ import { PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/repo
 import { accentCssVars, getAccentById } from "@/components/report/reportCustomization";
 import { useReportCustomization } from "@/components/report/useReportCustomization";
 import { ReportCustomizationPanel } from "@/components/report/ReportCustomizationPanel";
-import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
+import { PERFORMANCE_INITIAL_OVERRIDES, PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
 import { MovementChart } from "./MovementChart";
@@ -1271,7 +1271,11 @@ export function Report({
      customization.mode rather than tracked separately — one source of
      truth, translated at this single boundary so nothing downstream
      needs to know customization exists. */
-  const customizationActions = useReportCustomization(PERFORMANCE_SECTION_IDS, PERFORMANCE_PRESETS);
+  const customizationActions = useReportCustomization(
+    PERFORMANCE_SECTION_IDS,
+    PERFORMANCE_PRESETS,
+    PERFORMANCE_INITIAL_OVERRIDES
+  );
   const { customization } = customizationActions;
   const [panelOpen, setPanelOpen] = useState(false);
   const view: ReportView = customization.mode === "client" ? "client" : "buyer";

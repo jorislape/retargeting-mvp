@@ -5,6 +5,7 @@
 import {
   createDefaultSections,
   applyModeDefaults,
+  type InitialCustomizationOverrides,
   type PresetDefinition,
   type PresetId,
 } from "../report/reportCustomization.ts";
@@ -37,6 +38,13 @@ import {
 const clientSections: Record<PerformanceSectionId, boolean> = {
   ...applyModeDefaults(PERFORMANCE_SECTION_IDS, "client", PERFORMANCE_CLIENT_MODE_HIDDEN),
   creativeBriefs: false,
+  // Report Default Curation V1: the approved Client default set keeps
+  // Confidence visible (grounding the recommendation is exactly what a
+  // client-facing reader needs) — overridden here rather than dropped
+  // from PERFORMANCE_CLIENT_MODE_HIDDEN, since that list is also reused
+  // by the "executive" preset below, which keeps its own prior
+  // (confidence-hidden) behavior unchanged.
+  confidence: true,
 };
 
 export const PERFORMANCE_PRESETS: Record<
@@ -60,7 +68,10 @@ export const PERFORMANCE_PRESETS: Record<
     colorMode: "color",
     showRankingChart: true,
     showSpendAllocationChart: true,
-    showMovementChart: true,
+    // Report Default Curation V1: off — What Changed already covers
+    // this ground for the approved Client default set, so the chart
+    // is available via Customize but no longer on by default.
+    showMovementChart: false,
     sections: clientSections,
   },
   executive: {
@@ -71,7 +82,10 @@ export const PERFORMANCE_PRESETS: Record<
     showRankingChart: true,
     showSpendAllocationChart: true,
     showMovementChart: true,
-    sections: { ...clientSections, underperformers: false },
+    // Executive's own compact behavior is unchanged by this milestone —
+    // explicitly override the Client-only confidence:true above so this
+    // preset (which spreads clientSections) keeps its prior value.
+    sections: { ...clientSections, underperformers: false, confidence: false },
   },
   print: {
     mode: "internal",
@@ -83,6 +97,33 @@ export const PERFORMANCE_PRESETS: Record<
     showMovementChart: true,
     sections: createDefaultSections(PERFORMANCE_SECTION_IDS),
   },
+};
+
+/**
+ * Report Default Curation V1 — the approved fresh-report starting
+ * point. Report.tsx always mounts in "internal"/Buyer mode (see
+ * useReportCustomization's initialOverrides parameter), so this is
+ * effectively "Buyer's curated defaults." Distinct from the "buyer"
+ * NAMED PRESET above, which deliberately stays the fuller "everything
+ * visible" option a user can still explicitly restore via Customize ->
+ * Buyer analysis — this is only what the report shows before any
+ * interaction at all (and what Reset returns to).
+ *
+ * Client's own curated starting point has no equivalent clean
+ * initial-mount path: mode always starts "internal," and a first
+ * Buyer -> Client tab switch must not silently change section
+ * visibility (approved decision #9 — see setMode's doc comment in
+ * useReportCustomization.ts). It's instead reached via the "client"
+ * preset above, which this milestone updated to match the approved
+ * Client default set.
+ */
+export const PERFORMANCE_INITIAL_OVERRIDES: InitialCustomizationOverrides<PerformanceSectionId> = {
+  sections: {
+    verdict: false,
+    patterns: false,
+  },
+  showRankingChart: false,
+  showMovementChart: false,
 };
 
 export const PRESET_LABELS: Record<Exclude<PresetId, "custom">, string> = {

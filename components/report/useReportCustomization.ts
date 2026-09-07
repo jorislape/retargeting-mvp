@@ -6,6 +6,7 @@ import {
   derivePreset,
   type AccentId,
   type Density,
+  type InitialCustomizationOverrides,
   type PresetDefinition,
   type PresetId,
   type ReportCustomization,
@@ -31,6 +32,29 @@ import { validateLogoFile } from "./logoValidation";
  * When omitted (Competitor Debrief, this milestone), `preset` simply
  * always reads "custom"; nothing else about the hook changes.
  */
+
+/**
+ * Report Default Curation V1: `initialOverrides` is optional and
+ * report-type-specific (e.g. components/debrief/reportPresets.ts's
+ * PERFORMANCE_INITIAL_OVERRIDES) — applied ONLY when this state is
+ * first created (the lazy useState initializer below) and by reset().
+ * setMode() never reads it, so switching Buyer/Client never re-applies
+ * or reverts to it — that would reintroduce the exact "mode switch
+ * resets customization" regression approved decision #9 removed.
+ */
+function buildInitialCustomization<Id extends string>(
+  sectionIds: readonly Id[],
+  presets: Partial<Record<Exclude<PresetId, "custom">, PresetDefinition<Id>>> | undefined,
+  initialOverrides: InitialCustomizationOverrides<Id> | undefined
+): ReportCustomization<Id> {
+  const base = createDefaultCustomization(sectionIds);
+  const merged: ReportCustomization<Id> = {
+    ...base,
+    ...initialOverrides,
+    sections: { ...base.sections, ...initialOverrides?.sections },
+  };
+  return { ...merged, preset: derivePreset(merged, presets, sectionIds) };
+}
 export interface UseReportCustomizationResult<Id extends string> {
   customization: ReportCustomization<Id>;
   setAgencyName: (value: string) => void;
@@ -71,12 +95,12 @@ export interface UseReportCustomizationResult<Id extends string> {
 
 export function useReportCustomization<Id extends string>(
   sectionIds: readonly Id[],
-  presets?: Partial<Record<Exclude<PresetId, "custom">, PresetDefinition<Id>>>
+  presets?: Partial<Record<Exclude<PresetId, "custom">, PresetDefinition<Id>>>,
+  initialOverrides?: InitialCustomizationOverrides<Id>
 ): UseReportCustomizationResult<Id> {
-  const [customization, setCustomization] = useState<ReportCustomization<Id>>(() => {
-    const base = createDefaultCustomization(sectionIds);
-    return { ...base, preset: derivePreset(base, presets, sectionIds) };
-  });
+  const [customization, setCustomization] = useState<ReportCustomization<Id>>(() =>
+    buildInitialCustomization(sectionIds, presets, initialOverrides)
+  );
   const logoUrlRef = useRef<string | null>(null);
 
   const revokeCurrentLogo = useCallback(() => {
@@ -199,9 +223,8 @@ export function useReportCustomization<Id extends string>(
 
   const reset = useCallback(() => {
     revokeCurrentLogo();
-    const base = createDefaultCustomization(sectionIds);
-    setCustomization({ ...base, preset: derivePreset(base, presets, sectionIds) });
-  }, [sectionIds, presets, revokeCurrentLogo]);
+    setCustomization(buildInitialCustomization(sectionIds, presets, initialOverrides));
+  }, [sectionIds, presets, initialOverrides, revokeCurrentLogo]);
 
   return {
     customization,

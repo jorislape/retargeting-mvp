@@ -123,6 +123,26 @@ export interface PresetDefinition<SectionId extends string> extends PresetSnapsh
   mode: ReportMode;
 }
 
+/**
+ * Report Default Curation V1 — an optional, additive overlay applied
+ * ONCE, at the moment a report's customization state is first created
+ * (the lazy useState initializer and reset() in
+ * useReportCustomization.ts), never on a mode switch. Deliberately NOT
+ * a PresetSnapshot: a preset is a named, explicitly-chosen full
+ * configuration a user can return to at any time (see setPreset); this
+ * is just "what the very first render of createDefaultCustomization
+ * should look like" for a given report type, so every field is
+ * optional and only the fields that diverge from the all-visible
+ * default need to be listed. `sections` is a partial map for the same
+ * reason — omitted ids simply keep createDefaultSections' `true`.
+ */
+export interface InitialCustomizationOverrides<Id extends string> {
+  sections?: Partial<Record<Id, boolean>>;
+  showRankingChart?: boolean;
+  showSpendAllocationChart?: boolean;
+  showMovementChart?: boolean;
+}
+
 export type TopAdsShown = 3 | 5;
 export type Density = "compact" | "standard";
 export type ColorMode = "color" | "grayscale";
