@@ -1575,33 +1575,22 @@ export function Report({
           )}
         </header>
 
-        {/* Period Comparison V2 — change is the context the decision is
-            read in, so it renders above the Next-move card. Unnumbered,
-            like the card. */}
-        {memo.comparison && sections.whatChanged && (
-          <WhatChangedSection
-            comparison={memo.comparison}
-            view={view}
-            topAdsShown={customization.topAdsShown}
-          />
-        )}
-
-        {/* Report Density & Sequencing Coherence V1 — Movement moved
-            here, directly beside What Changed (same comparison
-            narrative, same question: "what moved and by how much").
-            Previously sat after Verdict/Performance Ranking/Spend
-            Allocation, separated from What Changed by several unrelated
-            sections despite answering the same question from the same
-            data. Gating is unchanged and stays fully independent of
-            What Changed's own toggle (sections.whatChanged) — only
-            customization.showMovementChart, and MovementChart's own
-            internal "no comparison, no render" check, same as before
-            this move. No comparison data still renders nothing; no
-            chart math, copy, or comparison logic changed. */}
-        {customization.showMovementChart && (
-          <MovementChart comparison={memo.comparison} view={view} topAdsShown={customization.topAdsShown} />
-        )}
-
+        {/* Report Decision Primacy V1 — the committed call is the first
+            substantive block after the masthead, in every case,
+            including when comparison data exists. Previously What
+            Changed + Movement rendered here, ahead of the card, on the
+            reasoning that "change is the context the decision is read
+            in" — live QA measured ~1408px of scroll before the Next
+            Move card at 1280×1400 whenever a previous-period file was
+            attached, meaning the one committed recommendation the
+            homepage promises was entirely off-screen for exactly the
+            users most likely to re-run the tool. Decision computation
+            is untouched — expandLimits already read memo.comparison
+            before this move (to decide whether the card's OWN "what we
+            don't know" list starts expanded) and still does; the
+            decision itself has never read comparison, isolation is
+            test-enforced in decision.test.ts/compare.test.ts and
+            unaffected by render order. */}
         <DecisionCard
           memo={memo}
           view={view}
@@ -1610,6 +1599,31 @@ export function Report({
             memo.decision.appliedCriteria.some((c) => c.source === "user")
           }
         />
+
+        {/* Period Comparison V2 — change is the context the decision was
+            just read in, so it follows immediately under the card
+            rather than gating access to it. Unnumbered, like the card. */}
+        {memo.comparison && sections.whatChanged && (
+          <WhatChangedSection
+            comparison={memo.comparison}
+            view={view}
+            topAdsShown={customization.topAdsShown}
+          />
+        )}
+
+        {/* Report Density & Sequencing Coherence V1 — Movement stays
+            directly beside What Changed (same comparison narrative,
+            same question: "what moved and by how much"); Report
+            Decision Primacy V1 only moved this pair, together, to
+            after the Next-move card — their order relative to each
+            other, their gating (customization.showMovementChart,
+            independent of sections.whatChanged), and MovementChart's
+            own internal "no comparison, no render" check are all
+            unchanged. No comparison data still renders nothing; no
+            chart math, copy, or comparison logic changed. */}
+        {customization.showMovementChart && (
+          <MovementChart comparison={memo.comparison} view={view} topAdsShown={customization.topAdsShown} />
+        )}
 
         {/* Creative Evidence V1 — which actual ads the decision above is
             about. Spotlights come from evidence only; renders only when
