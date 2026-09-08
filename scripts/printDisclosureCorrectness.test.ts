@@ -122,7 +122,7 @@ const decisionCardSrc = reportSrc.slice(decisionCardStart, decisionCardEnd);
   console.log("printDisclosureCorrectness: 5. heading copy is byte-identical between screen and print — no wording changed");
 }
 
-/* ===================== 6. The always-visible expandLimits branch is untouched ===================== */
+/* ===================== 6. The always-visible expandLimits branch was never affected by the print bug ===================== */
 {
   assert.match(
     decisionCardSrc,
@@ -132,11 +132,18 @@ const decisionCardSrc = reportSrc.slice(decisionCardStart, decisionCardEnd);
   const alwaysVisibleBlockMatch = decisionCardSrc.match(/expandLimits \? \(([\s\S]*?)\) : \(/);
   assert.ok(alwaysVisibleBlockMatch, "the always-visible (expandLimits=true) branch is found");
   const alwaysVisibleBlock = alwaysVisibleBlockMatch![1];
-  assert.ok(!alwaysVisibleBlock.includes("<details"), "the always-visible branch never used <details> — confirmed unaffected by this milestone's fix");
+  assert.ok(!alwaysVisibleBlock.includes("<details"), "the always-visible branch never used <details> — confirmed unaffected by this milestone's print-omission fix");
   assert.ok(!alwaysVisibleBlock.includes("print-only"), "the always-visible branch needed no print-only mirror — it was never broken");
   assert.match(alwaysVisibleBlock, /What we don't know/, "buyer label for the always-visible branch is unchanged");
+  // Print Page One Composition V1 (a later, separate milestone) added
+  // print-avoid-break here — a pure pagination hint (break-inside:
+  // avoid has zero effect outside page/column fragmentation, so screen
+  // rendering is untouched) — to stop this multi-line block from
+  // splitting awkwardly across a page boundary. That is compatible
+  // with, not a regression of, this milestone's own fix.
+  assert.match(alwaysVisibleBlock, /print-avoid-break/, "print-avoid-break was later added for pagination — expected, not a regression");
 
-  console.log("printDisclosureCorrectness: 6. the always-visible expandLimits branch (never affected) is confirmed untouched");
+  console.log("printDisclosureCorrectness: 6. the always-visible expandLimits branch was never affected by the print-omission bug (print-avoid-break added later, for pagination, is compatible)");
 }
 
 /* ===================== 7. key={view} reset-on-mode-switch behavior preserved ===================== */

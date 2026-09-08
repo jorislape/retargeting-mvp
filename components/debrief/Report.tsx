@@ -429,7 +429,22 @@ function DecisionCard({
   return (
     <section
       aria-label="Next move"
-      className="print-avoid-break animate-rise mt-8 rounded-xl border border-accent/25 border-l-[3px] border-l-accent/70 bg-accent/[0.05] p-5 sm:p-6"
+      /* Print Page One Composition V1 — this card is NOT print-avoid-
+         break as a whole: it's long enough (headline through Evidence
+         limits) that keeping it fully atomic forces the entire block
+         to defer past the masthead onto page 2 whenever it doesn't
+         fit the remaining page-1 space, leaving that space blank
+         (root cause of the reported issue — confirmed by measuring
+         the real sample: masthead ~340px, card ~844px, remaining
+         page-1 space ~692px, so the whole card never fits regardless).
+         Removing the outer guard lets the card start filling page 1
+         immediately after the masthead; each individual multi-line
+         sub-block below still carries its own print-avoid-break so
+         nothing splits mid-list or leaves an orphaned heading — this
+         mirrors this class's own original intent ("applied selectively
+         to the units worth protecting, not blanket-applied," see
+         globals.css) rather than introducing new behavior. */
+      className="animate-rise mt-8 rounded-xl border border-accent/25 border-l-[3px] border-l-accent/70 bg-accent/[0.05] p-5 sm:p-6"
     >
       <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
         <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
@@ -515,7 +530,7 @@ function DecisionCard({
           {/* Print-only mirror of the disclosure above — see this
               function's own doc comment. The <details> itself is
               print-hidden, so the two never both render at once. */}
-          <div className="print-only mt-3">
+          <div className="print-only print-avoid-break mt-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Decision bars applied
             </p>
@@ -524,7 +539,7 @@ function DecisionCard({
         </>
       )}
       {avoid.length > 0 && (
-        <div className="mt-4">
+        <div className="print-avoid-break mt-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             {client ? "What we're deliberately not doing yet" : "Not yet"}
           </p>
@@ -541,7 +556,7 @@ function DecisionCard({
         </div>
       )}
       {d.nextControlledTest && (
-        <div className="mt-4">
+        <div className="print-avoid-break mt-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             Next controlled test
           </p>
@@ -582,7 +597,7 @@ function DecisionCard({
              criteria in play, the limits carry load-bearing caveats —
              always visible as the "What we don't know" counterpart to
              "What we know" above. */
-          <div className="mt-4 border-t border-white/[0.08] pt-3">
+          <div className="print-avoid-break mt-4 border-t border-white/[0.08] pt-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {client ? "What we still can't conclude" : "What we don't know"}
             </p>
@@ -613,7 +628,7 @@ function DecisionCard({
             {/* Print-only mirror — see this function's own doc comment.
                 The <details> above is print-hidden, so the two never
                 both render at once. */}
-            <div className="print-only mt-4 border-t border-white/[0.08] pt-3">
+            <div className="print-only print-avoid-break mt-4 border-t border-white/[0.08] pt-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 {client ? "What we still can't conclude" : "Evidence limits"}
               </p>
