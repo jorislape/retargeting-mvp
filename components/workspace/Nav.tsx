@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wordmark } from "@/components/ui/brand";
+import { useDebrief } from "@/components/workspace/DebriefProvider";
 import {
   FileTextIcon,
   HelpCircleIcon,
   HomeIcon,
+  ListChecksIcon,
   ShieldIcon,
   SparklesIcon,
   ZapIcon,
@@ -26,12 +28,27 @@ const NAV = [
   { href: "/how-it-works", label: "How it works", icon: HelpCircleIcon },
 ] as const;
 
+/* Decision Queue / Multi-Account V1 — deliberately NOT a permanent
+   6th entry in NAV above: it's useless (an explained-empty state)
+   until at least one account has been debriefed, and a 6th item would
+   also force MobileTabBar's fixed 5-column grid to change for every
+   visitor, most of whom analyze a single account. Instead it appears
+   here only once the session's portfolio is non-empty — still a real,
+   persistent, always-reachable route once it matters, per CLAUDE.md's
+   "user must always be able to return to queue" requirement — without
+   cluttering the primary nav for the common single-account case. */
+function useDecisionQueueNavItem() {
+  const { portfolio } = useDebrief();
+  return portfolio.length;
+}
+
 function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
 export function Sidebar() {
   const pathname = usePathname();
+  const queueCount = useDecisionQueueNavItem();
 
   return (
     <aside className="print-hidden fixed inset-y-0 left-0 z-20 hidden w-52 flex-col border-r border-white/[0.06] bg-carbon md:flex">
@@ -67,6 +84,29 @@ export function Sidebar() {
             </Link>
           );
         })}
+        {queueCount > 0 && (
+          <Link
+            href="/decision-queue"
+            aria-current={isActive(pathname, "/decision-queue") ? "page" : undefined}
+            className={`group mt-1 flex items-center gap-2.5 rounded-lg border-t border-white/[0.06] px-2.5 pt-3 pb-2 text-[13px] font-medium transition-colors ${
+              isActive(pathname, "/decision-queue")
+                ? "bg-white/[0.06] text-white"
+                : "text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-300"
+            }`}
+          >
+            <ListChecksIcon
+              className={`h-4 w-4 shrink-0 transition-colors ${
+                isActive(pathname, "/decision-queue")
+                  ? "text-accent-soft"
+                  : "text-zinc-500 group-hover:text-zinc-400"
+              }`}
+            />
+            Decision Queue
+            <span className="ml-auto shrink-0 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
+              {queueCount}
+            </span>
+          </Link>
+        )}
       </nav>
 
       <div className="mt-auto border-t border-white/[0.06] p-4">
@@ -82,15 +122,37 @@ export function Sidebar() {
 }
 
 export function MobileTopBar() {
+  const pathname = usePathname();
+  const queueCount = useDecisionQueueNavItem();
+
   return (
     <header className="print-hidden sticky top-0 z-30 border-b border-white/[0.06] bg-carbon/90 backdrop-blur md:hidden">
-      <div className="flex h-14 items-center justify-between px-5">
-        <Link href="/" className="flex items-center">
+      <div className="flex h-14 items-center justify-between gap-3 px-5">
+        <Link href="/" className="flex shrink-0 items-center">
           <Wordmark />
         </Link>
-        <span className="text-[10px] font-medium text-zinc-400">
-          Ads data never stored server-side
-        </span>
+        {queueCount > 0 ? (
+          /* Decision Queue / Multi-Account V1 — mobile's tab bar stays a
+             fixed 5-column grid (see MobileTabBar below), so this top-bar
+             link is the persistent, always-reachable mobile route back to
+             the queue once it has entries — it replaces the static
+             privacy line only when there's something to navigate to;
+             the privacy guarantee itself is unchanged and still shown
+             everywhere else (sidebar, workspace footer). */
+          <Link
+            href="/decision-queue"
+            aria-current={isActive(pathname, "/decision-queue") ? "page" : undefined}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-medium text-zinc-300 transition hover:border-white/20 hover:text-white"
+          >
+            <ListChecksIcon className="h-3 w-3 text-accent-soft" />
+            Queue
+            <span className="rounded-full bg-white/10 px-1.5 text-[9px]">{queueCount}</span>
+          </Link>
+        ) : (
+          <span className="text-[10px] font-medium text-zinc-400">
+            Ads data never stored server-side
+          </span>
+        )}
       </div>
     </header>
   );

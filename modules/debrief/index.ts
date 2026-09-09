@@ -13,6 +13,8 @@ export {
 export { buildComparison, COMPARISON_CAVEAT } from "./compare";
 export type { ComparisonFormatters, ComparisonPeriod } from "./compare";
 export { MIN_GROUP_REPETITION, normalizeGroupLabel, summarizeCreativeGroups } from "./creativeGroups";
+export { deriveDecisionQueue, QUEUE_CATEGORY_LABELS } from "./decisionQueue";
+export type { DecisionQueue, QueueAccountInput, QueueCategory, QueueEntry } from "./decisionQueue";
 export { fmtKpiValue, fmtMoney } from "./format";
 export { generateMemo } from "./memo";
 export {

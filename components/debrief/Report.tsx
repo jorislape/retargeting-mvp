@@ -12,6 +12,7 @@ import {
   CheckIcon,
   CopyIcon,
   DownloadIcon,
+  PlusIcon,
   PrinterIcon,
   RefreshIcon,
   SlidersIcon,
@@ -1341,12 +1342,19 @@ export function Report({
   variant = "generated",
   generatedAt = null,
   onNewDebrief,
+  onAddToQueue,
   creativeAssets = {},
 }: {
   memo: Memo;
   variant?: "generated" | "sample";
   generatedAt?: number | null;
   onNewDebrief?: () => void;
+  /** Decision Queue / Multi-Account V1 — snapshots THIS report into the
+   *  session's portfolio. Undefined on /sample (sample data must never
+   *  reach a real queue) and whenever the caller has no portfolio to
+   *  add to. Does not reset the generator — pair with onNewDebrief to
+   *  move on to the next account. */
+  onAddToQueue?: () => void;
   /** Creative Evidence V1 — session-only creative images keyed by
    *  normalized ad name (DebriefProvider's map for generated runs, the
    *  bundled demo map for /sample). Presentation only: an empty map
@@ -1371,6 +1379,13 @@ export function Report({
   const view: ReportView = customization.mode === "client" ? "client" : "buyer";
 
   const [copied, setCopied] = useState(false);
+  /* Decision Queue / Multi-Account V1 — a report instance only ever
+     needs to be added once; disabling after a successful add avoids a
+     double-click creating two identical portfolio entries for the
+     same account. Resets naturally whenever `memo` changes, because
+     the generator flow always unmounts/remounts Report between
+     accounts (reset() clears status before the next generate()). */
+  const [addedToQueue, setAddedToQueue] = useState(false);
   const [queued, setQueued] = useState<boolean[]>(() =>
     memo.nextTests.map(() => false)
   );
@@ -1529,6 +1544,27 @@ export function Report({
             <DownloadIcon className="h-3.5 w-3.5" />
             Export TXT
           </button>
+          {onAddToQueue && (
+            <button
+              onClick={() => {
+                onAddToQueue();
+                setAddedToQueue(true);
+              }}
+              disabled={addedToQueue}
+              className={`inline-flex items-center gap-1.5 rounded-sm text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                addedToQueue
+                  ? "cursor-default text-emerald-400"
+                  : "cursor-pointer text-zinc-400 underline decoration-zinc-700 underline-offset-2 hover:text-accent-soft hover:decoration-accent/50"
+              }`}
+            >
+              {addedToQueue ? (
+                <CheckIcon className="h-3.5 w-3.5" />
+              ) : (
+                <PlusIcon className="h-3.5 w-3.5" />
+              )}
+              {addedToQueue ? "Added to Decision Queue" : "Add to Decision Queue"}
+            </button>
+          )}
           {onNewDebrief && (
             <button
               onClick={onNewDebrief}

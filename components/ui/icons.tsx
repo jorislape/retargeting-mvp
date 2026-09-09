@@ -217,6 +217,28 @@ export function GaugeIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+/** A short checklist — used for the Decision Queue nav entry/CTAs. */
+export function ListChecksIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={`shrink-0 ${className}`}>
+      <path d="m3 7 2 2 4-4" />
+      <path d="M13 6h8" />
+      <path d="m3 17 2 2 4-4" />
+      <path d="M13 18h8" />
+    </Icon>
+  );
+}
+
+/** Plain "+" — used by the "Add to Decision Queue" action. */
+export function PlusIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <Icon className={`shrink-0 ${className}`}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </Icon>
+  );
+}
+
 /** Three horizontal sliders — used only by the report customization
  *  drawer's trigger button. */
 export function SlidersIcon({ className = "h-4 w-4" }: { className?: string }) {

@@ -44,6 +44,13 @@ export interface CreativeAssetRef {
 
 export interface GeneratorFields {
   kpi: KpiKey;
+  /** Decision Queue / Multi-Account V1 — an OPTIONAL local label for
+   *  this account in the session's Decision Queue only. Never sent to
+   *  /api/debrief, never analyzed, never required — leaving it blank
+   *  falls back to a deterministic label (the loaded file's name, or
+   *  "Account N") when the report is added to the queue. See
+   *  deriveFallbackAccountLabel below. */
+  accountLabel: string;
   /** Report-identification/framing only — required so the report has a
    *  label, but never analyzed and never affects scoring. */
   product: string;
@@ -98,6 +105,7 @@ export type GeneratorStatus = "idle" | "processing" | "ready";
 
 const DEFAULT_FIELDS: GeneratorFields = {
   kpi: "roas",
+  accountLabel: "",
   product: "",
   offer: "",
   targetCpa: "",
@@ -141,6 +149,49 @@ function normalizeError(raw: unknown): DebriefApiError {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Decision Queue / Multi-Account V1                                   */
+/*                                                                    */
+/* A session-only portfolio of already-completed, independent Debrief */
+/* results. Each entry is a plain, immutable snapshot: the exact Memo  */
+/* object a past generate() call returned, plus a display label and a  */
+/* session-local id. Adding an account never mutates a previous entry  */
+/* (Memo objects are never written to after being set — see generate() */
+/* — and each addToQueue call appends a new element rather than        */
+/* touching existing ones); removing one is a plain array filter, so   */
+/* it structurally cannot mutate the entries that remain. React state  */
+/* only — no localStorage, no cookies, no server call — a refresh      */
+/* wipes the whole portfolio exactly like it already wipes `memo`.     */
+/* Creative images (creativeAssets) are deliberately NOT captured into */
+/* a snapshot: they're revoked object URLs tied to whichever file is   */
+/* currently loaded (see setFile/reset above), so a past account       */
+/* reopened from the queue renders without its creative image — never  */
+/* a broken one, since CreativeEvidenceStrip already renders nothing   */
+/* when no asset exists for an ad.                                     */
+/* ------------------------------------------------------------------ */
+
+export interface QueueAccountSnapshot {
+  /** Session-local, insertion-ordered identity — never persisted, never
+   *  a business-sensitive value. */
+  id: number;
+  label: string;
+  addedAt: number;
+  memo: Memo;
+}
+
+/** Filename minus a trailing ".csv" (case-insensitive), trimmed — used
+ *  only when the user left the optional account label blank. For a
+ *  Meta pull this is already "Meta — {account name} — {date range}"
+ *  (see MetaConnect.tsx), so the fallback is a genuinely meaningful
+ *  label there, not just a raw filename. */
+function deriveFallbackAccountLabel(file: File | null, position: number): string {
+  if (file) {
+    const base = file.name.replace(/\.csv$/i, "").trim();
+    if (base !== "") return base;
+  }
+  return `Account ${position}`;
+}
+
 interface DebriefContextValue {
   status: GeneratorStatus;
   file: File | null;
@@ -171,6 +222,17 @@ interface DebriefContextValue {
   memo: Memo | null;
   error: DebriefApiError | null;
   generatedAt: number | null;
+  /** Decision Queue / Multi-Account V1 — every completed Debrief added
+   *  to this session's portfolio so far, oldest first. React state
+   *  only; see this file's Decision Queue section comment above for
+   *  the immutability/privacy contract. */
+  portfolio: QueueAccountSnapshot[];
+  /** Snapshots the CURRENT memo into the portfolio under the given
+   *  label (falling back to deriveFallbackAccountLabel when blank) —
+   *  a no-op when there is no current memo. Does not reset the
+   *  generator; pair with reset() to start the next account. */
+  addToQueue: (label: string) => void;
+  removeFromQueue: (id: number) => void;
   setFile: (file: File | null) => void;
   setPreviousFile: (file: File | null) => void;
   updateFields: (patch: Partial<GeneratorFields>) => void;
@@ -282,6 +344,37 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<DebriefApiError | null>(null);
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
 
+  /* Decision Queue / Multi-Account V1 — see this file's header comment
+     for the section above for the full contract. nextQueueIdRef is a
+     plain incrementing counter (never Date.now()/crypto — this is a
+     session-local list key, not ads data or anything requiring
+     unpredictability) so ids are also a stable, readable insertion-
+     order tie-break. */
+  const [portfolio, setPortfolio] = useState<QueueAccountSnapshot[]>([]);
+  const nextQueueIdRef = useRef(1);
+
+  const addToQueue = useCallback(
+    (label: string) => {
+      if (!memo) return;
+      const trimmed = label.trim();
+      const id = nextQueueIdRef.current++;
+      setPortfolio((prev) => [
+        ...prev,
+        {
+          id,
+          label: trimmed !== "" ? trimmed : deriveFallbackAccountLabel(file, prev.length + 1),
+          addedAt: Date.now(),
+          memo,
+        },
+      ]);
+    },
+    [memo, file]
+  );
+
+  const removeFromQueue = useCallback((id: number) => {
+    setPortfolio((prev) => prev.filter((entry) => entry.id !== id));
+  }, []);
+
   const updateFields = useCallback((patch: Partial<GeneratorFields>) => {
     setFields((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -390,6 +483,9 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       memo,
       error,
       generatedAt,
+      portfolio,
+      addToQueue,
+      removeFromQueue,
       setFile,
       setPreviousFile,
       updateFields,
@@ -402,7 +498,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       clearError,
       reset,
     }),
-    [status, file, previousFile, fields, competitorSources, formatOverrides, creativeGroups, creativeAssets, memo, error, generatedAt, setFile, updateFields, setCreativeAsset, setSampleCreativeAssets, generate, clearError, reset]
+    [status, file, previousFile, fields, competitorSources, formatOverrides, creativeGroups, creativeAssets, memo, error, generatedAt, portfolio, addToQueue, removeFromQueue, setFile, updateFields, setCreativeAsset, setSampleCreativeAssets, generate, clearError, reset]
   );
 
   return (

@@ -1583,6 +1583,37 @@ export function GeneratorPanel() {
             </ul>
           </div>
 
+          {/* Decision Queue / Multi-Account V1 — optional, local-only
+              label for this account's Decision Queue entry. Deliberately
+              separate from "Product / industry" below: this field is
+              NEVER sent to /api/debrief and never analyzed — it exists
+              only so multiple accounts are distinguishable in the
+              session's queue. Leaving it blank is fine for the existing
+              single-account flow; a deterministic fallback (the loaded
+              file's name, or "Account N") is used automatically when the
+              report is added to the queue. */}
+          <div className="mt-5">
+            <label htmlFor="accountLabel" className={fieldLabel}>
+              Account / client name (optional)
+            </label>
+            <input
+              id="accountLabel"
+              value={fields.accountLabel}
+              onChange={(e) => updateFields({ accountLabel: e.target.value })}
+              placeholder={
+                file
+                  ? `Defaults to “${file.name.replace(/\.csv$/i, "")}”`
+                  : "Defaults to “Account 1”, “Account 2”, …"
+              }
+              maxLength={80}
+              className={`mt-1.5 max-w-sm ${inputBase}`}
+            />
+            <p className="mt-1.5 text-xs text-zinc-400">
+              Only used to label this account in your Decision Queue — never
+              sent for analysis.
+            </p>
+          </div>
+
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="product" className={fieldLabel}>
