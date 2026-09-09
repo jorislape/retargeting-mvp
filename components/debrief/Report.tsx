@@ -20,6 +20,7 @@ import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
+import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
 import { computePerformanceSectionNumbers } from "@/components/report/reportNumbering";
 import { PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/report/reportSections";
@@ -1722,6 +1723,15 @@ export function Report({
             about. Spotlights come from evidence only; renders only when
             at least one creative image exists this session. */}
         <CreativeEvidenceStrip memo={memo} view={view} assets={creativeAssets} />
+
+        {/* Creative Grouping V1 — descriptive repeated-performance
+            evidence for user-declared creative groups. Renders only
+            when memo.creativeGroups has repeated-group evidence; a run
+            with no declared groups is byte-identical to before this
+            feature. Not part of the Customize toggle surface or
+            report numbering — same "conditional on data" precedent as
+            Market signal (see reportSections.ts's own doc comment). */}
+        <CreativeGroupsSection memo={memo} view={view} />
 
         {/* Expert Commentary V2 — attributed judgment, never mixed with
             engine claims. */}

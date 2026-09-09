@@ -1518,6 +1518,12 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
        function, which is also what keeps the decision above provably
        comparison-blind. */
     comparison: null,
+    /* Creative Grouping V1: same pattern as comparison directly above —
+       always null here. The route computes it from analysis.rankedAds
+       + the request's optional creativeGroups field and attaches it
+       after generateMemo returns, so the decision is committed with
+       zero awareness this field exists. */
+    creativeGroups: null,
     spendAllocation: buildSpendAllocation(analysis),
     scope: {
       product: context.product || "Your account",

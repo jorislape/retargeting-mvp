@@ -254,6 +254,48 @@ export function memoToText(
     lines.push("");
   }
 
+  /* Creative Grouping V1 — same "always fully expanded in text export"
+     rule as Evidence limits directly above: member executions are
+     screen-progressive-disclosed in the report, but Copy/TXT has no
+     concept of "collapsed," so every judged execution is listed. Only
+     present when memo.creativeGroups has repeated-group evidence. */
+  if (memo.creativeGroups && memo.creativeGroups.groups.length > 0) {
+    lines.push("CREATIVE GROUPS");
+    memo.creativeGroups.groups.forEach((group) => {
+      lines.push(group.label);
+      lines.push(`${group.judgedCount} judged execution${group.judgedCount === 1 ? "" : "s"}`);
+      const tally: string[] = [];
+      if (group.aboveCount > 0) {
+        tally.push(`${group.aboveCount} ${view === "client" ? "above the typical result" : "above median"}`);
+      }
+      if (group.atCount > 0) {
+        tally.push(`${group.atCount} ${view === "client" ? "at the typical result" : "at median"}`);
+      }
+      if (group.belowCount > 0) {
+        tally.push(`${group.belowCount} ${view === "client" ? "below the typical result" : "below median"}`);
+      }
+      lines.push(tally.join(" · "));
+      group.members.forEach((m) => {
+        const categoryLabel =
+          m.category === "above"
+            ? view === "client"
+              ? "above typical"
+              : "above median"
+            : m.category === "below"
+              ? view === "client"
+                ? "below typical"
+                : "below median"
+              : view === "client"
+                ? "at typical"
+                : "at median";
+        lines.push(`  - ${m.name} — ${categoryLabel}`);
+      });
+      lines.push("");
+    });
+    lines.push(view === "client" ? memo.creativeGroups.limits.client : memo.creativeGroups.limits.buyer);
+    lines.push("");
+  }
+
   lines.push(view === "client" ? "SUMMARY" : "THE CALL");
   (view === "client" ? memo.clientSummary : memo.tldr).forEach((line) =>
     lines.push(`- ${line}`)

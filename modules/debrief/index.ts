@@ -12,6 +12,7 @@ export {
 } from "./decision";
 export { buildComparison, COMPARISON_CAVEAT } from "./compare";
 export type { ComparisonFormatters, ComparisonPeriod } from "./compare";
+export { MIN_GROUP_REPETITION, normalizeGroupLabel, summarizeCreativeGroups } from "./creativeGroups";
 export { fmtKpiValue, fmtMoney } from "./format";
 export { generateMemo } from "./memo";
 export {

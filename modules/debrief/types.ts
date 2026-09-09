@@ -86,6 +86,24 @@ export const CREATIVE_FORMAT_LABELS: Record<string, string> =
  *  the debrief request; lives only for that request, like the CSV. */
 export type CreativeFormatOverrides = Record<string, string>;
 
+/* ------------------------------------------------------------------ */
+/* Creative Grouping V1                                                */
+/*                                                                    */
+/* Same category of input as CreativeFormatOverrides directly above:  */
+/* user-declared context about their own ads, never engine-inferred,  */
+/* never a performance number. A "group" is whatever the user calls   */
+/* it — Debrief encodes no taxonomy of hooks/angles/concepts/formats. */
+/* ------------------------------------------------------------------ */
+
+/** Ad name → the group labels the user assigned it (an ad may carry
+ *  more than one). Sent as an optional JSON field with the debrief
+ *  request, exactly like CreativeFormatOverrides — lives only for that
+ *  request, never stored. Keyed the same way format overrides are
+ *  (raw ad name, matched server-side via sourceName ?? name), so
+ *  duplicate-named rows share assignment — the same accepted
+ *  limitation Creative Format Confirmation already has. */
+export type CreativeGroupAssignments = Record<string, string[]>;
+
 /** Structured, user-actionable error returned by /api/debrief. Every
  *  failure reads as a product guide (what happened, how to fix it),
  *  never a stack trace. `detectedColumns` are the CSV's own headers —
@@ -436,6 +454,63 @@ export interface MemoSpendAllocation {
   setAside: MemoSpendAllocationSetAside | null;
   headline: { buyer: string; client: string };
   caveat: { buyer: string; client: string };
+}
+
+/* ------------------------------------------------------------------ */
+/* Creative Grouping V1                                                */
+/*                                                                    */
+/* Descriptive repeated-evidence summary for user-declared creative    */
+/* groups — computed in modules/debrief/creativeGroups.ts, a dedicated,*/
+/* decision-blind module (same isolation pattern as briefReadiness.ts/ */
+/* evidenceDiagnostic.ts/compare.ts). NEVER read by decision.ts, NEVER */
+/* changes evidenceState/confidence/Brief Readiness/the committed      */
+/* action/the spend gate/winners/losers — it only summarizes the same  */
+/* already-computed rankedAds by a label the user typed. Reuses        */
+/* MemoSpendAllocationSegment's own "below"/"at"/"above" vocabulary —  */
+/* the SAME benchmark classification (RankedAd.deltaFromMedian's sign),*/
+/* no new threshold invented anywhere in this feature.                 */
+/* ------------------------------------------------------------------ */
+
+export interface MemoCreativeGroupMember {
+  /** Display name (post duplicate-name disambiguation, e.g. an
+   *  ad that shares its raw name with another row already carries a
+   *  "(row N)" suffix here — see extract.ts's Duplicate Identity fix). */
+  name: string;
+  category: "below" | "at" | "above";
+}
+
+/** One repeated group: >=2 judged executions carrying the same
+ *  normalized label. Never fewer — a single execution is not reported
+ *  as repeated evidence (see summarizeCreativeGroups). */
+export interface MemoCreativeGroup {
+  /** As the user typed it the first time this session (whitespace-
+   *  collapsed, trimmed) — never the normalized/lowercased match key,
+   *  which exists only to decide whether two labels are "the same
+   *  group," not to be shown. */
+  label: string;
+  judgedCount: number;
+  belowCount: number;
+  atCount: number;
+  aboveCount: number;
+  /** Sorted best-to-worst (RankedAd's own order), never truncated —
+   *  the whole judged, labeled set, per the "count every judged
+   *  execution in the denominator" contract. */
+  members: MemoCreativeGroupMember[];
+}
+
+/** Memo-level fact sheet, null when there is no repeated-group
+ *  evidence to show (no labels supplied, or every label was used on
+ *  fewer than 2 judged executions) — the same "nothing to render"
+ *  discipline MemoSpendAllocation already follows. Groups are sorted
+ *  judgedCount descending, then label alphabetically (normalized) —
+ *  deterministic, not a ranking claim. */
+export interface MemoCreativeGroups {
+  groups: MemoCreativeGroup[];
+  /** Evidence-honesty caveat: grouping is user-declared, shared
+   *  membership doesn't establish that the group caused performance,
+   *  and executions may differ in other unobserved ways. One shared
+   *  statement for the whole section, not repeated per group. */
+  limits: { buyer: string; client: string };
 }
 
 /** A hand-off-ready creative brief for one next test. Generated
@@ -797,6 +872,13 @@ export interface Memo {
   /** Spend Allocation V1 — purely additive; null when there's no judged
    *  spend to show. */
   spendAllocation: MemoSpendAllocation | null;
+  /** Creative Grouping V1 — purely additive, same pattern as
+   *  `comparison`: generateMemo always sets null; the route attaches it
+   *  (computed from analysis.rankedAds + the request's optional
+   *  creativeGroups field) after generateMemo returns, so the decision
+   *  is built and committed with zero awareness this field exists.
+   *  null when the user supplied no groups, or none repeated. */
+  creativeGroups: MemoCreativeGroups | null;
   tldr: string[];
   /** Plain-language verdict for the client-facing view — same facts as
    *  tldr, none of the buyer shorthand. */

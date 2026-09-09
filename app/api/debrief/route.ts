@@ -13,10 +13,13 @@ import {
   parseCsv,
   requiredColumnsFor,
   resolveColumns,
+  summarizeCreativeGroups,
   toTable,
   type CreativeFormatOverrides,
+  type CreativeGroupAssignments,
   type DebriefApiError,
   type MemoComparison,
+  type MemoCreativeGroups,
   type Objective,
   type ParsedAd,
 } from "@/modules/debrief";
@@ -46,6 +49,9 @@ export const dynamic = "force-dynamic";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
 const MAX_DATA_ROWS = 5000;
+/** Creative Grouping V1 — a generous but bounded cap on labels per ad,
+ *  purely defensive (the UI never encourages anywhere near this many). */
+const MAX_GROUPS_PER_AD = 20;
 const KPI_VALUES: KpiKey[] = ["roas", "cpa", "ctr", "cpc", "leads", "purchases"];
 /** Cap the headers echoed back in errors — enough to debug any real
  *  Ads Manager export without ballooning the response. */
@@ -391,6 +397,41 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  /* Creative Grouping V1 — optional user-declared groups (ad name →
+     labels the user typed). Same "user context, never a performance
+     number, never stored" contract as creativeFormatOverrides directly
+     above, parsed the same defensive way. Labels are free text — no
+     fixed vocabulary to validate against, so malformed entries are
+     dropped rather than failed, exactly like an unrecognized format. */
+  const groupsRaw = form.get("creativeGroups");
+  const declaredGroups: CreativeGroupAssignments = {};
+  if (typeof groupsRaw === "string" && groupsRaw.trim() !== "") {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(groupsRaw);
+    } catch {
+      parsed = null;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return fail(400, {
+        title: "Creative groups could not be read",
+        message: "The creative groups sent with this request weren't valid.",
+        fix: "Reset the \"Review creative formats\" section's group tags and try again — the debrief also runs fine without groups.",
+      });
+    }
+    let kept = 0;
+    for (const [name, labels] of Object.entries(parsed)) {
+      if (kept >= MAX_DATA_ROWS) break;
+      if (name.trim() === "" || name.length > 500 || !Array.isArray(labels)) continue;
+      const cleanLabels = labels
+        .filter((l): l is string => typeof l === "string" && l.trim() !== "" && l.length <= 80)
+        .slice(0, MAX_GROUPS_PER_AD);
+      if (cleanLabels.length === 0) continue;
+      declaredGroups[name] = cleanLabels;
+      kept += 1;
+    }
+  }
+
   let text: string;
   try {
     text = await file.text();
@@ -536,6 +577,17 @@ export async function POST(request: NextRequest) {
   try {
     const analysis = analyze(ads, rows, columns, context);
     let memo = generateMemo(analysis, context);
+    /* Creative Grouping V1: computed from the SAME analysis.rankedAds
+       generateMemo already used to build the (now-committed) decision
+       above — attached after the fact, exactly like comparison below,
+       so the decision is provably built with zero awareness this
+       field exists. Current-period only, same scoping as
+       creativeFormatOverrides ("apply to the CURRENT file only"). */
+    const creativeGroups: MemoCreativeGroups | null = summarizeCreativeGroups(
+      analysis.rankedAds,
+      declaredGroups
+    );
+    memo = { ...memo, creativeGroups };
     if (previous) {
       const prevAnalysis = analyze(previous.ads, previous.rows, previous.columns, context);
       const comparison: MemoComparison = buildComparison(

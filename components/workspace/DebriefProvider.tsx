@@ -15,6 +15,7 @@ import {
 import type {
   CompetitorSource,
   CreativeFormatOverrides,
+  CreativeGroupAssignments,
   DebriefApiError,
   KpiKey,
   Memo,
@@ -154,6 +155,11 @@ interface DebriefContextValue {
    *  Keyed to the loaded file — changing the file clears them. Sent to
    *  the API as an optional JSON field; never stored anywhere. */
   formatOverrides: CreativeFormatOverrides;
+  /** Creative Grouping V1: ad name → the group labels the user typed.
+   *  Same lifecycle as formatOverrides — keyed to the loaded file,
+   *  cleared on file change, sent as an optional JSON field, never
+   *  stored anywhere (session-only, no localStorage). */
+  creativeGroups: CreativeGroupAssignments;
   /** Creative Evidence V1: normalized ad name → attached creative
    *  image. Browser-only; cleared (and object URLs revoked) whenever
    *  the file changes, on reset, and on unmount. NEVER appended to the
@@ -167,6 +173,7 @@ interface DebriefContextValue {
   updateFields: (patch: Partial<GeneratorFields>) => void;
   setCompetitorSources: Dispatch<SetStateAction<CompetitorSource[]>>;
   setFormatOverrides: (overrides: CreativeFormatOverrides) => void;
+  setCreativeGroups: (groups: CreativeGroupAssignments) => void;
   /** Attach (File), replace (File), or remove (null) one ad's creative
    *  image. Validates via the shared image rules; returns the result so
    *  the Verify UI can show an inline error. `key` must already be the
@@ -191,6 +198,8 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
   >([]);
   const [formatOverrides, setFormatOverrides] =
     useState<CreativeFormatOverrides>({});
+  const [creativeGroups, setCreativeGroups] =
+    useState<CreativeGroupAssignments>({});
 
   /* Creative Evidence V1 — attached images, keyed by normalized ad
      name. Object URLs are tracked in a ref so every path that discards
@@ -252,13 +261,15 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  /* Format confirmations and attached creatives describe the loaded
-     CSV's ads by name — a different file makes them stale (or wrongly
-     matching), so any file change clears both. */
+  /* Format confirmations, creative groups, and attached creatives
+     describe the loaded CSV's ads by name — a different file makes
+     them stale (or wrongly matching), so any file change clears all
+     three. */
   const setFile = useCallback(
     (next: File | null) => {
       setFileState(next);
       setFormatOverrides({});
+      setCreativeGroups({});
       clearCreativeAssets();
     },
     [clearCreativeAssets]
@@ -314,6 +325,11 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     if (Object.keys(formatOverrides).length > 0) {
       body.append("creativeFormatOverrides", JSON.stringify(formatOverrides));
     }
+    // Creative Grouping V1: same "send only when the user actually
+    // used it" contract as creativeFormatOverrides directly above.
+    if (Object.keys(creativeGroups).length > 0) {
+      body.append("creativeGroups", JSON.stringify(creativeGroups));
+    }
 
     try {
       const res = await fetch("/api/debrief", { method: "POST", body });
@@ -340,7 +356,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       });
       setStatus("idle");
     }
-  }, [file, previousFile, fields, formatOverrides]);
+  }, [file, previousFile, fields, formatOverrides, creativeGroups]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -351,6 +367,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     setFields(DEFAULT_FIELDS);
     setCompetitorSources([]);
     setFormatOverrides({});
+    setCreativeGroups({});
     clearCreativeAssets();
     setMemo(null);
     setError(null);
@@ -365,6 +382,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       fields,
       competitorSources,
       formatOverrides,
+      creativeGroups,
       creativeAssets,
       memo,
       error,
@@ -374,13 +392,14 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       updateFields,
       setCompetitorSources,
       setFormatOverrides,
+      setCreativeGroups,
       setCreativeAsset,
       setSampleCreativeAssets,
       generate,
       clearError,
       reset,
     }),
-    [status, file, previousFile, fields, competitorSources, formatOverrides, creativeAssets, memo, error, generatedAt, setFile, updateFields, setCreativeAsset, setSampleCreativeAssets, generate, clearError, reset]
+    [status, file, previousFile, fields, competitorSources, formatOverrides, creativeGroups, creativeAssets, memo, error, generatedAt, setFile, updateFields, setCreativeAsset, setSampleCreativeAssets, generate, clearError, reset]
   );
 
   return (

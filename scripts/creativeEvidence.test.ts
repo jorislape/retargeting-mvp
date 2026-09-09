@@ -278,7 +278,9 @@ function source(overrides: Partial<SpotlightSource> = {}): SpotlightSource {
   );
   const generateBody = providerSource.slice(
     providerSource.indexOf("const generate = useCallback"),
-    providerSource.indexOf("}, [file, previousFile, fields, formatOverrides]")
+    // Creative Grouping V1 added creativeGroups to this dep array —
+    // update the exact-string boundary, not the check itself.
+    providerSource.indexOf("}, [file, previousFile, fields, formatOverrides, creativeGroups]")
   );
   assert.ok(generateBody.length > 0, "found the generate() body");
   assert.ok(

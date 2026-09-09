@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { CompetitorSource, KpiKey } from "@/modules/debrief";
+import type { CompetitorSource, CreativeGroupAssignments, KpiKey } from "@/modules/debrief";
 import {
   assessMarketNotes,
   CREATIVE_FORMAT_OPTIONS,
@@ -13,6 +13,7 @@ import {
   MARKET_SIGNALS_DISCLOSURE,
   MAX_COMPETITOR_SOURCES,
   mergeCompetitorSourcesIntoNotes,
+  normalizeGroupLabel,
   outcomeNounsForKpi,
   parseCsv,
   parseNumericCell,
@@ -206,6 +207,117 @@ function AdImageCell({
   );
 }
 
+/** Creative Grouping V1 — the per-row tagging widget. Type + Enter
+ *  creates a label (or reuses an existing one, canonicalized to
+ *  whichever casing/spacing was typed first this session — see
+ *  normalizeGroupLabel); clicking an outline "+ label" pill reuses an
+ *  existing label with zero typing; each assigned chip removes with
+ *  one click. No modal, no mandatory step — this ad's `assigned` array
+ *  is the only state this component owns; the parent (GeneratorPanel)
+ *  holds the full ad → labels map. */
+function CreativeGroupsCell({
+  adName,
+  assigned,
+  allLabels,
+  onChange,
+}: {
+  adName: string;
+  assigned: string[];
+  /** Every distinct label used on ANY ad this session, for one-click
+   *  reuse — deliberately not filtered to "labels used more than
+   *  once" here; that judgment belongs to the report's summarizer,
+   *  not this input widget. */
+  allLabels: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const addLabel = (raw: string) => {
+    const trimmed = raw.trim().replace(/\s+/g, " ");
+    if (trimmed === "") return;
+    const key = normalizeGroupLabel(trimmed);
+    if (assigned.some((l) => normalizeGroupLabel(l) === key)) {
+      setDraft("");
+      return; // already on this ad
+    }
+    // Reuse the existing canonical display form when this label (or a
+    // case/whitespace variant) already exists this session, so one
+    // group never shows as two visually different chips.
+    const canonical = allLabels.find((l) => normalizeGroupLabel(l) === key) ?? trimmed;
+    onChange([...assigned, canonical]);
+    setDraft("");
+  };
+
+  const removeLabel = (label: string) => {
+    onChange(assigned.filter((l) => l !== label));
+  };
+
+  const reusable = allLabels.filter(
+    (l) => !assigned.some((a) => normalizeGroupLabel(a) === normalizeGroupLabel(l))
+  );
+
+  return (
+    <div className="w-40">
+      {/* Fixed width, not min-w: a <td> in an auto-layout table grows to
+          fit its content's natural (unwrapped) width, so an
+          unconstrained flex-wrap row of chips/reuse-pills would widen
+          the whole table rather than wrapping — the same flexbox
+          footgun already fixed twice elsewhere in this file (see
+          DecisionCard's Preserve/Change/Watch <dd>s). A fixed width
+          forces the browser to actually wrap within it. */}
+      {assigned.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {assigned.map((label) => (
+            <span
+              key={label}
+              className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/[0.08] px-2 py-0.5 text-[11px] font-medium text-accent-soft"
+            >
+              {label}
+              <button
+                type="button"
+                aria-label={`Remove "${label}" from ${adName}`}
+                onClick={() => removeLabel(label)}
+                className="cursor-pointer text-accent-soft/70 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                <XIcon className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            addLabel(draft);
+          }
+        }}
+        placeholder="Add group…"
+        aria-label={`Add a creative group to ${adName}`}
+        maxLength={80}
+        className={`${assigned.length > 0 ? "mt-1.5" : ""} w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:border-accent/50 focus:outline-none`}
+      />
+      {reusable.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {reusable.slice(0, 6).map((label) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => addLabel(label)}
+              className="cursor-pointer rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium text-zinc-500 transition hover:border-white/20 hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              + {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function fmtBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -333,6 +445,7 @@ export function GeneratorPanel() {
     fields,
     competitorSources,
     formatOverrides,
+    creativeGroups,
     creativeAssets,
     error,
     setFile,
@@ -342,6 +455,7 @@ export function GeneratorPanel() {
     setSampleCreativeAssets,
     setCompetitorSources,
     setFormatOverrides,
+    setCreativeGroups,
     generate,
     clearError,
   } = useDebrief();
@@ -525,6 +639,20 @@ export function GeneratorPanel() {
   const previewKpiOk = preview?.kpisFound.includes(fields.kpi) ?? true;
   /* Creative Evidence V1: names on multiple rows can't take one image. */
   const previewAmbiguous = new Set(preview?.ambiguousNames ?? []);
+  /* Creative Grouping V1: every distinct label used on any ad this
+   *  session, first-seen display casing/spacing — feeds each row's
+   *  "click to reuse" pills. Cheap to recompute per render at realistic
+   *  ad/label counts; no memoization needed. */
+  const allGroupLabels = (() => {
+    const seen = new Map<string, string>();
+    for (const labels of Object.values(creativeGroups)) {
+      for (const label of labels) {
+        const key = normalizeGroupLabel(label);
+        if (!seen.has(key)) seen.set(key, label);
+      }
+    }
+    return [...seen.values()];
+  })();
 
   /* A real file download of the same synthetic dataset "Load the
      sample dataset" uses — so the expected format can be inspected
@@ -2649,7 +2777,7 @@ export function GeneratorPanel() {
               </summary>
               <div className="border-t border-white/[0.06] px-5 pb-5">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[680px] text-sm">
+                  <table className="w-full min-w-[844px] text-sm">
                     <thead>
                       <tr className="border-b border-white/10 text-left">
                         <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
@@ -2660,6 +2788,9 @@ export function GeneratorPanel() {
                         </th>
                         <th className="w-52 py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Correct format
+                        </th>
+                        <th className="w-40 py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                          Creative groups (optional)
                         </th>
                         <th className="w-44 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Creative image (optional)
@@ -2712,6 +2843,22 @@ export function GeneratorPanel() {
                               ))}
                             </select>
                           </td>
+                          <td className="py-2 pr-4 align-middle">
+                            <CreativeGroupsCell
+                              adName={ad.name}
+                              assigned={creativeGroups[ad.name] ?? []}
+                              allLabels={allGroupLabels}
+                              onChange={(next) => {
+                                const nextGroups: CreativeGroupAssignments = { ...creativeGroups };
+                                if (next.length === 0) {
+                                  delete nextGroups[ad.name];
+                                } else {
+                                  nextGroups[ad.name] = next;
+                                }
+                                setCreativeGroups(nextGroups);
+                              }}
+                            />
+                          </td>
                           <td className="py-2 pl-1 align-middle">
                             <AdImageCell
                               adName={ad.name}
@@ -2746,22 +2893,40 @@ export function GeneratorPanel() {
                     )}
                   </div>
                 )}
-                {Object.keys(formatOverrides).length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setFormatOverrides({})}
-                    className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                  >
-                    <XIcon className="h-3 w-3" />
-                    Clear all format edits
-                  </button>
+                {(Object.keys(formatOverrides).length > 0 ||
+                  Object.keys(creativeGroups).length > 0) && (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    {Object.keys(formatOverrides).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setFormatOverrides({})}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                      >
+                        <XIcon className="h-3 w-3" />
+                        Clear all format edits
+                      </button>
+                    )}
+                    {Object.keys(creativeGroups).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setCreativeGroups({})}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium text-zinc-400 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                      >
+                        <XIcon className="h-3 w-3" />
+                        Clear all creative groups
+                      </button>
+                    )}
+                  </div>
                 )}
                 <p className="mt-3 text-xs leading-relaxed text-zinc-400">
                   Auto-detected formats are used by default. Your edits
                   improve pattern wording but do not change performance
-                  numbers. Creative images are optional too: they appear in
-                  the report&rsquo;s Creative evidence section so a client can
-                  see the actual ad — they stay in this browser, are never
+                  numbers. Creative groups are your own labels — the report
+                  can summarize how ads sharing a label performed, but a
+                  shared label never becomes proof it caused the result.
+                  Creative images are optional too: they appear in the
+                  report&rsquo;s Creative evidence section so a client can see
+                  the actual ad — they stay in this browser, are never
                   uploaded, and never affect any number or recommendation.
                 </p>
               </div>

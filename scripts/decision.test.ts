@@ -1181,15 +1181,17 @@ console.log("decision (stage 1 — rules): all assertions passed");
     );
 
     // Structural additivity: decision aside, the memo's shape is unchanged.
-    // Decision & Comparison V2 added `comparison`; Spend Allocation V1
-    // added `spendAllocation` (right after it, matching generateMemo's
-    // own field order) — both purely additive, nothing else reordered.
+    // Decision & Comparison V2 added `comparison`; Creative Grouping V1
+    // added `creativeGroups` (right after it, matching generateMemo's own
+    // field order); Spend Allocation V1 added `spendAllocation` — all
+    // purely additive, nothing else reordered.
     const keys = Object.keys(memo);
     assert.deepEqual(
       keys.filter((k) => k !== "decision"),
-      ["comparison", "spendAllocation", "scope", "tldr", "clientSummary", "winners", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
-      "only the additive comparison/spendAllocation/leadingConversion fields exist; nothing else reordered"
+      ["comparison", "creativeGroups", "spendAllocation", "scope", "tldr", "clientSummary", "winners", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
+      "only the additive comparison/creativeGroups/spendAllocation/leadingConversion fields exist; nothing else reordered"
     );
+    assert.equal(memo.creativeGroups, null, "generateMemo always sets creativeGroups: null on its own (the route attaches it, like comparison)");
     assert.equal(memo.comparison, null, "single-period run carries comparison: null");
 
     /* ---- Session 2: memoToText presentation contract ---- */
