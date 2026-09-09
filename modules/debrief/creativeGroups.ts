@@ -28,16 +28,28 @@ export function normalizeGroupLabel(label: string): string {
   return label.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-/** Same raw-name resolution applyFormatOverrides (extract.ts) already
- *  uses for user-declared per-ad context: sourceName when the row was
- *  disambiguated for a duplicate name, else the plain name — trimmed
- *  fallback for a padded cell. Duplicate-named rows therefore share
- *  group assignment, the same accepted limitation Creative Format
- *  Confirmation already has (never keyed by row position, which isn't
- *  stable, and never guessed independently per row). */
+/** Execution-identity resolution (Creative Grouping V1, corrected):
+ *  Meta's Ad ID when the export included one — the most reliable,
+ *  rename-proof key — otherwise `ad.name`, which by this point is
+ *  ALREADY a stable, unique-per-row identity: extract.ts's Duplicate
+ *  Identity fix (disambiguateDuplicateNames) appends a deterministic
+ *  "(row N)" suffix to every row sharing a raw name BEFORE this module
+ *  ever sees it, so two executions named "UGC_V1" are never the same
+ *  key here. This is deliberately NOT sourceName (the shared RAW name)
+ *  — that was the bug: keying by sourceName collapsed distinct
+ *  executions that merely happen to share a display name back into one
+ *  shared assignment, exactly like creativeFormatOverrides does (a
+ *  fine tradeoff for a format guess, not for user-declared per-
+ *  execution group membership). A defensive `.trim()` fallback covers
+ *  a padded id/name from a hand-built request; both sides of this
+ *  match are otherwise already-computed, already-trimmed values. */
+function executionKey(ad: RankedAd): string {
+  return ad.id ?? ad.name;
+}
+
 function labelsForAd(ad: RankedAd, declared: CreativeGroupAssignments): readonly string[] {
-  const raw = ad.sourceName ?? ad.name;
-  return declared[raw] ?? declared[raw.trim()] ?? [];
+  const key = executionKey(ad);
+  return declared[key] ?? declared[key.trim()] ?? [];
 }
 
 /** RankedAd.deltaFromMedian is already polarity-corrected ("signed

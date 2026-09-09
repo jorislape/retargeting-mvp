@@ -164,28 +164,46 @@ export function extractAds(
     })
     .filter((ad) => ad.spend > 0 || ad.kpiValue != null); // drop fully-blank rows
 
-  /* Duplicate Identity fix: the same normalized name on multiple rows
-     is NOT proof of one creative (the same name routinely appears
-     across ad sets with very different results). Rows stay separate
-     ads; each duplicate's display name gains a deterministic,
-     client-readable "(row N)" suffix so no report sentence can ever
-     name the same label as both winner and loser. The raw name is
-     preserved in sourceName for cross-period and override matching —
-     row positions are NOT stable across exports, so labels must never
-     become match keys. Files without duplicates are byte-identical to
-     before this fix. */
-  const normalize = (name: string) => name.trim().replace(/\s+/g, " ");
+  return disambiguateDuplicateNames(ads).map(({ fileRow, ...ad }) => ad);
+}
+
+/** Trim + collapse internal whitespace — the identity-comparison key
+ *  only (never a display value; see disambiguateDuplicateNames). */
+export function normalizeRowName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+/** Duplicate Identity fix: the same normalized name on multiple rows
+ *  is NOT proof of one creative (the same name routinely appears
+ *  across ad sets with very different results). Rows stay separate
+ *  ads; each duplicate's display name gains a deterministic,
+ *  client-readable "(row N)" suffix so no report sentence can ever
+ *  name the same label as both winner and loser. The raw name is
+ *  preserved in sourceName for cross-period and override matching —
+ *  row positions are NOT stable across exports, so labels must never
+ *  become match keys. Files without duplicates are byte-identical to
+ *  before this fix.
+ *
+ *  Factored out of extractAds (Creative Grouping V1) so the Generator's
+ *  client-side preview can compute the IDENTICAL per-row disambiguated
+ *  identity the server will independently (but deterministically)
+ *  recompute — the two must never drift, since Creative Group
+ *  assignments are keyed to this exact identity (see
+ *  modules/debrief/creativeGroups.ts). */
+export function disambiguateDuplicateNames<T extends { name: string; fileRow: number }>(
+  items: readonly T[]
+): (T & { sourceName?: string })[] {
   const counts = new Map<string, number>();
-  for (const ad of ads) {
-    const key = normalize(ad.name);
+  for (const item of items) {
+    const key = normalizeRowName(item.name);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return ads.map(({ fileRow, ...ad }) => {
-    if ((counts.get(normalize(ad.name)) ?? 0) <= 1) return ad;
+  return items.map((item) => {
+    if ((counts.get(normalizeRowName(item.name)) ?? 0) <= 1) return item;
     return {
-      ...ad,
-      name: `${ad.name.trim()} (row ${fileRow})`,
-      sourceName: ad.name,
+      ...item,
+      name: `${item.name.trim()} (row ${item.fileRow})`,
+      sourceName: item.name,
     };
   });
 }

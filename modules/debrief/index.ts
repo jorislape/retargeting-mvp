@@ -1,6 +1,6 @@
 export { parseCsv, toTable, parseNumericCell } from "./csv";
 export { resolveColumns, requiredColumnsFor } from "./columns";
-export { applyFormatOverrides, extractAds, extractNameTags } from "./extract";
+export { applyFormatOverrides, disambiguateDuplicateNames, extractAds, extractNameTags, normalizeRowName } from "./extract";
 export { analyze, DEFAULT_SPEND_FLOOR } from "./analysis";
 export {
   buildDecision,

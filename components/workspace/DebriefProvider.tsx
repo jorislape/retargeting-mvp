@@ -155,10 +155,13 @@ interface DebriefContextValue {
    *  Keyed to the loaded file — changing the file clears them. Sent to
    *  the API as an optional JSON field; never stored anywhere. */
   formatOverrides: CreativeFormatOverrides;
-  /** Creative Grouping V1: ad name → the group labels the user typed.
-   *  Same lifecycle as formatOverrides — keyed to the loaded file,
-   *  cleared on file change, sent as an optional JSON field, never
-   *  stored anywhere (session-only, no localStorage). */
+  /** Creative Grouping V1: execution identity (Ad ID when available,
+   *  else the disambiguated per-row name) → the group labels the user
+   *  typed — see CreativeGroupAssignments' doc comment for why this is
+   *  deliberately not keyed like formatOverrides. Same lifecycle as
+   *  formatOverrides otherwise — keyed to the loaded file, cleared on
+   *  file change, sent as an optional JSON field, never stored anywhere
+   *  (session-only, no localStorage). */
   creativeGroups: CreativeGroupAssignments;
   /** Creative Evidence V1: normalized ad name → attached creative
    *  image. Browser-only; cleared (and object URLs revoked) whenever

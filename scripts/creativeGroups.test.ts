@@ -13,13 +13,14 @@ import type { CreativeGroupAssignments, RankedAd } from "../modules/debrief/type
 function mkAd(opts: {
   name: string;
   sourceName?: string;
+  id?: string | null;
   deltaFromMedian: number;
   spend?: number;
 }): RankedAd {
   return {
     name: opts.name,
     sourceName: opts.sourceName,
-    id: null,
+    id: opts.id ?? null,
     spend: opts.spend ?? 100,
     kpiValue: 2 + opts.deltaFromMedian,
     nameTags: [],
@@ -164,29 +165,134 @@ function mkAd(opts: {
   console.log("creativeGroups: 7. a label on a below-spend-gate (unjudged) ad never inflates the tally");
 }
 
-/* ===================== 8. Duplicate display ad names — assignment attaches via sourceName ===================== */
+/* ===================== 8. Duplicate display ad names — each execution takes an INDEPENDENT assignment ===================== */
 {
   // extract.ts's Duplicate Identity fix: same-name rows get a
   // disambiguated display name ("Ad X (row N)") and carry the RAW name
-  // in sourceName. Group assignment is keyed the same way
-  // applyFormatOverrides already matches user context — sourceName ??
-  // name — so it correctly reaches disambiguated rows via their raw
-  // name, exactly like format overrides already do.
+  // in sourceName. Creative Grouping V1's corrected identity contract
+  // keys assignment by `id ?? name` — the disambiguated, per-row
+  // `name` here — NOT by the shared sourceName, so a raw-name-only
+  // declaration ("Ad X") deliberately reaches NEITHER duplicate row:
+  // two distinct executions that happen to share a raw name must be
+  // addressable independently, matching the milestone's own example
+  // (raw name "UGC_V1", execution A: Morning routine, execution B:
+  // Testimonial).
   const ads = [
     mkAd({ name: "Ad X (row 2)", sourceName: "Ad X", deltaFromMedian: 1 }),
     mkAd({ name: "Ad X (row 5)", sourceName: "Ad X", deltaFromMedian: -1 }),
     mkAd({ name: "Ad Y", deltaFromMedian: 1 }),
   ];
-  const declared: CreativeGroupAssignments = {
-    "Ad X": ["Founder story"],
+  const staleKeyDeclared: CreativeGroupAssignments = {
+    "Ad X": ["Founder story"], // the OLD (buggy) sourceName-shaped key
     "Ad Y": ["Founder story"],
+  };
+  const staleResult = summarizeCreativeGroups(ads, staleKeyDeclared);
+  assert.equal(staleResult, null, "a raw-name key ('Ad X') no longer reaches either duplicate execution — only Ad Y (a non-duplicate, keyed by its own name) would attach, which alone never clears the repetition floor");
+
+  const correctlyKeyed: CreativeGroupAssignments = {
+    "Ad X (row 2)": ["Founder story"],
+    "Ad X (row 5)": ["Founder story"],
+    "Ad Y": ["Founder story"],
+  };
+  const result = summarizeCreativeGroups(ads, correctlyKeyed);
+  const g = result!.groups[0];
+  assert.equal(g.judgedCount, 3, "keyed by each execution's own disambiguated name, all three correctly attach");
+  const names = g.members.map((m) => m.name).sort();
+  assert.deepEqual(names, ["Ad X (row 2)", "Ad X (row 5)", "Ad Y"]);
+  console.log("creativeGroups: 8. duplicate display names — a raw-name key no longer collapses both executions; per-execution keys reach each independently");
+}
+
+/* ===================== 8a. Two executions sharing a raw name get DIFFERENT groups ===================== */
+{
+  const ads = [
+    mkAd({ name: "UGC_V1 (row 2)", sourceName: "UGC_V1", deltaFromMedian: 2 }),
+    mkAd({ name: "UGC_V1 (row 7)", sourceName: "UGC_V1", deltaFromMedian: 1 }),
+    // A second execution of each so both groups clear the repetition floor.
+    mkAd({ name: "Other morning", deltaFromMedian: 1 }),
+    mkAd({ name: "Other testimonial", deltaFromMedian: -1 }),
+  ];
+  const declared: CreativeGroupAssignments = {
+    "UGC_V1 (row 2)": ["Morning routine"],
+    "Other morning": ["Morning routine"],
+    "UGC_V1 (row 7)": ["Testimonial"],
+    "Other testimonial": ["Testimonial"],
+  };
+  const result = summarizeCreativeGroups(ads, declared);
+  assert.equal(result!.groups.length, 2, "the two same-named executions land in two DIFFERENT groups, not one shared group");
+  const morning = result!.groups.find((g) => g.label === "Morning routine")!;
+  const testimonial = result!.groups.find((g) => g.label === "Testimonial")!;
+  assert.ok(morning.members.some((m) => m.name === "UGC_V1 (row 2)"));
+  assert.ok(!morning.members.some((m) => m.name === "UGC_V1 (row 7)"), "the OTHER same-named execution never leaks into this group");
+  assert.ok(testimonial.members.some((m) => m.name === "UGC_V1 (row 7)"));
+  assert.ok(!testimonial.members.some((m) => m.name === "UGC_V1 (row 2)"));
+  console.log("creativeGroups: 8a. two executions sharing a raw name independently take different groups; each contributes only to its own");
+}
+
+/* ===================== 8b. Same raw name + the SAME group intentionally assigned to both -> counts twice ===================== */
+{
+  const ads = [
+    mkAd({ name: "UGC_V1 (row 2)", sourceName: "UGC_V1", deltaFromMedian: 2 }),
+    mkAd({ name: "UGC_V1 (row 7)", sourceName: "UGC_V1", deltaFromMedian: -1 }),
+  ];
+  const declared: CreativeGroupAssignments = {
+    "UGC_V1 (row 2)": ["Morning routine"],
+    "UGC_V1 (row 7)": ["Morning routine"],
+  };
+  const result = summarizeCreativeGroups(ads, declared);
+  assert.ok(result, "explicitly assigning the same group to both same-named executions is a legitimate, deliberate choice");
+  assert.equal(result!.groups[0].judgedCount, 2, "both executions count — once each — toward the group");
+  console.log("creativeGroups: 8b. same raw name, same group deliberately assigned to both -> counts twice, once per execution");
+}
+
+/* ===================== 8c. Duplicate-name execution WITHOUT a group is never accidentally included ===================== */
+{
+  const ads = [
+    mkAd({ name: "UGC_V1 (row 2)", sourceName: "UGC_V1", deltaFromMedian: 2 }),
+    mkAd({ name: "UGC_V1 (row 7)", sourceName: "UGC_V1", deltaFromMedian: -1 }), // no group declared
+    mkAd({ name: "Other morning", deltaFromMedian: 1 }),
+  ];
+  const declared: CreativeGroupAssignments = {
+    "UGC_V1 (row 2)": ["Morning routine"],
+    "Other morning": ["Morning routine"],
+    // "UGC_V1 (row 7)" intentionally has no entry.
   };
   const result = summarizeCreativeGroups(ads, declared);
   const g = result!.groups[0];
-  assert.equal(g.judgedCount, 3, "both duplicate-named rows AND the third ad all correctly attach");
+  assert.equal(g.judgedCount, 2, "the undeclared duplicate-name execution is excluded — sharing a raw name with a labeled execution is not itself an assignment");
+  assert.ok(!g.members.some((m) => m.name === "UGC_V1 (row 7)"));
+  console.log("creativeGroups: 8c. an unlabeled duplicate-name execution never inherits its sibling's group");
+}
+
+/* ===================== 8d. Ad ID path: id takes priority over name, even across duplicate-named rows ===================== */
+{
+  const ads = [
+    mkAd({ name: "UGC_V1 (row 2)", sourceName: "UGC_V1", id: "act_111", deltaFromMedian: 2 }),
+    mkAd({ name: "UGC_V1 (row 7)", sourceName: "UGC_V1", id: "act_222", deltaFromMedian: -1 }),
+    mkAd({ name: "Solo", id: "act_333", deltaFromMedian: 1 }),
+  ];
+  const declared: CreativeGroupAssignments = {
+    act_111: ["Morning routine"],
+    act_333: ["Morning routine"],
+    // act_222 (the second duplicate-named execution) undeclared.
+  };
+  const result = summarizeCreativeGroups(ads, declared);
+  const g = result!.groups[0];
+  assert.equal(g.judgedCount, 2, "assignment keyed by Ad ID reaches exactly the two declared executions");
   const names = g.members.map((m) => m.name).sort();
-  assert.deepEqual(names, ["Ad X (row 2)", "Ad X (row 5)", "Ad Y"], "assignment reaches the correct (disambiguated) executions, not a fabricated single one");
-  console.log("creativeGroups: 8. duplicate display names — assignment correctly reaches both underlying executions via sourceName");
+  assert.deepEqual(names, ["Solo", "UGC_V1 (row 2)"], "the id-keyed declaration resolves to the correct row despite both rows sharing a raw name");
+  console.log("creativeGroups: 8d. Ad ID path — assignment keyed by id correctly disambiguates same-named rows without relying on row-N suffixing");
+}
+
+/* ===================== 8e. Fallback path: no id anywhere -> name-keyed assignment still works ===================== */
+{
+  const ads = [
+    mkAd({ name: "Plain A", deltaFromMedian: 1 }),
+    mkAd({ name: "Plain B", deltaFromMedian: -1 }),
+  ];
+  const declared: CreativeGroupAssignments = { "Plain A": ["G"], "Plain B": ["G"] };
+  const result = summarizeCreativeGroups(ads, declared);
+  assert.equal(result!.groups[0].judgedCount, 2, "with no Ad IDs present anywhere, the name fallback still resolves both executions correctly");
+  console.log("creativeGroups: 8e. fallback path — name-keyed assignment works end to end when no ad carries an id");
 }
 
 /* ===================== 9. Missing KPI / unjudged execution never accidentally included ===================== */

@@ -95,13 +95,19 @@ export type CreativeFormatOverrides = Record<string, string>;
 /* it — Debrief encodes no taxonomy of hooks/angles/concepts/formats. */
 /* ------------------------------------------------------------------ */
 
-/** Ad name → the group labels the user assigned it (an ad may carry
- *  more than one). Sent as an optional JSON field with the debrief
- *  request, exactly like CreativeFormatOverrides — lives only for that
- *  request, never stored. Keyed the same way format overrides are
- *  (raw ad name, matched server-side via sourceName ?? name), so
- *  duplicate-named rows share assignment — the same accepted
- *  limitation Creative Format Confirmation already has. */
+/** Execution identity → the group labels the user assigned it (an ad
+ *  may carry more than one). Sent as an optional JSON field with the
+ *  debrief request, exactly like CreativeFormatOverrides — lives only
+ *  for that request, never stored. Deliberately NOT keyed like format
+ *  overrides (raw ad name via sourceName ?? name): a group is
+ *  execution-level user context, and two executions can legitimately
+ *  share a raw name (same creative reused, or unrelated ads exported
+ *  with the same label) while belonging to different groups. Keyed
+ *  instead by Meta's Ad ID when the export has one, else the
+ *  already-unique-per-row `name` the Duplicate Identity fix produces
+ *  (see creativeGroups.ts's executionKey and extract.ts's
+ *  disambiguateDuplicateNames) — so duplicate-named rows can carry
+ *  independent assignments. */
 export type CreativeGroupAssignments = Record<string, string[]>;
 
 /** Structured, user-actionable error returned by /api/debrief. Every

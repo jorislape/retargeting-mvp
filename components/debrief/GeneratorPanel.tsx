@@ -5,6 +5,7 @@ import type { CompetitorSource, CreativeGroupAssignments, KpiKey } from "@/modul
 import {
   assessMarketNotes,
   CREATIVE_FORMAT_OPTIONS,
+  disambiguateDuplicateNames,
   EMPTY_COMPETITOR_SOURCE,
   extractNameTags,
   fmtMoney,
@@ -542,12 +543,22 @@ export function GeneratorPanel() {
     dateRange: { start: string; stop: string } | null;
     /** Deduped ad names + their name-derived format tags, in file
      *  order — feeds the optional "Review creative formats" list.
-     *  Structure only; no analysis. */
+     *  Structure only; no analysis. Unchanged by Creative Grouping V1's
+     *  identity fix — creativeFormatOverrides stays keyed the same way
+     *  it always has (raw name; see applyFormatOverrides). */
     ads: { name: string; tags: string[] }[];
     /** Creative Evidence V1: normalized names that appear on MORE THAN
      *  ONE row — one image can't be tied to one row for these, so the
      *  attach control is disabled with an explanation. */
     ambiguousNames: string[];
+    /** Creative Grouping V1 (identity fix): every underlying execution
+     *  for a given raw ad name, keyed the SAME way the server will
+     *  independently (but deterministically) resolve it — Meta's Ad ID
+     *  when present, else the disambiguated "(row N)" name
+     *  extract.ts's Duplicate Identity fix already produces (see
+     *  disambiguateDuplicateNames). Non-ambiguous names have exactly
+     *  one entry, whose disambiguatedName equals the raw name. */
+    executionsByName: Record<string, { executionKey: string; disambiguatedName: string }[]>;
   } | null>(null);
   /* "Review creative formats" list expansion past the first 25 ads —
      keyed to the File object so a new file starts collapsed without an
@@ -585,6 +596,36 @@ export function GeneratorPanel() {
           }
         }
         const ambiguousNames = [...findAmbiguousAdNames(allRowNames)];
+        /* Creative Grouping V1 (identity fix): recompute the exact
+           per-row execution identity extract.ts's Duplicate Identity
+           fix will independently (but deterministically) produce
+           server-side — Ad ID when the column resolved, else the
+           disambiguated "(row N)" name — so the Verify table can offer
+           one grouping control per underlying execution instead of one
+           per raw name. Entirely separate from the `ads`/`seen` loop
+           above; creativeFormatOverrides' keying is untouched. */
+        const executionsByName: Record<
+          string,
+          { executionKey: string; disambiguatedName: string }[]
+        > = {};
+        if (nameIdx >= 0) {
+          const adIdIdx = columns.adId ? headers.indexOf(columns.adId) : -1;
+          const rawRows: { name: string; fileRow: number; id: string | null }[] = [];
+          matrix.slice(1).forEach((row, i) => {
+            const name = (row[nameIdx] ?? "").trim();
+            if (name === "") return;
+            const rawId = adIdIdx >= 0 ? (row[adIdIdx] ?? "").trim() : "";
+            rawRows.push({ name, fileRow: i + 2, id: rawId !== "" ? rawId : null });
+          });
+          for (const item of disambiguateDuplicateNames(rawRows)) {
+            const rawName = item.sourceName ?? item.name;
+            const key = item.id ?? item.name;
+            (executionsByName[rawName] ??= []).push({
+              executionKey: key,
+              disambiguatedName: item.name,
+            });
+          }
+        }
         /* Display-only extras (the API recomputes everything): spend
            column total and the file's reporting range. */
         const spendIdx = columns.spend ? headers.indexOf(columns.spend) : -1;
@@ -623,6 +664,7 @@ export function GeneratorPanel() {
           dateRange,
           ads,
           ambiguousNames,
+          executionsByName,
         });
       })
       .catch(() => {
@@ -2844,20 +2886,52 @@ export function GeneratorPanel() {
                             </select>
                           </td>
                           <td className="py-2 pr-4 align-middle">
-                            <CreativeGroupsCell
-                              adName={ad.name}
-                              assigned={creativeGroups[ad.name] ?? []}
-                              allLabels={allGroupLabels}
-                              onChange={(next) => {
-                                const nextGroups: CreativeGroupAssignments = { ...creativeGroups };
-                                if (next.length === 0) {
-                                  delete nextGroups[ad.name];
-                                } else {
-                                  nextGroups[ad.name] = next;
-                                }
-                                setCreativeGroups(nextGroups);
-                              }}
-                            />
+                            {/* Creative Grouping V1 (identity fix): keyed
+                                by each row's execution identity (Ad ID
+                                when the export has one, else the
+                                disambiguated "(row N)" name) — the same
+                                key creativeGroups.ts resolves server-side
+                                — never by the raw display name, which
+                                collapses distinct executions that merely
+                                share a name. A name with more than one
+                                underlying execution (a duplicate) renders
+                                one independently-labeled control per
+                                execution instead of one shared control. */}
+                            <div className="flex flex-col gap-2">
+                              {(
+                                preview.executionsByName[ad.name] ?? [
+                                  { executionKey: ad.name, disambiguatedName: ad.name },
+                                ]
+                              ).map((exec) => {
+                                const ambiguous =
+                                  (preview.executionsByName[ad.name]?.length ?? 0) > 1;
+                                return (
+                                  <div key={exec.executionKey}>
+                                    {ambiguous && (
+                                      <p className="mb-1 truncate text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                                        {exec.disambiguatedName}
+                                      </p>
+                                    )}
+                                    <CreativeGroupsCell
+                                      adName={exec.disambiguatedName}
+                                      assigned={creativeGroups[exec.executionKey] ?? []}
+                                      allLabels={allGroupLabels}
+                                      onChange={(next) => {
+                                        const nextGroups: CreativeGroupAssignments = {
+                                          ...creativeGroups,
+                                        };
+                                        if (next.length === 0) {
+                                          delete nextGroups[exec.executionKey];
+                                        } else {
+                                          nextGroups[exec.executionKey] = next;
+                                        }
+                                        setCreativeGroups(nextGroups);
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </td>
                           <td className="py-2 pl-1 align-middle">
                             <AdImageCell
