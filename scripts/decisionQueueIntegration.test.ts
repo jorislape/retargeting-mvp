@@ -33,6 +33,7 @@ try {
   const { generateMemo } = require(join(dist, "modules/debrief/memo.js"));
   const { deriveDecisionQueue } = require(join(dist, "modules/debrief/decisionQueue.js"));
   const { insightsToCsv } = require(join(dist, "modules/meta/insightsToCsv.js"));
+  const { buildSampleMemo } = require(join(dist, "modules/debrief/sample.js"));
 
   const ctx = {
     kpi: "roas",
@@ -158,6 +159,29 @@ try {
   assert.equal(JSON.stringify(memoD.decision), decisionDBefore);
   console.log("decisionQueueIntegration: real 4-account portfolio orders correctly; every account's own decision is untouched by the projection");
 
+  /* ===================== Reassessment trigger (Phase 3): real engine, verbatim reuse ===================== */
+  const watchEntry = queue.entries.find((e: { label: string }) => e.label === "Growth Brand Co");
+  assert.equal(watchEntry.category, "watch_review");
+  assert.equal(
+    watchEntry.reassessTrigger,
+    memoB.decision.reassess.buyer,
+    "watch_review's reassessTrigger is the REAL engine's decision.reassess.buyer, verbatim — not a re-derived or reworded string"
+  );
+  assert.match(watchEntry.reassessTrigger, /^Reassess /, "the real reassess.buyer sentence reads naturally on its own — no queue-added prefix needed");
+
+  const noDataEntry = queue.entries.find((e: { label: string }) => e.label === "New Launch Co");
+  assert.equal(noDataEntry.category, "no_action_yet");
+  assert.equal(noDataEntry.reassessTrigger, memoC.decision.reassess.buyer);
+
+  const readyEntry = queue.entries.find((e: { label: string }) => e.label === "Scaling Winner Co");
+  assert.equal(readyEntry.category, "needs_decision");
+  assert.equal(readyEntry.reassessTrigger, null, "needs_decision never surfaces a reassessTrigger, even from real engine output");
+
+  const stableEntry = queue.entries.find((e: { label: string }) => e.label === "Stable Retail Co");
+  assert.equal(stableEntry.category, "stable_hold");
+  assert.equal(stableEntry.reassessTrigger, null, "stable_hold never surfaces a reassessTrigger, even from real engine output");
+  console.log("decisionQueueIntegration: reassessTrigger reused verbatim from the real engine's decision.reassess.buyer, scoped to watch_review/no_action_yet only");
+
   /* ===================== Meta virtual-CSV path (testable without credentials) ===================== */
   const metaCsv = insightsToCsv(
     [
@@ -175,6 +199,27 @@ try {
   const metaQueue = deriveDecisionQueue([{ id: "meta-1", label: "Meta — Acme Co — Last 7 days", memo: memoMeta }]);
   assert.equal(metaQueue.entries[0].category, "needs_decision", "an account sourced from the Meta virtual CSV feeds the queue identically to a CSV-upload account — the queue module is origin-agnostic by construction");
   console.log("decisionQueueIntegration: Meta virtual-CSV path (no credentials needed) feeds the queue identically to a manual CSV upload");
+
+  /* ===================== Demo/validation path (Phase 5): real engine, zero fabricated Memo ===================== */
+  // The empty-state demo card (see app/(workspace)/decision-queue/page.tsx)
+  // is built by feeding buildSampleMemo() — the SAME real-engine output
+  // that powers /sample, computed from the shared, already-shipped
+  // sampleCsv.ts fixture — through this same deriveDecisionQueue()
+  // projection. No hardcoded fake MemoDecision object exists anywhere
+  // for this path; whatever category the real engine's sample output
+  // currently produces is whatever the demo card currently shows.
+  const sampleMemo = buildSampleMemo();
+  const demoQueue = deriveDecisionQueue([{ id: "demo", label: "Sample account", memo: sampleMemo }]);
+  assert.equal(demoQueue.entries.length, 1);
+  assert.equal(demoQueue.entries[0].headline, sampleMemo.decision.headline, "the demo entry's headline is the real sample memo's own committed headline, not invented copy");
+  assert.ok(
+    ["needs_decision", "watch_review", "no_action_yet", "stable_hold"].includes(demoQueue.entries[0].category),
+    "the demo entry lands in a real, valid category derived from the real sample decision — never a hardcoded category"
+  );
+  const demoDecisionBefore = JSON.stringify(sampleMemo.decision);
+  deriveDecisionQueue([{ id: "demo", label: "Sample account", memo: sampleMemo }]);
+  assert.equal(JSON.stringify(sampleMemo.decision), demoDecisionBefore, "deriving the demo queue entry never mutates the sample memo's own decision");
+  console.log("decisionQueueIntegration: the empty-state demo entry is real-engine output (buildSampleMemo -> deriveDecisionQueue), not a hardcoded fake Memo");
 
   console.log("decisionQueueIntegration: all assertions passed");
 } finally {

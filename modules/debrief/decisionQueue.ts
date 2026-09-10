@@ -20,8 +20,20 @@ import type { Memo, MemoDecision } from "./types";
  *    cross-account performance comparison to make;
  *  - no blended/weighted "health score" of any kind — every ordering
  *    decision is a lexicographic comparison over EXISTING categorical
- *    facts (category, then action type, then confidence, then label,
- *    then insertion order), never arithmetic;
+ *    facts (category, then confidence, then label, then insertion
+ *    order), never arithmetic;
+ *  - NO action-type tier (budget vs test) in the ordering — Decision
+ *    Queue Usability V1's prioritization-semantics correction removed
+ *    it. An earlier version of this module ranked budget actions ahead
+ *    of test actions within the same category/confidence, but nothing
+ *    in decision.ts establishes that a budget move is inherently more
+ *    worth reviewing first than a test — that was this module's own
+ *    invented opinion, not a fact the engine computed, and it edged
+ *    toward exactly the "category order implies business impact"
+ *    failure mode this module exists to avoid. `action` is still
+ *    reported on every entry (and still shapes `priorityReason`'s
+ *    copy — "Budget decision ready" vs "Test decision ready" is
+ *    useful CONTEXT), it just no longer participates in sorting;
  *  - Period Comparison (Memo.comparison) is surfaced as a read-only,
  *    non-ordering ANNOTATION only (see comparisonAnnotation below) —
  *    it never affects category or position, so this file can never
@@ -135,6 +147,19 @@ export interface QueueEntry {
    *  already-descriptive sentence — nothing here re-derives or
    *  re-words it. */
   comparisonAnnotation: string | null;
+  /** Decision Queue Usability V1 (Phase 3) — decision.ts's own
+   *  deterministic, numeric reassessment trigger
+   *  (MemoDecision.reassess.buyer), reused VERBATIM: no new threshold,
+   *  no invented date, no portfolio-specific calculation. Populated
+   *  ONLY for "watch_review" and "no_action_yet" — the two categories
+   *  where "when should I look again" is the natural next question
+   *  (an actionable, well-evidenced call doesn't need a recheck date;
+   *  a confirmed-flat account's own recheck condition exists in the
+   *  memo too, but showing a fifth fact on the already-settled,
+   *  lowest-priority bucket adds noise without adding a decision the
+   *  reader needs to make). null for the other two categories — never
+   *  a placeholder string. */
+  reassessTrigger: string | null;
 }
 
 export interface DecisionQueue {
@@ -142,16 +167,18 @@ export interface DecisionQueue {
   counts: Record<QueueCategory, number>;
 }
 
-const ACTION_ORDER: Record<MemoDecision["action"], number> = {
-  budget: 0,
-  test: 1,
-  hold: 2,
-};
 const CONFIDENCE_ORDER: Record<Memo["confidence"]["level"], number> = {
   high: 0,
   medium: 1,
   low: 2,
 };
+
+/** See QueueEntry.reassessTrigger's doc comment: verbatim reuse, two
+ *  categories only. */
+function reassessTriggerFor(category: QueueCategory, decision: MemoDecision): string | null {
+  if (category !== "watch_review" && category !== "no_action_yet") return null;
+  return decision.reassess.buyer;
+}
 
 function buildEntry(account: QueueAccountInput): QueueEntry {
   const { decision } = account.memo;
@@ -167,24 +194,24 @@ function buildEntry(account: QueueAccountInput): QueueEntry {
     evidenceState: decision.evidenceState,
     confidenceLevel: account.memo.confidence.level,
     comparisonAnnotation: account.memo.comparison?.medianMovement.buyer ?? null,
+    reassessTrigger: reassessTriggerFor(category, decision),
   };
 }
 
 /**
  * Deterministic lexicographic ordering — NEVER a weighted/numeric
- * score. Tiers, in order:
+ * score, and NEVER an action-type tier (see this file's header
+ * comment on the prioritization-semantics correction). Tiers, in
+ * order:
  *   1. QueueCategory (needs_decision -> watch_review -> no_action_yet
  *      -> stable_hold)
- *   2. Action type within the same category (budget before test — a
- *      budget move is already a committed spend change; a hold's
- *      action is constant within its own categories, so this tier is
- *      a no-op there)
- *   3. Memo.confidence.level (high -> medium -> low) — reused exactly
+ *   2. Memo.confidence.level (high -> medium -> low) — reused exactly
  *      as the memo computed it, never blended with evidenceState
- *   4. Label, case-insensitive alphabetical — a readable, predictable
+ *   3. Label, case-insensitive alphabetical — a readable, predictable
  *      tie-break the user can reason about
- *   5. Original insertion order — the final deterministic fallback for
- *      genuinely identical entries (e.g. duplicate labels)
+ *   4. Original insertion order — the final deterministic fallback for
+ *      genuinely identical entries (e.g. duplicate labels, or a budget
+ *      and a test action tied on every other tier)
  */
 function compareEntries(
   a: QueueEntry,
@@ -193,8 +220,6 @@ function compareEntries(
 ): number {
   const categoryDiff = CATEGORY_ORDER[a.category] - CATEGORY_ORDER[b.category];
   if (categoryDiff !== 0) return categoryDiff;
-  const actionDiff = ACTION_ORDER[a.action] - ACTION_ORDER[b.action];
-  if (actionDiff !== 0) return actionDiff;
   const confidenceDiff = CONFIDENCE_ORDER[a.confidenceLevel] - CONFIDENCE_ORDER[b.confidenceLevel];
   if (confidenceDiff !== 0) return confidenceDiff;
   const labelDiff = a.label.toLowerCase().localeCompare(b.label.toLowerCase());

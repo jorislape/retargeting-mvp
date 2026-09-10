@@ -17,6 +17,7 @@ function mkDecision(opts: {
   holdReason?: MemoDecision["holdReason"];
   evidenceState: MemoDecision["evidenceState"];
   headline?: string;
+  reassessBuyer?: string;
 }): MemoDecision {
   return {
     action: opts.action,
@@ -26,7 +27,7 @@ function mkDecision(opts: {
     rationale: "rationale",
     clientRationale: "client rationale",
     avoidNow: { buyer: [], client: [] },
-    reassess: { buyer: "reassess", client: "reassess" },
+    reassess: { buyer: opts.reassessBuyer ?? "reassess", client: "reassess" },
     evidenceState: opts.evidenceState,
     limits: { buyer: [], client: [] },
     appliedCriteria: [],
@@ -40,6 +41,7 @@ function mkMemo(opts: {
   confidence?: "high" | "medium" | "low";
   headline?: string;
   comparisonMedianMovement?: string | null;
+  reassessBuyer?: string;
 }): Memo {
   return {
     decision: mkDecision(opts),
@@ -140,9 +142,9 @@ function acct(id: string | number, label: string, memo: Memo): QueueAccountInput
   assert.deepEqual(
     q.entries.map((e) => e.label),
     ["High co", "Med co", "Low co"],
-    "within the same category+action, higher confidence sorts first"
+    "within the same category, higher confidence sorts first"
   );
-  console.log("decisionQueue: 7. confidence tie-break orders high -> medium -> low within same category/action");
+  console.log("decisionQueue: 7. confidence tie-break orders high -> medium -> low within the same category");
 }
 
 /* ===================== 8. Mixed portfolio containing all states ===================== */
@@ -175,7 +177,7 @@ function acct(id: string | number, label: string, memo: Memo): QueueAccountInput
   const q1 = deriveDecisionQueue(accounts);
   const q2 = deriveDecisionQueue(accounts);
   assert.deepEqual(q1.entries.map((e) => e.label), q2.entries.map((e) => e.label));
-  assert.deepEqual(q1.entries.map((e) => e.label), ["Alpha", "Zeta"], "alphabetical tie-break within identical category/action/confidence");
+  assert.deepEqual(q1.entries.map((e) => e.label), ["Alpha", "Zeta"], "alphabetical tie-break within identical category/confidence");
   console.log("decisionQueue: 9. deterministic ordering — repeated derivation produces the same order; alpha tie-break confirmed");
 }
 
@@ -184,7 +186,7 @@ function acct(id: string | number, label: string, memo: Memo): QueueAccountInput
   const memoA = mkMemo({ action: "budget", evidenceState: "supported" });
   const memoB = mkMemo({ action: "budget", evidenceState: "supported" });
   const q = deriveDecisionQueue([acct(1, "Same Name", memoA), acct(2, "Same Name", memoB)]);
-  assert.deepEqual(q.entries.map((e) => e.id), [1, 2], "identical category/action/confidence/label falls back to insertion order");
+  assert.deepEqual(q.entries.map((e) => e.id), [1, 2], "identical category/confidence/label falls back to insertion order");
   console.log("decisionQueue: 10. fully-tied entries fall back to insertion order, deterministically");
 }
 
@@ -197,8 +199,30 @@ function acct(id: string | number, label: string, memo: Memo): QueueAccountInput
   const cpaAcct = mkMemo({ action: "test", evidenceState: "supported" });
   const q = deriveDecisionQueue([acct(1, "ROAS Co", roasAcct), acct(2, "CPA Co", cpaAcct)]);
   assert.equal(q.entries.length, 2);
-  assert.equal(q.entries[0].label, "ROAS Co", "budget outranks test within the same category+confidence, regardless of underlying KPI");
+  assert.equal(q.entries[0].label, "CPA Co", "same category+confidence -> alphabetical label order (\"CPA\" before \"ROAS\"), regardless of underlying KPI or action type");
   console.log("decisionQueue: 11. different KPIs across accounts — queue never reads KPI, ordering unaffected");
+}
+
+/* ===================== 11a. Prioritization-semantics correction: no action-type priority ===================== */
+{
+  // Regression guard for the correction this milestone makes: an
+  // earlier version of this module ranked "budget" ahead of "test"
+  // within the same category/confidence. That tier is gone. Two
+  // accounts, identical category/confidence/label, differing ONLY in
+  // action, with the BUDGET one inserted SECOND: if action-type
+  // priority had returned, budget would jump to position 1 despite
+  // being inserted later. It must not — insertion order governs.
+  const testFirst = mkMemo({ action: "test", evidenceState: "supported" });
+  const budgetSecond = mkMemo({ action: "budget", evidenceState: "supported" });
+  const q = deriveDecisionQueue([acct(1, "Tied Co", testFirst), acct(2, "Tied Co", budgetSecond)]);
+  assert.deepEqual(
+    q.entries.map((e) => e.id),
+    [1, 2],
+    "action type (budget vs test) never overrides insertion order — no action-type priority tier exists"
+  );
+  assert.equal(q.entries[0].action, "test");
+  assert.equal(q.entries[1].action, "budget");
+  console.log("decisionQueue: 11a. no action-type priority — budget does not jump ahead of an earlier-inserted, otherwise-tied test entry");
 }
 
 /* ===================== 12. Different target CPA/ROAS criteria — no cross-account criteria comparison ===================== */
@@ -241,6 +265,52 @@ function acct(id: string | number, label: string, memo: Memo): QueueAccountInput
   assert.equal(q.entries[1].category, "stable_hold");
   assert.deepEqual(q.entries.map((e) => e.label), ["A Co", "B Co"], "alphabetical tie-break wins — a declining comparison never bumps priority");
   console.log("decisionQueue: comparison (even a declining one) never mutates category or reorders — alphabetical tie-break stands");
+}
+
+/* ===================== Reassessment trigger (Phase 3): reused verbatim, two categories only ===================== */
+{
+  // watch_review: an actionable call with thinner evidence -> the
+  // trigger IS shown, verbatim from decision.reassess.buyer.
+  const watch = mkMemo({
+    action: "test",
+    evidenceState: "limited",
+    reassessBuyer: "Reassess when the test clears the $50.00 spend gate — then judge it against the median.",
+  });
+  const qWatch = deriveDecisionQueue([acct(1, "Watch Co", watch)]);
+  assert.equal(qWatch.entries[0].category, "watch_review");
+  assert.equal(
+    qWatch.entries[0].reassessTrigger,
+    "Reassess when the test clears the $50.00 spend gate — then judge it against the median.",
+    "watch_review's reassessTrigger is decision.reassess.buyer verbatim — no rewording"
+  );
+
+  // no_action_yet: the trigger IS shown too.
+  const noData = mkMemo({
+    action: "hold",
+    holdReason: "insufficient_data",
+    evidenceState: "insufficient",
+    reassessBuyer: "Reassess when ≥5 ads clear the $50.00 spend gate.",
+  });
+  const qNoData = deriveDecisionQueue([acct(1, "NoData Co", noData)]);
+  assert.equal(qNoData.entries[0].category, "no_action_yet");
+  assert.equal(qNoData.entries[0].reassessTrigger, "Reassess when ≥5 ads clear the $50.00 spend gate.");
+
+  // needs_decision: the trigger is null — an actionable, well-evidenced
+  // call doesn't need a "when to look again" prompt.
+  const ready = mkMemo({ action: "budget", evidenceState: "supported", reassessBuyer: "Reassess once the new allocation has spend behind it." });
+  const qReady = deriveDecisionQueue([acct(1, "Ready Co", ready)]);
+  assert.equal(qReady.entries[0].category, "needs_decision");
+  assert.equal(qReady.entries[0].reassessTrigger, null, "needs_decision never shows a reassessTrigger, even though decision.reassess.buyer exists on every decision");
+
+  // stable_hold: also null — deliberately scoped out (see this file's
+  // doc comment) to avoid piling a fifth fact onto the lowest-priority,
+  // already-settled bucket.
+  const stable = mkMemo({ action: "hold", holdReason: "flat_performance", evidenceState: "supported", reassessBuyer: "Reassess when any judged ad moves." });
+  const qStable = deriveDecisionQueue([acct(1, "Stable Co", stable)]);
+  assert.equal(qStable.entries[0].category, "stable_hold");
+  assert.equal(qStable.entries[0].reassessTrigger, null, "stable_hold never shows a reassessTrigger");
+
+  console.log("decisionQueue: reassessTrigger reused verbatim for watch_review/no_action_yet only; null for needs_decision/stable_hold");
 }
 
 /* ===================== 15. Duplicate display labels ===================== */
@@ -387,11 +457,11 @@ function acct(id: string | number, label: string, memo: Memo): QueueAccountInput
   assert.ok(!/\bhealth\b/i.test(codeOnly), "no 'health' identifier/field anywhere in decisionQueue.ts's executable code");
   assert.ok(!/\bweight(ed|ing)?\b/i.test(codeOnly), "no 'weight/weighted/weighting' identifier anywhere in decisionQueue.ts's executable code");
   // The only arithmetic in the file is comparator subtraction between
-  // small fixed-lookup-table integers (CATEGORY_ORDER/ACTION_ORDER/
-  // CONFIDENCE_ORDER differences) and array indices — never a sum or
-  // product of weighted account facts. Confirm no multiplication
-  // operator (the shape a weighted formula would need) appears in any
-  // executable line.
+  // small fixed-lookup-table integers (CATEGORY_ORDER/CONFIDENCE_ORDER
+  // differences) and array indices — never a sum or product of
+  // weighted account facts. Confirm no multiplication operator (the
+  // shape a weighted formula would need) appears in any executable
+  // line.
   assert.ok(!codeOnly.includes("*"), "no multiplication operator in any executable line — rules out a weighted-formula score");
   console.log("decisionQueue: source-scan confirms no numerical health-score or weighted-score implementation");
 }
