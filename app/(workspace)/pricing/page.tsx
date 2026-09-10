@@ -25,6 +25,13 @@ const TIERS = [
       "No login required",
       "Ads data never stored server-side",
       "Unlimited debriefs, this session",
+      // Commercial Surface V1 addition: lives in the Free tier
+      // deliberately — it exists TODAY, unlike Team's "planned" items
+      // below. "Session-scoped" keeps it honestly distinct from Team's
+      // "structured learnings across accounts" (a future, persistent,
+      // not-yet-built thing) — the two must never read as the same
+      // promise at two different price points.
+      "Session-scoped Decision Queue to triage accounts you've debriefed",
     ],
   },
   {

@@ -432,6 +432,20 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+        {/* Multi-account queue mention (Commercial Surface V1): one
+            subordinate line, not a 5th benefit tile (would break the
+            4-col grid) and not a new section competing with the
+            single-account hero above. Copy-only, no link — an empty
+            /decision-queue is not a useful cold landing, so this
+            explains the workflow instead of inviting a click into it
+            (see that route's own empty state for why: it only becomes
+            useful after a completed debrief exists to add). */}
+        <p className="mt-4 max-w-2xl text-[13px] leading-relaxed text-zinc-400">
+          Working on more than one account? After a few debriefs in the
+          same session, add them to your Decision Queue to see which
+          already have a decision ready, which need a second look, and
+          which don&apos;t have enough evidence yet.
+        </p>
       </section>
 
       {/* ---- Founding path: restrained, agency-only, not competing with

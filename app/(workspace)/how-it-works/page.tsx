@@ -204,8 +204,12 @@ export default function HowItWorksPage() {
         </h2>
         <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-zinc-400">
           Today, Debrief is a deterministic decision-support system — fixed
-          rules, no model in the loop, nothing stored between visits. The
-          direction is a learning system: one that remembers the structured
+          rules, no model in the loop, nothing stored between visits. If you
+          debrief more than one account in the same session, you can add
+          them to a Decision Queue that groups them by the decision each
+          one already reached — still nothing saved between visits, and
+          never ranked by spend or a health score. The direction beyond
+          that is a learning system: one that remembers the structured
           learnings you record from each debrief and uses them to help
           prioritize what to test next. That&rsquo;s not built yet, and
           nothing about the current flow depends on it — this page and{" "}

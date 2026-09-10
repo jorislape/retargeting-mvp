@@ -30,6 +30,13 @@ const EMAIL_MAILTO = "mailto:joris.adomas@gmail.com";
 
 const GET = [
   "White-label client reports",
+  // Commercial Surface V1 addition: "session-scoped" is load-bearing,
+  // not decorative — it's the word that keeps this item honest against
+  // the very next item's future, persistent workspace. See
+  // modules/debrief/decisionQueue.ts / app/(workspace)/decision-queue
+  // for what this actually is today: a pure projection over completed
+  // Debriefs already in the session, not saved history or monitoring.
+  "Session-scoped Decision Queue — triage several accounts in one sitting",
   "Direct roadmap input",
   "Early access to structured learnings/workspace when it ships",
   "Founding pricing protected while the account remains active",

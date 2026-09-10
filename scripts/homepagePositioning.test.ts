@@ -100,15 +100,22 @@ const hero = src.slice(heroStart, heroEnd);
 
 /* ===================== 6. No prohibited capability/claim language ===================== */
 {
+  // Decision Queue Commercial Surface V1: "Decision Queue" / "multi
+  // account" wording is no longer blanket-banned — the homepage now
+  // deliberately mentions the queue once (section 7 below pins exactly
+  // where and how). What stays banned is any AI/guarantee/health-score/
+  // automation framing, on the homepage or anywhere near the new
+  // Decision Queue mention specifically.
   const banned = [
     "AI-powered",
     "unlock insights",
     "never touches a server",
     "guaranteed",
-    "Decision Queue",
-    "multi-account",
-    "multi account",
     "portfolio triage",
+    "health score",
+    "AI decides",
+    "automatically pulls",
+    "all your accounts automatically",
   ];
   for (const phrase of banned) {
     assert.ok(
@@ -120,6 +127,40 @@ const hero = src.slice(heroStart, heroEnd);
   // card) must survive untouched — proves the banned-phrase scan above
   // isn't accidentally over-broad.
   assert.match(src, /never touches a database/, "pre-existing, approved database claim still present");
+}
+
+/* ===================== 7. Decision Queue mention: present once, subordinate, honest ===================== */
+{
+  // Exactly one mention — this is a secondary capability note, not a
+  // repeated pitch woven through the page.
+  assert.equal(
+    (src.match(/Decision Queue/g) ?? []).length,
+    1,
+    "Decision Queue is mentioned exactly once on the homepage"
+  );
+
+  // Subordinate: lives inside "What you get", strictly after the hero
+  // (single-account positioning must stay the headline) and before the
+  // Founding-path line — never its own <section> competing with either.
+  const whatYouGetStart = src.indexOf("{/* ---- What you get ---- */}");
+  const foundingPathStart = src.indexOf("{/* ---- Founding path:");
+  assert.ok(whatYouGetStart > 0 && foundingPathStart > whatYouGetStart, "What you get / Founding path boundaries found, in order");
+  assert.ok(!hero.includes("Decision Queue"), "Decision Queue is never mentioned in the hero");
+
+  const dqIdx = src.indexOf("Decision Queue");
+  assert.ok(
+    dqIdx > whatYouGetStart && dqIdx < foundingPathStart,
+    "the Decision Queue mention sits inside 'What you get', not before it or in the separate Founding-path line"
+  );
+  const dqParagraphStart = src.lastIndexOf("<p", dqIdx);
+  const dqParagraph = src.slice(dqParagraphStart, src.indexOf("</p>", dqIdx) + 5);
+  assert.match(
+    dqParagraph,
+    /After a few debriefs in the\s+same session/,
+    "the mention is framed as a session-scoped, after-the-fact capability, not a persistent feature"
+  );
+  assert.ok(!dqParagraph.includes("<Link"), "the mention is copy only — no CTA/link into an empty /decision-queue from the homepage");
+  assert.ok(!dqParagraph.includes(" score"), "no scoring language near the Decision Queue mention");
 }
 
 console.log("homepagePositioning: all assertions passed");
