@@ -1038,6 +1038,15 @@ export function GeneratorPanel() {
   // gates submission.
   const contextDone = fields.product.trim() !== "";
   const canSubmit = !!file && contextDone;
+  // Verify's own "done" reflects BOTH optional inputs it hosts — format
+  // corrections and Creative Groups — not just whichever was added
+  // first. A user who only assigned groups previously saw "Optional
+  // accuracy step" in muted gray despite having meaningfully engaged
+  // with the stage; this fixes the indicator without changing what
+  // either input actually does.
+  const verifyEngagementDone =
+    Object.keys(formatOverrides).length > 0 ||
+    Object.keys(creativeGroups).length > 0;
 
   const handleFiles = (files: FileList | null) => {
     const picked = files?.[0];
@@ -2814,21 +2823,16 @@ export function GeneratorPanel() {
           <StageHeader
             n="3"
             title="Verify"
-            done={Object.keys(formatOverrides).length > 0}
-            status={
-              Object.keys(formatOverrides).length > 0
-                ? "Complete"
-                : "Optional accuracy step"
-            }
-            statusTone={
-              Object.keys(formatOverrides).length > 0 ? "accent" : "muted"
-            }
+            done={verifyEngagementDone}
+            status={verifyEngagementDone ? "Complete" : "Optional accuracy step"}
+            statusTone={verifyEngagementDone ? "accent" : "muted"}
             hint="Debrief auto-detects creative formats from ad names. Review or edit only if something looks wrong."
           />
           <p className="mt-2 text-xs leading-relaxed text-zinc-400">
             {preview &&
             preview.ads.length > 0 &&
-            Object.keys(formatOverrides).length === 0
+            Object.keys(formatOverrides).length === 0 &&
+            Object.keys(creativeGroups).length === 0
               ? "Auto-detected — Debrief will use ad names unless you edit formats."
               : "Recommended for better pattern detection, but not required."}
           </p>
@@ -2849,6 +2853,21 @@ export function GeneratorPanel() {
                 </span>
               </summary>
               <div className="border-t border-white/[0.06] px-5 pb-5">
+                {/* Narrow viewports: the table itself scrolls internally
+                    (min-w-[844px] inside overflow-x-auto) rather than
+                    widening the page — confirmed via direct measurement
+                    that this never drags the page itself sideways. The
+                    only real gap was discoverability: at 320-375px only
+                    "Ad name" and part of "Detected format" are visible on
+                    first glance, with nothing signaling that Correct
+                    format / Creative groups / Creative image are further
+                    right. This is copy only — the table's own scroll
+                    mechanics and every identity/format/group behavior
+                    are unchanged. */}
+                <p className="mb-2 text-xs text-zinc-400 sm:hidden">
+                  This table scrolls sideways — swipe to reach Correct
+                  format, Creative groups, and Creative image.
+                </p>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[844px] text-sm">
                     <thead>
@@ -2864,6 +2883,16 @@ export function GeneratorPanel() {
                         </th>
                         <th className="w-40 py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Creative groups (optional)
+                          {/* Phase 5 trust audit: the full caveat lives in
+                              the paragraph below the table, but a user
+                              scanning column headers for the first time
+                              — before reading anything below a ~5-column,
+                              25+ row table — should see the "descriptive,
+                              not causal" framing at the moment they
+                              encounter the input, not only after it. */}
+                          <span className="mt-0.5 block normal-case text-[10px] font-normal tracking-normal text-zinc-500">
+                            Your labels — not causal proof
+                          </span>
                         </th>
                         <th className="w-44 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                           Creative image (optional)
