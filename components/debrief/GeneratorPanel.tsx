@@ -299,7 +299,7 @@ function CreativeGroupsCell({
         placeholder="Add group…"
         aria-label={`Add a creative group to ${adName}`}
         maxLength={80}
-        className={`${assigned.length > 0 ? "mt-1.5" : ""} w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:border-accent/50 focus:outline-none`}
+        className={`${assigned.length > 0 ? "mt-1.5" : ""} w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
       />
       {reusable.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">

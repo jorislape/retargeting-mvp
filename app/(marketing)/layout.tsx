@@ -29,6 +29,9 @@ export default function MarketingLayout({
             <Link href="/pricing" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
               Pricing
             </Link>
+            <Link href="/founding" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
+              Founding
+            </Link>
             <Link href="/about" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
               About
             </Link>

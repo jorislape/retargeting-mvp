@@ -18,7 +18,7 @@ export const metadata = {
 const SECTIONS = [
   {
     title: "What happens to your CSV",
-    body: "It's read into memory to generate your debrief and never written to a database, a file, a cache, or a log. There is no history page and no account — nothing to look back at, because nothing is kept. Refreshing the page really does erase everything.",
+    body: "It's read into memory to generate your debrief and never written to a database, a file, a cache, or a log. If you debrief more than one account in the same session, you can add each one's report to a Decision Queue to triage them together — that queue keeps the full report in your browser's memory, including ad names, spend, and KPI values, so nothing about it touches localStorage, cookies, or our servers either. There is no history page and no account: refreshing the page or closing the tab erases the CSV, every report, and the queue together.",
   },
   {
     title: "What we collect",
@@ -34,7 +34,7 @@ const SECTIONS = [
   },
   {
     title: "Competitor ads from Meta's Ad Library (optional)",
-    body: "The competitor debrief page has an optional \"Search advertiser\" mode. When you use it, our server queries Meta's public Ad Library API for the advertiser Page you pick, and the returned ads are processed in memory to render that one debrief — this flow does not store, cache, or log them. The manual paste modes make no such request. Meta operates the Ad Library API and handles those requests under its own terms; we can't speak to what Meta logs on its side. Your own CSV and performance data are never involved in this flow.",
+    body: "The competitor debrief page has an optional \"Search advertiser\" mode. When you use it, our server queries Meta's public Ad Library API for the advertiser Page you pick, and the returned ads are processed in memory to render that one debrief — this flow does not store, cache, or log them. The manual paste modes make no such request. This is a separate integration from the optional ads_read Meta connection described below — the two never share data or a token. Meta operates the Ad Library API and handles those requests under its own terms; we can't speak to what Meta logs on its side. Your own CSV and performance data are never involved in this flow.",
   },
   {
     title: "Meta affiliation",

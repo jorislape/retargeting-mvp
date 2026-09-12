@@ -18,7 +18,7 @@ export const metadata = {
 const SECTIONS = [
   {
     title: "What's session-only today",
-    body: "The CSV generator, the competitor debrief, and internal learnings all run in memory for one request and are discarded when it's done. Nothing is written to a database, a file, a cache, or a log. There's no account and no history page — refreshing the page erases everything, because there's nothing kept to look back at.",
+    body: "The CSV generator, the competitor debrief, and internal learnings all run in memory for one request and are discarded when it's done. If you debrief more than one account in a session, adding them to the Decision Queue keeps each full report — ad names, spend, and KPI values included — in that same browser memory purely so you can triage across accounts; none of it is written to a database, a file, a cache, or a log. There's no account and no history page — refreshing the page erases the CSV, every report, and the queue together.",
   },
   {
     title: "What already persists — opt-in, and never your ads data",
