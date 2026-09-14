@@ -116,6 +116,15 @@ const hero = src.slice(heroStart, heroEnd);
     "AI decides",
     "automatically pulls",
     "all your accounts automatically",
+    // Future Pricing Claim Removal V1: €149 is only ever the current
+    // 30-day Founding Pilot's price — never a guarantee about the
+    // future Team/Agency product's price, which is undecided.
+    "locked-in pricing",
+    "locked in pricing",
+    "pricing protected",
+    "pricing locked in",
+    "grandfathered",
+    "lifetime pricing",
   ];
   for (const phrase of banned) {
     assert.ok(

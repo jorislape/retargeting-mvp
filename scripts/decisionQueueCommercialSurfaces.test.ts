@@ -78,6 +78,26 @@ const FORBIDDEN_PAYMENT_CLAIMS = [
   "unlock the software",
 ];
 
+/** Future Pricing Claim Removal V1 — €149 is only ever the price of the
+ *  CURRENT 30-day Founding Pilot; it must never read as a guarantee
+ *  about the future Team/Agency product's price, whose feature
+ *  boundary, price, launch date, and billing model are all explicitly
+ *  undecided. Covers every phrasing found in the prior audit
+ *  ("founding pricing locked in", "protected", "locked-in pricing")
+ *  plus the adjacent claims this milestone must also foreclose. */
+const FORBIDDEN_FUTURE_PRICING_CLAIMS = [
+  "lock in founding pricing",
+  "locked-in pricing",
+  "locked in pricing",
+  "pricing protected",
+  "pricing locked in",
+  "grandfathered",
+  "grandfather",
+  "lifetime pricing",
+  "future €149",
+  "€149 forever",
+];
+
 /** "health score" is banned outright on surfaces that have no reason
  *  to use it at all; on how-it-works it may appear exactly once, and
  *  only inside the approved negation this file's own How-it-works
@@ -94,7 +114,29 @@ function assertNoBareHealthScoreClaim(src: string, surfaceName: string) {
   const src = readFileSync(join(ROOT, "app/(workspace)/founding/page.tsx"), "utf8");
   assertNoForbiddenClaims(src, "founding");
   assertNoForbiddenClaims(src, "founding", FORBIDDEN_PAYMENT_CLAIMS);
+  assertNoForbiddenClaims(src, "founding", FORBIDDEN_FUTURE_PRICING_CLAIMS);
   assertNoBareHealthScoreClaim(src, "founding");
+
+  // The "future Agency/Team workspace" FAQ answer still offers early
+  // access and roadmap input, but pricing is now explicitly grouped
+  // with scope/timeline as UNDECIDED, not promised.
+  const workspaceFaqStart = src.indexOf('q: "What happens when the future Agency/Team workspace launches?"');
+  assert.ok(workspaceFaqStart > 0, "founding: future-workspace FAQ entry found");
+  const workspaceFaqEnd = src.indexOf("),", workspaceFaqStart);
+  const workspaceFaqAnswer = src.slice(workspaceFaqStart, workspaceFaqEnd);
+  assert.match(
+    workspaceFaqAnswer,
+    /Scope, timeline, and pricing aren&rsquo;t fixed yet/,
+    "founding: pricing is explicitly grouped with scope/timeline as undecided, not promised"
+  );
+
+  // The hero paragraph no longer trades roadmap input for a pricing
+  // promise — it names only the structured founder-led pilot itself.
+  assert.match(
+    src,
+    /work directly with the founder through a structured 30-day\s+pilot/,
+    "founding: hero paragraph's third clause is the structured pilot, not a pricing promise"
+  );
 
   assert.equal(
     (src.match(/Decision Queue/g) ?? []).length,
@@ -118,7 +160,18 @@ function assertNoBareHealthScoreClaim(src: string, surfaceName: string) {
   const futureWorkspacePos = getBlock.indexOf("Early access to structured learnings/workspace");
   assert.ok(dqPos < futureWorkspacePos, "founding: the CURRENT Decision Queue item is listed before the FUTURE workspace item");
 
-  console.log("decisionQueueCommercialSurfaces: founding page — one honest, session-scoped mention, correctly ordered before the future-workspace item");
+  // Future Pricing Claim Removal V1: the former "Founding pricing
+  // protected while the account remains active" item is gone, not
+  // replaced by another future-commercial promise — the list simply
+  // ends on the future-workspace early-access item.
+  assert.ok(!getBlock.toLowerCase().includes("pricing"), "founding: the GET list contains no pricing claim of any kind");
+  assert.match(
+    getBlock.trim(),
+    /"Early access to structured learnings\/workspace when it ships",\s*$/,
+    "founding: the GET list's last item is the future-workspace early-access line, with nothing appended after it"
+  );
+
+  console.log("decisionQueueCommercialSurfaces: founding page — one honest, session-scoped mention, correctly ordered before the future-workspace item; no pricing claim in the GET list");
 }
 
 /* ===================== Pricing page ===================== */
@@ -126,6 +179,7 @@ function assertNoBareHealthScoreClaim(src: string, surfaceName: string) {
   const src = readFileSync(join(ROOT, "app/(workspace)/pricing/page.tsx"), "utf8");
   assertNoForbiddenClaims(src, "pricing");
   assertNoForbiddenClaims(src, "pricing", FORBIDDEN_PAYMENT_CLAIMS);
+  assertNoForbiddenClaims(src, "pricing", FORBIDDEN_FUTURE_PRICING_CLAIMS);
   assertNoBareHealthScoreClaim(src, "pricing");
 
   assert.equal(
@@ -160,6 +214,7 @@ function assertNoBareHealthScoreClaim(src: string, surfaceName: string) {
 {
   const src = readFileSync(join(ROOT, "app/(workspace)/how-it-works/page.tsx"), "utf8");
   assertNoForbiddenClaims(src, "how-it-works");
+  assertNoForbiddenClaims(src, "how-it-works", FORBIDDEN_FUTURE_PRICING_CLAIMS);
 
   assert.equal(
     (src.match(/Decision Queue/g) ?? []).length,

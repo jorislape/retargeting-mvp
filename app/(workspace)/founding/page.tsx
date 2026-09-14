@@ -21,7 +21,7 @@ import {
 export const metadata = {
   title: "Founding agencies",
   description:
-    "Debrief is opening 10 founding-agency spots: real client work, direct roadmap input, and founding pricing locked in before the public Agency plan launches.",
+    "Debrief is opening 10 founding-agency spots: a structured, founder-led 30-day pilot with real client work and direct roadmap input.",
   alternates: { canonical: "/founding" },
 };
 
@@ -39,7 +39,6 @@ const GET = [
   "Session-scoped Decision Queue — triage several accounts in one sitting",
   "Direct roadmap input",
   "Early access to structured learnings/workspace when it ships",
-  "Founding pricing protected while the account remains active",
 ] as const;
 
 const WHO_FOR = [
@@ -76,9 +75,8 @@ const FAQ: { q: string; a: ReactNode }[] = [
     q: "What happens when the future Agency/Team workspace launches?",
     a: (
       <>
-        Founding agencies get early access and input into what it becomes,
-        plus locked-in pricing once it launches. Scope and timeline
-        aren&rsquo;t fixed yet — see{" "}
+        Founding agencies get early access and input into what it becomes.
+        Scope, timeline, and pricing aren&rsquo;t fixed yet — see{" "}
         <Link
           href="/pricing"
           className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
@@ -106,8 +104,8 @@ export default function FoundingPage() {
         </h1>
         <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
           Use Debrief on real client work, help shape what gets built next,
-          and lock in founding pricing before the public Agency plan
-          launches.
+          and work directly with the founder through a structured 30-day
+          pilot.
         </p>
         <div
           className="animate-rise mt-6 flex flex-wrap items-center gap-3"
