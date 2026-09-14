@@ -91,7 +91,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Is payment live today?",
-    a: "Not yet. The founding program starts with a short conversation and a manual agreement. Hosted payment links will be added once the first cohort is confirmed.",
+    a: "Yes. The Founding Pilot is €149 for an initial 30 days, arranged manually and paid by invoice — no auto-renewal; continuing past 30 days means a new, separate agreement. The Debrief software itself stays free either way.",
   },
 ];
 

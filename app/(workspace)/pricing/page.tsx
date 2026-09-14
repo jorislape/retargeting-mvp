@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { GaugeIcon, ShieldIcon, ZapIcon } from "@/components/ui/icons";
 import {
   card,
@@ -10,7 +11,7 @@ import {
 export const metadata = {
   title: "Pricing",
   description:
-    "Debrief is free to use today. No billing is live yet — see what's planned and what stays free.",
+    "Debrief is free to use today. No self-serve billing is live yet — see what's planned and what stays free.",
   alternates: { canonical: "/pricing" },
 };
 
@@ -54,13 +55,22 @@ export default function PricingPage() {
       <header className="animate-rise">
         <p className={eyebrow}>Pricing</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-          <span className={gradientText}>Free today.</span> No billing live
-          yet.
+          <span className={gradientText}>Free today.</span> No self-serve
+          billing yet.
         </h1>
         <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-zinc-400">
-          Debrief has no payment system connected. Everything described on
-          this site is free to use right now. The tiers below are a preview
-          of direction, not a commitment to a date or a price.
+          Debrief&rsquo;s software stays free to use right now — there&rsquo;s
+          no self-serve billing connected, and the tiers below are a preview
+          of direction, not a commitment to a date or a price. The separate
+          30-Day Founding Pilot is a manually arranged €149 engagement,
+          invoiced directly — see{" "}
+          <Link
+            href="/founding"
+            className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-4 transition hover:text-accent-soft hover:decoration-accent/60 active:text-accent-soft"
+          >
+            founding
+          </Link>{" "}
+          for details.
         </p>
       </header>
 

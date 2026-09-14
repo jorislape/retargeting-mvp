@@ -45,14 +45,38 @@ const FORBIDDEN_NEAR_DECISION_QUEUE = [
   "team collaboration",
 ];
 
-function assertNoForbiddenClaims(src: string, surfaceName: string) {
-  for (const phrase of FORBIDDEN_NEAR_DECISION_QUEUE) {
+function assertNoForbiddenClaims(src: string, surfaceName: string, phrases = FORBIDDEN_NEAR_DECISION_QUEUE) {
+  for (const phrase of phrases) {
     assert.ok(
       !src.toLowerCase().includes(phrase.toLowerCase()),
       `${surfaceName}: prohibited phrase "${phrase}" must not appear anywhere on the page`
     );
   }
 }
+
+/** Launch Admin Surfaces V1 — claims that must never appear once the
+ *  €149 Founding Pilot is a real, manually invoiced engagement: the
+ *  old "payment isn't live yet" framing, any future hosted-checkout
+ *  promise, and any phrasing that would present the paid pilot as
+ *  UNLOCKING an existing, already-free capability (the software itself
+ *  is not the thing being sold — see CLAUDE.md and the Launch Admin
+ *  Surfaces V1 milestone). */
+const FORBIDDEN_PAYMENT_CLAIMS = [
+  "payment is not live",
+  "payment isn't live",
+  "not yet accepting payment",
+  "hosted payment links will be added",
+  "hosted payment link",
+  "no payment system",
+  "unlocks decision queue",
+  "unlock the decision queue",
+  "unlocks white-label",
+  "unlock white-label",
+  "unlocks creative groups",
+  "unlock creative groups",
+  "unlocks the software",
+  "unlock the software",
+];
 
 /** "health score" is banned outright on surfaces that have no reason
  *  to use it at all; on how-it-works it may appear exactly once, and
@@ -69,6 +93,7 @@ function assertNoBareHealthScoreClaim(src: string, surfaceName: string) {
 {
   const src = readFileSync(join(ROOT, "app/(workspace)/founding/page.tsx"), "utf8");
   assertNoForbiddenClaims(src, "founding");
+  assertNoForbiddenClaims(src, "founding", FORBIDDEN_PAYMENT_CLAIMS);
   assertNoBareHealthScoreClaim(src, "founding");
 
   assert.equal(
@@ -100,6 +125,7 @@ function assertNoBareHealthScoreClaim(src: string, surfaceName: string) {
 {
   const src = readFileSync(join(ROOT, "app/(workspace)/pricing/page.tsx"), "utf8");
   assertNoForbiddenClaims(src, "pricing");
+  assertNoForbiddenClaims(src, "pricing", FORBIDDEN_PAYMENT_CLAIMS);
   assertNoBareHealthScoreClaim(src, "pricing");
 
   assert.equal(
@@ -180,6 +206,68 @@ function assertNoBareHealthScoreClaim(src: string, surfaceName: string) {
   );
 
   console.log("decisionQueueCommercialSurfaces: how-it-works page — one honest mention inside the existing roadmap paragraph, persistence/ranking explicitly disclaimed");
+}
+
+/* ===================== Launch Admin Surfaces V1: €149 Founding Pilot payment copy ===================== */
+{
+  const foundingSrc = readFileSync(join(ROOT, "app/(workspace)/founding/page.tsx"), "utf8");
+  const pricingSrc = readFileSync(join(ROOT, "app/(workspace)/pricing/page.tsx"), "utf8");
+
+  // The free-software promise (pre-existing, untouched by this
+  // milestone) must survive on both pages — this is what keeps the
+  // €149 pilot from ever reading as a software unlock.
+  assert.match(
+    foundingSrc,
+    /stays free and unlimited for everyone, whether or not you join the founding program/,
+    "founding: the pre-existing 'free tool stays free' FAQ answer is unchanged"
+  );
+  assert.match(
+    pricingSrc,
+    /Debrief&rsquo;s software stays free to use right now/,
+    "pricing: the corrected header paragraph opens by reaffirming the software is free"
+  );
+
+  // Founding FAQ: payment is live, priced, timeboxed, and manually
+  // invoiced — no bare "not yet" and no future hosted-checkout promise.
+  const paymentFaqStart = foundingSrc.indexOf('q: "Is payment live today?"');
+  assert.ok(paymentFaqStart > 0, "founding: 'Is payment live today?' FAQ entry found");
+  const paymentFaqEnd = foundingSrc.indexOf("},", paymentFaqStart);
+  const paymentFaqAnswer = foundingSrc.slice(paymentFaqStart, paymentFaqEnd);
+  assert.match(paymentFaqAnswer, /€149/, "founding: payment FAQ states the €149 price");
+  assert.match(paymentFaqAnswer, /30 days/, "founding: payment FAQ states the 30-day term");
+  assert.match(paymentFaqAnswer, /invoice/i, "founding: payment FAQ states manual invoicing");
+  assert.match(paymentFaqAnswer, /no auto-renewal/i, "founding: payment FAQ states no auto-renewal");
+  assert.match(paymentFaqAnswer, /software itself stays free/, "founding: payment FAQ reaffirms the software stays free");
+  assert.ok(!paymentFaqAnswer.toLowerCase().includes("not yet"), "founding: payment FAQ no longer says payment isn't live");
+
+  // The paid pilot must never be framed as unlocking an existing free
+  // capability — none of these belong inside the payment answer.
+  for (const feature of ["Decision Queue", "white-label", "Creative Group", "Client report"]) {
+    assert.ok(
+      !paymentFaqAnswer.includes(feature),
+      `founding: payment FAQ must not present the pilot as unlocking "${feature}"`
+    );
+  }
+
+  // Pricing header: price, term, manual/invoice mechanics, and a link
+  // to /founding — kept OUT of the Free/Team tier definitions so the
+  // pilot never reads as a third software tier.
+  const headerEnd = pricingSrc.indexOf("</header>");
+  const header = pricingSrc.slice(0, headerEnd);
+  assert.match(header, /€149/, "pricing: header paragraph states the €149 price");
+  assert.match(header, /30-Day Founding Pilot/, "pricing: header paragraph names the Founding Pilot by its exact name");
+  assert.match(header, /manually arranged/, "pricing: header paragraph states the pilot is manually arranged");
+  assert.match(header, /invoiced/, "pricing: header paragraph states invoicing, not self-serve checkout");
+  assert.match(header, /href="\/founding"/, "pricing: header paragraph links to /founding for details");
+  assert.match(header, /self-serve billing/, "pricing: reaffirms no self-serve billing exists, distinct from the manual pilot");
+
+  const freeTierStart = pricingSrc.indexOf('name: "Free"');
+  const teamTierStart = pricingSrc.indexOf('name: "Team"');
+  const tiersBlock = pricingSrc.slice(freeTierStart, pricingSrc.indexOf("] as const", teamTierStart));
+  assert.ok(!tiersBlock.includes("149"), "pricing: the €149 price never appears inside the Free/Team tier definitions — Founding is not a software tier");
+  assert.ok(!tiersBlock.includes("Founding Pilot"), "pricing: the Founding Pilot is never listed as a tier point");
+
+  console.log("decisionQueueCommercialSurfaces: Launch Admin Surfaces V1 — €149 Founding Pilot payment copy is live, priced, timeboxed, manually invoiced, and never framed as a software unlock");
 }
 
 console.log("decisionQueueCommercialSurfaces: all assertions passed");
