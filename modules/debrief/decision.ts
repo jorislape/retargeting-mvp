@@ -424,6 +424,33 @@ function withEfficiencyScaleCaveat(
   };
 }
 
+/** Material-Action Verification Guardrail V1 — appended to every
+ *  budget decision (shift, scale, and cut alike), unconditionally: a
+ *  larger account or budget doesn't make this recommendation more
+ *  authoritative, so the same reminder applies at any size — no
+ *  spend-based gating, by design. Copy only — never changes the
+ *  action, evidenceState, or any other field.
+ *
+ *  Applied BEFORE withEfficiencyScaleCaveat at each call site so that
+ *  caveat, when it fires, remains the TRAILING element of `limits` —
+ *  several existing tests assert on the last array element
+ *  specifically (scripts/decision.test.ts). */
+function withMaterialActionVerificationGuardrail(limits: {
+  buyer: string[];
+  client: string[];
+}): { buyer: string[]; client: string[] } {
+  return {
+    buyer: [
+      ...limits.buyer,
+      "Confirm the underlying figures in Meta Ads Manager before making a material budget change.",
+    ],
+    client: [
+      ...limits.client,
+      "Check the underlying numbers in Meta Ads Manager before making a meaningful budget change.",
+    ],
+  };
+}
+
 export function buildDecision(
   analysis: AnalysisResult,
   firstTestTitle: string | null,
@@ -725,7 +752,10 @@ export function buildDecision(
       avoidClient.push("We're making this one change on its own so results stay readable.");
       return {
         ...evidence,
-        limits: withEfficiencyScaleCaveat(evidence.limits, testQuality?.objective),
+        limits: withEfficiencyScaleCaveat(
+          withMaterialActionVerificationGuardrail(evidence.limits),
+          testQuality?.objective
+        ),
         action: "budget",
         budgetVariant: "shift",
         headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
@@ -742,7 +772,10 @@ export function buildDecision(
       avoidClient.push("We're making this one change on its own so results stay readable.");
       return {
         ...evidence,
-        limits: withEfficiencyScaleCaveat(evidence.limits, testQuality?.objective),
+        limits: withEfficiencyScaleCaveat(
+          withMaterialActionVerificationGuardrail(evidence.limits),
+          testQuality?.objective
+        ),
         action: "budget",
         budgetVariant: "scale",
         headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% past the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
@@ -759,6 +792,7 @@ export function buildDecision(
     avoidClient.push("We're not starting anything new with the freed budget yet.");
     return {
       ...evidence,
+      limits: withMaterialActionVerificationGuardrail(evidence.limits),
       action: "budget",
       budgetVariant: "cut",
       headline: `Cut ${loserNames(analysis)}; hold everything else steady.`,

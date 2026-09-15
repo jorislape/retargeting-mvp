@@ -286,6 +286,154 @@ function assertContract(d: MemoDecision, label: string) {
   assertContract(at50, "conc@50");
 }
 
+/* ============ Material-Action Verification Guardrail V1 ============ */
+
+const GUARDRAIL_BUYER =
+  "Confirm the underlying figures in Meta Ads Manager before making a material budget change.";
+const GUARDRAIL_CLIENT =
+  "Check the underlying numbers in Meta Ads Manager before making a meaningful budget change.";
+
+{
+  // 1. Present for all three budget variants, both registers.
+  const shift = buildDecision(
+    fixture({
+      winners: [ad("Hero", 300, 45)],
+      losers: [ad("L1", 200, -40), ad("L2", 150, -33)],
+      judgedSpend: 1000,
+      belowBenchmarkSpend: 350,
+      belowBenchmarkCount: 2,
+    }),
+    "Fallback test.",
+    money
+  );
+  const scale = buildDecision(
+    fixture({
+      winners: [ad("W", 300, 30)],
+      losers: [ad("L", 100, -10)],
+      belowBenchmarkSpend: 100,
+      belowBenchmarkCount: 1,
+    }),
+    "Fallback test.",
+    money
+  );
+  const cut = buildDecision(
+    fixture({
+      winners: [ad("W", 200, 10)],
+      losers: [ad("L1", 250, -35), ad("L2", 50, -32)],
+      judgedSpend: 1000,
+      belowBenchmarkSpend: 250,
+      belowBenchmarkCount: 4,
+    }),
+    "Fallback test.",
+    money
+  );
+  assert.equal(shift.budgetVariant, "shift", "precondition: shift fixture");
+  assert.equal(scale.budgetVariant, "scale", "precondition: scale fixture");
+  assert.equal(cut.budgetVariant, "cut", "precondition: cut fixture");
+
+  for (const [label, d] of [["shift", shift], ["scale", scale], ["cut", cut]] as const) {
+    assert.ok(d.limits.buyer.includes(GUARDRAIL_BUYER), `${label}: buyer guardrail present`);
+    assert.ok(d.limits.client.includes(GUARDRAIL_CLIENT), `${label}: client guardrail present`);
+    assertContract(d, `guardrail-${label}`);
+  }
+
+  // 2. Absent for hold and test actions.
+  const holdInsufficient = buildDecision(
+    fixture({ adsJudged: 4, winners: [ad("W", 400, 80)], losers: [ad("L", 100, -40)] }),
+    "Some test.",
+    money
+  );
+  const holdFlat = buildDecision(
+    fixture({ winners: [ad("W", 200, 14)], losers: [ad("L", 200, -14)] }),
+    "Fallback test.",
+    money
+  );
+  const testAction = buildDecision(
+    fixture({ winners: [ad("W", 200, 20)], losers: [ad("L", 200, -20)] }),
+    "Test problem-first hooks vs current openers.",
+    money
+  );
+  assert.equal(holdInsufficient.action, "hold");
+  assert.equal(holdFlat.action, "hold");
+  assert.equal(testAction.action, "test");
+  for (const [label, d] of [
+    ["hold-insufficient", holdInsufficient],
+    ["hold-flat", holdFlat],
+    ["test", testAction],
+  ] as const) {
+    assert.ok(!d.limits.buyer.includes(GUARDRAIL_BUYER), `${label}: no buyer guardrail on a non-budget action`);
+    assert.ok(!d.limits.client.includes(GUARDRAIL_CLIENT), `${label}: no client guardrail on a non-budget action`);
+  }
+
+  // 3. Touches ONLY limits — action/evidenceState/headline/rationale/
+  //    avoidNow/reassess still match this fixture's documented values
+  //    (the same values the pre-existing B1 sections above assert).
+  assert.equal(scale.action, "budget");
+  assert.equal(scale.evidenceState, "limited", "unrelated field: evidenceState unaffected by the guardrail");
+  assert.ok(scale.headline.startsWith('Scale "W"'), "unrelated field: headline unaffected");
+  assert.ok(scale.rationale.includes(`${SCALE_TEST_MIN_DELTA_PCT}%`), "unrelated field: rationale unaffected");
+  assert.equal(scale.avoidNow.buyer[0], "No new creative test alongside the scale — one variable at a time.", "unrelated field: avoidNow unaffected");
+  assert.ok(scale.reassess.buyer.startsWith("Reassess once the new allocation"), "unrelated field: reassess unaffected");
+
+  // 4. No spend-size gating: a low-spend and a high-spend fixture with
+  //    the same shape receive byte-identical guardrail copy.
+  const lowSpend = buildDecision(
+    fixture({
+      winners: [ad("W", 300, 30)],
+      losers: [ad("L", 100, -10)],
+      judgedSpend: 400,
+      belowBenchmarkSpend: 100,
+      belowBenchmarkCount: 1,
+    }),
+    "Fallback test.",
+    money
+  );
+  const highSpend = buildDecision(
+    fixture({
+      winners: [ad("W", 300_000, 30)],
+      losers: [ad("L", 100_000, -10)],
+      judgedSpend: 400_000,
+      belowBenchmarkSpend: 100_000,
+      belowBenchmarkCount: 1,
+    }),
+    "Fallback test.",
+    money
+  );
+  assert.equal(lowSpend.action, "budget");
+  assert.equal(highSpend.action, "budget");
+  const lowLine = lowSpend.limits.buyer.find((l) => l === GUARDRAIL_BUYER);
+  const highLine = highSpend.limits.buyer.find((l) => l === GUARDRAIL_BUYER);
+  assert.ok(lowLine != null && highLine != null, "guardrail present regardless of spend magnitude");
+  assert.equal(lowLine, highLine, "a $400 account and a $400,000 account get byte-identical guardrail copy — no size-based gating");
+
+  // 5. Client jargon contract still passes (assertContract above already
+  //    re-scans d.limits.client for kill/gate/benchmark/median/judged on
+  //    every guardrail-bearing decision — restated here for clarity).
+  for (const d of [shift, scale, cut]) {
+    assert.ok(!d.limits.client.join(" ").toLowerCase().includes("gate"), "client guardrail-bearing limits stay jargon-free");
+  }
+
+  // 6. The existing efficiency-objective caveat, when it fires, remains
+  //    the TRAILING element of limits.buyer — the guardrail is appended
+  //    BEFORE it, exactly as designed.
+  const effSeparation = fixture({
+    adsJudged: 12,
+    winners: [ad("W1", 200, 45), ad("W2", 180, 20), ad("W3", 160, 18)],
+    losers: [ad("L1", 120, -18), ad("L2", 110, -17), ad("L3", 100, -16)],
+    judgedSpend: 1000,
+    belowBenchmarkSpend: 330,
+    belowBenchmarkCount: 3,
+  });
+  const eff = buildDecision(effSeparation, "T", money, null, { objective: "efficiency" });
+  assert.equal(eff.action, "budget", "precondition: efficiency fixture is a budget action");
+  const last = eff.limits.buyer[eff.limits.buyer.length - 1];
+  const secondToLast = eff.limits.buyer[eff.limits.buyer.length - 2];
+  assert.ok(last.includes("Verify profitability before increasing spend"), "efficiency caveat remains the trailing element");
+  assert.equal(secondToLast, GUARDRAIL_BUYER, "guardrail sits immediately before the trailing efficiency caveat");
+
+  console.log("decision: Material-Action Verification Guardrail V1 — present on shift/scale/cut, absent on hold/test, no size gating, jargon-clean, trailing order preserved");
+}
+
 /* ===================== null-median honesty ===================== */
 
 {
@@ -692,8 +840,12 @@ function assertContract(d: MemoDecision, label: string) {
       base.limits.buyer.length + 1,
       `objective=growth + kpi=${kpi} adds exactly one caveat`
     );
+    // Presence, not position (Material-Action Verification Guardrail
+    // V1 may also append its own trailing line on this fixture's
+    // budget action — see the guardrail's own dedicated test section
+    // for the trailing-order guarantee that DOES still hold).
     assert.ok(
-      growth.limits.buyer[growth.limits.buyer.length - 1].toLowerCase().includes("traffic efficiency"),
+      growth.limits.buyer.some((l) => l.toLowerCase().includes("traffic efficiency")),
       `growth+${kpi} caveat present`
     );
   }
