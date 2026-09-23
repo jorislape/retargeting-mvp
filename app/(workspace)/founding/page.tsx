@@ -123,6 +123,20 @@ export default function FoundingPage() {
             Email me
           </a>
         </div>
+        {/* Founding Price Visibility V1 — the price was only reachable in
+            the FAQ; launch traffic arrives having already read "€149" in
+            the post, so it sits next to the CTA. Framed so it can never
+            read as a paywall: the software is free, the fee is the pilot. */}
+        <p
+          className="animate-rise mt-3 max-w-lg text-[13px] leading-relaxed text-zinc-400"
+          style={{ animationDelay: "90ms" }}
+        >
+          <span className="font-medium text-zinc-200">
+            €149 for the 30-day Founding Pilot
+          </span>{" "}
+          · invoiced manually · no auto-renewal · the Debrief software itself
+          stays free.
+        </p>
       </header>
 
       <div className="mt-8 space-y-3">
