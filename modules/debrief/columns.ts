@@ -1,4 +1,4 @@
-import { KpiKey } from "./types";
+import { ColumnMatch, ConversionField, KpiColumnSource, KpiKey } from "./types";
 
 /**
  * Meta Ads Manager CSV exports don't have fixed column names — they
@@ -21,19 +21,38 @@ function normalize(header: string): string {
  *  aliases exactly, then falls back to substring containment — exact
  *  matches first so e.g. "results" doesn't shadow "cost per result".
  *  Very short aliases ("ad") are exact-only: as substrings they match
- *  into unrelated headers ("leads", "return on ad spend"). */
-function findHeader(headers: string[], aliases: readonly string[]): string | null {
+ *  into unrelated headers ("leads", "return on ad spend").
+ *
+ *  KPI Source Column Disclosure: also reports WHICH alias matched and
+ *  whether it matched exactly — the chosen header is identical to the
+ *  pre-disclosure resolver (same passes, same order); this only
+ *  exposes how it was found. */
+function findHeaderMatch(
+  headers: string[],
+  aliases: readonly string[]
+): { header: string; alias: string; exact: boolean } | null {
   const normalized = headers.map((h) => ({ header: h, norm: normalize(h) }));
   for (const alias of aliases) {
     const exact = normalized.find((h) => h.norm === alias);
-    if (exact) return exact.header;
+    if (exact) return { header: exact.header, alias, exact: true };
   }
   for (const alias of aliases) {
     if (alias.length < 3) continue;
     const partial = normalized.find((h) => h.norm.includes(alias));
-    if (partial) return partial.header;
+    if (partial) return { header: partial.header, alias, exact: false };
   }
   return null;
+}
+
+function findHeader(headers: string[], aliases: readonly string[]): string | null {
+  return findHeaderMatch(headers, aliases)?.header ?? null;
+}
+
+/** True when a header would match any alias under findHeaderMatch's
+ *  own rules (exact, or containment for aliases of 3+ characters). */
+function matchesAny(header: string, aliases: readonly string[]): boolean {
+  const norm = normalize(header);
+  return aliases.some((a) => norm === a || (a.length >= 3 && norm.includes(a)));
 }
 
 const ALIASES = {
@@ -88,6 +107,41 @@ const ALIASES = {
   cpm: ["cpm cost per 1 000 impressions", "cpm"],
 } as const;
 
+/** Meta's per-campaign optimisation-event columns. They're resolved as
+ *  purchases / cost per purchase (unchanged behaviour), but "Results"
+ *  counts whatever each campaign optimises for — so a match through
+ *  these aliases is always disclosed, exact or not. */
+const RESULTS_ALIASES: readonly string[] = ["results", "cost per result"];
+
+/** The conversion fields whose source header is recorded. Other fields
+ *  (spend, CTR, dates, …) are standard, unambiguous Meta columns and
+ *  stay out of the disclosure entirely. */
+const CONVERSION_FIELDS: readonly ConversionField[] = [
+  "purchases",
+  "leads",
+  "purchaseValue",
+  "purchaseRoas",
+  "costPerPurchase",
+  "costPerLead",
+];
+
+/** A header that matches a MORE specific field is never listed as an
+ *  ignored variant of a broader one — e.g. "Offline purchases
+ *  conversion value" contains "purchases" but is a value column, not a
+ *  competing purchases count. */
+const MORE_SPECIFIC: Partial<Record<ConversionField, ConversionField[]>> = {
+  purchases: ["purchaseValue", "purchaseRoas", "costPerPurchase"],
+  leads: ["costPerLead"],
+};
+
+export interface ColumnSource {
+  header: string;
+  match: ColumnMatch;
+  /** Other headers that ALSO matched this field's aliases but weren't
+   *  used (e.g. "Qualified leads" when "Leads" won). Display-only. */
+  ignored: string[];
+}
+
 export interface ColumnMap {
   adName: string | null;
   /** "Ad ID" when present — optional; used only for cross-period ad
@@ -112,6 +166,10 @@ export interface ColumnMap {
   cpm: string | null;
   /** 3-letter currency code pulled from the spend header, if present. */
   currency: string | null;
+  /** KPI Source Column Disclosure: for each RESOLVED conversion field,
+   *  the header used and how it matched. Never read by extract/analysis
+   *  math — disclosure only. */
+  sources: Partial<Record<ConversionField, ColumnSource>>;
 }
 
 export function resolveColumns(headers: string[]): ColumnMap {
@@ -144,7 +202,84 @@ export function resolveColumns(headers: string[]): ColumnMap {
     contentViews: findHeader(headers, ALIASES.contentViews),
     cpm: findHeader(headers, ALIASES.cpm),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
+    sources: resolveSources(headers),
   };
+}
+
+function resolveSources(headers: string[]): ColumnMap["sources"] {
+  const sources: ColumnMap["sources"] = {};
+  for (const field of CONVERSION_FIELDS) {
+    const aliases = ALIASES[field];
+    const hit = findHeaderMatch(headers, aliases);
+    if (!hit) continue;
+    const excluded = (MORE_SPECIFIC[field] ?? []).flatMap((f) => [...ALIASES[f]]);
+    const ignored = headers.filter(
+      (h) => h !== hit.header && matchesAny(h, aliases) && !matchesAny(h, excluded)
+    );
+    /* A trailing currency code ("Cost per purchase (USD)") is how Meta
+       labels standard money columns — that's still the standard column,
+       not a variant, so it classifies as exact. Classification only:
+       the resolved header above is untouched. */
+    const exactModuloCurrency =
+      hit.exact || normalize(hit.header.replace(/\s*\([A-Za-z]{3}\)\s*$/, "")) === hit.alias;
+    sources[field] = {
+      header: hit.header,
+      match: RESULTS_ALIASES.includes(hit.alias)
+        ? "results"
+        : exactModuloCurrency
+          ? "exact"
+          : "partial",
+      ignored,
+    };
+  }
+  return sources;
+}
+
+/** The conversion fields extract.ts actually reads for a KPI, in read
+ *  order — mirrors kpiValueForRow/conversionsForRow exactly:
+ *  roas: direct ROAS column, else purchase value; plus the purchases
+ *        count (display-only conversions)
+ *  cpa:  direct cost-per-purchase, else cost-per-lead; plus purchases
+ *        (count + per-row fallback divisor), else leads (fallback only)
+ *  ctr/cpc read no conversion field. */
+export function kpiReadFields(kpi: KpiKey, columns: ColumnMap): ConversionField[] {
+  const has = (f: ConversionField) => columns[f] != null;
+  switch (kpi) {
+    case "purchases":
+      return has("purchases") ? ["purchases"] : [];
+    case "leads":
+      return has("leads") ? ["leads"] : [];
+    case "roas": {
+      const out: ConversionField[] = [];
+      if (has("purchaseRoas")) out.push("purchaseRoas");
+      else if (has("purchaseValue")) out.push("purchaseValue");
+      if (has("purchases")) out.push("purchases");
+      return out;
+    }
+    case "cpa": {
+      const out: ConversionField[] = [];
+      if (has("costPerPurchase")) out.push("costPerPurchase");
+      else if (has("costPerLead")) out.push("costPerLead");
+      if (has("purchases")) out.push("purchases");
+      else if (has("leads")) out.push("leads");
+      return out;
+    }
+    case "ctr":
+    case "cpc":
+      return [];
+  }
+}
+
+/** The disclosure-worthy sources behind a KPI: only partial matches and
+ *  Meta "Results"-alias matches. Standard exact matches return nothing,
+ *  so a normal export (and the sample) produces an empty list. */
+export function kpiColumnSourcesFor(kpi: KpiKey, columns: ColumnMap): KpiColumnSource[] {
+  const out: KpiColumnSource[] = [];
+  for (const field of kpiReadFields(kpi, columns)) {
+    const src = columns.sources[field];
+    if (src && src.match !== "exact") out.push({ field, header: src.header, match: src.match });
+  }
+  return out;
 }
 
 /** Columns required to compute a given KPI, for a clear "missing X" error
@@ -187,4 +322,37 @@ export function requiredColumnsFor(kpi: KpiKey, columns: ColumnMap): string[] {
       break;
   }
   return missing;
+}
+
+const PREVIEW_LABEL: Record<ConversionField, string> = {
+  purchases: "Purchases",
+  leads: "Leads",
+  purchaseValue: "Purchase value",
+  purchaseRoas: "ROAS",
+  costPerPurchase: "Cost per purchase",
+  costPerLead: "Cost per lead",
+};
+
+function quoted(headers: string[]): string {
+  const q = headers.map((h) => `'${h}'`);
+  if (q.length <= 1) return q.join("");
+  return `${q.slice(0, -1).join(", ")} and ${q[q.length - 1]}`;
+}
+
+/** Upload-preview line: which column each conversion field behind the
+ *  selected KPI is read from, and which competing variants were found
+ *  but not used. null for KPIs that read no conversion column (CTR/CPC)
+ *  or when none resolved. Display only — same resolver the API uses. */
+export function kpiSourcePreview(kpi: KpiKey, columns: ColumnMap): string | null {
+  const parts = kpiReadFields(kpi, columns).flatMap((field) => {
+    const src = columns.sources[field];
+    if (!src) return [];
+    let part = `${PREVIEW_LABEL[field]} from column '${src.header}'`;
+    if (src.match === "results") part += " (Meta's optimisation event — check it's the conversion you mean)";
+    if (src.ignored.length > 0) {
+      part += ` — ${quoted(src.ignored)} also found, not used`;
+    }
+    return [part];
+  });
+  return parts.length > 0 ? `${parts.join("; ")}.` : null;
 }

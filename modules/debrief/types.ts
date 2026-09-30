@@ -52,6 +52,31 @@ export function outcomeNounsForKpi(
 }
 
 /* ------------------------------------------------------------------ */
+/* KPI Source Column Disclosure: which CSV column a conversion field   */
+/* was read from, and how it matched (columns.ts). Disclosure only —   */
+/* never an input to any number, threshold, or the decision.          */
+/* ------------------------------------------------------------------ */
+
+export type ConversionField =
+  | "purchases"
+  | "leads"
+  | "purchaseValue"
+  | "purchaseRoas"
+  | "costPerPurchase"
+  | "costPerLead";
+
+/** "exact": a standard Meta header. "partial": the header only CONTAINS
+ *  an alias (e.g. "Qualified leads" → leads). "results": Meta's
+ *  per-campaign optimisation-event column ("Results"/"Cost per result"). */
+export type ColumnMatch = "exact" | "partial" | "results";
+
+export interface KpiColumnSource {
+  field: ConversionField;
+  header: string;
+  match: "partial" | "results";
+}
+
+/* ------------------------------------------------------------------ */
 /* Creative Format Confirmation V1: the user can confirm each ad's     */
 /* creative format before generating, replacing the ad-name GUESS with */
 /* user-provided context. Confirmations feed pattern detection, test   */
@@ -373,6 +398,12 @@ export interface AnalysisResult {
    *  kept as separate ads with row-numbered labels; this list drives
    *  the honesty disclosure in the decision's limits. */
   duplicateAdNames: string[];
+  /** KPI Source Column Disclosure — present ONLY when a conversion
+   *  column behind the selected KPI was a partial or "Results" match
+   *  (standard exact exports omit the key entirely, so the sample and
+   *  the Meta pull are byte-identical to before). Drives one limits
+   *  line; never gating, ranking, or the decision. */
+  kpiColumnSources?: KpiColumnSource[];
 }
 
 export interface MemoScope {

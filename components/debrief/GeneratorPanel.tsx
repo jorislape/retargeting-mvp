@@ -18,6 +18,7 @@ import {
   outcomeNounsForKpi,
   parseCsv,
   parseNumericCell,
+  kpiSourcePreview,
   requiredColumnsFor,
   resolveColumns,
   SAMPLE_CONTEXT,
@@ -536,6 +537,10 @@ export function GeneratorPanel() {
     rows: number;
     cols: number;
     kpisFound: KpiKey[];
+    /** KPI Source Column Disclosure: the resolved column map, kept so
+     *  the source line follows the KPI selector without re-reading the
+     *  file. Display only. */
+    columnMap: ReturnType<typeof resolveColumns>;
     /** Total of the spend column (display only — the API recomputes
      *  everything) and the file's reporting range, when present. */
     spendTotal: number | null;
@@ -659,6 +664,7 @@ export function GeneratorPanel() {
           rows: Math.max(0, matrix.length - 1),
           cols: headers.length,
           kpisFound,
+          columnMap: columns,
           spendTotal,
           currency: columns.currency,
           dateRange,
@@ -679,6 +685,10 @@ export function GeneratorPanel() {
   const preview =
     file && previewState?.forFile === file ? previewState : null;
   const previewKpiOk = preview?.kpisFound.includes(fields.kpi) ?? true;
+  /* KPI Source Column Disclosure: which column the selected KPI's
+     conversion data comes from (and any competing variants ignored). */
+  const previewKpiSource =
+    preview && previewKpiOk ? kpiSourcePreview(fields.kpi, preview.columnMap) : null;
   /* Creative Evidence V1: names on multiple rows can't take one image. */
   const previewAmbiguous = new Set(preview?.ambiguousNames ?? []);
   /* Creative Grouping V1: every distinct label used on any ad this
@@ -1328,6 +1338,7 @@ export function GeneratorPanel() {
               {/* Lightweight structural preview — catches a missing-KPI
                   column BEFORE the run instead of after it. */}
               {preview && (
+                <>
                 <p
                   aria-live="polite"
                   className={`mt-2 text-xs leading-relaxed ${
@@ -1353,6 +1364,12 @@ export function GeneratorPanel() {
                           : ""
                       }`}
                 </p>
+                {previewKpiSource && (
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                    {previewKpiSource}
+                  </p>
+                )}
+                </>
               )}
             </div>
           )}

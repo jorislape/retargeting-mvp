@@ -1,4 +1,4 @@
-import { ColumnMap } from "./columns";
+import { ColumnMap, kpiColumnSourcesFor } from "./columns";
 import {
   AnalysisResult,
   DebriefContext,
@@ -115,6 +115,7 @@ export function analyze(
   context: DebriefContext
 ): AnalysisResult {
   const { kpi, targetCpa } = context;
+  const kpiSources = kpiColumnSourcesFor(kpi, columns);
   const { gate: spendGate, basis: spendGateBasis } = computeSpendGate(
     ads,
     targetCpa,
@@ -176,5 +177,8 @@ export function analyze(
     duplicateAdNames: [
       ...new Set(ads.filter((a) => a.sourceName != null).map((a) => a.sourceName as string)),
     ],
+    /* KPI Source Column Disclosure: only attached when non-empty, so a
+       standard export's AnalysisResult is unchanged key-for-key. */
+    ...(kpiSources.length > 0 ? { kpiColumnSources: kpiSources } : {}),
   };
 }

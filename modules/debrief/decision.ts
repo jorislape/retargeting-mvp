@@ -12,6 +12,7 @@ import type {
   AppliedCriterion,
   DecisionCriteria,
   DecisionInputContext,
+  KpiColumnSource,
   MemoDecision,
   Objective,
 } from "./types.ts";
@@ -222,6 +223,71 @@ export function deriveEvidenceShape(
   return flatField ? "flatness" : "separation";
 }
 
+/* ------------------------------------------------------------------ */
+/* KPI Source Column Disclosure                                        */
+/* ------------------------------------------------------------------ */
+
+const SOURCE_NOUN: Record<KpiColumnSource["field"], { noun: string; plural: boolean }> = {
+  purchases: { noun: "purchases", plural: true },
+  leads: { noun: "leads", plural: true },
+  purchaseValue: { noun: "purchase value", plural: false },
+  purchaseRoas: { noun: "ROAS", plural: false },
+  costPerPurchase: { noun: "cost per purchase", plural: false },
+  costPerLead: { noun: "cost per lead", plural: false },
+};
+
+function quotedList(headers: string[]): string {
+  const q = headers.map((h) => `'${h}'`);
+  if (q.length <= 1) return q.join("");
+  return `${q.slice(0, -1).join(", ")} and ${q[q.length - 1]}`;
+}
+
+/**
+ * One limits line (per register) naming the CSV column(s) a KPI's
+ * conversion data was read from — ONLY for partial matches ("Qualified
+ * leads" read as leads) and Meta's "Results"/"Cost per result"
+ * optimisation-event columns. Empty input ⇒ null ⇒ nothing appended,
+ * so standard exports stay byte-identical. Copy only.
+ */
+export function kpiSourceLimitLines(
+  sources: readonly KpiColumnSource[] | undefined
+): { buyer: string; client: string } | null {
+  if (!sources || sources.length === 0) return null;
+
+  const sentences: string[] = [];
+  const partial = sources.filter((s) => s.match === "partial");
+  if (partial.length > 0) {
+    const [first, ...rest] = partial;
+    const f = SOURCE_NOUN[first.field];
+    let sentence = `${f.noun.charAt(0).toUpperCase()}${f.noun.slice(1)} ${f.plural ? "were" : "was"} read from the column '${first.header}'`;
+    if (rest.length > 0) {
+      sentence += `, and ${rest.map((r) => `${SOURCE_NOUN[r.field].noun} from '${r.header}'`).join(", ")}`;
+    }
+    sentences.push(`${sentence}.`);
+  }
+  const results = sources.filter((s) => s.match === "results");
+  const countResult = results.find((r) => r.field === "purchases");
+  const costResult = results.find((r) => r.field === "costPerPurchase");
+  if (countResult) {
+    sentences.push(
+      `'${countResult.header}' is Meta's optimisation event for each campaign, read here as purchases.`
+    );
+  }
+  if (costResult) {
+    sentences.push(
+      countResult
+        ? `'${costResult.header}' is the cost of that event, read here as cost per purchase.`
+        : `'${costResult.header}' is the cost of Meta's optimisation event for each campaign, read here as cost per purchase.`
+    );
+  }
+  sentences.push("Confirm it's the conversion you want judged.");
+
+  const headers = [...new Set(sources.map((s) => s.header))];
+  const client = `The results counted here come from the column${headers.length > 1 ? "s" : ""} ${quotedList(headers)} in the export — worth checking ${headers.length > 1 ? "they're" : "it's"} the result you mean to measure.`;
+
+  return { buyer: sentences.join(" "), client };
+}
+
 /**
  * What this read CANNOT establish. One permanent dataset-only caveat (no
  * causation, no future-performance guarantee, no control for unobserved
@@ -250,6 +316,14 @@ export function buildLimits(
   client.push(
     "This is based only on the data in this file. It shows what happened, not why — and it can't account for differences in audience, timing, budget, or goals the export doesn't include, or promise the same result going forward."
   );
+
+  /* KPI Source Column Disclosure — right after the permanent line so
+     it never displaces any existing trailing caveat. */
+  const sourceLines = kpiSourceLimitLines(analysis.kpiColumnSources);
+  if (sourceLines) {
+    buyer.push(sourceLines.buyer);
+    client.push(sourceLines.client);
+  }
 
   if (analysis.adsSetAside > 0) {
     buyer.push(
