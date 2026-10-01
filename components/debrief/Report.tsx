@@ -1905,9 +1905,13 @@ export function Report({
           )}
           <p className="mt-4 text-xs leading-relaxed text-zinc-400">
             {client
-              ? memo.scope.adsSetAside > 0
-                ? `${memo.scope.adsSetAside} ad${memo.scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
-                : "Every ad had enough spend to be judged fairly."
+              ? memo.scope.setAsideBreakdown
+                ? /* First-Run Fixes: split by cause when some ads have
+                     no KPI figure at all — never "not enough spend" for those. */
+                  `${memo.scope.setAsideBreakdown.spend > 0 ? `${memo.scope.setAsideBreakdown.spend} ad${memo.scope.setAsideBreakdown.spend === 1 ? " did" : "s did"} not have enough spend to compare fairly; ` : ""}${memo.scope.setAsideBreakdown.noValue} had no ${memo.scope.kpiLabel} figure in the file — set aside rather than counted against.`
+                : memo.scope.adsSetAside > 0
+                  ? `${memo.scope.adsSetAside} ad${memo.scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
+                  : "Every ad had enough spend to be judged fairly."
               : memo.losers.setAsideNote}
           </p>
         </section>
@@ -2137,10 +2141,10 @@ export function Report({
                 {memo.scope.dateRangeLabel
                   ? ` between ${memo.scope.dateRangeLabel}`
                   : ""}
-                . {memo.scope.adsJudged} ads had enough spend to judge fairly
-                {memo.scope.adsSetAside > 0
-                  ? `; ${memo.scope.adsSetAside} did not and were set aside`
-                  : ""}
+                . {memo.scope.setAsideBreakdown
+                  ? /* First-Run Fixes: name both causes. */
+                    `${memo.scope.adsJudged} ads could be compared fairly; ${memo.scope.setAsideBreakdown.noValue} had no ${memo.scope.kpiLabel} figure${memo.scope.setAsideBreakdown.spend > 0 ? ` and ${memo.scope.setAsideBreakdown.spend} didn't have enough spend` : ""}, so they were set aside`
+                  : `${memo.scope.adsJudged} ads had enough spend to judge fairly${memo.scope.adsSetAside > 0 ? `; ${memo.scope.adsSetAside} did not and were set aside` : ""}`}
                 . Every number comes directly from the ad account — nothing is
                 estimated.
               </p>

@@ -9,6 +9,11 @@ import { ColumnMatch, ConversionField, KpiColumnSource, KpiKey } from "./types";
  * priority-ordered alias list.
  */
 
+/** The one "export at ad level" instruction — shared by the API's
+ *  structured errors and the generator's upload preview so the two can
+ *  never drift. */
+export const EXPORT_AT_AD_LEVEL = "Export ads at ad level for a date range with delivery.";
+
 function normalize(header: string): string {
   return header
     .toLowerCase()

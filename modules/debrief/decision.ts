@@ -13,6 +13,7 @@ import type {
   DecisionCriteria,
   DecisionInputContext,
   KpiColumnSource,
+  KpiGaps,
   MemoDecision,
   Objective,
 } from "./types.ts";
@@ -288,6 +289,124 @@ export function kpiSourceLimitLines(
   return { buyer: sentences.join(" "), client };
 }
 
+/* ------------------------------------------------------------------ */
+/* First-Run Fixes: honest set-aside wording                           */
+/* ------------------------------------------------------------------ */
+
+/** Oxford-comma join — the parts themselves contain commas ("had no
+ *  purchases, so CPA couldn't be computed"), so a bare "and" misreads. */
+function joinAnd(parts: string[]): string {
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
+
+/** The set-aside partition behind KpiGaps, as (count, buyer phrase,
+ *  client phrase) parts. The first part carries the "ad/ads" noun. */
+function gapParts(gaps: KpiGaps, kpiLabel: string, outcomeMany: string | null) {
+  const missing = gaps.noValue - gaps.zeroOutcome;
+  const parts: { n: number; buyer: string; client: string }[] = [];
+  if (missing > 0) {
+    parts.push({
+      n: missing,
+      buyer: `had no ${kpiLabel} value in the export`,
+      client: `had no ${kpiLabel} figure in the file`,
+    });
+  }
+  if (gaps.zeroOutcome > 0 && outcomeMany) {
+    parts.push({
+      n: gaps.zeroOutcome,
+      buyer: `had no ${outcomeMany}, so ${kpiLabel} couldn't be computed`,
+      client: `had no ${outcomeMany} yet`,
+    });
+  }
+  if (gaps.belowGateWithValue > 0) {
+    parts.push({
+      n: gaps.belowGateWithValue,
+      buyer: "had too little spend to judge",
+      client: "didn't have enough spend to include yet",
+    });
+  }
+  const render = (register: "buyer" | "client") =>
+    joinAnd(
+      parts.map((p, i) =>
+        i === 0 ? `${p.n} ad${p.n === 1 ? "" : "s"} ${p[register]}` : `${p.n} ${p[register]}`
+      )
+    );
+  return { buyer: render("buyer"), client: render("client") };
+}
+
+/** Hold copy when ads cleared the spend gate but have no KPI value — so
+ *  the hold names that cause instead of blaming the gate. Wording only;
+ *  the hold itself is decided exactly as before. */
+function kpiGapHold(
+  analysis: AnalysisResult,
+  gaps: KpiGaps,
+  gatePhrase: string
+): Pick<MemoDecision, "headline" | "clientHeadline" | "clientRationale" | "reassess"> {
+  const kpiLabel = KPI_LABELS[analysis.kpi];
+  const outcomeMany = outcomeNounsForKpi(analysis.kpi)?.many ?? null;
+  const missing = gaps.noValue - gaps.zeroOutcome;
+  const suggest = gaps.suggestedKpi ? KPI_LABELS[gaps.suggestedKpi] : null;
+  const zeroPart = gaps.zeroOutcome > 0 && outcomeMany != null;
+
+  /* Buyer headline. Pure missing-column case reads as one fact; any
+     mix of causes lists each with its count. */
+  let headline: string;
+  if (missing > 0 && !zeroPart && gaps.belowGateWithValue === 0) {
+    headline =
+      missing === analysis.adsAnalyzed
+        ? `Hold — none of the ${analysis.adsAnalyzed} ads has a ${kpiLabel} value in this export.`
+        : `Hold — ${missing} of ${analysis.adsAnalyzed} ads have no ${kpiLabel} value in this export.`;
+  } else {
+    const buyerParts: string[] = [];
+    if (missing > 0) buyerParts.push(`${missing} ${missing === 1 ? "has" : "have"} no ${kpiLabel} value in this export`);
+    if (zeroPart) {
+      buyerParts.push(
+        `${gaps.zeroOutcome} had no ${outcomeMany}, so ${kpiLabel} can't be computed for ${gaps.zeroOutcome === 1 ? "it" : "them"}`
+      );
+    }
+    if (gaps.belowGateWithValue > 0) {
+      buyerParts.push(
+        `${gaps.belowGateWithValue}${buyerParts.length > 0 ? " more" : ""} didn't clear the ${gatePhrase}`
+      );
+    }
+    headline = `Hold — only ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads could be judged: ${joinAnd(buyerParts)}. This call needs ${DECISION_MIN_JUDGED}.`;
+  }
+  if (suggest) headline += ` Try ${suggest}.`;
+
+  const clientParts: string[] = [];
+  if (missing > 0) {
+    clientParts.push(
+      missing === analysis.adsAnalyzed
+        ? `none of the ${analysis.adsAnalyzed} ads has a ${kpiLabel} figure in this file`
+        : `${missing} of ${analysis.adsAnalyzed} ads have no ${kpiLabel} figure in this file`
+    );
+  }
+  if (zeroPart) {
+    clientParts.push(
+      `${gaps.zeroOutcome} ad${gaps.zeroOutcome === 1 ? "" : "s"} had no ${outcomeMany} yet, so ${gaps.zeroOutcome === 1 ? "its" : "their"} ${kpiLabel} can't be worked out`
+    );
+  }
+  if (gaps.belowGateWithValue > 0) {
+    clientParts.push(
+      `${gaps.belowGateWithValue}${clientParts.length > 0 ? " more" : ""} ${gaps.belowGateWithValue === 1 ? "hasn't" : "haven't"} had enough spend to compare fairly`
+    );
+  }
+  let clientHeadline = `Hold — ${joinAnd(clientParts)}, so there isn't enough to compare yet.`;
+  if (suggest) clientHeadline += ` Switching the report to ${suggest} would use the results this file does have.`;
+
+  return {
+    headline,
+    clientHeadline,
+    clientRationale:
+      "With this few ads that can be compared, an apparent winner is as likely luck as a real pattern — a call needs more ads with a result to compare.",
+    reassess: {
+      buyer: `Reassess with an export where ≥${DECISION_MIN_JUDGED} ads have a ${kpiLabel} value and clear the ${gatePhrase}.`,
+      client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have a ${kpiLabel} figure and enough spend to compare.`,
+    },
+  };
+}
+
 /**
  * What this read CANNOT establish. One permanent dataset-only caveat (no
  * causation, no future-performance guarantee, no control for unobserved
@@ -325,7 +444,18 @@ export function buildLimits(
     client.push(sourceLines.client);
   }
 
-  if (analysis.adsSetAside > 0) {
+  if (analysis.kpiGaps) {
+    /* First-Run Fixes: some set-aside ads spent enough but have no KPI
+       value — name each cause with its count instead of "too little
+       spend" for all of them. */
+    const parts = gapParts(
+      analysis.kpiGaps,
+      KPI_LABELS[analysis.kpi],
+      outcomeNounsForKpi(analysis.kpi)?.many ?? null
+    );
+    buyer.push(`${parts.buyer} — set aside, so no conclusion is drawn about them either way.`);
+    client.push(`${parts.client}, so they're not part of this read.`);
+  } else if (analysis.adsSetAside > 0) {
     buyer.push(
       `${analysis.adsSetAside} ad${analysis.adsSetAside === 1 ? "" : "s"} had too little spend to judge and were set aside — no conclusion is drawn about them either way.`
     );
@@ -794,6 +924,12 @@ export function buildDecision(
       buyer: `Reassess when ≥${DECISION_MIN_JUDGED} ads clear the ${gatePhrase}.`,
       client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have spent about ${gateLabel} each${clientGateSuffix}.`,
     },
+    /* First-Run Fixes: when the hold is caused (at least partly) by ads
+       with no KPI value, say so — only on the H1 path, where "too few
+       judged ads" is actually the reason. */
+    ...(analysis.kpiGaps && analysis.adsJudged < DECISION_MIN_JUDGED
+      ? kpiGapHold(analysis, analysis.kpiGaps, gatePhrase)
+      : {}),
   });
 
   /* ---- H1: too few judged ads ---- */

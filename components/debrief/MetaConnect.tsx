@@ -310,6 +310,15 @@ export function MetaConnect() {
         />
         {pulling ? "Pulling ads…" : "Pull ads into the generator"}
       </button>
+      {/* First-Run Fixes: what's about to be pulled, stated plainly —
+          a multi-account user sees the account and range before pulling. */}
+      {selectedAccount && (
+        <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+          Pulls{" "}
+          <span className="font-medium text-zinc-200">{selectedAccount.name}</span>{" "}
+          ({selectedAccount.currency}) · {DATE_PRESET_LABELS[datePreset]}
+        </p>
+      )}
 
       {pullNote && (
         <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-accent-soft/90">

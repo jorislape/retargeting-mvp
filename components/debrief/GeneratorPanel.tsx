@@ -18,7 +18,12 @@ import {
   outcomeNounsForKpi,
   parseCsv,
   parseNumericCell,
+  chooseAutoKpi,
+  EXPORT_AT_AD_LEVEL,
   kpiSourcePreview,
+  kpiUsability,
+  sparseKpiWarning,
+  toTable,
   requiredColumnsFor,
   resolveColumns,
   SAMPLE_CONTEXT,
@@ -541,6 +546,9 @@ export function GeneratorPanel() {
      *  the source line follows the KPI selector without re-reading the
      *  file. Display only. */
     columnMap: ReturnType<typeof resolveColumns>;
+    /** First-Run Fixes: per-KPI value coverage (same extraction the
+     *  engine runs) — drives the auto-switch and the sparse warning. */
+    usability: ReturnType<typeof kpiUsability>;
     /** Total of the spend column (display only — the API recomputes
      *  everything) and the file's reporting range, when present. */
     spendTotal: number | null;
@@ -573,6 +581,22 @@ export function GeneratorPanel() {
   );
   const showAllFormats = expandedFormatsFor !== null && expandedFormatsFor === file;
 
+  /* First-Run Fixes: KPI auto-selection. kpiManualRef flips the first
+     time the user picks a KPI (selector or an error's one-click switch)
+     and from then on the data never changes their choice. kpiRef lets
+     the file-read effect see the current KPI without re-running on it. */
+  const kpiManualRef = useRef(false);
+  const kpiRef = useRef(fields.kpi);
+  useEffect(() => {
+    kpiRef.current = fields.kpi;
+  }, [fields.kpi]);
+  const [kpiNotice, setKpiNotice] = useState<{ from: KpiKey; to: KpiKey } | null>(null);
+  const chooseKpiManually = (k: KpiKey) => {
+    kpiManualRef.current = true;
+    setKpiNotice(null);
+    updateFields({ kpi: k });
+  };
+
   useEffect(() => {
     if (!file || file.size > 5 * 1024 * 1024) return;
     let cancelled = false;
@@ -586,6 +610,7 @@ export function GeneratorPanel() {
         const kpisFound = KPI_OPTIONS.map((o) => o.value).filter(
           (k) => requiredColumnsFor(k, columns).length === 0
         );
+        const usability = kpiUsability(toTable(matrix).rows, columns);
         const nameIdx = columns.adName ? headers.indexOf(columns.adName) : -1;
         const seen = new Set<string>();
         const ads: { name: string; tags: string[] }[] = [];
@@ -665,6 +690,7 @@ export function GeneratorPanel() {
           cols: headers.length,
           kpisFound,
           columnMap: columns,
+          usability,
           spendTotal,
           currency: columns.currency,
           dateRange,
@@ -672,6 +698,16 @@ export function GeneratorPanel() {
           ambiguousNames,
           executionsByName,
         });
+        /* First-Run Fixes: the KPI follows the data — but only until the
+           user picks one themselves; a manual choice is never overridden. */
+        const current = kpiRef.current;
+        const next = chooseAutoKpi(current, usability, kpiManualRef.current);
+        if (next) {
+          updateFields({ kpi: next });
+          setKpiNotice({ from: current, to: next });
+        } else {
+          setKpiNotice(null);
+        }
       })
       .catch(() => {
         /* Unreadable here just means no preview — the API gives the
@@ -680,7 +716,7 @@ export function GeneratorPanel() {
     return () => {
       cancelled = true;
     };
-  }, [file]);
+  }, [file, updateFields]);
 
   const preview =
     file && previewState?.forFile === file ? previewState : null;
@@ -689,6 +725,9 @@ export function GeneratorPanel() {
      conversion data comes from (and any competing variants ignored). */
   const previewKpiSource =
     preview && previewKpiOk ? kpiSourcePreview(fields.kpi, preview.columnMap) : null;
+  const previewSparse = preview
+    ? sparseKpiWarning(preview.usability[fields.kpi], KPI_LABELS[fields.kpi])
+    : null;
   /* Creative Evidence V1: names on multiple rows can't take one image. */
   const previewAmbiguous = new Set(preview?.ambiguousNames ?? []);
   /* Creative Grouping V1: every distinct label used on any ad this
@@ -1046,8 +1085,10 @@ export function GeneratorPanel() {
   // field — it's report-identification only (never analyzed), but the
   // report needs a label. Offer and Objective are optional; neither
   // gates submission.
+  /* First-Run Fixes: Product / industry is optional — it only labels the
+     report, and the engine already falls back to "Your account". */
   const contextDone = fields.product.trim() !== "";
-  const canSubmit = !!file && contextDone;
+  const canSubmit = !!file;
   // Verify's own "done" reflects BOTH optional inputs it hosts — format
   // corrections and Creative Groups — not just whichever was added
   // first. A user who only assigned groups previously saw "Optional
@@ -1130,7 +1171,7 @@ export function GeneratorPanel() {
                   key={k}
                   type="button"
                   onClick={() => {
-                    updateFields({ kpi: k });
+                    chooseKpiManually(k);
                     clearError();
                   }}
                   className={`cursor-pointer ${btnSecondary}`}
@@ -1156,8 +1197,7 @@ export function GeneratorPanel() {
       {/* The required path, stated once up front — everything else on
           this page is an optional enhancement. */}
       <p className="mb-10 border-l-2 border-accent/40 pl-3 text-xs leading-relaxed text-zinc-400">
-        Required: load data, then fill in product / industry below —
-        everything else on this page is optional.
+        Required: load data — everything else on this page is optional.
       </p>
 
       {/* space-y-14 is the one shared rhythm between stages — larger
@@ -1369,6 +1409,47 @@ export function GeneratorPanel() {
                     {previewKpiSource}
                   </p>
                 )}
+                {/* First-Run Fixes: the KPI followed the data — say so,
+                    with a one-click way back to the selector. */}
+                {kpiNotice && kpiNotice.to === fields.kpi && (
+                  <p role="status" className="mt-1.5 text-xs leading-relaxed text-accent-soft">
+                    No {KPI_LABELS[kpiNotice.from]} values in this export —
+                    switched to {KPI_LABELS[kpiNotice.to]}.{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById("kpi-selector");
+                        el?.scrollIntoView({ block: "start" });
+                        el?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.focus({ preventScroll: true });
+                      }}
+                      className="cursor-pointer rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    >
+                      Change
+                    </button>
+                  </p>
+                )}
+                {!preview.columnMap.adName && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-amber-300">
+                    No Ad name column found — this looks like a campaign- or
+                    ad set-level export, so individual ads can&apos;t be
+                    compared. {EXPORT_AT_AD_LEVEL}
+                  </p>
+                )}
+                {previewSparse && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-amber-300">
+                    {previewSparse}
+                  </p>
+                )}
+                {/* First-Run Fixes: run right here — same submit as the
+                    Run stage's button, so no 4–7 screens of scrolling. */}
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className={`mt-3 cursor-pointer ${btnPrimary}`}
+                >
+                  Generate debrief
+                  <ArrowIcon className="h-4 w-4" />
+                </button>
                 </>
               )}
             </div>
@@ -1544,12 +1625,12 @@ export function GeneratorPanel() {
             n="2"
             title="Context"
             done={contextDone}
-            status={contextDone ? "Complete" : "Required"}
+            status={contextDone ? "Complete" : "Optional"}
             statusTone={contextDone ? "accent" : "muted"}
             hint="The KPI the memo judges by, your framing, and optional market context."
           />
 
-          <fieldset className="mt-5">
+          <fieldset id="kpi-selector" className="mt-5 scroll-mt-24">
             <legend className="sr-only">Primary KPI</legend>
             <div
               role="group"
@@ -1562,7 +1643,7 @@ export function GeneratorPanel() {
                     key={opt.value}
                     type="button"
                     aria-pressed={active}
-                    onClick={() => updateFields({ kpi: opt.value })}
+                    onClick={() => chooseKpiManually(opt.value)}
                     className={`relative cursor-pointer px-2 pb-2.5 pt-1.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       active
                         ? "text-zinc-100"
@@ -1643,7 +1724,8 @@ export function GeneratorPanel() {
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="product" className={fieldLabel}>
-                Product / industry *
+                Product / industry{" "}
+                <span className="font-normal text-zinc-400">(optional)</span>
               </label>
               <input
                 id="product"
@@ -1654,7 +1736,8 @@ export function GeneratorPanel() {
               />
               <p className="mt-1.5 text-xs text-zinc-400">
                 Used to label and frame the report. It is not analyzed and
-                does not affect scoring.
+                does not affect scoring. Left blank, the report is titled
+                &ldquo;Your account&rdquo;.
               </p>
             </div>
             <div>
@@ -3112,9 +3195,7 @@ export function GeneratorPanel() {
                     <span className="font-mono text-zinc-200">{file.name}</span>
                     {" · "}
                     {KPI_OPTIONS.find((o) => o.value === fields.kpi)?.label}
-                    {contextDone
-                      ? " · ready"
-                      : " · fill product / industry in stage 2"}
+                    {" · ready"}
                   </>
                 ) : (
                   "Load data in stage 1 to run."

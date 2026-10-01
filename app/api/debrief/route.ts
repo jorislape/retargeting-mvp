@@ -12,6 +12,7 @@ import {
   KpiKey,
   parseCsv,
   requiredColumnsFor,
+  EXPORT_AT_AD_LEVEL,
   resolveColumns,
   summarizeCreativeGroups,
   toTable,
@@ -71,8 +72,6 @@ function fail(status: number, error: DebriefApiError) {
   );
 }
 
-const EXPORT_AT_AD_LEVEL =
-  "Export ads at ad level for a date range with delivery.";
 
 /* Period Comparison V2 — validation + parse for the OPTIONAL previous-
    period file, mirroring the primary file's checks with error titles

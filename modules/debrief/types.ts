@@ -351,6 +351,28 @@ export interface RankedAd extends GatedAd {
   deltaPct: number | null;
 }
 
+/** First-Run Fixes: present ONLY when at least one ad cleared the spend
+ *  gate but has no value for the selected KPI — the one situation where
+ *  "set aside for too little spend" would be false. Counts partition the
+ *  export: adsJudged + noValue + belowGateWithValue === adsAnalyzed.
+ *  Wording only — the gate, the judged set, and the decision are
+ *  computed exactly as before. */
+export interface KpiGaps {
+  /** Ads that cleared the spend gate but have no KPI value. */
+  setAsideNoValue: number;
+  /** All ads with no KPI value, at any spend. */
+  noValue: number;
+  /** Subset of noValue: ROAS/CPA ads whose purchase count is a real 0 —
+   *  the KPI can't be computed, it isn't missing from the export. */
+  zeroOutcome: number;
+  /** Ads with a KPI value that didn't clear the spend gate. */
+  belowGateWithValue: number;
+  /** The KPI this export reads best with (kpiUsability's preferredUsableKpi
+   *  — same choice the generator's auto-switch makes), offered only when
+   *  most ads simply lack the selected KPI's column data. */
+  suggestedKpi: KpiKey | null;
+}
+
 export interface AnalysisResult {
   kpi: KpiKey;
   adsAnalyzed: number;
@@ -404,6 +426,9 @@ export interface AnalysisResult {
    *  the Meta pull are byte-identical to before). Drives one limits
    *  line; never gating, ranking, or the decision. */
   kpiColumnSources?: KpiColumnSource[];
+  /** First-Run Fixes — see KpiGaps. Absent on every export where all
+   *  set-aside ads were set aside for spend (incl. the sample). */
+  kpiGaps?: KpiGaps;
 }
 
 export interface MemoScope {
@@ -415,6 +440,9 @@ export interface MemoScope {
   adsAnalyzed: number;
   adsJudged: number;
   adsSetAside: number;
+  /** First-Run Fixes: present only when some set-aside ads cleared the
+   *  spend gate but have no KPI value — splits the count by cause. */
+  setAsideBreakdown?: { spend: number; noValue: number };
   totalSpendLabel: string;
   medianLabel: string;
 }

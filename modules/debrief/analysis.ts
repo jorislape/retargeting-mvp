@@ -1,10 +1,12 @@
 import { ColumnMap, kpiColumnSourcesFor } from "./columns";
+import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import {
   AnalysisResult,
   DebriefContext,
   GateReason,
   GatedAd,
   HIGHER_IS_BETTER,
+  KpiGaps,
   KpiKey,
   ParsedAd,
   RankedAd,
@@ -123,6 +125,7 @@ export function analyze(
   );
   const gated = gateAds(ads, spendGate);
   const judged = gated.filter((a) => a.gate === "judged");
+  const kpiGaps = computeKpiGaps(gated, kpi, rawRows, columns);
   const benchmark = median(judged.map((a) => a.kpiValue as number));
 
   const ranked = benchmark != null ? rankJudged(judged, kpi, benchmark) : [];
@@ -180,5 +183,39 @@ export function analyze(
     /* KPI Source Column Disclosure: only attached when non-empty, so a
        standard export's AnalysisResult is unchanged key-for-key. */
     ...(kpiSources.length > 0 ? { kpiColumnSources: kpiSources } : {}),
+    ...(kpiGaps ? { kpiGaps } : {}),
+  };
+}
+
+/** First-Run Fixes: see KpiGaps in types.ts. Returns null unless an ad
+ *  cleared the spend gate yet has no KPI value. Reads only facts the
+ *  gate already established — never re-gates or re-ranks. */
+function computeKpiGaps(
+  gated: { gate: string; kpiValue: number | null; conversions?: number | null }[],
+  kpi: KpiKey,
+  rawRows: Record<string, string>[],
+  columns: ColumnMap
+): KpiGaps | null {
+  const setAsideNoValue = gated.filter((a) => a.gate === "no_kpi_value").length;
+  if (setAsideNoValue === 0) return null;
+  const noValueAds = gated.filter((a) => a.kpiValue == null);
+  const zeroOutcome =
+    kpi === "roas" || kpi === "cpa"
+      ? noValueAds.filter((a) => a.conversions === 0).length
+      : 0;
+  const belowGateWithValue = gated.filter(
+    (a) => a.gate === "below_spend_gate" && a.kpiValue != null
+  ).length;
+  const missing = noValueAds.length - zeroOutcome;
+  let suggestedKpi: KpiKey | null = null;
+  if (missing * 2 >= gated.length) {
+    suggestedKpi = preferredUsableKpi(kpiUsability(rawRows, columns), kpi);
+  }
+  return {
+    setAsideNoValue,
+    noValue: noValueAds.length,
+    zeroOutcome,
+    belowGateWithValue,
+    suggestedKpi,
   };
 }

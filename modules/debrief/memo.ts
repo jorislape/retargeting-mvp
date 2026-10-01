@@ -51,6 +51,14 @@ import {
  *  not in the confirmable list pass through as-is. */
 const formatLabel = (tag: string): string => CREATIVE_FORMAT_LABELS[tag] ?? tag;
 
+/** First-Run Fixes: ads set aside for SPEND only. Equals adsSetAside
+ *  unless some ads cleared the gate but have no KPI value (KpiGaps) —
+ *  those are explained by the decision's own limits line, so spend
+ *  wording never claims them. */
+function spendSetAside(analysis: AnalysisResult): number {
+  return analysis.kpiGaps ? analysis.kpiGaps.belowGateWithValue : analysis.adsSetAside;
+}
+
 function describeAdReason(
   ad: RankedAd,
   hasCreativeNotes: boolean,
@@ -484,8 +492,8 @@ function buildNextTests(
     hasNameSignal,
     belowBenchmarkSpend,
     belowBenchmarkCount,
-    adsSetAside,
   } = analysis;
+  const adsSetAside = spendSetAside(analysis);
   const kpiLabel = KPI_LABELS[kpi];
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : "the benchmark";
   const gateLabel = fmtMoney(spendGate, currency);
@@ -1064,8 +1072,8 @@ function buildAvoid(
    *  when the decision withheld it). */
   decision: MemoDecision
 ): { buyer: string[]; client: string[] } {
-  const { winners, losers, median, kpi, currency, spendGate, adsSetAside } =
-    analysis;
+  const { winners, losers, median, kpi, currency, spendGate } = analysis;
+  const adsSetAside = spendSetAside(analysis);
   const kpiLabel = KPI_LABELS[kpi];
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : null;
   const top = winners[0] ?? null;
@@ -1182,7 +1190,9 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
     );
   } else {
     lines.push(
-      `Most ads hadn't spent enough yet to judge fairly, so this report is directional rather than conclusive.`
+      analysis.kpiGaps
+        ? `Most ads don't have a ${KPI_LABELS[analysis.kpi]} figure to compare yet, so this report is directional rather than conclusive.`
+        : `Most ads hadn't spent enough yet to judge fairly, so this report is directional rather than conclusive.`
     );
   }
 
@@ -1225,8 +1235,9 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
    is kept because it's a structural fact derived from ad NAMES across a
    group, not user prose. */
 function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
-  const { adsJudged, adsSetAside, adsAnalyzed, winners, losers, median, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
+  const { adsJudged, adsAnalyzed, winners, losers, median, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
     analysis;
+  const adsSetAside = spendSetAside(analysis);
   const notes: string[] = [];
   /* Evidence Confidence V2 (hoisted — also drives the level cap below):
      when the volume floor or short-window qualifier binds, that fact IS
@@ -1238,6 +1249,12 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
   if (adsSetAside > 0) {
     notes.push(
       `${adsSetAside} of ${adsAnalyzed} ads were set aside for insufficient spend (below ${fmtMoney(spendGate, currency)}) — excluded from winners/losers, not penalized.`
+    );
+  }
+  if (analysis.kpiGaps) {
+    const { noValue } = analysis.kpiGaps;
+    notes.push(
+      `${noValue} of ${adsAnalyzed} ads had no ${KPI_LABELS[analysis.kpi]} value to compare — excluded from winners/losers, not penalized.`
     );
   }
   if (missingColumns.includes("Ad name")) {
@@ -1357,8 +1374,9 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
     reasons.push(
       "Treat the tests below as ideas to validate, not firm decisions."
     );
-    clientWhy =
-      "Confidence is low because too few ads had enough spend to judge — treat the next steps as ideas to test rather than firm decisions.";
+    clientWhy = analysis.kpiGaps
+      ? `Confidence is low because too few ads have a ${KPI_LABELS[analysis.kpi]} figure with enough spend to compare — treat the next steps as ideas to test rather than firm decisions.`
+      : "Confidence is low because too few ads had enough spend to judge — treat the next steps as ideas to test rather than firm decisions.";
   }
 
   return { level, notes, reasons: reasons.slice(0, 4), clientWhy };
@@ -1423,10 +1441,17 @@ function buildSpendAllocation(analysis: AnalysisResult): MemoSpendAllocation | n
           spend: setAsideSpend,
           spendLabel: fmtMoney(setAsideSpend, currency),
           shareOfTotalLabel: `${roundPct(shareOf(setAsideSpend, totalSpend))}%`,
-          note: {
-            buyer: `${fmtMoney(setAsideSpend, currency)} (${adsSetAside} ad${adsSetAside === 1 ? "" : "s"}, ${roundPct(shareOf(setAsideSpend, totalSpend))}% of total spend) not yet judged — too little spend to draw a conclusion either way.`,
-            client: `${fmtMoney(setAsideSpend, currency)} hasn't spent enough yet to include in this read.`,
-          },
+          note: analysis.kpiGaps
+            ? {
+                /* First-Run Fixes: this bucket also holds ads with no KPI
+                   value, so the note names both causes, not just spend. */
+                buyer: `${fmtMoney(setAsideSpend, currency)} (${adsSetAside} ad${adsSetAside === 1 ? "" : "s"}, ${roundPct(shareOf(setAsideSpend, totalSpend))}% of total spend) not judged — too little spend or no ${KPI_LABELS[analysis.kpi]} value to draw a conclusion either way.`,
+                client: `${fmtMoney(setAsideSpend, currency)} isn't part of this read — those ads either haven't spent enough yet or have no ${KPI_LABELS[analysis.kpi]} figure in the file.`,
+              }
+            : {
+                buyer: `${fmtMoney(setAsideSpend, currency)} (${adsSetAside} ad${adsSetAside === 1 ? "" : "s"}, ${roundPct(shareOf(setAsideSpend, totalSpend))}% of total spend) not yet judged — too little spend to draw a conclusion either way.`,
+                client: `${fmtMoney(setAsideSpend, currency)} hasn't spent enough yet to include in this read.`,
+              },
         }
       : null;
 
@@ -1535,6 +1560,16 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       adsAnalyzed: analysis.adsAnalyzed,
       adsJudged: analysis.adsJudged,
       adsSetAside: analysis.adsSetAside,
+      /* First-Run Fixes: only when some set-aside ads have no KPI value
+         (absent otherwise, so standard memos are key-for-key unchanged). */
+      ...(analysis.kpiGaps
+        ? {
+            setAsideBreakdown: {
+              spend: analysis.kpiGaps.belowGateWithValue,
+              noValue: analysis.kpiGaps.noValue,
+            },
+          }
+        : {}),
       totalSpendLabel: fmtMoney(analysis.totalSpend, currency),
       medianLabel: median != null ? fmtKpiValue(median, kpi, currency) : "Not enough data",
     },
@@ -1563,10 +1598,16 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
             : `The ads below performed under the account's typical result — together ${fmtMoney(analysis.belowBenchmarkSpend, currency)} of spend. We're not reducing their budgets yet; the decision above explains the next step.`
           : "No ad underperformed badly enough to pause this period.",
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),
-      setAsideNote:
-        analysis.adsSetAside > 0
-          ? `${analysis.adsSetAside} ad${analysis.adsSetAside === 1 ? "" : "s"} had too little spend (below ${fmtMoney(analysis.spendGate, currency)}) to judge fairly — set aside, not penalized.`
-          : "No ads were set aside for low spend.",
+      setAsideNote: (() => {
+        const spendCount = spendSetAside(analysis);
+        const spendLine =
+          spendCount > 0
+            ? `${spendCount} ad${spendCount === 1 ? "" : "s"} had too little spend (below ${fmtMoney(analysis.spendGate, currency)}) to judge fairly — set aside, not penalized.`
+            : "No ads were set aside for low spend.";
+        return analysis.kpiGaps
+          ? `${spendLine} ${analysis.kpiGaps.noValue} had no ${KPI_LABELS[kpi]} value — also set aside, not penalized.`
+          : spendLine;
+      })(),
     },
     patterns: buildPatterns(analysis),
     marketSignal: buildMarketSignal(analysis, context),
