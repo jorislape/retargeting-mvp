@@ -147,6 +147,7 @@ export function CreativeEvidenceStrip({
 
   const spotlights = selectSpotlights({
     kpiLabel: memo.scope.kpiLabel,
+    kpiLabelClient: memo.scope.kpiLabelClient,
     adsJudged: memo.scope.adsJudged,
     winners: memo.winners,
     loserRows: memo.losers.rows,

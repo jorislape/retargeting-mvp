@@ -6,7 +6,7 @@
 // extensionless imports and is NOT directly Node-importable; that is
 // why buildDecision takes a money formatter as an argument instead of
 // importing format.ts (whose own internal import is extensionless).
-import { KPI_LABELS, outcomeNounsForKpi } from "./types.ts";
+import { KPI_LABELS, kpiClientLabelFor, kpiLabelFor, outcomeNounsFor } from "./types.ts";
 import type {
   AnalysisResult,
   AppliedCriterion,
@@ -98,7 +98,7 @@ export const SHORT_WINDOW_DAYS = 7;
  *  Shared by deriveEvidenceState (label cap), buildConfidence's cap
  *  in memo.ts, and the limits copy — one rule, no drift. */
 export function isOutcomeVolumeBelowFloor(analysis: AnalysisResult): boolean {
-  if (outcomeNounsForKpi(analysis.kpi) == null) return false;
+  if (outcomeNounsFor(analysis) == null) return false;
   const top = analysis.winners[0] ?? null;
   if (top == null || top.conversions == null) return false;
   return top.conversions < MIN_OUTCOMES_FOR_SUPPORTED;
@@ -144,7 +144,7 @@ export function isScaleActionSupported(
   if (top == null || top.deltaPct == null || top.deltaPct < SCALE_TEST_MIN_DELTA_PCT) {
     return false;
   }
-  const nouns = outcomeNounsForKpi(analysis.kpi);
+  const nouns = outcomeNounsFor(analysis);
   const minOutcome =
     criteria?.minOutcomeCount != null && criteria.minOutcomeCount > 0
       ? criteria.minOutcomeCount
@@ -302,14 +302,14 @@ function joinAnd(parts: string[]): string {
 
 /** The set-aside partition behind KpiGaps, as (count, buyer phrase,
  *  client phrase) parts. The first part carries the "ad/ads" noun. */
-function gapParts(gaps: KpiGaps, kpiLabel: string, outcomeMany: string | null) {
+function gapParts(gaps: KpiGaps, kpiLabel: string, kpiClient: string, outcomeMany: string | null) {
   const missing = gaps.noValue - gaps.zeroOutcome;
   const parts: { n: number; buyer: string; client: string }[] = [];
   if (missing > 0) {
     parts.push({
       n: missing,
       buyer: `had no ${kpiLabel} value in the export`,
-      client: `had no ${kpiLabel} figure in the file`,
+      client: `had no ${kpiClient} figure in the file`,
     });
   }
   if (gaps.zeroOutcome > 0 && outcomeMany) {
@@ -343,10 +343,23 @@ function kpiGapHold(
   gaps: KpiGaps,
   gatePhrase: string
 ): Pick<MemoDecision, "headline" | "clientHeadline" | "clientRationale" | "reassess"> {
-  const kpiLabel = KPI_LABELS[analysis.kpi];
-  const outcomeMany = outcomeNounsForKpi(analysis.kpi)?.many ?? null;
+  const kpiLabel = kpiLabelFor(analysis);
+  const kpiClient = kpiClientLabelFor(analysis);
+  const outcomeMany = outcomeNounsFor(analysis)?.many ?? null;
   const missing = gaps.noValue - gaps.zeroOutcome;
-  const suggest = gaps.suggestedKpi ? KPI_LABELS[gaps.suggestedKpi] : null;
+  /* CPA Leads Label: a suggested CPA that reads as cost per lead is
+     named so the user still finds it (the selector button says CPA). */
+  const suggestCpl = gaps.suggestedKpi === "cpa" && gaps.suggestedCpaBasis === "leads";
+  const suggest = gaps.suggestedKpi
+    ? suggestCpl
+      ? "CPA (cost per lead)"
+      : KPI_LABELS[gaps.suggestedKpi]
+    : null;
+  const suggestClient = gaps.suggestedKpi
+    ? suggestCpl
+      ? "cost per lead"
+      : KPI_LABELS[gaps.suggestedKpi]
+    : null;
   const zeroPart = gaps.zeroOutcome > 0 && outcomeMany != null;
 
   /* Buyer headline. Pure missing-column case reads as one fact; any
@@ -378,13 +391,13 @@ function kpiGapHold(
   if (missing > 0) {
     clientParts.push(
       missing === analysis.adsAnalyzed
-        ? `none of the ${analysis.adsAnalyzed} ads has a ${kpiLabel} figure in this file`
-        : `${missing} of ${analysis.adsAnalyzed} ads have no ${kpiLabel} figure in this file`
+        ? `none of the ${analysis.adsAnalyzed} ads has a ${kpiClient} figure in this file`
+        : `${missing} of ${analysis.adsAnalyzed} ads have no ${kpiClient} figure in this file`
     );
   }
   if (zeroPart) {
     clientParts.push(
-      `${gaps.zeroOutcome} ad${gaps.zeroOutcome === 1 ? "" : "s"} had no ${outcomeMany} yet, so ${gaps.zeroOutcome === 1 ? "its" : "their"} ${kpiLabel} can't be worked out`
+      `${gaps.zeroOutcome} ad${gaps.zeroOutcome === 1 ? "" : "s"} had no ${outcomeMany} yet, so ${gaps.zeroOutcome === 1 ? "its" : "their"} ${kpiClient} can't be worked out`
     );
   }
   if (gaps.belowGateWithValue > 0) {
@@ -393,7 +406,7 @@ function kpiGapHold(
     );
   }
   let clientHeadline = `Hold — ${joinAnd(clientParts)}, so there isn't enough to compare yet.`;
-  if (suggest) clientHeadline += ` Switching the report to ${suggest} would use the results this file does have.`;
+  if (suggestClient) clientHeadline += ` Switching the report to ${suggestClient} would use the results this file does have.`;
 
   return {
     headline,
@@ -402,7 +415,7 @@ function kpiGapHold(
       "With this few ads that can be compared, an apparent winner is as likely luck as a real pattern — a call needs more ads with a result to compare.",
     reassess: {
       buyer: `Reassess with an export where ≥${DECISION_MIN_JUDGED} ads have a ${kpiLabel} value and clear the ${gatePhrase}.`,
-      client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have a ${kpiLabel} figure and enough spend to compare.`,
+      client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have a ${kpiClient} figure and enough spend to compare.`,
     },
   };
 }
@@ -450,8 +463,9 @@ export function buildLimits(
        spend" for all of them. */
     const parts = gapParts(
       analysis.kpiGaps,
-      KPI_LABELS[analysis.kpi],
-      outcomeNounsForKpi(analysis.kpi)?.many ?? null
+      kpiLabelFor(analysis),
+      kpiClientLabelFor(analysis),
+      outcomeNounsFor(analysis)?.many ?? null
     );
     buyer.push(`${parts.buyer} — set aside, so no conclusion is drawn about them either way.`);
     client.push(`${parts.client}, so they're not part of this read.`);
@@ -575,13 +589,14 @@ export function buildLimits(
      in buildDecision's scaleEligible branches — see
      withEfficiencyScaleCaveat below. ---- */
   const objective = testQuality?.objective;
-  const kpiLabel = KPI_LABELS[analysis.kpi];
+  const kpiLabel = kpiLabelFor(analysis);
+  const kpiClient = kpiClientLabelFor(analysis);
   if (objective === "growth" && (analysis.kpi === "ctr" || analysis.kpi === "cpc")) {
     buyer.push(
       `You flagged "scale profitable volume" as the objective, but ${kpiLabel} measures traffic efficiency, not profitable growth or purchase outcomes — this read can't confirm the extra traffic is profitable.`
     );
     client.push(
-      `Your goal is more profitable volume, but this report is based on ${kpiLabel}, which measures clicks — not whether that traffic turns into profitable sales.`
+      `Your goal is more profitable volume, but this report is based on ${kpiClient}, which measures clicks — not whether that traffic turns into profitable sales.`
     );
   }
   if (objective === "efficiency" && analysis.kpi === "ctr") {
@@ -676,7 +691,8 @@ export function buildDecision(
    *  earn. Absent/null is a complete no-op on the action. */
   criteria?: DecisionCriteria
 ): MemoDecision {
-  const kpiLabel = KPI_LABELS[analysis.kpi];
+  const kpiLabel = kpiLabelFor(analysis);
+  const kpiClient = kpiClientLabelFor(analysis);
   const gateLabel = money(analysis.spendGate);
   /* Decision Criteria V2 — gate provenance, woven into the exact
      strings that cite the gate so a user-set bar is always labeled as
@@ -705,7 +721,7 @@ export function buildDecision(
      export. An absent count column never silently enforces OR ignores
      the bar: it produces an explicit "couldn't be checked" limits
      line and no gating. ---- */
-  const nouns = outcomeNounsForKpi(analysis.kpi);
+  const nouns = outcomeNounsFor(analysis);
   const minOutcome =
     criteria?.minOutcomeCount != null && criteria.minOutcomeCount > 0
       ? criteria.minOutcomeCount
@@ -771,7 +787,7 @@ export function buildDecision(
       `Your minimum-outcome criterion (${minOutcome}) doesn't apply to ${kpiLabel} — it has no purchase or lead count, so the criterion was not used.`
     );
     criteriaClient.push(
-      `The minimum result count you set doesn't apply to ${kpiLabel} reports, so it wasn't used here.`
+      `The minimum result count you set doesn't apply to ${kpiClient} reports, so it wasn't used here.`
     );
   }
   if (outcomeUnverifiable && minOutcome != null && nouns != null) {
@@ -991,7 +1007,7 @@ export function buildDecision(
         headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% past the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,
         rationale: `"${top!.name}" leads the ${kpiLabel} median by ${pct(top!.deltaPct!)}% on ${money(top!.spend)} of spend — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move. No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`,
-        clientRationale: `"${top!.name}" is delivering about ${pct(top!.deltaPct!)}% better ${kpiLabel} than this account's typical result, with real spend behind it — it has earned more budget.`,
+        clientRationale: `"${top!.name}" is delivering about ${pct(top!.deltaPct!)}% better ${kpiClient} than this account's typical result, with real spend behind it — it has earned more budget.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
       };

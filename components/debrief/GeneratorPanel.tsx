@@ -721,10 +721,18 @@ export function GeneratorPanel() {
   const preview =
     file && previewState?.forFile === file ? previewState : null;
   const previewKpiOk = preview?.kpisFound.includes(fields.kpi) ?? true;
+  /* CPA Leads Label: for this file, does CPA mean cost per lead? Then
+     the preview, the notice and the source line say so. */
+  const cplInPreview = preview?.usability.cpa.cpaLeadBased ?? false;
+  const previewCpl = fields.kpi === "cpa" && cplInPreview;
+  const kpiDisplay = (k: KpiKey, longForm = false) =>
+    k === "cpa" && cplInPreview ? (longForm ? "CPA (cost per lead)" : "cost per lead") : KPI_LABELS[k];
   /* KPI Source Column Disclosure: which column the selected KPI's
      conversion data comes from (and any competing variants ignored). */
   const previewKpiSource =
-    preview && previewKpiOk ? kpiSourcePreview(fields.kpi, preview.columnMap) : null;
+    preview && previewKpiOk
+      ? kpiSourcePreview(fields.kpi, preview.columnMap, previewCpl ? "leads" : undefined)
+      : null;
   const previewSparse = preview
     ? sparseKpiWarning(preview.usability[fields.kpi], KPI_LABELS[fields.kpi])
     : null;
@@ -1397,7 +1405,7 @@ export function GeneratorPanel() {
                       }. KPI columns: ${
                         preview.kpisFound.map((k) => KPI_LABELS[k]).join(", ") ||
                         "none detected"
-                      } — ${KPI_LABELS[fields.kpi]} selected.`
+                      } — ${kpiDisplay(fields.kpi, true)} selected.`
                     : `${KPI_LABELS[fields.kpi]} was selected, but no ${KPI_LABELS[fields.kpi]}-like column was detected. You can still run, but Debrief may return a missing-column error.${
                         preview.kpisFound.length > 0
                           ? ` Columns found for: ${preview.kpisFound.map((k) => KPI_LABELS[k]).join(", ")}.`
@@ -1414,7 +1422,7 @@ export function GeneratorPanel() {
                 {kpiNotice && kpiNotice.to === fields.kpi && (
                   <p role="status" className="mt-1.5 text-xs leading-relaxed text-accent-soft">
                     No {KPI_LABELS[kpiNotice.from]} values in this export —
-                    switched to {KPI_LABELS[kpiNotice.to]}.{" "}
+                    switched to {kpiDisplay(kpiNotice.to)}.{" "}
                     <button
                       type="button"
                       onClick={() => {

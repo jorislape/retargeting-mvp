@@ -21,10 +21,7 @@ import {
   CREATIVE_FORMAT_LABELS,
   DebriefContext,
   HIGHER_IS_BETTER,
-  KPI_EXPLAINERS,
-  KPI_LABELS,
   DecisionCriteria,
-  KpiKey,
   Memo,
   MemoDecision,
   MemoMarketSignal,
@@ -33,7 +30,10 @@ import {
   MemoSpendAllocationSetAside,
   MemoTest,
   MemoWinnerLoserRow,
-  outcomeNounsForKpi,
+  kpiClientLabelFor,
+  kpiExplainerFor,
+  kpiLabelFor,
+  outcomeNounsFor,
   RankedAd,
 } from "./types";
 
@@ -87,13 +87,13 @@ function describeAdReason(
    Criteria V2) so display and criterion can never disagree about which
    count a KPI carries. None of this reads or changes spend, the gate,
    median, ranking, KPI values, action, or evidenceState. */
-const conversionNouns = outcomeNounsForKpi;
+const conversionNouns = outcomeNounsFor;
 
 /** Neutral per-row conversion label ("34 purchases" / "1 lead"), or
  *  undefined when not applicable (non-purchase KPI or no count for this
  *  ad). Never estimated. */
-function conversionLabelFor(ad: RankedAd, kpi: KpiKey): string | undefined {
-  const nouns = conversionNouns(kpi);
+function conversionLabelFor(ad: RankedAd, analysis: AnalysisResult): string | undefined {
+  const nouns = conversionNouns(analysis);
   if (nouns == null || ad.conversions == null) return undefined;
   const n = Math.round(ad.conversions);
   return `${fmtCount(n)} ${n === 1 ? nouns.one : nouns.many}`;
@@ -106,7 +106,7 @@ function conversionLabelFor(ad: RankedAd, kpi: KpiKey): string | undefined {
 function buildLeadingConversion(
   analysis: AnalysisResult
 ): { buyer: string; client: string } | null {
-  const nouns = conversionNouns(analysis.kpi);
+  const nouns = conversionNouns(analysis);
   const top = analysis.winners[0] ?? null;
   if (nouns == null || top == null) return null;
   if (top.conversions == null) {
@@ -133,7 +133,7 @@ function buildRow(
     deltaPct: ad.deltaPct,
     spendLabel: fmtMoney(ad.spend, analysis.currency),
     reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
-    conversionLabel: conversionLabelFor(ad, analysis.kpi),
+    conversionLabel: conversionLabelFor(ad, analysis),
   };
 }
 
@@ -146,7 +146,7 @@ function buildRow(
 function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
   const { winners, losers, median, kpi, currency, belowBenchmarkSpend, belowBenchmarkCount } =
     analysis;
-  const kpiLabel = KPI_LABELS[kpi];
+  const kpiLabel = kpiLabelFor(analysis);
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : null;
   const lines: string[] = [];
   /* Winner imperative only under shift/scale; kill imperative only
@@ -494,7 +494,7 @@ function buildNextTests(
     belowBenchmarkCount,
   } = analysis;
   const adsSetAside = spendSetAside(analysis);
-  const kpiLabel = KPI_LABELS[kpi];
+  const kpiLabel = kpiLabelFor(analysis);
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : "the benchmark";
   const gateLabel = fmtMoney(spendGate, currency);
   const tests: MemoTest[] = [];
@@ -513,7 +513,7 @@ function buildNextTests(
      claim brief readiness qualifies. Decision-blind and comparison-
      blind by construction — briefReadiness.ts reads only AnalysisResult
      facts, never memo.comparison. */
-  const outcomeNouns = outcomeNounsForKpi(kpi);
+  const outcomeNouns = outcomeNounsFor(analysis);
   const winnerReadiness = deriveSignalVolumeReadiness(
     analysis,
     criteria,
@@ -1074,7 +1074,7 @@ function buildAvoid(
 ): { buyer: string[]; client: string[] } {
   const { winners, losers, median, kpi, currency, spendGate } = analysis;
   const adsSetAside = spendSetAside(analysis);
-  const kpiLabel = KPI_LABELS[kpi];
+  const kpiLabel = kpiLabelFor(analysis);
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : null;
   const top = winners[0] ?? null;
   const worst = losers[0] ?? null;
@@ -1171,7 +1171,7 @@ function buildAvoid(
 function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): string[] {
   const { winners, losers, median, kpi, currency, belowBenchmarkSpend, belowBenchmarkCount } =
     analysis;
-  const kpiLabel = KPI_LABELS[kpi];
+  const kpiLabel = kpiClientLabelFor(analysis);
   const lines: string[] = [];
   const scaleSide = decision.action === "budget" && decision.budgetVariant !== "cut";
   const cutSide = decision.action === "budget" && decision.budgetVariant !== "scale";
@@ -1191,7 +1191,7 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
   } else {
     lines.push(
       analysis.kpiGaps
-        ? `Most ads don't have a ${KPI_LABELS[analysis.kpi]} figure to compare yet, so this report is directional rather than conclusive.`
+        ? `Most ads don't have a ${kpiClientLabelFor(analysis)} figure to compare yet, so this report is directional rather than conclusive.`
         : `Most ads hadn't spent enough yet to judge fairly, so this report is directional rather than conclusive.`
     );
   }
@@ -1254,7 +1254,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
   if (analysis.kpiGaps) {
     const { noValue } = analysis.kpiGaps;
     notes.push(
-      `${noValue} of ${adsAnalyzed} ads had no ${KPI_LABELS[analysis.kpi]} value to compare — excluded from winners/losers, not penalized.`
+      `${noValue} of ${adsAnalyzed} ads had no ${kpiLabelFor(analysis)} value to compare — excluded from winners/losers, not penalized.`
     );
   }
   if (missingColumns.includes("Ad name")) {
@@ -1375,7 +1375,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
       "Treat the tests below as ideas to validate, not firm decisions."
     );
     clientWhy = analysis.kpiGaps
-      ? `Confidence is low because too few ads have a ${KPI_LABELS[analysis.kpi]} figure with enough spend to compare — treat the next steps as ideas to test rather than firm decisions.`
+      ? `Confidence is low because too few ads have a ${kpiClientLabelFor(analysis)} figure with enough spend to compare — treat the next steps as ideas to test rather than firm decisions.`
       : "Confidence is low because too few ads had enough spend to judge — treat the next steps as ideas to test rather than firm decisions.";
   }
 
@@ -1445,8 +1445,8 @@ function buildSpendAllocation(analysis: AnalysisResult): MemoSpendAllocation | n
             ? {
                 /* First-Run Fixes: this bucket also holds ads with no KPI
                    value, so the note names both causes, not just spend. */
-                buyer: `${fmtMoney(setAsideSpend, currency)} (${adsSetAside} ad${adsSetAside === 1 ? "" : "s"}, ${roundPct(shareOf(setAsideSpend, totalSpend))}% of total spend) not judged — too little spend or no ${KPI_LABELS[analysis.kpi]} value to draw a conclusion either way.`,
-                client: `${fmtMoney(setAsideSpend, currency)} isn't part of this read — those ads either haven't spent enough yet or have no ${KPI_LABELS[analysis.kpi]} figure in the file.`,
+                buyer: `${fmtMoney(setAsideSpend, currency)} (${adsSetAside} ad${adsSetAside === 1 ? "" : "s"}, ${roundPct(shareOf(setAsideSpend, totalSpend))}% of total spend) not judged — too little spend or no ${kpiLabelFor(analysis)} value to draw a conclusion either way.`,
+                client: `${fmtMoney(setAsideSpend, currency)} isn't part of this read — those ads either haven't spent enough yet or have no ${kpiClientLabelFor(analysis)} figure in the file.`,
               }
             : {
                 buyer: `${fmtMoney(setAsideSpend, currency)} (${adsSetAside} ad${adsSetAside === 1 ? "" : "s"}, ${roundPct(shareOf(setAsideSpend, totalSpend))}% of total spend) not yet judged — too little spend to draw a conclusion either way.`,
@@ -1552,8 +1552,11 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     spendAllocation: buildSpendAllocation(analysis),
     scope: {
       product: context.product || "Your account",
-      kpiLabel: KPI_LABELS[kpi],
-      kpiExplainer: KPI_EXPLAINERS[kpi],
+      kpiLabel: kpiLabelFor(analysis),
+      kpiExplainer: kpiExplainerFor(analysis),
+      /* CPA Leads Label: the client register's plain label, present only
+         when it differs (lead-based CPA) — standard memos are unchanged. */
+      ...(analysis.cpaBasis === "leads" ? { kpiLabelClient: kpiClientLabelFor(analysis) } : {}),
       dateRangeLabel: analysis.dateRange
         ? `${analysis.dateRange.start} – ${analysis.dateRange.end}`
         : null,
@@ -1605,7 +1608,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
             ? `${spendCount} ad${spendCount === 1 ? "" : "s"} had too little spend (below ${fmtMoney(analysis.spendGate, currency)}) to judge fairly — set aside, not penalized.`
             : "No ads were set aside for low spend.";
         return analysis.kpiGaps
-          ? `${spendLine} ${analysis.kpiGaps.noValue} had no ${KPI_LABELS[kpi]} value — also set aside, not penalized.`
+          ? `${spendLine} ${analysis.kpiGaps.noValue} had no ${kpiLabelFor(analysis)} value — also set aside, not penalized.`
           : spendLine;
       })(),
     },

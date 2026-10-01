@@ -26,7 +26,9 @@ export function clientizeText(text: string): string {
     .replace(/clears the spend gate/g, "has enough spend to judge fairly")
     .replace(/clear the spend gate/g, "have enough spend to judge fairly")
     .replace(/spend gate/g, "spend needed to judge fairly")
-    .replace(/\bmedian (ROAS|CPA|CTR|CPC|Leads|Purchases)\b/g, "typical $1")
+    .replace(/\bmedian (ROAS|CPA|CPL|CTR|CPC|Leads|Purchases)\b/g, "typical $1")
+    /* CPA Leads Label: buyer-register "CPL" reads as plain cost per lead. */
+    .replace(/\bCPL\b/g, "cost per lead")
     .replace(/\bmedian\b/g, "typical result")
     .replace(/\bjudged ads\b/g, "ads with enough spend to judge fairly")
     .replace(/\bjudged ad\b/g, "ad with enough spend to judge fairly");
@@ -113,13 +115,14 @@ export function memoToText(
      passed through untouched. */
   const c = (text: string) => (view === "client" ? clientizeText(text) : text);
 
-  lines.push(`${scope.product} — ${scope.kpiLabel} ${view === "client" ? "PERFORMANCE REPORT" : "DEBRIEF"}`);
-  if (view === "client") lines.push(`${scope.kpiLabel}: ${scope.kpiExplainer}`);
+  const viewKpiLabel = view === "client" ? scope.kpiLabelClient ?? scope.kpiLabel : scope.kpiLabel;
+  lines.push(`${scope.product} — ${viewKpiLabel} ${view === "client" ? "PERFORMANCE REPORT" : "DEBRIEF"}`);
+  if (view === "client") lines.push(`${viewKpiLabel}: ${scope.kpiExplainer}`);
   if (scope.dateRangeLabel) lines.push(scope.dateRangeLabel);
   lines.push(
     `Ads analyzed: ${scope.adsAnalyzed} · Judged: ${scope.adsJudged} · Set aside: ${scope.adsSetAside}`
   );
-  lines.push(`Total spend: ${scope.totalSpendLabel} · ${view === "client" ? "Typical" : "Median"} ${scope.kpiLabel}: ${scope.medianLabel}`);
+  lines.push(`Total spend: ${scope.totalSpendLabel} · ${view === "client" ? "Typical" : "Median"} ${viewKpiLabel}: ${scope.medianLabel}`);
   lines.push("");
 
   /* Period Comparison V2 — mirrors the on-screen order: what changed

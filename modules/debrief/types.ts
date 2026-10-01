@@ -52,6 +52,38 @@ export function outcomeNounsForKpi(
 }
 
 /* ------------------------------------------------------------------ */
+/* CPA Leads Label: CPA computed from leads is "cost per lead" — CPL in */
+/* the buyer register, plain "cost per lead" in the client register,   */
+/* with leads (not purchases) as its outcome. Wording only: the value, */
+/* gate, median, ranking and decision rules are the same CPA.          */
+/* ------------------------------------------------------------------ */
+
+export type CpaBasis = "leads";
+
+type KpiWithBasis = { kpi: KpiKey; cpaBasis?: CpaBasis };
+
+const isCpl = (a: KpiWithBasis) => a.kpi === "cpa" && a.cpaBasis === "leads";
+
+/** Buyer-register KPI label: "CPL" for lead-based CPA, else KPI_LABELS. */
+export function kpiLabelFor(a: KpiWithBasis): string {
+  return isCpl(a) ? "CPL" : KPI_LABELS[a.kpi];
+}
+
+/** Client-register KPI label: "cost per lead" for lead-based CPA. */
+export function kpiClientLabelFor(a: KpiWithBasis): string {
+  return isCpl(a) ? "cost per lead" : KPI_LABELS[a.kpi];
+}
+
+export function kpiExplainerFor(a: KpiWithBasis): string {
+  return isCpl(a) ? "Cost per lead — what one lead costs in ad spend" : KPI_EXPLAINERS[a.kpi];
+}
+
+/** outcomeNounsForKpi, basis-aware: lead-based CPA counts leads. */
+export function outcomeNounsFor(a: KpiWithBasis): { one: string; many: string } | null {
+  return isCpl(a) ? { one: "lead", many: "leads" } : outcomeNounsForKpi(a.kpi);
+}
+
+/* ------------------------------------------------------------------ */
 /* KPI Source Column Disclosure: which CSV column a conversion field   */
 /* was read from, and how it matched (columns.ts). Disclosure only —   */
 /* never an input to any number, threshold, or the decision.          */
@@ -308,6 +340,9 @@ export interface ParsedAd {
   spend: number;
   /** The value for the selected KPI, in that KPI's own units. */
   kpiValue: number | null;
+  /** CPA Leads Label: set ONLY when the KPI is CPA and every CPA value in
+   *  the export came from lead data (cost per lead / spend ÷ leads). */
+  cpaBasis?: "lead";
   /** Best-effort lowercase keyword tags pulled from the ad name, used
    *  only for structural pattern hints — never presented as certainty.
    *  When the user confirms a format, this holds exactly that one tag
@@ -371,6 +406,9 @@ export interface KpiGaps {
    *  — same choice the generator's auto-switch makes), offered only when
    *  most ads simply lack the selected KPI's column data. */
   suggestedKpi: KpiKey | null;
+  /** CPA Leads Label: set when the suggested CPA would read as cost per
+   *  lead for this export. */
+  suggestedCpaBasis?: CpaBasis;
 }
 
 export interface AnalysisResult {
@@ -429,11 +467,17 @@ export interface AnalysisResult {
   /** First-Run Fixes — see KpiGaps. Absent on every export where all
    *  set-aside ads were set aside for spend (incl. the sample). */
   kpiGaps?: KpiGaps;
+  /** CPA Leads Label — present only when kpi is CPA and every CPA value
+   *  came from lead data. Drives labels/nouns via kpiLabelFor & co. */
+  cpaBasis?: CpaBasis;
 }
 
 export interface MemoScope {
   product: string;
   kpiLabel: string;
+  /** CPA Leads Label: client-register label ("cost per lead"), present
+   *  only when it differs from kpiLabel. Report/text pick per view. */
+  kpiLabelClient?: string;
   /** Plain-language expansion of the KPI abbreviation (client view). */
   kpiExplainer: string;
   dateRangeLabel: string | null;

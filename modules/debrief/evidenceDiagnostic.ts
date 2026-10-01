@@ -3,7 +3,7 @@
 // file's whole dependency chain resolves under plain Node's
 // type-stripping test runner (scripts/evidenceDiagnostic.test.ts).
 import { MIN_OUTCOMES_FOR_SUPPORTED } from "./decision.ts";
-import { outcomeNounsForKpi } from "./types.ts";
+import { outcomeNounsFor } from "./types.ts";
 import type {
   AnalysisResult,
   EvidenceDiagnosticFinding,
@@ -192,7 +192,7 @@ function outcomeTrigger(
   ad: RankedAd,
   kpi: KpiKey
 ): "thin_volume" | "unverifiable_volume" | null {
-  if (outcomeNounsForKpi(kpi) == null) return null;
+  if (outcomeNounsFor({ kpi }) == null) return null;
   if (ad.conversions == null) return "unverifiable_volume";
   if (ad.conversions < MIN_OUTCOMES_FOR_SUPPORTED) return "thin_volume";
   return null;
@@ -237,8 +237,8 @@ export function deriveEvidenceDiagnostic(
      column, not a threshold, so no floor applies to attribute. */
   const triggerClause =
     trigger === "thin_volume"
-      ? `"${top.name}" has ${top.conversions} recorded ${outcomeNounsForKpi(analysis.kpi)!.many} — under this read's minimal ${MIN_OUTCOMES_FOR_SUPPORTED}-${outcomeNounsForKpi(analysis.kpi)!.one} noise floor (Debrief default, not a universal threshold), too few to trust this KPI reading on its own.`
-      : `This export has no verifiable ${outcomeNounsForKpi(analysis.kpi)!.one} count for "${top.name}", so this KPI reading can't be fully verified.`;
+      ? `"${top.name}" has ${top.conversions} recorded ${outcomeNounsFor(analysis)!.many} — under this read's minimal ${MIN_OUTCOMES_FOR_SUPPORTED}-${outcomeNounsFor(analysis)!.one} noise floor (Debrief default, not a universal threshold), too few to trust this KPI reading on its own.`
+      : `This export has no verifiable ${outcomeNounsFor(analysis)!.one} count for "${top.name}", so this KPI reading can't be fully verified.`;
 
   const buyer =
     finding != null

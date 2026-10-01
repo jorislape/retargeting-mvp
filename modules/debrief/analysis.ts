@@ -117,7 +117,14 @@ export function analyze(
   context: DebriefContext
 ): AnalysisResult {
   const { kpi, targetCpa } = context;
-  const kpiSources = kpiColumnSourcesFor(kpi, columns);
+  /* CPA Leads Label: extract.ts tags every ad when all CPA values are
+     lead-based; the analysis carries that as cpaBasis for wording. */
+  const cpaBasis: "leads" | undefined =
+    kpi === "cpa" && ads.some((a) => a.kpiValue != null) &&
+    ads.every((a) => a.kpiValue == null || a.cpaBasis === "lead")
+      ? "leads"
+      : undefined;
+  const kpiSources = kpiColumnSourcesFor(kpi, columns, cpaBasis);
   const { gate: spendGate, basis: spendGateBasis } = computeSpendGate(
     ads,
     targetCpa,
@@ -184,6 +191,7 @@ export function analyze(
        standard export's AnalysisResult is unchanged key-for-key. */
     ...(kpiSources.length > 0 ? { kpiColumnSources: kpiSources } : {}),
     ...(kpiGaps ? { kpiGaps } : {}),
+    ...(cpaBasis ? { cpaBasis } : {}),
   };
 }
 
@@ -208,8 +216,11 @@ function computeKpiGaps(
   ).length;
   const missing = noValueAds.length - zeroOutcome;
   let suggestedKpi: KpiKey | null = null;
+  let suggestedCpaBasis: "leads" | undefined;
   if (missing * 2 >= gated.length) {
-    suggestedKpi = preferredUsableKpi(kpiUsability(rawRows, columns), kpi);
+    const usability = kpiUsability(rawRows, columns);
+    suggestedKpi = preferredUsableKpi(usability, kpi);
+    if (suggestedKpi === "cpa" && usability.cpa.cpaLeadBased) suggestedCpaBasis = "leads";
   }
   return {
     setAsideNoValue,
@@ -217,5 +228,6 @@ function computeKpiGaps(
     zeroOutcome,
     belowGateWithValue,
     suggestedKpi,
+    ...(suggestedCpaBasis ? { suggestedCpaBasis } : {}),
   };
 }

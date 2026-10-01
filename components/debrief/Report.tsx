@@ -829,7 +829,7 @@ function ClientStatCards({ memo }: { memo: Memo }) {
         sub: "in the period reviewed",
       },
       {
-        label: `Typical ${scope.kpiLabel}`,
+        label: `Typical ${scope.kpiLabelClient ?? scope.kpiLabel}`,
         value: scope.medianLabel,
         sub: "the account's midpoint result",
       },
@@ -1394,6 +1394,9 @@ export function Report({
      like everything else — snapshot of the selection at click time. */
   const [briefIdxs, setBriefIdxs] = useState<number[]>([]);
   const client = view === "client";
+  /* CPA Leads Label: "CPL" in Buyer view, "cost per lead" in Client view
+     (scope.kpiLabelClient exists only when the two differ). */
+  const viewKpiLabel = client ? memo.scope.kpiLabelClient ?? memo.scope.kpiLabel : memo.scope.kpiLabel;
   const accent = getAccentById(customization.accentId);
   const displayTitle = customization.reportTitle.trim() || memo.scope.product;
 
@@ -1632,7 +1635,7 @@ export function Report({
           {/* Meta line: mono facts separated by hairline rules. */}
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 font-mono text-[11px] tabular-nums text-zinc-400">
             <span title={memo.scope.kpiExplainer} className="text-zinc-300">
-              KPI · {memo.scope.kpiLabel}
+              KPI · {viewKpiLabel}
             </span>
             {memo.scope.dateRangeLabel && (
               <>
@@ -1654,7 +1657,7 @@ export function Report({
           {client && (
             <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-400">
               <span className="font-semibold text-zinc-300">
-                {memo.scope.kpiLabel}
+                {viewKpiLabel}
               </span>{" "}
               = {memo.scope.kpiExplainer}.
             </p>
@@ -1674,7 +1677,7 @@ export function Report({
               ["Set aside", String(memo.scope.adsSetAside)],
               ["Total spend", memo.scope.totalSpendLabel],
               [
-                `${client ? "Typical" : "Median"} ${memo.scope.kpiLabel}`,
+                `${client ? "Typical" : "Median"} ${viewKpiLabel}`,
                 memo.scope.medianLabel,
               ],
             ].map(([label, value], i) => (
@@ -1842,7 +1845,7 @@ export function Report({
           <PerformanceRankingChart
             winners={sections.winners ? memo.winners.slice(0, customization.topAdsShown) : []}
             losers={sections.underperformers ? memo.losers.rows.slice(0, customization.topAdsShown) : []}
-            kpiLabel={memo.scope.kpiLabel}
+            kpiLabel={viewKpiLabel}
             medianLabel={memo.scope.medianLabel}
             view={view}
             density={customization.density}
@@ -1908,7 +1911,7 @@ export function Report({
               ? memo.scope.setAsideBreakdown
                 ? /* First-Run Fixes: split by cause when some ads have
                      no KPI figure at all — never "not enough spend" for those. */
-                  `${memo.scope.setAsideBreakdown.spend > 0 ? `${memo.scope.setAsideBreakdown.spend} ad${memo.scope.setAsideBreakdown.spend === 1 ? " did" : "s did"} not have enough spend to compare fairly; ` : ""}${memo.scope.setAsideBreakdown.noValue} had no ${memo.scope.kpiLabel} figure in the file — set aside rather than counted against.`
+                  `${memo.scope.setAsideBreakdown.spend > 0 ? `${memo.scope.setAsideBreakdown.spend} ad${memo.scope.setAsideBreakdown.spend === 1 ? " did" : "s did"} not have enough spend to compare fairly; ` : ""}${memo.scope.setAsideBreakdown.noValue} had no ${viewKpiLabel} figure in the file — set aside rather than counted against.`
                 : memo.scope.adsSetAside > 0
                   ? `${memo.scope.adsSetAside} ad${memo.scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
                   : "Every ad had enough spend to be judged fairly."
@@ -2143,7 +2146,7 @@ export function Report({
                   : ""}
                 . {memo.scope.setAsideBreakdown
                   ? /* First-Run Fixes: name both causes. */
-                    `${memo.scope.adsJudged} ads could be compared fairly; ${memo.scope.setAsideBreakdown.noValue} had no ${memo.scope.kpiLabel} figure${memo.scope.setAsideBreakdown.spend > 0 ? ` and ${memo.scope.setAsideBreakdown.spend} didn't have enough spend` : ""}, so they were set aside`
+                    `${memo.scope.adsJudged} ads could be compared fairly; ${memo.scope.setAsideBreakdown.noValue} had no ${viewKpiLabel} figure${memo.scope.setAsideBreakdown.spend > 0 ? ` and ${memo.scope.setAsideBreakdown.spend} didn't have enough spend` : ""}, so they were set aside`
                   : `${memo.scope.adsJudged} ads had enough spend to judge fairly${memo.scope.adsSetAside > 0 ? `; ${memo.scope.adsSetAside} did not and were set aside` : ""}`}
                 . Every number comes directly from the ad account — nothing is
                 estimated.

@@ -4,7 +4,7 @@
 // (scripts/compare.test.ts). Formatters are injected rather than
 // imported from format.ts (extensionless internals) for the same
 // reason.
-import { HIGHER_IS_BETTER, outcomeNounsForKpi } from "./types.ts";
+import { HIGHER_IS_BETTER, outcomeNounsFor } from "./types.ts";
 import type {
   AnalysisResult,
   ComparisonMatchBasis,
@@ -60,6 +60,9 @@ export interface ComparisonFormatters {
   money: (value: number) => string;
   kpiValue: (value: number) => string;
   kpiLabel: string;
+  /** CPA Leads Label: client-register label when it differs (e.g.
+   *  "cost per lead"); falls back to kpiLabel. */
+  kpiLabelClient?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -123,7 +126,7 @@ export function buildComparison(
 ): MemoComparison {
   const kpi = current.analysis.kpi;
   const higherBetter = HIGHER_IS_BETTER[kpi];
-  const nouns = outcomeNounsForKpi(kpi);
+  const nouns = outcomeNounsFor(current.analysis);
 
   /* ---- basis: Ad ID only when BOTH exports actually carry ids;
      otherwise exact name. One file having ids and the other not would
@@ -285,7 +288,7 @@ export function buildComparison(
           ? " (unchanged)"
           : "";
     medianMovementBuyer = `Median ${fmt.kpiLabel} moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${pctLabel}.`;
-    medianMovementClient = `The account's typical ${fmt.kpiLabel} result moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${
+    medianMovementClient = `The account's typical ${fmt.kpiLabelClient ?? fmt.kpiLabel} result moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${
       direction === "unchanged" ? "" : ` — ${direction} than last period`
     }.`;
   } else {

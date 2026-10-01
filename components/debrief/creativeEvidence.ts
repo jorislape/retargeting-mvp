@@ -84,6 +84,8 @@ export const CREATIVE_EVIDENCE_CAVEAT = {
  *  slice of the memo with NO asset/image field. */
 export interface SpotlightSource {
   kpiLabel: string;
+  /** CPA Leads Label: client-register label when it differs. */
+  kpiLabelClient?: string;
   adsJudged: number;
   winners: readonly MemoWinnerLoserRow[];
   loserRows: readonly MemoWinnerLoserRow[];
@@ -117,6 +119,7 @@ function changeMagnitude(changeLabel: string): number {
 
 export function selectSpotlights(source: SpotlightSource): Spotlight[] {
   const { kpiLabel, adsJudged, winners, loserRows, comparison } = source;
+  const kpiClient = source.kpiLabelClient ?? kpiLabel;
   const judgedPhrase = `${adsJudged} ad${adsJudged === 1 ? "" : "s"}`;
 
   const spotlights: Spotlight[] = [];
@@ -133,7 +136,7 @@ export function selectSpotlights(source: SpotlightSource): Spotlight[] {
       spendLabel: top.spendLabel,
       takeaway: {
         buyer: `Best ${kpiLabel} of the ${judgedPhrase} judged this period.`,
-        client: `The strongest ${kpiLabel} result of the ${judgedPhrase} with enough spend for a fair read.`,
+        client: `The strongest ${kpiClient} result of the ${judgedPhrase} with enough spend for a fair read.`,
       },
     });
   }
@@ -150,7 +153,7 @@ export function selectSpotlights(source: SpotlightSource): Spotlight[] {
       spendLabel: worst.spendLabel,
       takeaway: {
         buyer: `Weakest ${kpiLabel} of the ${judgedPhrase} judged this period.`,
-        client: `The weakest ${kpiLabel} result of the ${judgedPhrase} with enough spend for a fair read.`,
+        client: `The weakest ${kpiClient} result of the ${judgedPhrase} with enough spend for a fair read.`,
       },
     });
   }

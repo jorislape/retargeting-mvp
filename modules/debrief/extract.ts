@@ -90,6 +90,26 @@ function kpiValueForRow(
   }
 }
 
+/** CPA Leads Label: which data a row's CPA value actually came from —
+ *  mirrors kpiValueForRow's "cpa" branch exactly (same columns, same
+ *  order, same null rules), so it can never disagree with the value:
+ *  the direct cost column (Cost per purchase, else Cost per lead — and
+ *  Cost per lead is only read when NO Cost per purchase column exists),
+ *  else spend ÷ (purchases ?? leads). null when nothing was readable. */
+function cpaBasisForRow(
+  row: Record<string, string>,
+  columns: ColumnMap
+): "purchase" | "lead" | null {
+  if (columns.costPerPurchase) {
+    if (parseNumericCell(row[columns.costPerPurchase]) != null) return "purchase";
+  } else if (columns.costPerLead) {
+    if (parseNumericCell(row[columns.costPerLead]) != null) return "lead";
+  }
+  if (columns.purchases && parseNumericCell(row[columns.purchases]) != null) return "purchase";
+  if (columns.leads && parseNumericCell(row[columns.leads]) != null) return "lead";
+  return null;
+}
+
 /** Evidence Inputs V1: the raw conversion count behind a purchase-based
  *  KPI — purchases for roas/cpa/purchases, leads for leads — when a count
  *  column is present. Returns null for ctr/cpc (their reliability axis is
@@ -160,11 +180,30 @@ export function extractAds(
         /* Spreadsheet row number (header = row 1) — used only for the
            duplicate-name display label below. */
         fileRow: index + 2,
+        /* CPA Leads Label — internal, stripped below. */
+        cpaRowBasis: kpi === "cpa" ? cpaBasisForRow(row, columns) : null,
+        leadCount: kpi === "cpa" && columns.leads ? parseNumericCell(row[columns.leads]) : null,
       };
     })
     .filter((ad) => ad.spend > 0 || ad.kpiValue != null); // drop fully-blank rows
 
-  return disambiguateDuplicateNames(ads).map(({ fileRow, ...ad }) => ad);
+  /* CPA Leads Label: when EVERY CPA value in this export is lead-based
+     (a lead-gen account), the outcome behind CPA is leads — so the count
+     carried for display/evidence is the leads count, and each ad is
+     tagged cpaBasis "lead". The CPA values themselves are untouched.
+     A mixed or purchase-based export keeps the existing purchase count. */
+  const valued = ads.filter((a) => a.kpiValue != null);
+  const leadBased =
+    kpi === "cpa" && valued.length > 0 && valued.every((a) => a.cpaRowBasis === "lead");
+
+  return disambiguateDuplicateNames(ads).map(({ fileRow, ...withMeta }) => {
+    const ad: Partial<typeof withMeta> = { ...withMeta };
+    const leadCount = withMeta.leadCount;
+    delete ad.cpaRowBasis;
+    delete ad.leadCount;
+    const parsed = ad as ParsedAd;
+    return leadBased ? { ...parsed, conversions: leadCount, cpaBasis: "lead" as const } : parsed;
+  });
 }
 
 /** Trim + collapse internal whitespace — the identity-comparison key

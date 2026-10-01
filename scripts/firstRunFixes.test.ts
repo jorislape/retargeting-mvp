@@ -179,8 +179,8 @@ try {
     const { analysis, memo } = run(metaCsv, "roas");
     assert.equal(analysis.adsJudged, 0);
     assert.equal(analysis.kpiGaps.noValue, 14);
-    assert.equal(analysis.kpiGaps.suggestedKpi, "leads",
-      "lead-gen export: suggests Leads, not purchase-framed CPA");
+    assert.equal(analysis.kpiGaps.suggestedKpi, "cpa", "lead-gen export: suggests CPA …");
+    assert.equal(analysis.kpiGaps.suggestedCpaBasis, "leads", "… which reads as cost per lead (CPA Leads Label)");
     assert.equal(
       analysis.adsJudged + analysis.kpiGaps.noValue + analysis.kpiGaps.belowGateWithValue,
       analysis.adsAnalyzed,
@@ -188,7 +188,7 @@ try {
     );
     assert.equal(memo.decision.action, "hold");
     assert.equal(memo.decision.holdReason, "insufficient_data", "same hold the engine always reached");
-    assert.equal(memo.decision.headline, "Hold — none of the 14 ads has a ROAS value in this export. Try Leads.");
+    assert.equal(memo.decision.headline, "Hold — none of the 14 ads has a ROAS value in this export. Try CPA (cost per lead).");
     assert.deepEqual(memo.scope.setAsideBreakdown, { spend: 0, noValue: 14 });
     for (const view of ["buyer", "client"] as const) {
       const text = memoToText(memo, view);
@@ -201,9 +201,8 @@ try {
     assert.equal(u.roas.hasColumns, true);
     assert.equal(u.roas.withValue, 0);
     assert.equal(u.roas.usable, false);
-    assert.equal(chooseAutoKpi("roas", u, false), "leads", "Meta lead-gen: switches off empty ROAS to Leads");
-    assert.equal(u.cpa.usable, true, "CPA has values (spend ÷ leads) …");
-    assert.equal(u.purchases.usable, false, "… but no purchases back it, so it isn't auto-picked");
+    assert.equal(chooseAutoKpi("roas", u, false), "cpa", "Meta lead-gen: switches off empty ROAS to CPA …");
+    assert.equal(u.cpa.cpaLeadBased, true, "… which is cost per lead here (spend ÷ leads), preferred over the raw Leads count");
     assert.equal(chooseAutoKpi("roas", u, true), null, "a manual ROAS choice is never overridden");
     assert.equal(chooseAutoKpi("leads", u, false), null, "a usable current KPI is kept");
     assert.equal(sparseKpiWarning(u.roas, "ROAS"),
@@ -222,7 +221,7 @@ try {
     const { headers, rows } = table(leadsCsv);
     const u = kpiUsability(rows, resolveColumns(headers));
     assert.equal(u.roas.hasColumns, false);
-    assert.equal(chooseAutoKpi("roas", u, false), "leads", "CSV lead-gen export with no ROAS column: switches to Leads");
+    assert.equal(chooseAutoKpi("roas", u, false), "cpa", "CSV lead-gen export with no ROAS column: switches to cost per lead");
     assert.equal(chooseAutoKpi("roas", u, true), null, "manual choice kept even when unusable");
   }
 
@@ -281,7 +280,7 @@ try {
   assert.match(gen, /onClick=\{\(\) => chooseKpiManually\(opt\.value\)\}/, "KPI selector marks a manual choice");
   assert.match(gen, /chooseKpiManually\(k\);\s*clearError\(\);/, "error one-click switch marks a manual choice");
   assert.match(gen, /chooseAutoKpi\(current, usability, kpiManualRef\.current\)/, "auto-switch respects the manual flag");
-  assert.match(gen, /No \{KPI_LABELS\[kpiNotice\.from\]\} values in this export —\s*switched to \{KPI_LABELS\[kpiNotice\.to\]\}\./);
+  assert.match(gen, /No \{KPI_LABELS\[kpiNotice\.from\]\} values in this export —\s*switched to \{kpiDisplay\(kpiNotice\.to\)\}\./);
 
   // Early Generate button: a second submit button in the same form — the
   // form's single onSubmit is the only handler.

@@ -13,6 +13,8 @@ import {
   parseCsv,
   requiredColumnsFor,
   EXPORT_AT_AD_LEVEL,
+  kpiClientLabelFor,
+  kpiLabelFor,
   resolveColumns,
   summarizeCreativeGroups,
   toTable,
@@ -595,7 +597,8 @@ export async function POST(request: NextRequest) {
         {
           money: (v) => fmtMoney(v, analysis.currency),
           kpiValue: (v) => fmtKpiValue(v, context.kpi, analysis.currency),
-          kpiLabel: KPI_LABELS[context.kpi],
+          kpiLabel: kpiLabelFor(analysis),
+          kpiLabelClient: kpiClientLabelFor(analysis),
         }
       );
       memo = { ...memo, comparison };

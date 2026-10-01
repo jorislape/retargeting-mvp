@@ -1,4 +1,4 @@
-import { ColumnMatch, ConversionField, KpiColumnSource, KpiKey } from "./types";
+import { ColumnMatch, ConversionField, CpaBasis, KpiColumnSource, KpiKey } from "./types";
 
 /**
  * Meta Ads Manager CSV exports don't have fixed column names — they
@@ -247,8 +247,21 @@ function resolveSources(headers: string[]): ColumnMap["sources"] {
  *  cpa:  direct cost-per-purchase, else cost-per-lead; plus purchases
  *        (count + per-row fallback divisor), else leads (fallback only)
  *  ctr/cpc read no conversion field. */
-export function kpiReadFields(kpi: KpiKey, columns: ColumnMap): ConversionField[] {
+export function kpiReadFields(
+  kpi: KpiKey,
+  columns: ColumnMap,
+  /** CPA Leads Label: lead-based CPA reads Cost per lead only when NO
+   *  Cost per purchase column exists (extract.ts's order), else spend ÷
+   *  leads — never the empty purchase columns. */
+  cpaBasis?: CpaBasis
+): ConversionField[] {
   const has = (f: ConversionField) => columns[f] != null;
+  if (kpi === "cpa" && cpaBasis === "leads") {
+    const out: ConversionField[] = [];
+    if (!has("costPerPurchase") && has("costPerLead")) out.push("costPerLead");
+    if (has("leads")) out.push("leads");
+    return out;
+  }
   switch (kpi) {
     case "purchases":
       return has("purchases") ? ["purchases"] : [];
@@ -278,9 +291,13 @@ export function kpiReadFields(kpi: KpiKey, columns: ColumnMap): ConversionField[
 /** The disclosure-worthy sources behind a KPI: only partial matches and
  *  Meta "Results"-alias matches. Standard exact matches return nothing,
  *  so a normal export (and the sample) produces an empty list. */
-export function kpiColumnSourcesFor(kpi: KpiKey, columns: ColumnMap): KpiColumnSource[] {
+export function kpiColumnSourcesFor(
+  kpi: KpiKey,
+  columns: ColumnMap,
+  cpaBasis?: CpaBasis
+): KpiColumnSource[] {
   const out: KpiColumnSource[] = [];
-  for (const field of kpiReadFields(kpi, columns)) {
+  for (const field of kpiReadFields(kpi, columns, cpaBasis)) {
     const src = columns.sources[field];
     if (src && src.match !== "exact") out.push({ field, header: src.header, match: src.match });
   }
@@ -348,8 +365,13 @@ function quoted(headers: string[]): string {
  *  selected KPI is read from, and which competing variants were found
  *  but not used. null for KPIs that read no conversion column (CTR/CPC)
  *  or when none resolved. Display only — same resolver the API uses. */
-export function kpiSourcePreview(kpi: KpiKey, columns: ColumnMap): string | null {
-  const parts = kpiReadFields(kpi, columns).flatMap((field) => {
+export function kpiSourcePreview(
+  kpi: KpiKey,
+  columns: ColumnMap,
+  cpaBasis?: CpaBasis
+): string | null {
+  const fields = kpiReadFields(kpi, columns, cpaBasis);
+  const parts = fields.flatMap((field) => {
     const src = columns.sources[field];
     if (!src) return [];
     let part = `${PREVIEW_LABEL[field]} from column '${src.header}'`;
@@ -359,5 +381,11 @@ export function kpiSourcePreview(kpi: KpiKey, columns: ColumnMap): string | null
     }
     return [part];
   });
-  return parts.length > 0 ? `${parts.join("; ")}.` : null;
+  if (parts.length === 0) return null;
+  /* CPA Leads Label: no direct cost column read ⇒ CPL is derived. */
+  const derived =
+    kpi === "cpa" && cpaBasis === "leads" && !fields.includes("costPerLead")
+      ? " Cost per lead = spend ÷ leads."
+      : "";
+  return `${parts.join("; ")}.${derived}`;
 }

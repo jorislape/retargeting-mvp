@@ -29,6 +29,9 @@ export interface KpiUsability {
   total: number;
   /** Columns present AND at least one ad has a value. */
   usable: boolean;
+  /** CPA only: every CPA value came from lead data — i.e. this CPA is
+   *  cost per lead (extract.ts tags such ads cpaBasis "lead"). */
+  cpaLeadBased: boolean;
 }
 
 export function kpiUsability(
@@ -46,33 +49,38 @@ export function kpiUsability(
       withValue,
       total: hasColumns ? ads.length : rows.length,
       usable: hasColumns && withValue > 0,
+      cpaLeadBased: kpi === "cpa" && withValue > 0 && ads.every((a) => a.kpiValue == null || a.cpaBasis === "lead"),
     };
   }
   return out;
 }
 
 /** Preference when the data has to pick the KPI: conversion outcomes
- *  before click metrics. Deliberately NOT plain selector order — CPA is
- *  purchase-framed throughout the engine (outcomeNounsForKpi), so a
- *  lead-gen export switched to CPA would read "this export carries no
- *  purchase counts" everywhere; such an export should land on Leads. */
-const AUTO_PREFERENCE: readonly KpiKey[] = ["roas", "cpa", "purchases", "leads", "ctr", "cpc"];
+ *  before click metrics, and an efficiency KPI before a raw count —
+ *  a count KPI (Leads, Purchases) favours whichever ads spent most.
+ *  CPA appears twice: purchase-backed CPA first; lead-based CPA (cost
+ *  per lead) after Purchases but before the Leads count. */
+const AUTO_PREFERENCE: readonly { kpi: KpiKey; when?: (u: Record<KpiKey, KpiUsability>) => boolean }[] = [
+  { kpi: "roas" },
+  { kpi: "cpa", when: (u) => !u.cpa.cpaLeadBased },
+  { kpi: "purchases" },
+  { kpi: "cpa", when: (u) => u.cpa.cpaLeadBased },
+  { kpi: "leads" },
+  { kpi: "ctr" },
+  { kpi: "cpc" },
+];
 
 /** The best KPI this export can be read with, excluding `except`.
- *  CPA only counts when purchases actually back it. Shared by the
- *  generator's auto-switch and the hold's "Try …" suggestion so the two
- *  never disagree. */
+ *  Shared by the generator's auto-switch and the hold's "Try …"
+ *  suggestion so the two never disagree. */
 export function preferredUsableKpi(
   usability: Record<KpiKey, KpiUsability>,
   except?: KpiKey
 ): KpiKey | null {
   return (
     AUTO_PREFERENCE.find(
-      (k) =>
-        k !== except &&
-        usability[k].usable &&
-        (k !== "cpa" || usability.purchases.usable)
-    ) ?? null
+      (c) => c.kpi !== except && usability[c.kpi].usable && (c.when ? c.when(usability) : true)
+    )?.kpi ?? null
   );
 }
 

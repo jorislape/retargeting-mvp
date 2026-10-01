@@ -3,7 +3,7 @@
 // chain resolves under plain Node's type-stripping test runner
 // (scripts/briefReadiness.test.ts).
 import { MIN_OUTCOMES_FOR_SUPPORTED } from "./decision.ts";
-import { outcomeNounsForKpi } from "./types.ts";
+import { outcomeNounsFor } from "./types.ts";
 import type {
   AnalysisResult,
   AppliedCriterion,
@@ -94,7 +94,7 @@ export function deriveSignalVolumeReadiness(
   nounOne: string,
   nounMany: string
 ): MemoBriefReadiness | null {
-  if (outcomeNounsForKpi(analysis.kpi) == null) return null;
+  if (outcomeNounsFor(analysis) == null) return null;
   const top: RankedAd | null = analysis.winners[0] ?? null;
   if (top == null) return null;
 
