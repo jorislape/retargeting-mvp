@@ -114,7 +114,7 @@ const KPI_ALIAS_DOC: [string, string][] = [
 
 const PROCESSING_STEPS = [
   "Reading ads",
-  "Applying the spend gate",
+  "Applying the minimum spend",
   "Finding winners and losers",
   "Writing the debrief",
 ];
@@ -1846,7 +1846,8 @@ export function GeneratorPanel() {
                     className={`mt-1.5 ${inputBase}`}
                   />
                   <p className="mt-1.5 text-xs text-zinc-400">
-                    Sharpens the spend gate when set.
+                    Sharpens the minimum spend to judge (evidence gate)
+                    when set.
                   </p>
                 </div>
                 <div>
@@ -1868,7 +1869,7 @@ export function GeneratorPanel() {
                   />
                   <p className="mt-1.5 text-xs text-zinc-400">
                     Used in this report&rsquo;s success criteria when ranking
-                    by ROAS. Never affects the spend gate.
+                    by ROAS. Never affects the minimum spend.
                   </p>
                 </div>
                 <div className="sm:col-span-2">
@@ -1913,7 +1914,7 @@ export function GeneratorPanel() {
                 <div className="mt-3 grid gap-4 sm:grid-cols-3">
                   <div>
                     <label htmlFor="spendGateOverride" className={fieldLabel}>
-                      Evidence gate (spend per ad)
+                      Minimum spend to judge (per ad)
                     </label>
                     <input
                       id="spendGateOverride"
@@ -1929,7 +1930,7 @@ export function GeneratorPanel() {
                     />
                     <p className="mt-1.5 text-xs text-zinc-400">
                       An ad must spend this much before it&rsquo;s judged.
-                      Replaces the default gate (and the 3× target CPA
+                      Replaces the default minimum spend (and the 3× target CPA
                       rule) when set.
                     </p>
                   </div>
@@ -2044,7 +2045,7 @@ export function GeneratorPanel() {
                     />
                     <p className="mt-1.5 text-xs text-zinc-400">
                       Multiple of target CPA (or, with no target CPA set,
-                      this account&rsquo;s own evidence gate) the worst ad
+                      this account&rsquo;s own minimum spend) the worst ad
                       must have spent before its underperformance reads as
                       confident rather than possibly under-tested.
                     </p>

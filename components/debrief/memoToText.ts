@@ -21,11 +21,21 @@ export type ReportView = "buyer" | "client";
  *  reader encounters one consistent way of saying this across the
  *  whole client report. This is a narrow, fixed addition to an
  *  existing small rule table — not a general jargon-rewriting system. */
+/** Report Clarity Pass — shared with Report.tsx's client view. */
+export const CLIENT_BRIEF_LEGEND =
+  "Ready means the winning idea has enough results behind it to build new creative on; Early signal means it looks promising but needs more results; Not enough evidence means it's too early to brief on.";
+
 export function clientizeText(text: string): string {
   return text
     .replace(/clears the spend gate/g, "has enough spend to judge fairly")
     .replace(/clear the spend gate/g, "have enough spend to judge fairly")
-    .replace(/spend gate/g, "spend needed to judge fairly")
+    /* Report Clarity Pass: the client register never says "gate". The
+       buyer register now says "minimum spend" (defined once as "Minimum
+       spend to judge (evidence gate)"); these rules catch the defining
+       parenthetical and any legacy phrasing. */
+    .replace(/\s*\(evidence gate\)/gi, "")
+    .replace(/\b(?:spend|evidence) gate\b/gi, "minimum spend to judge")
+    .replace(/\bgate\b/gi, "minimum spend")
     .replace(/\bmedian (ROAS|CPA|CPL|CTR|CPC|Leads|Purchases)\b/g, "typical $1")
     /* CPA Leads Label: buyer-register "CPL" reads as plain cost per lead. */
     .replace(/\bCPL\b/g, "cost per lead")
@@ -122,6 +132,9 @@ export function memoToText(
   lines.push(
     `Ads analyzed: ${scope.adsAnalyzed} · Judged: ${scope.adsJudged} · Set aside: ${scope.adsSetAside}`
   );
+  if (view !== "client" && scope.spendGateLabel) {
+    lines.push(`Minimum spend to judge (evidence gate): ${scope.spendGateLabel} per ad`);
+  }
   lines.push(`Total spend: ${scope.totalSpendLabel} · ${view === "client" ? "Typical" : "Median"} ${viewKpiLabel}: ${scope.medianLabel}`);
   lines.push("");
 
@@ -419,6 +432,11 @@ export function memoToText(
   }
 
   lines.push(view === "client" ? "WHAT WE'LL TEST NEXT" : "NEXT 3 TESTS");
+  /* Report Clarity Pass: the client register explains the readiness
+     states once, in plain words (same sentence as the report). */
+  if (view === "client" && memo.nextTests.some((t) => t.briefReadiness)) {
+    lines.push(`Ready for a creative brief? ${CLIENT_BRIEF_LEGEND}`);
+  }
   memo.nextTests.forEach((t, i) => {
     lines.push(`${i + 1}. ${c(t.test)}`);
     if (t.briefReadiness) {
@@ -432,7 +450,7 @@ export function memoToText(
           : t.briefReadiness.state === "directional"
             ? "Early signal"
             : "Not enough evidence";
-      lines.push(`   Brief readiness: ${label}`);
+      lines.push(view === "client" ? `   Ready for a creative brief? ${label}` : `   Brief readiness: ${label}`);
       if (t.briefReadiness.state !== "ready") {
         lines.push(`   ${view === "client" ? "Worth knowing" : "Evidence check"}: ${c(view === "client" ? t.briefReadiness.client : t.briefReadiness.buyer)}`);
       } else if (view !== "client" && t.briefReadiness.disclosureNote) {

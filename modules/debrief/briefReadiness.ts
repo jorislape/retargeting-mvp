@@ -187,7 +187,7 @@ export function deriveLossConfidenceReadiness(
     );
     const gateNote =
       analysis.spendGateBasis === "target_cpa"
-        ? " This account's evidence gate already requires 3× target CPA before any ad is judged at all, so this bar is already assured for every judged ad here."
+        ? " This account's minimum spend already requires 3× target CPA before any ad is judged at all, so this bar is already assured for every judged ad here."
         : "";
     if (multiple >= bar) {
       return {
@@ -211,21 +211,21 @@ export function deriveLossConfidenceReadiness(
   // equivalent to a real cost target, and never allowed to reach "ready".
   const proxyMultiple = analysis.spendGate > 0 ? worst.spend / analysis.spendGate : 0;
   const criterion = criterionLabel(
-    `Loss confidence: ≥${bar}× this account's evidence gate spent on a losing ad (no target CPA set) — Debrief default (practitioner-informed, not a universal threshold)`,
-    `Loss confidence: ≥${bar}× this account's evidence gate spent on a losing ad (no target CPA set) — your criterion`,
+    `Loss confidence: ≥${bar}× this account's minimum spend, spent on a losing ad (no target CPA set) — Debrief default (practitioner-informed, not a universal threshold)`,
+    `Loss confidence: ≥${bar}× this account's minimum spend, spent on a losing ad (no target CPA set) — your criterion`,
     isUserBar
   );
   if (proxyMultiple >= bar) {
     return {
       state: "directional",
-      buyer: `Directional — no target CPA was set, so this uses this account's ${money(analysis.spendGate)} evidence gate as a stand-in: "${worst.name}" has spent ${proxyMultiple.toFixed(1)}× that gate, past the ${bar}× bar. Treat this as suggestive, not a confirmed loss, until a target CPA is set for a fully confident read.`,
+      buyer: `Directional — no target CPA was set, so this uses this account's ${money(analysis.spendGate)} minimum spend as a stand-in: "${worst.name}" has spent ${proxyMultiple.toFixed(1)}× that minimum, past the ${bar}× bar. Treat this as suggestive, not a confirmed loss, until a target CPA is set for a fully confident read.`,
       client: `We're treating "${worst.name}" as a likely underperformer based on how much it's spent relative to typical spend in this account — set a cost target for a more confident read.`,
       criterion,
     };
   }
   return {
     state: "insufficient",
-    buyer: `Not enough evidence — "${worst.name}" has spent only ${proxyMultiple.toFixed(1)}× this account's ${money(analysis.spendGate)} evidence gate (no target CPA set), under the ${bar}× bar this read requires.`,
+    buyer: `Not enough evidence — "${worst.name}" has spent only ${proxyMultiple.toFixed(1)}× this account's ${money(analysis.spendGate)} minimum spend (no target CPA set), under the ${bar}× bar this read requires.`,
     client: `This ad hasn't spent enough yet, relative to typical spend in this account, for us to be confident it's truly underperforming.`,
     criterion,
   };

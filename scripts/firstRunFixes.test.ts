@@ -55,7 +55,7 @@ function clientClean(d: MemoDecision, label: string) {
 
   // Spend gate only (no kpiGaps) — byte-identical to the pre-change wording.
   const gateOnly = buildDecision(fixture(hold), "Test.", money);
-  assert.equal(gateOnly.headline, "Hold — 2 of 10 ads cleared the $100.00 spend gate; this call needs 5.");
+  assert.equal(gateOnly.headline, "Hold — 2 of 10 ads reached the $100.00 minimum spend; this call needs 5.");
   assert.equal(gateOnly.clientHeadline, "Hold — most ads haven't had enough spend to judge fairly yet.");
   assert.ok(gateOnly.limits.buyer.includes(
     "8 ads had too little spend to judge and were set aside — no conclusion is drawn about them either way."
@@ -69,7 +69,7 @@ function clientClean(d: MemoDecision, label: string) {
     noValue.clientHeadline,
     "Hold — none of the 10 ads has a ROAS figure in this file, so there isn't enough to compare yet. Switching the report to CPA would use the results this file does have."
   );
-  assert.ok(!noValue.headline.includes("spend gate"), "no-value hold never blames the spend gate");
+  assert.ok(!noValue.headline.includes("minimum spend"), "no-value hold never blames the minimum spend");
   assert.ok(noValue.limits.buyer.includes(
     "10 ads had no ROAS value in the export — set aside, so no conclusion is drawn about them either way."
   ));
@@ -91,7 +91,7 @@ function clientClean(d: MemoDecision, label: string) {
   );
   assert.equal(
     both.headline,
-    "Hold — only 2 of 10 ads could be judged: 6 have no ROAS value in this export, and 2 more didn't clear the $100.00 spend gate. This call needs 5."
+    "Hold — only 2 of 10 ads could be judged: 6 have no ROAS value in this export, and 2 more didn't reach the $100.00 minimum spend. This call needs 5."
   );
   assert.equal(
     both.clientHeadline,
@@ -109,7 +109,7 @@ function clientClean(d: MemoDecision, label: string) {
   );
   assert.equal(
     cpa.headline,
-    "Hold — only 2 of 10 ads could be judged: 4 had no purchases, so CPA can't be computed for them, and 1 more didn't clear the $100.00 spend gate. This call needs 5."
+    "Hold — only 2 of 10 ads could be judged: 4 had no purchases, so CPA can't be computed for them, and 1 more didn't reach the $100.00 minimum spend. This call needs 5."
   );
   assert.ok(!cpa.headline.includes("no CPA value"), "zero purchases is never reported as a missing value");
   assert.ok(cpa.clientHeadline.includes("4 ads had no purchases yet, so their CPA can't be worked out"));

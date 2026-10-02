@@ -380,7 +380,7 @@ function kpiGapHold(
     }
     if (gaps.belowGateWithValue > 0) {
       buyerParts.push(
-        `${gaps.belowGateWithValue}${buyerParts.length > 0 ? " more" : ""} didn't clear the ${gatePhrase}`
+        `${gaps.belowGateWithValue}${buyerParts.length > 0 ? " more" : ""} didn't reach the ${gatePhrase}`
       );
     }
     headline = `Hold — only ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads could be judged: ${joinAnd(buyerParts)}. This call needs ${DECISION_MIN_JUDGED}.`;
@@ -414,7 +414,7 @@ function kpiGapHold(
     clientRationale:
       "With this few ads that can be compared, an apparent winner is as likely luck as a real pattern — a call needs more ads with a result to compare.",
     reassess: {
-      buyer: `Reassess with an export where ≥${DECISION_MIN_JUDGED} ads have a ${kpiLabel} value and clear the ${gatePhrase}.`,
+      buyer: `Reassess with an export where ≥${DECISION_MIN_JUDGED} ads have a ${kpiLabel} value and reach the ${gatePhrase}.`,
       client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have a ${kpiClient} figure and enough spend to compare.`,
     },
   };
@@ -525,7 +525,7 @@ export function buildLimits(
   }
   if (analysis.adsJudged < SUPPORTED_MIN_JUDGED) {
     buyer.push(
-      `Only ${analysis.adsJudged} ad${analysis.adsJudged === 1 ? "" : "s"} cleared the spend gate — under the ${SUPPORTED_MIN_JUDGED}-ad bar this read treats as a fuller sample, so more spend could still shift the pattern.`
+      `Only ${analysis.adsJudged} ad${analysis.adsJudged === 1 ? "" : "s"} reached the minimum spend — under the ${SUPPORTED_MIN_JUDGED}-ad bar this read treats as a fuller sample, so more spend could still shift the pattern.`
     );
     client.push(
       `Fewer than ${SUPPORTED_MIN_JUDGED} ads had enough spend to compare, so more spend could still change the picture.`
@@ -701,8 +701,8 @@ export function buildDecision(
      where the gate amount is already being explained. */
   const userGate = analysis.spendGateBasis === "user_gate";
   const gatePhrase = userGate
-    ? `${gateLabel} spend gate you set`
-    : `${gateLabel} spend gate`;
+    ? `${gateLabel} minimum spend you set`
+    : `${gateLabel} minimum spend`;
   const clientGateSuffix = userGate ? " — the threshold you set" : "";
   const top = analysis.winners[0] ?? null;
   const worst = analysis.losers[0] ?? null;
@@ -800,7 +800,7 @@ export function buildDecision(
   }
   if (outcomeBlockedScale && minOutcome != null && nouns != null && top != null) {
     criteriaBuyer.push(
-      `"${top.name}" is ${pct(top.deltaPct!)}% past the median — over the ${SCALE_TEST_MIN_DELTA_PCT}% bar — but recorded ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many}, below your ${minOutcome}-${nouns.one} minimum for a scaling decision, so no scale move is recommended.`
+      `"${top.name}" is ${pct(top.deltaPct!)}% better than the median — over the ${SCALE_TEST_MIN_DELTA_PCT}% bar — but recorded ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many}, below your ${minOutcome}-${nouns.one} minimum for a scaling decision, so no scale move is recommended.`
     );
     criteriaClient.push(
       `"${top.name}" is ahead, but with ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} so far it hasn't reached the ${minOutcome} you require before scaling — so we're not increasing its budget yet.`
@@ -878,10 +878,10 @@ export function buildDecision(
   const appliedCriteria: AppliedCriterion[] = [
     {
       label: userGate
-        ? `Evidence gate: ${gateLabel} spend per ad — your criterion`
+        ? `Minimum spend to judge: ${gateLabel} per ad — your criterion`
         : analysis.spendGateBasis === "target_cpa"
-          ? `Evidence gate: ${gateLabel} spend per ad (3× your target CPA) — Debrief default rule`
-          : `Evidence gate: ${gateLabel} spend per ad — Debrief default (spend floor / half of mean spend)`,
+          ? `Minimum spend to judge: ${gateLabel} per ad (3× your target CPA) — Debrief default rule`
+          : `Minimum spend to judge: ${gateLabel} per ad — Debrief default (spend floor / half of mean spend)`,
       source: userGate ? "user" : "debrief_default",
     },
     {
@@ -889,7 +889,7 @@ export function buildDecision(
       source: "debrief_default",
     },
     {
-      label: `Budget-move bar: top ad ≥${SCALE_TEST_MIN_DELTA_PCT}% past the median — Debrief default`,
+      label: `Budget-move bar: top ad ≥${SCALE_TEST_MIN_DELTA_PCT}% better than the median — Debrief default`,
       source: "debrief_default",
     },
     {
@@ -926,7 +926,7 @@ export function buildDecision(
     ...evidence,
     action: "hold",
     holdReason: "insufficient_data",
-    headline: `Hold — ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads cleared the ${gatePhrase}; this call needs ${DECISION_MIN_JUDGED}.`,
+    headline: `Hold — ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads reached the ${gatePhrase}; this call needs ${DECISION_MIN_JUDGED}.`,
     clientHeadline:
       "Hold — most ads haven't had enough spend to judge fairly yet.",
     rationale: `Fewer than ${DECISION_MIN_JUDGED} judged ads is too thin a base for a budget or test call — any pattern at this size is as likely noise as signal.`,
@@ -937,7 +937,7 @@ export function buildDecision(
       client: ["We're not adding anything new while the data builds."],
     },
     reassess: {
-      buyer: `Reassess when ≥${DECISION_MIN_JUDGED} ads clear the ${gatePhrase}.`,
+      buyer: `Reassess when ≥${DECISION_MIN_JUDGED} ads reach the ${gatePhrase}.`,
       client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have spent about ${gateLabel} each${clientGateSuffix}.`,
     },
     /* First-Run Fixes: when the hold is caused (at least partly) by ads
@@ -986,7 +986,7 @@ export function buildDecision(
         budgetVariant: "shift",
         headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
         clientHeadline: `Move budget from the weakest ads into "${top!.name}", the clear leader.`,
-        rationale: `"${top!.name}" is ${pct(top!.deltaPct!)}% past the median ${kpiLabel} on ${money(top!.spend)}; ${analysis.belowBenchmarkCount} below-benchmark ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}).`,
+        rationale: `"${top!.name}" is ${pct(top!.deltaPct!)}% better than the median ${kpiLabel} on ${money(top!.spend)}; ${analysis.belowBenchmarkCount} below-benchmark ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}).`,
         clientRationale: `"${top!.name}" is clearly ahead while several ads sit well behind — moving budget captures that gap now.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
@@ -1004,7 +1004,7 @@ export function buildDecision(
         ),
         action: "budget",
         budgetVariant: "scale",
-        headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% past the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
+        headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% better than the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,
         rationale: `"${top!.name}" leads the ${kpiLabel} median by ${pct(top!.deltaPct!)}% on ${money(top!.spend)} of spend — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move. No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`,
         clientRationale: `"${top!.name}" is delivering about ${pct(top!.deltaPct!)}% better ${kpiClient} than this account's typical result, with real spend behind it — it has earned more budget.`,
@@ -1087,7 +1087,7 @@ export function buildDecision(
         ],
       },
       reassess: {
-        buyer: `Reassess when the test clears the ${gatePhrase} — then judge it against the median.`,
+        buyer: `Reassess when the test reaches the ${gatePhrase} — then judge it against the median.`,
         client: `We'll revisit once the test has spent about ${gateLabel}${clientGateSuffix} — enough for a fair read.`,
       },
     };

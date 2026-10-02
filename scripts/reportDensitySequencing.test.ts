@@ -54,7 +54,7 @@ try {
   );
   assert.equal(
     clientizeText(`3 judged ads cleared the gate.`),
-    `3 ads with enough spend to judge fairly cleared the gate.`
+    `3 ads with enough spend to judge fairly cleared the minimum spend.`
   );
 
   // B. Legitimate plain-language phrasing is NOT touched — the fix is

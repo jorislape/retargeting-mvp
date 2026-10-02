@@ -931,7 +931,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
     money
   );
   assert.ok(
-    userGateHold.headline.includes("spend gate you set"),
+    userGateHold.headline.includes("minimum spend you set"),
     "user-gate headline says whose gate it is"
   );
   assert.equal(userGateHold.appliedCriteria[0].source, "user", "gate criterion labeled user");

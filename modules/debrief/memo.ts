@@ -169,7 +169,7 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
     );
   } else {
     lines.push(
-      `Not enough ads cleared the spend gate to call a winner this period — treat this debrief as directional only.`
+      `Not enough ads reached the minimum spend to call a winner this period — treat this debrief as directional only.`
     );
   }
 
@@ -187,7 +187,7 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
 
   if (decision.action === "hold" && decision.holdReason === "insufficient_data") {
     lines.push(
-      `Next: let the current ads accrue spend until enough clear the gate — no new tests yet; rerun this debrief once they do.`
+      `Next: let the current ads accrue spend until enough reach the minimum spend — no new tests yet; rerun this debrief once they do.`
     );
   } else if (decision.action === "hold" && decision.holdReason === "flat_performance") {
     lines.push(
@@ -602,15 +602,15 @@ function buildNextTests(
   const typicalLabel =
     median != null
       ? `the ${medianLabel} typical result`
-      : "the account benchmark (once enough ads clear the gate to set one)";
+      : "the account benchmark (once enough ads reach the minimum spend to set one)";
   const successMetric =
     kpi === "cpa" && context.targetCpa != null
-      ? `CPA below your ${fmtMoney(context.targetCpa, currency)} target once the ~${gateLabel} spend gate is cleared.`
+      ? `CPA below your ${fmtMoney(context.targetCpa, currency)} target once the ~${gateLabel} minimum spend is reached.`
       : kpi === "roas" && context.targetRoas != null
-        ? `ROAS above your ${context.targetRoas.toFixed(2)}x target once the ~${gateLabel} spend gate is cleared.`
+        ? `ROAS above your ${context.targetRoas.toFixed(2)}x target once the ~${gateLabel} minimum spend is reached.`
         : kpi === "ctr"
-          ? `CTR above ${typicalLabel} once the ~${gateLabel} spend gate is cleared, without cost per click worsening materially.`
-          : `${kpiLabel} ${HIGHER_IS_BETTER[kpi] ? "above" : "below"} ${typicalLabel} once the ~${gateLabel} spend gate is cleared.`;
+          ? `CTR above ${typicalLabel} once the ~${gateLabel} minimum spend is reached, without cost per click worsening materially.`
+          : `${kpiLabel} ${HIGHER_IS_BETTER[kpi] ? "above" : "below"} ${typicalLabel} once the ~${gateLabel} minimum spend is reached.`;
   /* Creative / brand constraints the user typed (tone, geo, claims to
      avoid, required offer language). Surfaced as a brief guardrail so
      the hand-off respects them — never touches scoring, ranking, or the
@@ -626,7 +626,7 @@ function buildNextTests(
       ]
     : [];
   const briefGuardrails = (marketInformed: boolean): string[] => [
-    `Do not judge before ~${gateLabel} of spend — below the gate the ad is set aside, not failed.`,
+    `Do not judge before ~${gateLabel} of spend — below the minimum spend the ad is set aside, not failed.`,
     `Do not scale until the test beats ${typicalLabel} by ${SCALE_TEST_MIN_DELTA_PCT}%+.`,
     ...(marketInformed
       ? [
@@ -662,7 +662,7 @@ function buildNextTests(
           ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of this leading angle. Adapt, don't copy."
           : ""
       }`,
-      setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each clears the spend gate. Change only the opening 3 seconds / first frame between variants.`,
+      setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each reaches the minimum spend. Change only the opening 3 seconds / first frame between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
       signals,
       hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" already leads this dataset at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend.`,
@@ -979,7 +979,7 @@ function buildNextTests(
     tests.push({
       test: `Test "${top.name}"'s leading angle with a bundle offer variant (market signal).`,
       why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already leading at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
-      setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it clears the spend gate.`,
+      setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it reaches the minimum spend.`,
       winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
       signals,
       hypothesis: `If we swap only the offer to a bundle while holding "${top.name}"'s creative and audience constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because bundle offers repeat in your market notes (directional) and the angle already leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel}, making an offer swap the cheapest adaptation to test.`,
@@ -1025,7 +1025,7 @@ function buildNextTests(
         : winnerTag
           ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive — a structured challenger shows whether the format or the message is doing the work.`
           : `No format is clearly winning${hasNameSignal ? "" : " and names carry no format signal"} — the fastest way to a pattern is one controlled format-vs-format test.${context.creativeNotes ? ` Use your notes ("${context.creativeNotes.slice(0, 60)}…") to pick the challenger.` : ""}`,
-      setup: `Launch the challenger at ~${gateLabel} alongside the control, same audience and offer, until both clear the spend gate.`,
+      setup: `Launch the challenger at ~${gateLabel} alongside the control, same audience and offer, until both reach the minimum spend.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
       hypothesis: `If we launch ${challenger} at matched budget alongside the current control while holding audience and offer constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because ${leadPastBar ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar but this debrief isn't committing a budget move on it yet, so a structured challenger builds comparison data while that evidence firms up` : winnerTag ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive enough to say the format itself is the reason` : "no format is clearly winning yet, so a controlled comparison is the fastest way to a real pattern"}.`,
@@ -1125,7 +1125,7 @@ function buildAvoid(
       );
     } else {
       buyer.push(
-        `Do not scale budgets on this lead — "${top.name}" is ${Math.round(top.deltaPct)}% past the median, under the ${SCALE_TEST_MIN_DELTA_PCT}% bar a scale move needs.`
+        `Do not scale budgets on this lead — "${top.name}" is ${Math.round(top.deltaPct)}% better than the median, under the ${SCALE_TEST_MIN_DELTA_PCT}% bar a scale move needs.`
       );
       client.push(
         `We're not increasing budgets yet — the current lead isn't decisive enough to scale safely.`
@@ -1143,7 +1143,7 @@ function buildAvoid(
   /* Guardrail: thin-spend ads stay unjudged. */
   if (adsSetAside > 0) {
     buyer.push(
-      `Do not judge the ${adsSetAside} low-spend ad${adsSetAside === 1 ? "" : "s"} yet — below the ${fmtMoney(spendGate, currency)} spend gate they're set aside, not failed.`
+      `Do not judge the ${adsSetAside} low-spend ad${adsSetAside === 1 ? "" : "s"} yet — below the ${fmtMoney(spendGate, currency)} minimum spend they're set aside, not failed.`
     );
     client.push(
       `We're not judging the ${adsSetAside} ad${adsSetAside === 1 ? "" : "s"} that ${adsSetAside === 1 ? "hasn't" : "haven't"} spent enough yet — they get a fair read once the data is there.`
@@ -1264,7 +1264,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
     notes.push("CSV didn't include a reporting date range — treating all rows as one period.");
   }
   if (median == null) {
-    notes.push("Not enough ads passed the spend gate to compute a reliable benchmark.");
+    notes.push("Not enough ads reached the minimum spend to compute a reliable benchmark.");
   }
   if (volumeBelowFloor && winners[0]?.conversions != null) {
     const n = Math.round(winners[0].conversions);
@@ -1310,11 +1310,11 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
 
   if (level === "high") {
     reasons.push(
-      `${adsJudged} of ${adsAnalyzed} ads cleared the spend gate — a fair sample to judge.`
+      `${adsJudged} of ${adsAnalyzed} ads reached the minimum spend — a fair sample to judge.`
     );
     if (topPct != null && topPct >= 30) {
       reasons.push(
-        `The top winner is ${Math.round(topPct)}% past the median — a clear observed lead within this dataset.`
+        `The top winner is ${Math.round(topPct)}% better than the median — a clear observed lead within this dataset.`
       );
     }
     if (losers.length > 0 && belowBenchmarkSpend > 0) {
@@ -1327,7 +1327,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
   } else if (level === "medium") {
     if (adsJudged < 10) {
       reasons.push(
-        `Only ${adsJudged} ads cleared the spend gate — patterns can still shift as more spend lands.`
+        `Only ${adsJudged} ads reached the minimum spend — patterns can still shift as more spend lands.`
       );
     }
     if (winners.length < 3 || losers.length < 3) {
@@ -1352,7 +1352,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
     }
     if (topPct != null && topPct < 30) {
       reasons.push(
-        `The top winner is ${Math.round(topPct)}% past the median — an observed lead, though the gap is moderate.`
+        `The top winner is ${Math.round(topPct)}% better than the median — an observed lead, though the gap is moderate.`
       );
     }
     clientWhy =
@@ -1360,7 +1360,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
   } else {
     if (median == null) {
       reasons.push(
-        "Not enough ads cleared the spend gate to set a reliable benchmark."
+        "Not enough ads reached the minimum spend to set a reliable benchmark."
       );
     }
     if (adsJudged < 5) {
@@ -1553,6 +1553,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     scope: {
       product: context.product || "Your account",
       kpiLabel: kpiLabelFor(analysis),
+      spendGateLabel: fmtMoney(analysis.spendGate, currency),
       kpiExplainer: kpiExplainerFor(analysis),
       /* CPA Leads Label: the client register's plain label, present only
          when it differs (lead-based CPA) — standard memos are unchanged. */

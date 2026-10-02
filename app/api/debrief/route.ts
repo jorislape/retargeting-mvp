@@ -269,8 +269,8 @@ export async function POST(request: NextRequest) {
     const parsed = Number(gateOverrideRaw);
     if (!Number.isFinite(parsed) || parsed <= 0) {
       return fail(400, {
-        title: "Invalid evidence gate",
-        message: "Your custom spend gate must be a positive number.",
+        title: "Invalid minimum spend",
+        message: "Your custom minimum spend must be a positive number.",
         fix: "Enter a positive amount (spend per ad before it's judged), or leave the field blank to use Debrief's default.",
       });
     }

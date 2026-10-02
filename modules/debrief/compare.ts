@@ -381,7 +381,7 @@ export function buildComparison(
       }
     } else if (matchedKeys.has(k)) {
       persistenceBuyer.push(
-        `${label} — a top ad last period — didn't clear the evidence gate this period, so it isn't judged.`
+        `${label} — a top ad last period — didn't reach the minimum spend this period, so it isn't judged.`
       );
       persistenceClient.push(
         `${label}, a leading ad last period, didn't have enough spend this period for a fair read.`
@@ -418,7 +418,7 @@ export function buildComparison(
       if (!prevRead) {
         leaderConsistency = {
           status: "not_judged_previously",
-          buyer: `the current leader ${label} didn't clear the evidence gate last period, so cross-period consistency can't be read.`,
+          buyer: `the current leader ${label} didn't reach the minimum spend last period, so cross-period consistency can't be read.`,
           client: `${label} didn't have enough spend last period for a fair read, so its lead can't be compared across periods.`,
         };
       } else if (prevRead.deltaFromMedian > 0) {
@@ -458,7 +458,7 @@ export function buildComparison(
   }
   if (judgedOnePeriodOnly > 0) {
     limitsBuyer.push(
-      `${judgedOnePeriodOnly} matched ad${judgedOnePeriodOnly === 1 ? "" : "s"} cleared the evidence gate in only one of the two periods — no movement is reported for ${judgedOnePeriodOnly === 1 ? "it" : "them"}.`
+      `${judgedOnePeriodOnly} matched ad${judgedOnePeriodOnly === 1 ? "" : "s"} reached the minimum spend in only one of the two periods — no movement is reported for ${judgedOnePeriodOnly === 1 ? "it" : "them"}.`
     );
     limitsClient.push(
       `${judgedOnePeriodOnly} ad${judgedOnePeriodOnly === 1 ? "" : "s"} had enough spend to judge in only one of the two periods, so no movement is reported for ${judgedOnePeriodOnly === 1 ? "it" : "them"}.`

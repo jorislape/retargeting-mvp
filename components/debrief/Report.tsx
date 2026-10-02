@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/icons";
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
-import { clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { clampTip, Term, TipBubble, withTerms } from "@/components/ui/Term";
+import { CLIENT_BRIEF_LEGEND, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
@@ -366,6 +367,24 @@ function firstClause(text: string): string {
   return idx === -1 ? text : text.slice(0, idx);
 }
 
+/* Report Clarity Pass — buyer-term explanations. Each reuses the
+   report's existing client-register wording for the same concept
+   (ClientStatCards subs, client rationale/losers copy, evidenceLine's
+   client sentences) — no new definitions. */
+const TIP_JUDGED = "Ads that had enough spend to judge fairly.";
+const TIP_MEDIAN = "The account's midpoint result.";
+const TIP_JUDGED_SPEND = "The budget that's had a fair chance to perform.";
+const TIP_BELOW_BENCHMARK = "Performing under the account's typical result.";
+const TIP_BRIEF_READINESS =
+  "Whether this winner has enough results behind it to build the next creative brief on.";
+const TIP_DECISION_BARS =
+  "The bars this call used — the report always states whose bars decided: Debrief's defaults or your own criteria.";
+const READINESS_LABEL: Record<"ready" | "directional" | "insufficient", string> = {
+  ready: "Ready",
+  directional: "Early signal",
+  insufficient: "Not enough evidence",
+};
+
 function DecisionCard({
   memo,
   view,
@@ -383,6 +402,7 @@ function DecisionCard({
 }) {
   const d = memo.decision;
   const client = view === "client";
+  const barsTipId = useId();
   const avoid = client ? d.avoidNow.client : d.avoidNow.buyer;
   const limits = client ? d.limits.client : d.limits.buyer;
   // nextControlledTest is a single register; clientize defensively in
@@ -463,13 +483,22 @@ function DecisionCard({
         {client ? "What the data shows" : "What we know"}
       </p>
       <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-zinc-300">
-        {client ? d.clientRationale : d.rationale}
+        {client
+          ? d.clientRationale
+          : withTerms(d.rationale, [
+              { phrase: "judged spend", tip: TIP_JUDGED_SPEND },
+              { phrase: "below-benchmark", tip: TIP_BELOW_BENCHMARK },
+            ])}
       </p>
       <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
         <span
           className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${EVIDENCE_COLOR[d.evidenceState]}`}
         >
-          {client ? "How sure we are" : "Evidence"}
+          {client ? (
+            "How sure we are"
+          ) : (
+            <Term tip={evidenceLine(d, memo.scope.adsJudged, "client")}>Evidence</Term>
+          )}
         </span>
         {": "}
         {evidenceLine(d, memo.scope.adsJudged, view)}
@@ -509,9 +538,13 @@ function DecisionCard({
             <span
               className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${READINESS_COLOR[memo.nextTests[0].briefReadiness.state]}`}
             >
-              {client ? "Creative pattern" : "Brief readiness"}
+              {client ? (
+                "Ready for a creative brief?"
+              ) : (
+                <Term tip={TIP_BRIEF_READINESS}>Brief readiness</Term>
+              )}
             </span>
-            {": "}
+            {client ? " " : ": "}
             {client
               ? memo.nextTests[0].briefReadiness.client
               : memo.nextTests[0].briefReadiness.buyer}
@@ -524,8 +557,14 @@ function DecisionCard({
       {!client && d.appliedCriteria.length > 0 && (
         <>
           <details className="print-hidden mt-3">
-            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <summary
+              aria-describedby={barsTipId}
+              onMouseEnter={clampTip}
+              onFocus={clampTip}
+              className="group relative cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400"
+            >
               Decision bars applied
+              <TipBubble id={barsTipId}>{TIP_DECISION_BARS}</TipBubble>
             </summary>
             {appliedCriteriaList}
           </details>
@@ -1087,11 +1126,13 @@ function TestRow({
           <p
             className={`mt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${READINESS_COLOR[test.briefReadiness.state]}`}
           >
-            {test.briefReadiness.state === "ready"
-              ? "Ready"
-              : test.briefReadiness.state === "directional"
-                ? "Early signal"
-                : "Not enough evidence"}
+            {view === "client" ? (
+              `Ready for a creative brief? ${READINESS_LABEL[test.briefReadiness.state]}`
+            ) : (
+              <Term tip={test.briefReadiness.client}>
+                {READINESS_LABEL[test.briefReadiness.state]}
+              </Term>
+            )}
           </p>
         )}
         <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
@@ -1397,6 +1438,14 @@ export function Report({
   /* CPA Leads Label: "CPL" in Buyer view, "cost per lead" in Client view
      (scope.kpiLabelClient exists only when the two differ). */
   const viewKpiLabel = client ? memo.scope.kpiLabelClient ?? memo.scope.kpiLabel : memo.scope.kpiLabel;
+  /* Report Clarity Pass — buyer stat-row explanations (see TIP_*). */
+  const statTips: Record<string, string> = {
+    Judged: TIP_JUDGED,
+    "Set aside": memo.scope.setAsideBreakdown
+      ? `Ads with no ${viewKpiLabel} figure, or not enough spend to judge fairly — set aside rather than counted against.`
+      : "Ads that did not have enough spend to judge fairly — set aside rather than counted against.",
+    [`Median ${viewKpiLabel}`]: TIP_MEDIAN,
+  };
   const accent = getAccentById(customization.accentId);
   const displayTitle = customization.reportTitle.trim() || memo.scope.product;
 
@@ -1597,7 +1646,7 @@ export function Report({
         </div>
 
         {/* ---- Masthead ---- */}
-        <header className="animate-rise mt-10" style={stagger(1)}>
+        <header className="animate-rise mt-6 sm:mt-10" style={stagger(1)}>
           <div className="flex items-start justify-between gap-4">
             <div aria-hidden="true" className="mb-4 h-1 w-10 rounded-full bg-accent" />
             {customization.agencyLogo && (
@@ -1663,14 +1712,14 @@ export function Report({
             </p>
           )}
 
-          <div aria-hidden="true" className="mt-8 h-px bg-white/[0.08]" />
+          <div aria-hidden="true" className="mt-6 sm:mt-8 h-px bg-white/[0.08]" />
 
           {/* Client view: executive summary cards (existing values
               only). Buyer view keeps the editorial stat row below. */}
           {client ? (
             <ClientStatCards memo={memo} />
           ) : (
-          <div className="mt-6 grid grid-cols-2 gap-y-5 sm:grid-cols-5">
+          <div className="mt-5 sm:mt-6 grid grid-cols-2 gap-y-4 sm:gap-y-5 sm:grid-cols-5">
             {[
               ["Analyzed", String(memo.scope.adsAnalyzed)],
               ["Judged", String(memo.scope.adsJudged)],
@@ -1700,11 +1749,23 @@ export function Report({
                   {value}
                 </p>
                 <p className="print-kv-label mt-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
-                  {label}
+                  {statTips[label] ? <Term tip={statTips[label]}>{label}</Term> : label}
                 </p>
               </div>
             ))}
           </div>
+          )}
+          {/* Report Clarity Pass — the buyer register's FIRST mention of
+              the evidence gate, always above the fold: defined once here
+              in plain words; every later mention says "minimum spend". */}
+          {!client && memo.scope.spendGateLabel && (
+            <p className="mt-4 sm:mt-5 text-xs leading-relaxed text-zinc-400">
+              <span className="font-medium text-zinc-300">
+                Minimum spend to judge (evidence gate):
+              </span>{" "}
+              {memo.scope.spendGateLabel} per ad — below it, an ad is set
+              aside rather than judged.
+            </p>
           )}
         </header>
 
@@ -2007,6 +2068,12 @@ export function Report({
           />
           {client ? (
             <>
+              {memo.nextTests.some((t) => t.briefReadiness) && (
+                <p className="mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
+                  <span className="font-medium text-zinc-300">Ready for a creative brief?</span>{" "}
+                  {CLIENT_BRIEF_LEGEND}
+                </p>
+              )}
               <p className="mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
                 We&apos;ll test new creative based on what performed strongest
                 this period — each test says why it&apos;s worth running and

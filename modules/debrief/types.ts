@@ -475,6 +475,10 @@ export interface AnalysisResult {
 export interface MemoScope {
   product: string;
   kpiLabel: string;
+  /** Report Clarity Pass: the evidence gate as money ("$120.91"), for the
+   *  buyer register's one plain-words definition ("Minimum spend to
+   *  judge (evidence gate)"). Display only. */
+  spendGateLabel?: string;
   /** CPA Leads Label: client-register label ("cost per lead"), present
    *  only when it differs from kpiLabel. Report/text pick per view. */
   kpiLabelClient?: string;

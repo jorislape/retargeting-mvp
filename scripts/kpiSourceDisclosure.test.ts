@@ -216,7 +216,7 @@ try {
     const both = resolveColumns(["Ad name", "Amount spent (EUR)", "Qualified leads", "Leads"]);
     assert.equal(kpiSourcePreview("leads", both), "Leads from column 'Leads' — 'Qualified leads' also found, not used.");
     const q = resolveColumns(["Ad name", "Amount spent (EUR)", "Qualified leads"]);
-    assert.equal(kpiSourcePreview("leads", q), "Leads from column 'Qualified leads'.");
+    assert.equal(kpiSourcePreview("leads", q), "Leads from column 'Qualified leads' (check it's the conversion you mean).");
     const r = resolveColumns(["Ad name", "Amount spent (EUR)", "Results"]);
     assert.match(kpiSourcePreview("purchases", r) ?? "", /Purchases from column 'Results' \(Meta's optimisation event/);
     assert.equal(kpiSourcePreview("ctr", q), null, "CTR shows no conversion source");

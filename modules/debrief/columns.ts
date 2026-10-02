@@ -376,6 +376,9 @@ export function kpiSourcePreview(
     if (!src) return [];
     let part = `${PREVIEW_LABEL[field]} from column '${src.header}'`;
     if (src.match === "results") part += " (Meta's optimisation event — check it's the conversion you mean)";
+    /* Report Clarity Pass: a partial match ("Qualified leads" read as
+       leads) gets the same check-the-conversion hint. */
+    if (src.match === "partial") part += " (check it's the conversion you mean)";
     if (src.ignored.length > 0) {
       part += ` — ${quoted(src.ignored)} also found, not used`;
     }
