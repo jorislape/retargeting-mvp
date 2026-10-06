@@ -126,6 +126,20 @@ function buildRow(
   analysis: AnalysisResult,
   context: DebriefContext
 ): MemoWinnerLoserRow {
+  /* Tester Feedback Fix 2: a judged zero-conversion CPA ad has no KPI
+     value to print — the row states the fact (0 purchases/leads) and
+     carries no percentage (deltaPct null → no ranking-chart geometry). */
+  if (ad.zeroConversions) {
+    const many = outcomeNounsFor(analysis)?.many ?? "conversions";
+    return {
+      name: ad.name,
+      valueLabel: `0 ${many}`,
+      vsMedianLabel: `no ${kpiLabelFor(analysis)} — ranked last`,
+      deltaPct: null,
+      spendLabel: fmtMoney(ad.spend, analysis.currency),
+      reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
+    };
+  }
   return {
     name: ad.name,
     valueLabel: fmtKpiValue(ad.kpiValue as number, analysis.kpi, analysis.currency),
@@ -599,8 +613,11 @@ function buildNextTests(
   const topSignal = top
     ? `"${top.name}" leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend.`
     : null;
+  const zeroMany = outcomeNouns?.many ?? "conversions";
   const worstSignal = worst
-    ? `"${worst.name}" spent ${fmtMoney(worst.spend, currency)} and ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}.`
+    ? worst.zeroConversions
+      ? `"${worst.name}" spent ${fmtMoney(worst.spend, currency)} with 0 ${zeroMany}.`
+      : `"${worst.name}" spent ${fmtMoney(worst.spend, currency)} and ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}.`
     : null;
   const tagSignal = winnerTag
     ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots${
@@ -780,7 +797,39 @@ function buildNextTests(
   if (worst) {
     const worstStats = `${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}) on ${fmtMoney(worst.spend, currency)} spend`;
     const problemFirst = market?.has("problem-first") ?? false;
-    if (worst.nameTags.includes("discount/promo")) {
+    if (worst.zeroConversions) {
+      /* Tester Feedback Fix 2: the weakest judged ad recorded nothing —
+         there is no value to "beat", so the test is whether a rebuilt
+         version converts at all. States the fact only; never why. */
+      const spent = fmtMoney(worst.spend, currency);
+      const signals = sig(worstSignal, belowSignal);
+      tests.push({
+        test: `Test one rebuilt version of "${worst.name}" before it gets more budget — it spent ${spent} with 0 ${zeroMany}.`,
+        why: `It spent ${spent}, past the ~${gateLabel} minimum spend, with 0 ${zeroMany} — the weakest judged result in this export. The data shows that it didn't convert, not why, so one controlled rebuild is the cheapest way to learn whether anything in it is worth keeping.`,
+        setup: `Pause or reduce the original. One rebuild at ~${gateLabel}, same audience, placement, and offer — change one element of the creative so the result is readable.`,
+        winningLooksLike: `The rebuild records ${zeroMany} and reaches ${medianLabel} or better; if it records none again by ~${gateLabel}, retire the angle.`,
+        signals,
+        hypothesis: `If we rebuild "${worst.name}" while holding audience, offer, and placement constant, we want to test whether it records ${zeroMany} at all — because the original spent ${spent} with 0 ${zeroMany}.`,
+        briefReadiness: loserReadiness ?? undefined,
+        brief: {
+          title: `Rebuild of "${worst.name}"`,
+          objective: `Learn whether a rebuilt version of this ad records any ${zeroMany} — one controlled rebuild before the angle is retired.`,
+          basedOn: signals,
+          concept: `The same offer and audience with one creative element changed — the original spent ${spent} with 0 ${zeroMany}.`,
+          hooks: [
+            "Payoff-first open: move the ad's strongest moment into second one.",
+            `Question open: the angle's promise for ${product} as a direct question.`,
+            "Text-led open: the core existing line as bold on-screen text before any footage.",
+          ],
+          assetDirection: directionFor(worst.nameTags[0]),
+          keepConstant: `Audience, placement, and ${offerLabel}.`,
+          change: "One creative element — so the result can be attributed to it.",
+          successMetric,
+          guardrails: briefGuardrails(false),
+          basisNote: basisNote(false),
+        },
+      });
+    } else if (worst.nameTags.includes("discount/promo")) {
       const signals = sig(
         worstSignal,
         belowSignal,
@@ -1111,7 +1160,11 @@ function buildAvoid(
   /* Loser-side: don't feed what's failing. */
   if (worst && worst.nameTags.includes("discount/promo")) {
     buyer.push(
-      `Do not launch more discount-led ads until the hook is rebuilt — "${worst.name}" ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}.`
+      `Do not launch more discount-led ads until the hook is rebuilt — "${worst.name}" ${
+        worst.zeroConversions
+          ? `spent ${fmtMoney(worst.spend, currency)} with 0 ${outcomeNounsFor(analysis)?.many ?? "conversions"}`
+          : `ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}`
+      }.`
     );
     client.push(
       `We're not creating more discount-first ads until the message is rebuilt — the current one runs below the typical result.`

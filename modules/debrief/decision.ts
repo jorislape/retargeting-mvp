@@ -744,10 +744,13 @@ export function buildDecision(
     analysis.judgedSpend > 0
       ? (analysis.belowBenchmarkSpend / analysis.judgedSpend) * 100
       : 0;
+  /* Tester Feedback Fix 2: a judged zero-conversion CPA ad (no value,
+     deltaPct null) is by definition further behind than any bar — it
+     qualifies on the "worst ad" half; the spend-share half still holds. */
   const cutEligible =
     worst != null &&
-    worst.deltaPct != null &&
-    worst.deltaPct <= -SCALE_TEST_MIN_DELTA_PCT &&
+    (worst.zeroConversions === true ||
+      (worst.deltaPct != null && worst.deltaPct <= -SCALE_TEST_MIN_DELTA_PCT)) &&
     belowShare >= CUT_MIN_SPEND_SHARE_PCT;
   const winnerShare =
     top != null && analysis.judgedSpend > 0

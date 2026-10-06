@@ -340,6 +340,14 @@ export interface ParsedAd {
   spend: number;
   /** The value for the selected KPI, in that KPI's own units. */
   kpiValue: number | null;
+  /** Tester Feedback Fix 2: set ONLY when the KPI is CPA, kpiValue is
+   *  null, and the export's conversion count cell (purchases, else leads
+   *  — the same columns kpiValueForRow divides by) is a real 0, not
+   *  blank. Such an ad spent money and converted nothing: above the
+   *  spend gate it is JUDGED as the worst performer (excluded from the
+   *  median, ranked below every loser) instead of being set aside as
+   *  "no value". Below the gate it is still set aside for spend. */
+  zeroConversions?: true;
   /** CPA Leads Label: set ONLY when the KPI is CPA and every CPA value in
    *  the export came from lead data (cost per lead / spend ÷ leads). */
   cpaBasis?: "lead";

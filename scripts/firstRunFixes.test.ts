@@ -251,8 +251,13 @@ try {
     [["A", 400, 8], ["B", 380, 0], ["C", 360, 6], ["D", 340, 0], ["E", 320, 0], ["F", 300, 4], ["G", 280, 0], ["H", 260, 3], ["I", 50, 1]]
       .forEach(([n, s, p]) => (csv += `${n},${s},${p},${p ? ((s as number) / (p as number)).toFixed(2) : ""}\n`));
     const cpa = run(csv, "cpa");
-    assert.equal(cpa.analysis.kpiGaps.zeroOutcome, 4, "zero-purchase ads recognised as zero outcomes");
-    assert.ok(cpa.memo.decision.headline.includes("4 had no purchases, so CPA can't be computed for them"));
+    // Tester Feedback Fix 2 (intended change): zero-purchase ads that
+    // cleared the spend gate are now JUDGED as the worst performers,
+    // not set aside as "no value" — so no gap / hold copy remains.
+    assert.equal(cpa.analysis.kpiGaps, undefined, "zero-purchase ads above the gate are judged, not gaps");
+    assert.equal(cpa.analysis.adsJudged, 8);
+    assert.deepEqual(cpa.analysis.losers.slice(0, 4).map((a: { name: string }) => a.name), ["B", "D", "E", "G"]);
+    assert.ok(!cpa.memo.decision.headline.includes("can't be computed"));
     // For the Purchases KPI, zero IS a value: the same ads are judged, no gaps.
     const purchases = run(csv, "purchases");
     assert.equal(purchases.analysis.kpiGaps, undefined, "zero purchases is a real value for a count KPI");

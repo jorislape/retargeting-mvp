@@ -56,7 +56,10 @@ function gateAds(ads: ParsedAd[], spendGate: number): GatedAd[] {
   return ads.map((ad) => {
     let gate: GateReason;
     if (ad.spend < spendGate) gate = "below_spend_gate";
-    else if (ad.kpiValue == null) gate = "no_kpi_value";
+    /* Tester Feedback Fix 2: a CPA ad with a real 0 conversion count
+       that cleared the spend gate is judged (as the worst), not set
+       aside — spending past the gate with nothing to show IS a result. */
+    else if (ad.kpiValue == null && !ad.zeroConversions) gate = "no_kpi_value";
     else gate = "judged";
     return { ...ad, gate };
   });
@@ -65,7 +68,13 @@ function gateAds(ads: ParsedAd[], spendGate: number): GatedAd[] {
 function rankJudged(judged: GatedAd[], kpi: KpiKey, benchmark: number): RankedAd[] {
   const higherBetter = HIGHER_IS_BETTER[kpi];
   return judged.map((ad) => {
-    const value = ad.kpiValue as number; // judged ads always have a value
+    /* Tester Feedback Fix 2: a zero-conversion CPA ad has no value to
+       compare. It ranks below every real loser via the most-negative
+       finite delta (finite on purpose — never Infinity, which JSON
+       turns into null and arithmetic turns into NaN); deltaPct stays
+       null so no surface invents a percentage for it. */
+    if (ad.zeroConversions) return { ...ad, deltaFromMedian: -Number.MAX_VALUE, deltaPct: null };
+    const value = ad.kpiValue as number; // every other judged ad has a value
     const delta = higherBetter ? value - benchmark : benchmark - value;
     const deltaPct = benchmark !== 0 ? (delta / Math.abs(benchmark)) * 100 : null;
     return { ...ad, deltaFromMedian: delta, deltaPct };
@@ -133,7 +142,11 @@ export function analyze(
   const gated = gateAds(ads, spendGate);
   const judged = gated.filter((a) => a.gate === "judged");
   const kpiGaps = computeKpiGaps(gated, kpi, rawRows, columns);
-  const benchmark = median(judged.map((a) => a.kpiValue as number));
+  /* Zero-conversion CPA ads are judged but have no value — they never
+     enter the median (Tester Feedback Fix 2). */
+  const benchmark = median(
+    judged.filter((a) => a.kpiValue != null).map((a) => a.kpiValue as number)
+  );
 
   const ranked = benchmark != null ? rankJudged(judged, kpi, benchmark) : [];
   const winnerPool = ranked
@@ -141,7 +154,13 @@ export function analyze(
     .sort((a, b) => b.deltaFromMedian - a.deltaFromMedian);
   const loserPool = ranked
     .filter((a) => a.deltaFromMedian < 0)
-    .sort((a, b) => a.deltaFromMedian - b.deltaFromMedian);
+    /* Zero-conversion ads share one sentinel delta; among them, more
+       spend wasted ranks worse. Every other comparison is unchanged. */
+    .sort((a, b) =>
+      a.zeroConversions && b.zeroConversions
+        ? b.spend - a.spend
+        : a.deltaFromMedian - b.deltaFromMedian
+    );
   /* Spend Allocation V1: the third bucket rankedAds' own doc comment
      already names ("winners ∪ losers ∪ ads exactly at the median") but
      never aggregates. Same classification the winner/loser pools
@@ -199,20 +218,24 @@ export function analyze(
  *  cleared the spend gate yet has no KPI value. Reads only facts the
  *  gate already established — never re-gates or re-ranks. */
 function computeKpiGaps(
-  gated: { gate: string; kpiValue: number | null; conversions?: number | null }[],
+  gated: { gate: string; kpiValue: number | null; conversions?: number | null; zeroConversions?: true }[],
   kpi: KpiKey,
   rawRows: Record<string, string>[],
   columns: ColumnMap
 ): KpiGaps | null {
   const setAsideNoValue = gated.filter((a) => a.gate === "no_kpi_value").length;
   if (setAsideNoValue === 0) return null;
-  const noValueAds = gated.filter((a) => a.kpiValue == null);
+  /* Tester Feedback Fix 2: zero-conversion CPA ads are a result, not a
+     missing value — judged above the gate, "too little spend" below it.
+     So for CPA, zeroOutcome no longer counts them (no set-aside copy
+     claims "CPA couldn't be computed" for an ad the memo judged). */
+  const noValueAds = gated.filter((a) => a.kpiValue == null && !a.zeroConversions);
   const zeroOutcome =
     kpi === "roas" || kpi === "cpa"
       ? noValueAds.filter((a) => a.conversions === 0).length
       : 0;
   const belowGateWithValue = gated.filter(
-    (a) => a.gate === "below_spend_gate" && a.kpiValue != null
+    (a) => a.gate === "below_spend_gate" && (a.kpiValue != null || a.zeroConversions)
   ).length;
   const missing = noValueAds.length - zeroOutcome;
   let suggestedKpi: KpiKey | null = null;

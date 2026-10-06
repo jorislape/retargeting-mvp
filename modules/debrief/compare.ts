@@ -182,6 +182,8 @@ export function buildComparison(
   const judgedByKey = (period: ComparisonPeriod): Map<string, RankedAd> => {
     const map = new Map<string, RankedAd>();
     for (const ad of period.analysis.rankedAds) {
+      /* A judged zero-conversion CPA ad has no value to diff. */
+      if (ad.kpiValue == null) continue;
       const k = usable(ad);
       if (k != null) map.set(k, ad);
     }

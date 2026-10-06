@@ -110,6 +110,17 @@ function cpaBasisForRow(
   return null;
 }
 
+/** Tester Feedback Fix 2: true when a CPA row has no computable value
+ *  because its conversion count is a real 0 — mirrors the count
+ *  kpiValueForRow's "cpa" branch divides by (purchases ?? leads). A
+ *  blank/missing cell parses to null and stays false: missing ≠ zero. */
+function cpaZeroConversions(row: Record<string, string>, columns: ColumnMap): boolean {
+  const count =
+    (columns.purchases ? parseNumericCell(row[columns.purchases]) : null) ??
+    (columns.leads ? parseNumericCell(row[columns.leads]) : null);
+  return count === 0;
+}
+
 /** Evidence Inputs V1: the raw conversion count behind a purchase-based
  *  KPI — purchases for roas/cpa/purchases, leads for leads — when a count
  *  column is present. Returns null for ctr/cpc (their reliability axis is
@@ -169,11 +180,17 @@ export function extractAds(
          an empty cell stays null. */
       const rawId = columns.adId ? row[columns.adId] : undefined;
       const id = rawId && rawId.trim() !== "" ? rawId.trim() : null;
+      const kpiValue = kpiValueForRow(row, columns, kpi, spend);
       return {
         name,
         id,
         spend,
-        kpiValue: kpiValueForRow(row, columns, kpi, spend),
+        kpiValue,
+        /* Tester Feedback Fix 2 — key present only when true, so other
+           ads (and every non-CPA run) are key-for-key unchanged. */
+        ...(kpi === "cpa" && kpiValue == null && cpaZeroConversions(row, columns)
+          ? { zeroConversions: true as const }
+          : {}),
         nameTags: extractNameTags(name),
         conversions: conversionsForRow(row, columns, kpi),
         ...upstreamFieldsForRow(row, columns),
