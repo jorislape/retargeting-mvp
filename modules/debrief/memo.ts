@@ -634,6 +634,17 @@ function buildNextTests(
     adsSetAside > 0
       ? `${adsSetAside} thin-spend ad${adsSetAside === 1 ? " was" : "s were"} set aside, not judged.`
       : null;
+  /* Tester Feedback Fix 3: Debrief never sees creative content, so an
+     "opening" test is a hypothesis, not a diagnosis. Without a hook-
+     level metric in the export the copy says the export can't show
+     whether the opening is the issue; with one, it names the column(s)
+     so each variant's opening can be compared directly. */
+  const hookCols = analysis.hookMetricColumns ?? [];
+  const hookColsLabel = hookCols.map((h) => `"${h}"`).join(" / ");
+  const openingEvidence =
+    hookCols.length > 0
+      ? `This export includes ${hookColsLabel}, so compare each version's opening on that as well as on ${kpiLabel}.`
+      : "This export has no hook-level metric (3-second video plays, ThruPlays), so it can't show whether the opening is what's holding the result back or pushing it forward.";
   const sig = (...items: (string | null | false | undefined)[]) =>
     items
       .filter((s): s is string => typeof s === "string" && s !== "")
@@ -698,9 +709,9 @@ function buildNextTests(
     );
     tests.push({
       test: founderLed
-        ? `Brief 2 new ${format}variants of "${top.name}" — keep the angle; make one a founder-led version (market signal), change only the hook on the other.`
-        : `Brief 2 new ${format}variants of "${top.name}" — keep the angle, change the hook.`,
-      why: `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend. This version produced the strongest observed result in the current dataset — new hooks find its ceiling before fatigue does.${
+        ? `Brief 2 new ${format}variants of "${top.name}" — make one a founder-led version (market signal); vary only the opening on the other.`
+        : `Brief 2 new ${format}variants of "${top.name}" — vary only the opening to test whether the angle has more headroom.`,
+      why: `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend — the strongest observed result in the current dataset. One way to test whether the angle has more headroom: vary only the opening. ${openingEvidence}${
         founderLed
           ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of this leading angle. Adapt, don't copy."
           : ""
@@ -716,7 +727,7 @@ function buildNextTests(
           ? `Founder-led variant of the "${top.name}" angle`
           : `Hook variants of "${top.name}"`,
         objective:
-          "Learn whether the account's leading angle has more headroom — find a new opening that beats the original before fatigue does.",
+          "Learn whether the account's leading angle has more headroom by varying only the opening.",
         basedOn: signals,
         concept: `Two variants of the winning ad: identical angle, offer, and audience — only the opening changes.${
           founderLed
@@ -919,7 +930,7 @@ function buildNextTests(
         test: problemFirst
           ? `Rebuild "${worst.name}" with a problem-first opening hook (observed market pattern) before writing the angle off.`
           : `Rebuild "${worst.name}" with a new opening hook before writing the angle off.`,
-        why: `At ${worstStats} it's the account's weakest judged ad — one rebuild is cheaper than losing an angle that might only have a hook problem.${
+        why: `At ${worstStats} it's the account's weakest judged ad. One way to test whether the angle is worth keeping: rebuild only the opening and see whether the result moves. ${openingEvidence}${
           problemFirst
             ? " Your market notes flag problem-first hooks as a repeating pattern — directional, and the cheapest place to test it."
             : ""
@@ -927,12 +938,12 @@ function buildNextTests(
         setup: `Reduce the original's spend. One rebuild at ~${gateLabel}, changing only the hook — same body, audience, and offer.`,
         winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
         signals,
-        hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, ${loserThin ? "we want to test whether it clearly beats" : "we expect it to clearly beat"} ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} — because at ${worstStats} it's the account's weakest judged ad, and a rebuild is the cheapest way to learn whether the angle itself is the problem or just the hook.`,
+        hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, ${loserThin ? "we want to test whether it clearly beats" : "we expect it to clearly beat"} ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} — because at ${worstStats} it's the account's weakest judged ad, and changing only the opening is the cheapest controlled way to learn whether the result moves with it.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `Hook rebuild of "${worst.name}"`,
           objective:
-            "Learn whether the angle only has a hook problem — one rebuild before retiring it.",
+            "Learn whether changing only the opening moves the result — one rebuild before retiring the angle.",
           basedOn: signals,
           concept: `The same ad with a new opening${problemFirst ? ", built problem-first (observed market pattern)" : ""} — body, audience, and offer untouched.`,
           hooks: [
@@ -1160,7 +1171,7 @@ function buildAvoid(
   /* Loser-side: don't feed what's failing. */
   if (worst && worst.nameTags.includes("discount/promo")) {
     buyer.push(
-      `Do not launch more discount-led ads until the hook is rebuilt — "${worst.name}" ${
+      `Do not launch more discount-led ads until a rebuilt version has been tested — "${worst.name}" ${
         worst.zeroConversions
           ? `spent ${fmtMoney(worst.spend, currency)} with 0 ${outcomeNounsFor(analysis)?.many ?? "conversions"}`
           : `ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}`

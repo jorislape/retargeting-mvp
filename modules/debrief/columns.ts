@@ -110,6 +110,15 @@ const ALIASES = {
      spend/impressions, so there is never a second, competing CPM
      definition alongside whatever Ads Manager itself computed. */
   cpm: ["cpm cost per 1 000 impressions", "cpm"],
+  /* Tester Feedback Fix 3: hook-level (opening) metrics. Detection
+     only — never read by gate/median/ranking/action; their presence
+     lets the memo cite them when it suggests varying an ad's opening,
+     and their absence makes it say plainly the export can't show
+     whether the opening is the issue. "Cost per …" variants never
+     match first-pass exact and are rejected below. */
+  videoPlays3s: ["3 second video plays", "3 second video views"],
+  thruPlays: ["thruplays", "thruplay"],
+  videoPlays: ["video plays"],
 } as const;
 
 /** Meta's per-campaign optimisation-event columns. They're resolved as
@@ -169,6 +178,10 @@ export interface ColumnMap {
   addToCart: string | null;
   contentViews: string | null;
   cpm: string | null;
+  /** Tester Feedback Fix 3 — optional hook-level video metrics. */
+  videoPlays3s: string | null;
+  thruPlays: string | null;
+  videoPlays: string | null;
   /** 3-letter currency code pulled from the spend header, if present. */
   currency: string | null;
   /** KPI Source Column Disclosure: for each RESOLVED conversion field,
@@ -206,9 +219,33 @@ export function resolveColumns(headers: string[]): ColumnMap {
     addToCart: findHeader(headers, ALIASES.addToCart),
     contentViews: findHeader(headers, ALIASES.contentViews),
     cpm: findHeader(headers, ALIASES.cpm),
+    ...hookMetricHeaders(headers),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
     sources: resolveSources(headers),
   };
+}
+
+/** Tester Feedback Fix 3: resolves the hook-level metric columns, never
+ *  from a cost-per header ("Cost per ThruPlay" is a cost, not a count). */
+function hookMetricHeaders(headers: string[]) {
+  const counts = headers.filter((h) => !/cost per/i.test(h));
+  return {
+    videoPlays3s: findHeader(counts, ALIASES.videoPlays3s),
+    thruPlays: findHeader(counts, ALIASES.thruPlays),
+    videoPlays: findHeader(counts, ALIASES.videoPlays),
+  };
+}
+
+/** The distinct hook-level metric headers present, in a fixed order
+ *  (3-second plays, ThruPlays, video plays). Empty when none. */
+export function hookMetricColumns(columns: ColumnMap): string[] {
+  return [
+    ...new Set(
+      [columns.videoPlays3s, columns.thruPlays, columns.videoPlays].filter(
+        (h): h is string => h != null
+      )
+    ),
+  ];
 }
 
 function resolveSources(headers: string[]): ColumnMap["sources"] {

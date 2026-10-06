@@ -475,6 +475,10 @@ export interface AnalysisResult {
   /** First-Run Fixes — see KpiGaps. Absent on every export where all
    *  set-aside ads were set aside for spend (incl. the sample). */
   kpiGaps?: KpiGaps;
+  /** Tester Feedback Fix 3: hook-level metric headers in the export
+   *  (3-second video plays / ThruPlays / video plays). Wording only —
+   *  lets opening-variant tests cite them; absent when none present. */
+  hookMetricColumns?: string[];
   /** CPA Leads Label — present only when kpi is CPA and every CPA value
    *  came from lead data. Drives labels/nouns via kpiLabelFor & co. */
   cpaBasis?: CpaBasis;

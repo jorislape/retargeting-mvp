@@ -1,4 +1,4 @@
-import { ColumnMap, kpiColumnSourcesFor } from "./columns";
+import { ColumnMap, hookMetricColumns, kpiColumnSourcesFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import {
   AnalysisResult,
@@ -134,6 +134,7 @@ export function analyze(
       ? "leads"
       : undefined;
   const kpiSources = kpiColumnSourcesFor(kpi, columns, cpaBasis);
+  const hookColumns = hookMetricColumns(columns);
   const { gate: spendGate, basis: spendGateBasis } = computeSpendGate(
     ads,
     targetCpa,
@@ -211,6 +212,8 @@ export function analyze(
     ...(kpiSources.length > 0 ? { kpiColumnSources: kpiSources } : {}),
     ...(kpiGaps ? { kpiGaps } : {}),
     ...(cpaBasis ? { cpaBasis } : {}),
+    /* Tester Feedback Fix 3: wording only; absent when none present. */
+    ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
   };
 }
 
