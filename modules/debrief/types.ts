@@ -542,7 +542,8 @@ export interface MemoWinnerLoserRow {
    *  present). Copy only — never changes action or evidenceState. */
   fewOutcomesNote?: string;
   /** Tester Feedback Fix 6 — BUYER register only: "Frequency 1.9",
-   *  present when the export has a Frequency column. Display only. */
+   *  present when the export has a Frequency column and the row has no
+   *  fatigueNote (which carries the number itself). Display only. */
   frequencyLabel?: string;
   /** BUYER register only: present when frequency ≥
    *  FREQUENCY_FATIGUE_NOTE_AT — "Frequency 5.1 — possible fatigue;

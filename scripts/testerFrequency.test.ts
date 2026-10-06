@@ -37,12 +37,16 @@ try {
   assert.equal(t.ads.find((a) => a.name === "Ad_H")?.frequency, 5.13);
   assert.equal(t.ads.find((a) => a.name === "Ad_H")?.reach, 11986);
   assert.equal(FREQUENCY_FATIGUE_NOTE_AT, 4);
-  for (const r of rows) assert.match(r.frequencyLabel ?? "", /^Frequency \d+\.\d$/, `${r.name} shows frequency`);
+  for (const r of rows)
+    assert.match(r.frequencyLabel ?? r.fatigueNote ?? "", /^Frequency \d+\.\d/, `${r.name} shows frequency`);
   const h = rows.find((r) => r.name === "Ad_H");
-  assert.equal(h?.frequencyLabel, "Frequency 5.1");
+  // Follow-up: the fatigue note carries the number — no second plain line.
+  assert.equal(h?.frequencyLabel, undefined, "no duplicate Frequency line on a fatigue row");
+  assert.ok(rows.filter((r) => r !== h).every((r) => r.frequencyLabel && !r.fatigueNote), "below threshold: plain line only");
   assert.equal(h?.fatigueNote, "Frequency 5.1 — possible fatigue; check the trend in Ads Manager.");
   assert.deepEqual(rows.filter((r) => r.fatigueNote).map((r) => r.name), ["Ad_H"], "only ≥4 gets the note");
-  assert.match(t.buyerText, /- Ad_H \| 18\.93 EUR \(at median\) \| 548\.99 EUR \| 29 purchases \| Frequency 5\.1 \| .*Frequency 5\.1 — possible fatigue; check the trend in Ads Manager\./);
+  assert.match(t.buyerText, /- Ad_H \| 18\.93 EUR \(at median\) \| 548\.99 EUR \| 29 purchases \| Metrics only — angle unknown\. Frequency 5\.1 — possible fatigue; check the trend in Ads Manager\./);
+  assert.equal((t.buyerText.match(/Frequency 5\.1/g) ?? []).length, 1, "the number appears once");
   assert.match(t.buyerText, /- Ad_D \| 15\.74 EUR .* \| 53 purchases \| Frequency 3\.2 \|/);
   assert.ok(!/Frequency|fatigue/i.test(t.clientText), "client register shows neither");
 

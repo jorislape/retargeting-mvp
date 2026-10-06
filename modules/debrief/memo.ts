@@ -165,12 +165,11 @@ export const FREQUENCY_FATIGUE_NOTE_AT = 4;
 function frequencyFieldsFor(ad: RankedAd): { frequencyLabel?: string; fatigueNote?: string } {
   if (ad.frequency == null) return {};
   const f = ad.frequency.toFixed(1);
-  return {
-    frequencyLabel: `Frequency ${f}`,
-    ...(ad.frequency >= FREQUENCY_FATIGUE_NOTE_AT
-      ? { fatigueNote: `Frequency ${f} — possible fatigue; check the trend in Ads Manager.` }
-      : {}),
-  };
+  /* At/above the threshold the note already carries the number — no
+     separate plain "Frequency N.N" line for that row. */
+  return ad.frequency >= FREQUENCY_FATIGUE_NOTE_AT
+    ? { fatigueNote: `Frequency ${f} — possible fatigue; check the trend in Ads Manager.` }
+    : { frequencyLabel: `Frequency ${f}` };
 }
 
 /* Tester Feedback Fix 4: a ROAS/CPA value divides by the conversion
