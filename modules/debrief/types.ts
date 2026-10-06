@@ -479,6 +479,11 @@ export interface AnalysisResult {
    *  (3-second video plays / ThruPlays / video plays). Wording only —
    *  lets opening-variant tests cite them; absent when none present. */
   hookMetricColumns?: string[];
+  /** Tester Feedback Fix 5: present ONLY when the KPI is CPA (incl.
+   *  lead-based) and no target CPA was given — the ranking is then
+   *  relative to this account, not to profitability. roasAvailable:
+   *  the export also carries ROAS / purchase value. Limits copy only. */
+  cpaWithoutTarget?: { roasAvailable: boolean };
   /** CPA Leads Label — present only when kpi is CPA and every CPA value
    *  came from lead data. Drives labels/nouns via kpiLabelFor & co. */
   cpaBasis?: CpaBasis;

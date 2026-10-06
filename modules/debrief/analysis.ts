@@ -1,4 +1,4 @@
-import { ColumnMap, hookMetricColumns, kpiColumnSourcesFor } from "./columns";
+import { ColumnMap, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import {
   AnalysisResult,
@@ -214,6 +214,10 @@ export function analyze(
     ...(cpaBasis ? { cpaBasis } : {}),
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
+    /* Tester Feedback Fix 5: wording only; absent unless CPA w/o target. */
+    ...(kpi === "cpa" && !(targetCpa != null && targetCpa > 0)
+      ? { cpaWithoutTarget: { roasAvailable: requiredColumnsFor("roas", columns).length === 0 } }
+      : {}),
   };
 }
 

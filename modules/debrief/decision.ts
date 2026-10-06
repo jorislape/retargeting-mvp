@@ -501,6 +501,27 @@ export function buildLimits(
     client.push(sourceLines.client);
   }
 
+  /* Tester Feedback Fix 5: CPA with no target ranks ads against each
+     other, not against profitability — say so, and point at ROAS when
+     the export has it. Copy only. */
+  if (analysis.cpaWithoutTarget) {
+    const label = kpiLabelFor(analysis);
+    const clientLabel = kpiClientLabelFor(analysis);
+    const lead = analysis.cpaBasis === "leads";
+    const differs = lead ? "lead quality or value differs" : "order value or margin differs";
+    const roas = analysis.cpaWithoutTarget.roasAvailable;
+    buyer.push(
+      `No target CPA set — ads are ranked against this account's median ${label}, not against what's profitable. A higher ${label} isn't automatically worse if ${differs}.${
+        roas ? " ROAS is available in this export and accounts for order value." : ""
+      }`
+    );
+    client.push(
+      `No cost target was set, so ads are compared with this account's typical ${clientLabel}, not with what's profitable. A higher ${clientLabel} isn't automatically worse if ${differs}.${
+        roas ? " This file also includes return on ad spend, which accounts for order value." : ""
+      }`
+    );
+  }
+
   if (analysis.kpiGaps) {
     /* First-Run Fixes: some set-aside ads spent enough but have no KPI
        value — name each cause with its count instead of "too little
