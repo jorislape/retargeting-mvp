@@ -876,7 +876,7 @@ function buildNextTests(
       const signals = sig(worstSignal, belowSignal);
       tests.push({
         test: `Test one rebuilt version of "${worst.name}" before it gets more budget — it spent ${spent} with 0 ${zeroMany}.`,
-        why: `It spent ${spent}, past the ~${gateLabel} minimum spend, with 0 ${zeroMany} — the weakest judged result in this export. The data shows that it didn't convert, not why, so one controlled rebuild is the cheapest way to learn whether anything in it is worth keeping.`,
+        why: `It spent ${spent}, past the ~${gateLabel} minimum spend, with 0 ${zeroMany} — the weakest result among ads past the minimum spend. The data shows that it didn't convert, not why, so one controlled rebuild is the cheapest way to learn whether anything in it is worth keeping.`,
         setup: `Pause or reduce the original. One rebuild at ~${gateSetupLabel}, same audience, placement, and offer — change one element of the creative so the result is readable.`,
         winningLooksLike: `The rebuild records ${zeroMany} and reaches ${medianLabel} or better; if it records none again by ~${gateLabel}, retire the angle.`,
         signals,
@@ -1398,7 +1398,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
 
   if (adsSetAside > 0) {
     notes.push(
-      `${adsSetAside} of ${adsAnalyzed} ads were set aside for insufficient spend (below ${fmtMoney(spendGate, currency)}) — excluded from winners/losers, not penalized.`
+      `${adsSetAside} of ${adsAnalyzed} ads ${adsSetAside === 1 ? "was" : "were"} set aside for insufficient spend (below ${fmtMoney(spendGate, currency)}) — excluded from winners/losers, not penalized.`
     );
   }
   if (analysis.kpiGaps) {

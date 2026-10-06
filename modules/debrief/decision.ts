@@ -532,17 +532,22 @@ export function buildLimits(
       kpiClientLabelFor(analysis),
       outcomeNounsFor(analysis)?.many ?? null
     );
-    buyer.push(`${parts.buyer} — set aside, so no conclusion is drawn about them either way.`);
-    client.push(`${parts.client}, so they're not part of this read.`);
+    const one = analysis.kpiGaps.noValue + analysis.kpiGaps.belowGateWithValue === 1;
+    buyer.push(`${parts.buyer} — set aside, so no conclusion is drawn about ${one ? "it" : "them"} either way.`);
+    client.push(`${parts.client}, so ${one ? "it's" : "they're"} not part of this read.`);
   } else if (analysis.adsSetAside - (analysis.zeroOutcomeThin?.ads.length ?? 0) > 0) {
     /* Zero-conversion ads under their spend bar get their own named
        lines in buildDecision (they need the money formatter). */
     const n = analysis.adsSetAside - (analysis.zeroOutcomeThin?.ads.length ?? 0);
     buyer.push(
-      `${n} ad${n === 1 ? "" : "s"} had too little spend to judge and were set aside — no conclusion is drawn about them either way.`
+      n === 1
+        ? "1 ad had too little spend to judge and was set aside — no conclusion is drawn about it either way."
+        : `${n} ads had too little spend to judge and were set aside — no conclusion is drawn about them either way.`
     );
     client.push(
-      `${n} ad${n === 1 ? "" : "s"} didn't have enough spend to include yet, so they're not part of this read.`
+      n === 1
+        ? "1 ad didn't have enough spend to include yet, so it's not part of this read."
+        : `${n} ads didn't have enough spend to include yet, so they're not part of this read.`
     );
   }
   if (!analysis.hasCreativeNotes && !analysis.hasNameSignal) {

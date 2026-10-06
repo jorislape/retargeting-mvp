@@ -40,8 +40,35 @@ export function clientizeText(text: string): string {
     /* CPA Leads Label: buyer-register "CPL" reads as plain cost per lead. */
     .replace(/\bCPL\b/g, "cost per lead")
     .replace(/\bmedian\b/g, "typical result")
+    /* Tester Feedback follow-up: the signal "N thin-spend ads were set
+       aside, not judged" reaches the client through here. */
+    .replace(/\bwere set aside, not judged\b/g, "aren't included yet — too little spend")
+    .replace(/\bwas set aside, not judged\b/g, "isn't included yet — too little spend")
+    .replace(/\bset aside, not judged\b/g, "not included yet — too little spend")
     .replace(/\bjudged ads\b/g, "ads with enough spend to judge fairly")
     .replace(/\bjudged ad\b/g, "ad with enough spend to judge fairly");
+}
+
+/** Tester Feedback follow-up — the client register's "data used"
+ *  sentence, shared by the report and TXT so they can't drift; never
+ *  says "judged", and singular/plural agree ("1 ad … it isn't"). */
+export function clientDataUsedSentence(
+  scope: Memo["scope"],
+  kpiLabel: string
+): string {
+  const n = scope.adsJudged;
+  const enough = `${n} ad${n === 1 ? "" : "s"} had enough spend to compare fairly`;
+  const b = scope.setAsideBreakdown;
+  if (b) {
+    const parts = [`${b.noValue} had no ${kpiLabel} figure`];
+    if (b.spend > 0) parts.push(`${b.spend} didn't have enough spend`);
+    const total = b.noValue + b.spend;
+    return `${enough}; ${parts.join(" and ")}, so ${total === 1 ? "it isn't" : "they aren't"} included yet.`;
+  }
+  const s = scope.adsSetAside;
+  return s > 0
+    ? `${enough}; ${s} did not, so ${s === 1 ? "it isn't" : "they aren't"} included yet.`
+    : `${enough}.`;
 }
 
 /**
@@ -130,7 +157,9 @@ export function memoToText(
   if (view === "client") lines.push(`${viewKpiLabel}: ${scope.kpiExplainer}`);
   if (scope.dateRangeLabel) lines.push(scope.dateRangeLabel);
   lines.push(
-    `Ads analyzed: ${scope.adsAnalyzed} · Judged: ${scope.adsJudged} · Set aside: ${scope.adsSetAside}`
+    view === "client"
+      ? `Ads analyzed: ${scope.adsAnalyzed} · Ads with enough spend to compare: ${scope.adsJudged} · Not included yet: ${scope.adsSetAside}`
+      : `Ads analyzed: ${scope.adsAnalyzed} · Judged: ${scope.adsJudged} · Set aside: ${scope.adsSetAside}`
   );
   if (view !== "client" && scope.spendGateLabel) {
     lines.push(
@@ -283,7 +312,11 @@ export function memoToText(
     lines.push("CREATIVE GROUPS");
     memo.creativeGroups.groups.forEach((group) => {
       lines.push(group.label);
-      lines.push(`${group.judgedCount} judged execution${group.judgedCount === 1 ? "" : "s"}`);
+      lines.push(
+        view === "client"
+          ? `${group.judgedCount} execution${group.judgedCount === 1 ? "" : "s"} with enough spend to compare`
+          : `${group.judgedCount} judged execution${group.judgedCount === 1 ? "" : "s"}`
+      );
       const tally: string[] = [];
       if (group.aboveCount > 0) {
         tally.push(`${group.aboveCount} ${view === "client" ? "above the typical result" : "above median"}`);
@@ -433,7 +466,7 @@ export function memoToText(
     view === "client"
       ? scope.adsSetAside > 0
         ? `${scope.adsSetAside} ad${scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
-        : "Every ad had enough spend to be judged fairly."
+        : "Every ad had enough spend to compare fairly."
       : memo.losers.setAsideNote
   );
   lines.push("");
@@ -531,7 +564,7 @@ export function memoToText(
     lines.push(`CONFIDENCE & DATA USED: ${memo.confidence.level.toUpperCase()}`);
     lines.push(memo.confidence.clientWhy);
     lines.push(
-      `This result is based on ${scope.adsAnalyzed} ads and ${scope.totalSpendLabel} in ad spend${scope.dateRangeLabel ? ` between ${scope.dateRangeLabel}` : ""}. ${scope.adsJudged} ads had enough spend to judge fairly${scope.adsSetAside > 0 ? `; ${scope.adsSetAside} did not and were set aside` : ""}. Every number comes directly from the ad account — nothing is estimated.`
+      `This result is based on ${scope.adsAnalyzed} ads and ${scope.totalSpendLabel} in ad spend${scope.dateRangeLabel ? ` between ${scope.dateRangeLabel}` : ""}. ${clientDataUsedSentence(scope, scope.kpiLabelClient ?? scope.kpiLabel)} Every number comes directly from the ad account — nothing is estimated.`
     );
   } else {
     lines.push(`CONFIDENCE: ${memo.confidence.level.toUpperCase()}`);

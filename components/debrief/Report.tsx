@@ -20,7 +20,7 @@ import {
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
-import { CLIENT_BRIEF_LEGEND, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { CLIENT_BRIEF_LEGEND, clientDataUsedSentence, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
@@ -956,9 +956,9 @@ function ClientStatCards({ memo }: { memo: Memo }) {
           ]
         : []),
       {
-        label: "Judged fairly",
+        label: "Enough spend to compare",
         value: `${scope.adsJudged} of ${scope.adsAnalyzed}`,
-        sub: "ads had enough spend to judge",
+        sub: "ads compared fairly",
       },
       {
         label: "Next tests",
@@ -2070,7 +2070,7 @@ export function Report({
                   `${memo.scope.setAsideBreakdown.spend > 0 ? `${memo.scope.setAsideBreakdown.spend} ad${memo.scope.setAsideBreakdown.spend === 1 ? " did" : "s did"} not have enough spend to compare fairly; ` : ""}${memo.scope.setAsideBreakdown.noValue} had no ${viewKpiLabel} figure in the file — set aside rather than counted against.`
                 : memo.scope.adsSetAside > 0
                   ? `${memo.scope.adsSetAside} ad${memo.scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
-                  : "Every ad had enough spend to be judged fairly."
+                  : "Every ad had enough spend to compare fairly."
               : memo.losers.setAsideNote}
           </p>
         </section>
@@ -2306,12 +2306,8 @@ export function Report({
                 {memo.scope.dateRangeLabel
                   ? ` between ${memo.scope.dateRangeLabel}`
                   : ""}
-                . {memo.scope.setAsideBreakdown
-                  ? /* First-Run Fixes: name both causes. */
-                    `${memo.scope.adsJudged} ads could be compared fairly; ${memo.scope.setAsideBreakdown.noValue} had no ${viewKpiLabel} figure${memo.scope.setAsideBreakdown.spend > 0 ? ` and ${memo.scope.setAsideBreakdown.spend} didn't have enough spend` : ""}, so they were set aside`
-                  : `${memo.scope.adsJudged} ads had enough spend to judge fairly${memo.scope.adsSetAside > 0 ? `; ${memo.scope.adsSetAside} did not and were set aside` : ""}`}
-                . Every number comes directly from the ad account — nothing is
-                estimated.
+                . {clientDataUsedSentence(memo.scope, viewKpiLabel)} Every number
+                comes directly from the ad account — nothing is estimated.
               </p>
             </>
           ) : (
