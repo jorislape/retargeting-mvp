@@ -41,9 +41,11 @@ try {
   for (const l of [...clientAtLines, ...clientStrings(m)])
     for (const w of ["benchmark", "median", "gate", "kill"]) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(l), `client "${w}": ${l}`);
 
-  // Order: after the winners list, before the losers section.
-  const iAt = t.buyerText.indexOf("At the median — this ad");
+  // Order: its own block after the winners section, before the losers section.
+  const iAt = t.buyerText.indexOf("AT THE MEDIAN\nAt the median — this ad");
   assert.ok(iAt > t.buyerText.indexOf("WINNERS") && iAt < t.buyerText.indexOf("LOSERS"));
+  assert.match(t.buyerText, /\n\nAT THE MEDIAN\n/, "separate block, blank line before");
+  assert.match(t.clientText, /\n\nAT THE TYPICAL RESULT\nPerformed exactly/);
 
   // Decision logic untouched: same call the tester saw on main.
   assert.equal(m.decision.action, "test");
@@ -62,7 +64,14 @@ try {
 
   // Report renders it in both views (PDF prints the same DOM).
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
-  assert.match(report, /\{memo\.atMedian && \(\s*<AtMedianRows atMedian=\{memo\.atMedian\} client=\{client\}/);
+  // Follow-up: its own unnumbered block BETWEEN the Winners and Losers sections.
+  assert.match(report, /\{memo\.atMedian && \(sections\.winners \|\| sections\.underperformers\) && \(\s*<section[^>]*>\s*<AtMedianRows atMedian=\{memo\.atMedian\} client=\{client\}/);
+  const iWin = report.indexOf("---- Winners / What worked ----");
+  const iAtSrc = report.indexOf("<AtMedianRows atMedian=");
+  const iLose = report.indexOf("---- Losers / What underperformed ----");
+  assert.ok(iWin < iAtSrc && iAtSrc < iLose, "rendered after the Winners section closes, before Losers");
+  const winnersSection = report.slice(iWin, iAtSrc);
+  assert.ok(/<\/section>\s*\)\}\s*[\s\S]*$/.test(winnersSection), "Winners section is closed before the at-median block");
   assert.match(report, /client \? atMedian\.clientLabel : atMedian\.buyerLabel/);
 
   // decision.ts never reads it.

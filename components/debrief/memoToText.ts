@@ -392,17 +392,16 @@ export function memoToText(
       );
     }
   }
-  // Tester Feedback Fixes: the ad(s) that ARE the median — in neither
-  // list above or below, so named here rather than left invisible.
-  if (memo.atMedian) {
-    lines.push(`${view === "client" ? memo.atMedian.clientLabel : memo.atMedian.buyerLabel}:`);
-    memo.atMedian.rows.forEach((r) => {
-      lines.push(
-        adRow(r)
-      );
-    });
-  }
   lines.push("");
+
+  // Tester Feedback Fixes: the ad(s) that ARE the median — neither a
+  // winner nor a loser, so their own block between the two sections.
+  if (memo.atMedian) {
+    lines.push(view === "client" ? "AT THE TYPICAL RESULT" : "AT THE MEDIAN");
+    lines.push(`${view === "client" ? memo.atMedian.clientLabel : memo.atMedian.buyerLabel}:`);
+    memo.atMedian.rows.forEach((r) => lines.push(adRow(r)));
+    lines.push("");
+  }
 
   /* Criteria Coherence fix: "KILL LIST" naming only when the committed
      decision actually contains a cut (shift/cut variants) — otherwise

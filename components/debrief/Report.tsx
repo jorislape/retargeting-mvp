@@ -876,8 +876,8 @@ function AtMedianRows({
   density: "compact" | "standard";
 }) {
   return (
-    <div className="mt-5">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+    <div>
+      <p className="border-b border-white/10 pb-2 text-[13px] font-semibold text-zinc-300">
         {client ? atMedian.clientLabel : atMedian.buyerLabel}
       </p>
       <div className="mt-2 divide-y divide-white/[0.06]">
@@ -2030,10 +2030,17 @@ export function Report({
               <AdTable rows={memo.winners} tone="win" view={view} topAdsShown={customization.topAdsShown} density={customization.density} />
             )}
           </div>
-          {memo.atMedian && (
-            <AtMedianRows atMedian={memo.atMedian} client={client} density={customization.density} />
-          )}
         </section>
+        )}
+
+        {/* ---- At the median (Tester Feedback follow-up) — its own
+            neutral, UNNUMBERED block between Winners and Losers (so no
+            section renumbers): the median ad is neither. Shown whenever
+            either neighbouring section is. Print follows the DOM. ---- */}
+        {memo.atMedian && (sections.winners || sections.underperformers) && (
+          <section className="animate-rise mt-12" aria-label={client ? "At the typical result" : "At the median"}>
+            <AtMedianRows atMedian={memo.atMedian} client={client} density={customization.density} />
+          </section>
         )}
 
         {/* ---- Losers / What underperformed ---- */}
