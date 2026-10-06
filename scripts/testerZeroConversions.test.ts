@@ -73,6 +73,57 @@ try {
     assert.equal(withZero.memo.decision.budgetVariant, "cut");
   }
 
+  /* ---- Follow-up guard: judged only at ≥ 2 × max(median CPA, target) ---- */
+  {
+    // Valued ads with CPA ≈ 100 → median 100 → zero-conversion bar 200.
+    const pricey = [["X1", 300, 3], ["X2", 320, 3], ["X3", 340, 4], ["X4", 360, 3], ["X5", 400, 4]] as const;
+    // Just above the spend gate but under 2× median CPA → set aside.
+    const thin = run(csvOf([...pricey, ["ZeroThin", 190, 0]]), "cpa");
+    const ta = thin.analysis;
+    assert.ok(190 >= ta.spendGate, `above the minimum spend (gate ${ta.spendGate})`);
+    assert.ok(ta.median != null && 190 < 2 * ta.median, "under 2× median CPA");
+    assert.equal(ta.adsJudged, 5, "not judged");
+    assert.ok(!ta.rankedAds.some((r) => r.name === "ZeroThin"));
+    assert.deepEqual(ta.zeroOutcomeThin, { ads: [{ name: "ZeroThin", spend: 190 }], needs: 2 * (ta.median as number) });
+    const needs = `${(2 * (ta.median as number)).toFixed(2)} EUR`;
+    const buyerLine = `"ZeroThin" spent 190.00 EUR with 0 purchases — not enough spend yet to call it (needs ≥ ${needs}).`;
+    assert.ok(thin.memo.decision.limits.buyer.includes(buyerLine), "buyer limits line");
+    assert.ok(thin.memo.losers.setAsideNote.includes(buyerLine), "losers set-aside note");
+    assert.ok(!/had too little spend \(below/.test(thin.memo.losers.setAsideNote), "never claimed to be below the minimum spend");
+    assert.ok(thin.memo.decision.limits.client.includes(
+      `"ZeroThin" has spent 190.00 EUR without a purchase so far — too early to call (it needs about ${needs} of spend).`));
+    assert.ok(thin.buyerText.includes(buyerLine));
+    for (const st of clientStrings(thin.memo))
+      for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(st), `client "${w}": ${st}`);
+
+    // Well above 2× median CPA → judged as the worst.
+    const big = run(csvOf([...pricey, ["ZeroBig2", 900, 0]]), "cpa");
+    assert.ok(900 >= 2 * (big.analysis.median as number));
+    assert.equal(big.analysis.losers[0].name, "ZeroBig2");
+    assert.equal(big.analysis.zeroOutcomeThin, undefined);
+
+    // With a target CPA: bar = 2 × max(median, target). (The spend gate is
+    // then 3 × target, so the target half only ever matters via the max.)
+    const tgt = run(csvOf([...pricey, ["ZeroMid", 190, 0]]), "cpa", { targetCpa: 60 });
+    assert.equal(tgt.analysis.spendGate, 180);
+    assert.equal(tgt.analysis.zeroOutcomeThin?.needs, 2 * Math.max(tgt.analysis.median as number, 60));
+    assert.ok(!tgt.analysis.rankedAds.some((r) => r.name === "ZeroMid"));
+  }
+
+  /* ---- Re-check: the 9-ad zero-purchase fixture (median 67.50 → bar 135;
+     B/D/E/G spent 280–380) — all four stay judged; decision unchanged. ---- */
+  {
+    let nine = "Ad name,Amount spent (USD),Purchases,Cost per purchase (USD)\n";
+    [["A", 400, 8], ["B", 380, 0], ["C", 360, 6], ["D", 340, 0], ["E", 320, 0], ["F", 300, 4], ["G", 280, 0], ["H", 260, 3], ["I", 50, 1]]
+      .forEach(([n, sp, p]) => (nine += `${n},${sp},${p},${p ? ((sp as number) / (p as number)).toFixed(2) : ""}\n`));
+    const r = run(nine, "cpa");
+    assert.equal(r.analysis.median, 67.5);
+    assert.equal(r.analysis.zeroOutcomeThin, undefined);
+    assert.equal(r.analysis.adsJudged, 8);
+    assert.equal(r.memo.decision.action, "budget");
+    assert.equal(r.memo.decision.budgetVariant, "cut");
+  }
+
   /* ---- Fixture B: zero-purchase ad BELOW the gate → set aside for spend ---- */
   {
     const t = run(csvOf([...BASE, ["ZeroSmall", 20, 0]]), "cpa");

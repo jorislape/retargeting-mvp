@@ -57,7 +57,27 @@ const formatLabel = (tag: string): string => CREATIVE_FORMAT_LABELS[tag] ?? tag;
  *  those are explained by the decision's own limits line, so spend
  *  wording never claims them. */
 function spendSetAside(analysis: AnalysisResult): number {
-  return analysis.kpiGaps ? analysis.kpiGaps.belowGateWithValue : analysis.adsSetAside;
+  /* Zero-conversion ads under the zero-conversion bar cleared the
+     minimum spend — they're named separately (zeroThinLines), never
+     counted as "below the minimum". */
+  const thin = analysis.zeroOutcomeThin?.ads.length ?? 0;
+  return (analysis.kpiGaps ? analysis.kpiGaps.belowGateWithValue : analysis.adsSetAside) - thin;
+}
+
+/** Tester Feedback follow-up: one buyer line per zero-conversion CPA ad
+ *  set aside under the zero-conversion spend bar. */
+function zeroThinLines(analysis: AnalysisResult): string[] {
+  const z = analysis.zeroOutcomeThin;
+  if (!z) return [];
+  const money = (v: number) => fmtMoney(v, analysis.currency);
+  const many = outcomeNounsFor(analysis)?.many ?? "conversions";
+  const need =
+    z.needs != null
+      ? `needs ≥ ${money(z.needs)}`
+      : `no other ad has a ${kpiLabelFor(analysis)} to measure it against yet`;
+  return z.ads.map(
+    (a) => `"${a.name}" spent ${money(a.spend)} with 0 ${many} — not enough spend yet to call it (${need}).`
+  );
 }
 
 function describeAdReason(
@@ -1736,13 +1756,17 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),
       setAsideNote: (() => {
         const spendCount = spendSetAside(analysis);
+        const thinLines = zeroThinLines(analysis);
         const spendLine =
           spendCount > 0
             ? `${spendCount} ad${spendCount === 1 ? "" : "s"} had too little spend (below ${fmtMoney(analysis.spendGate, currency)}) to judge fairly — set aside, not penalized.`
-            : "No ads were set aside for low spend.";
-        return analysis.kpiGaps
+            : thinLines.length > 0
+              ? ""
+              : "No ads were set aside for low spend.";
+        const base = analysis.kpiGaps
           ? `${spendLine} ${analysis.kpiGaps.noValue} had no ${kpiLabelFor(analysis)} value — also set aside, not penalized.`
           : spendLine;
+        return [base, ...thinLines].filter((s) => s.trim() !== "").join(" ").trim();
       })(),
     },
     patterns: buildPatterns(analysis),

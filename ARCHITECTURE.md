@@ -111,10 +111,13 @@ components/debrief/
 - **Benchmark** = median KPI value across gated ("judged") ads only.
 - **Zero-conversion CPA ads** — when the KPI is CPA and an ad's
   conversion count cell is a real 0 (not blank), it has no CPA but did
-  spend: past the gate it is judged as the worst performer (excluded
-  from the median, ranked below every loser, counted in below-benchmark
-  spend, eligible for the cut bar). Below the gate it is set aside for
-  spend; a blank cell is still set aside as "no value".
+  spend: past the gate AND at ≥ `ZERO_CONVERSION_SPEND_MULTIPLE` (2) ×
+  max(median CPA of the ads that have one, target CPA) it is judged as
+  the worst performer (excluded from the median, ranked below every
+  loser, counted in below-benchmark spend, eligible for the cut bar).
+  Past the gate but under that bar it is set aside, named with the
+  spend it needs ("not enough spend yet to call it"). Below the gate it
+  is set aside for spend; a blank cell is still set aside as "no value".
 - **Polarity** — ROAS/CTR/Leads/Purchases: higher is better. CPA/CPC:
   lower is better. (`HIGHER_IS_BETTER` in `types.ts`.)
 - **Winners/losers** = up to 5 judged ads strictly better/worse than

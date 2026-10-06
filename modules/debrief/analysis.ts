@@ -16,6 +16,15 @@ import {
  *  is given. Configurable — change this constant if your floor differs. */
 export const DEFAULT_SPEND_FLOOR = 10;
 
+/** Tester Feedback follow-up: a zero-conversion CPA ad is judged (as the
+ *  worst) only once its spend makes "0 conversions" meaningful — at least
+ *  this multiple of max(the median CPA of the ads that DO have a CPA,
+ *  the target CPA when set). At 2× the typical cost of one conversion,
+ *  an ad with none has missed by a clear margin; below that, 0 can be
+ *  ordinary noise, so the ad stays set aside ("not enough spend yet to
+ *  call it"). A disclosed Debrief default, not a statistical test. */
+export const ZERO_CONVERSION_SPEND_MULTIPLE = 2;
+
 const MAX_WINNERS_LOSERS = 5;
 const MIN_ADS_FOR_NAME_SIGNAL = 4;
 const NAME_SIGNAL_SHARE = 0.5;
@@ -140,14 +149,28 @@ export function analyze(
     targetCpa,
     context.spendGateOverride
   );
-  const gated = gateAds(ads, spendGate);
+  const firstPass = gateAds(ads, spendGate);
+  /* Zero-conversion CPA ads never enter the median (Tester Feedback
+     Fix 2) — it's computed from the ads that have a value. */
+  const benchmark = median(
+    firstPass
+      .filter((a) => a.gate === "judged" && a.kpiValue != null)
+      .map((a) => a.kpiValue as number)
+  );
+  /* Follow-up guard: past the spend gate, a zero-conversion ad is judged
+     only at ≥ ZERO_CONVERSION_SPEND_MULTIPLE × max(median CPA, target
+     CPA); below that it's set aside. No median and no target → there is
+     nothing to measure "0" against, so it's set aside too. */
+  const zeroBarBase = Math.max(benchmark ?? 0, targetCpa != null && targetCpa > 0 ? targetCpa : 0);
+  const zeroBar = zeroBarBase > 0 ? ZERO_CONVERSION_SPEND_MULTIPLE * zeroBarBase : null;
+  const gated: GatedAd[] = firstPass.map((a) =>
+    a.gate === "judged" && a.zeroConversions && !(zeroBar != null && a.spend >= zeroBar)
+      ? { ...a, gate: "zero_outcome_thin" }
+      : a
+  );
+  const zeroThin = gated.filter((a) => a.gate === "zero_outcome_thin");
   const judged = gated.filter((a) => a.gate === "judged");
   const kpiGaps = computeKpiGaps(gated, kpi, rawRows, columns);
-  /* Zero-conversion CPA ads are judged but have no value — they never
-     enter the median (Tester Feedback Fix 2). */
-  const benchmark = median(
-    judged.filter((a) => a.kpiValue != null).map((a) => a.kpiValue as number)
-  );
 
   const ranked = benchmark != null ? rankJudged(judged, kpi, benchmark) : [];
   const winnerPool = ranked
@@ -211,6 +234,14 @@ export function analyze(
        standard export's AnalysisResult is unchanged key-for-key. */
     ...(kpiSources.length > 0 ? { kpiColumnSources: kpiSources } : {}),
     ...(kpiGaps ? { kpiGaps } : {}),
+    ...(zeroThin.length > 0
+      ? {
+          zeroOutcomeThin: {
+            ads: zeroThin.map((z) => ({ name: z.name, spend: z.spend })),
+            needs: zeroBar,
+          },
+        }
+      : {}),
     ...(cpaBasis ? { cpaBasis } : {}),
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
@@ -242,7 +273,9 @@ function computeKpiGaps(
       ? noValueAds.filter((a) => a.conversions === 0).length
       : 0;
   const belowGateWithValue = gated.filter(
-    (a) => a.gate === "below_spend_gate" && (a.kpiValue != null || a.zeroConversions)
+    (a) =>
+      (a.gate === "below_spend_gate" && (a.kpiValue != null || a.zeroConversions)) ||
+      a.gate === "zero_outcome_thin"
   ).length;
   const missing = noValueAds.length - zeroOutcome;
   let suggestedKpi: KpiKey | null = null;

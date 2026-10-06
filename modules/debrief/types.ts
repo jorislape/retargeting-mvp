@@ -387,7 +387,11 @@ export interface ParsedAd {
   reach?: number | null;
 }
 
-export type GateReason = "judged" | "below_spend_gate" | "no_kpi_value";
+/** zero_outcome_thin (Tester Feedback follow-up): a zero-conversion CPA
+ *  ad past the spend gate whose spend is still under
+ *  ZERO_CONVERSION_SPEND_MULTIPLE × max(median CPA, target CPA) — too
+ *  little spend yet for "0" to mean anything; set aside, not judged. */
+export type GateReason = "judged" | "below_spend_gate" | "no_kpi_value" | "zero_outcome_thin";
 
 export interface GatedAd extends ParsedAd {
   gate: GateReason;
@@ -414,7 +418,9 @@ export interface KpiGaps {
   /** Subset of noValue: ROAS/CPA ads whose purchase count is a real 0 —
    *  the KPI can't be computed, it isn't missing from the export. */
   zeroOutcome: number;
-  /** Ads with a KPI value that didn't clear the spend gate. */
+  /** Ads set aside for too little spend: a KPI value but under the spend
+   *  gate, plus zero-conversion CPA ads under the zero-conversion spend
+   *  bar (gate "zero_outcome_thin"). */
   belowGateWithValue: number;
   /** The KPI this export reads best with (kpiUsability's preferredUsableKpi
    *  — same choice the generator's auto-switch makes), offered only when
@@ -490,6 +496,11 @@ export interface AnalysisResult {
    *  relative to this account, not to profitability. roasAvailable:
    *  the export also carries ROAS / purchase value. Limits copy only. */
   cpaWithoutTarget?: { roasAvailable: boolean };
+  /** Tester Feedback follow-up: zero-conversion CPA ads set aside under
+   *  the zero-conversion spend bar (gate "zero_outcome_thin"). `needs`
+   *  is that bar in money, or null when there was nothing to measure it
+   *  against (no median CPA and no target). Absent when none. */
+  zeroOutcomeThin?: { ads: { name: string; spend: number }[]; needs: number | null };
   /** CPA Leads Label — present only when kpi is CPA and every CPA value
    *  came from lead data. Drives labels/nouns via kpiLabelFor & co. */
   cpaBasis?: CpaBasis;

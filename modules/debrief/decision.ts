@@ -534,12 +534,15 @@ export function buildLimits(
     );
     buyer.push(`${parts.buyer} — set aside, so no conclusion is drawn about them either way.`);
     client.push(`${parts.client}, so they're not part of this read.`);
-  } else if (analysis.adsSetAside > 0) {
+  } else if (analysis.adsSetAside - (analysis.zeroOutcomeThin?.ads.length ?? 0) > 0) {
+    /* Zero-conversion ads under their spend bar get their own named
+       lines in buildDecision (they need the money formatter). */
+    const n = analysis.adsSetAside - (analysis.zeroOutcomeThin?.ads.length ?? 0);
     buyer.push(
-      `${analysis.adsSetAside} ad${analysis.adsSetAside === 1 ? "" : "s"} had too little spend to judge and were set aside — no conclusion is drawn about them either way.`
+      `${n} ad${n === 1 ? "" : "s"} had too little spend to judge and were set aside — no conclusion is drawn about them either way.`
     );
     client.push(
-      `${analysis.adsSetAside} ad${analysis.adsSetAside === 1 ? "" : "s"} didn't have enough spend to include yet, so they're not part of this read.`
+      `${n} ad${n === 1 ? "" : "s"} didn't have enough spend to include yet, so they're not part of this read.`
     );
   }
   if (!analysis.hasCreativeNotes && !analysis.hasNameSignal) {
@@ -944,6 +947,28 @@ export function buildDecision(
     const src = spendGateSource(analysis, money);
     gateSourceBuyer.push(`The ${gateLabel} minimum spend per ad is ${src.buyer}`);
     gateSourceClient.push(`The ${gateLabel} minimum spend used to include an ad is ${src.client}.`);
+  }
+  /* Tester Feedback follow-up: each zero-conversion CPA ad set aside
+     under the zero-conversion spend bar, named with the spend it needs. */
+  const thin = analysis.zeroOutcomeThin;
+  if (thin) {
+    const nouns = outcomeNounsFor(analysis);
+    const many = nouns?.many ?? "conversions";
+    const one = nouns?.one ?? "conversion";
+    for (const z of thin.ads) {
+      gateSourceBuyer.push(
+        `"${z.name}" spent ${money(z.spend)} with 0 ${many} — not enough spend yet to call it (${
+          thin.needs != null
+            ? `needs ≥ ${money(thin.needs)}`
+            : `no other ad has a ${kpiLabel} to measure it against yet`
+        }).`
+      );
+      gateSourceClient.push(
+        `"${z.name}" has spent ${money(z.spend)} without a ${one} so far — too early to call${
+          thin.needs != null ? ` (it needs about ${money(thin.needs)} of spend)` : " until other ads have results to compare it with"
+        }.`
+      );
+    }
   }
   const limits = {
     buyer: [...baseLimits.buyer, ...gateSourceBuyer, ...criteriaBuyer],
