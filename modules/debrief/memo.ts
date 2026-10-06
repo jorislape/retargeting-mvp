@@ -137,6 +137,32 @@ function buildRow(
   };
 }
 
+/* Tester Feedback Fixes: the ad(s) that ARE the median. Same row shape
+   as winners/losers; the delta label says "at median" rather than
+   "0% worse than median". Spread into the memo only when non-empty. */
+export const AT_MEDIAN_BUYER_LABEL = "At the median — this ad is the benchmark";
+export const AT_MEDIAN_CLIENT_LABEL =
+  "Performed exactly at the account's typical result — this ad is the one that sets it";
+
+function buildAtMedian(
+  analysis: AnalysisResult,
+  context: DebriefContext
+): { atMedian?: NonNullable<Memo["atMedian"]> } {
+  const ads = analysis.rankedAds.filter((a) => a.deltaFromMedian === 0);
+  if (ads.length === 0) return {};
+  return {
+    atMedian: {
+      rows: ads.map((ad) => ({ ...buildRow(ad, analysis, context), vsMedianLabel: "at median" })),
+      buyerLabel:
+        ads.length === 1 ? AT_MEDIAN_BUYER_LABEL : "At the median — these ads set the benchmark",
+      clientLabel:
+        ads.length === 1
+          ? AT_MEDIAN_CLIENT_LABEL
+          : "Performed exactly at the account's typical result — these ads are the ones that set it",
+    },
+  };
+}
+
 /* TLDR Coherence fix: the verdict lines take the ALREADY-BUILT decision
    and voice an imperative ("move budget toward it", "Kill or shrink")
    ONLY when the committed call actually is that move — otherwise they
@@ -1580,6 +1606,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     tldr: buildTldr(analysis, decision),
     clientSummary: buildClientSummary(analysis, decision),
     winners: analysis.winners.map((ad) => buildRow(ad, analysis, context)),
+    ...buildAtMedian(analysis, context),
     leadingConversion: buildLeadingConversion(analysis),
     losers: {
       rows: analysis.losers.map((ad) => buildRow(ad, analysis, context)),

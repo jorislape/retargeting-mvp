@@ -377,6 +377,16 @@ export function memoToText(
       );
     }
   }
+  // Tester Feedback Fixes: the ad(s) that ARE the median — in neither
+  // list above or below, so named here rather than left invisible.
+  if (memo.atMedian) {
+    lines.push(`${view === "client" ? memo.atMedian.clientLabel : memo.atMedian.buyerLabel}:`);
+    memo.atMedian.rows.forEach((r) => {
+      lines.push(
+        `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)}) | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""} | ${r.reason}`
+      );
+    });
+  }
   lines.push("");
 
   /* Criteria Coherence fix: "KILL LIST" naming only when the committed

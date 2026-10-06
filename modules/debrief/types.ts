@@ -997,6 +997,20 @@ export interface Memo {
    *  tldr, none of the buyer shorthand. */
   clientSummary: string[];
   winners: MemoWinnerLoserRow[];
+  /** Tester Feedback Fixes — judged ads sitting exactly ON the median
+   *  (deltaFromMedian === 0). With an odd number of judged ads the
+   *  median IS one ad, which lands in neither winners nor losers; this
+   *  surfaces it so it never reads as "not evaluated". Presentation
+   *  only — read from analysis.rankedAds, never by decision.ts. Absent
+   *  when no judged ad sits exactly on the median (e.g. an even count
+   *  with no tie), so those memos are key-for-key unchanged. */
+  atMedian?: {
+    rows: MemoWinnerLoserRow[];
+    /** "At the median — this ad is the benchmark" (buyer register). */
+    buyerLabel: string;
+    /** Jargon-free equivalent for the client view. */
+    clientLabel: string;
+  };
   /** Evidence Inputs V1: a neutral, one-line statement of the conversion
    *  count behind the leading ad — or an explicit "not in this export"
    *  line when the count is unavailable. Two registers. null when there

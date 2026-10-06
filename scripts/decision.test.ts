@@ -1336,12 +1336,14 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // Decision & Comparison V2 added `comparison`; Creative Grouping V1
     // added `creativeGroups` (right after it, matching generateMemo's own
     // field order); Spend Allocation V1 added `spendAllocation` — all
-    // purely additive, nothing else reordered.
+    // purely additive, nothing else reordered. Tester Feedback Fix 1 added
+    // `atMedian` (right after winners; present here because the sample's
+    // 11 judged ads put one ad exactly on the median).
     const keys = Object.keys(memo);
     assert.deepEqual(
       keys.filter((k) => k !== "decision"),
-      ["comparison", "creativeGroups", "spendAllocation", "scope", "tldr", "clientSummary", "winners", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
-      "only the additive comparison/creativeGroups/spendAllocation/leadingConversion fields exist; nothing else reordered"
+      ["comparison", "creativeGroups", "spendAllocation", "scope", "tldr", "clientSummary", "winners", "atMedian", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
+      "only the additive comparison/creativeGroups/spendAllocation/leadingConversion/atMedian fields exist; nothing else reordered"
     );
     assert.equal(memo.creativeGroups, null, "generateMemo always sets creativeGroups: null on its own (the route attaches it, like comparison)");
     assert.equal(memo.comparison, null, "single-period run carries comparison: null");

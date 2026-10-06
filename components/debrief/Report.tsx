@@ -847,6 +847,53 @@ function ClientAdList({
   );
 }
 
+/* Tester Feedback Fixes: the judged ad(s) sitting exactly on the
+   median — neither winner nor loser, so without this block the median
+   ad never appears and reads as "not evaluated". Neutral tone (no
+   win/loss colour); value + spend always shown. */
+function AtMedianRows({
+  atMedian,
+  client,
+  density,
+}: {
+  atMedian: NonNullable<Memo["atMedian"]>;
+  client: boolean;
+  density: "compact" | "standard";
+}) {
+  return (
+    <div className="mt-5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+        {client ? atMedian.clientLabel : atMedian.buyerLabel}
+      </p>
+      <div className="mt-2 divide-y divide-white/[0.06]">
+        {atMedian.rows.map((ad, i) => (
+          <div
+            key={ad.name + i}
+            className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-l-2 border-white/25 py-2.5 pl-4"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="break-words text-[13px] font-semibold leading-snug text-zinc-100">
+                {ad.name}
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
+                {ad.spendLabel} spent
+                {density === "standard" && ad.conversionLabel ? ` · ${ad.conversionLabel}` : ""}
+                {!client && density === "standard" ? ` · ${ad.reason}` : ""}
+              </p>
+            </div>
+            <p className="font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
+              {ad.valueLabel}
+            </p>
+            <p className="font-mono text-xs font-semibold tabular-nums text-zinc-400">
+              {client ? clientizeText(ad.vsMedianLabel) : ad.vsMedianLabel}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Client-view presentation blocks (V1 polish) ----------- */
 /* Presentation ONLY: every value below is read straight off the memo —
    no new calculations, no invented metrics. Debrief is not a
@@ -1945,6 +1992,9 @@ export function Report({
               <AdTable rows={memo.winners} tone="win" view={view} topAdsShown={customization.topAdsShown} density={customization.density} />
             )}
           </div>
+          {memo.atMedian && (
+            <AtMedianRows atMedian={memo.atMedian} client={client} density={customization.density} />
+          )}
         </section>
         )}
 
