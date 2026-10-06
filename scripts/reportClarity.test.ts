@@ -155,13 +155,16 @@ try {
 {
   const term = readFileSync(join(ROOT, "components/ui/Term.tsx"), "utf8");
   assert.match(term, /tabIndex=\{0\}/, "terms are keyboard-focusable");
-  assert.match(term, /aria-describedby=\{id\}/, "terms point at their explanation");
-  assert.match(term, /role="tooltip"/);
-  assert.match(term, /group-focus-within:block/, "explanation shows on keyboard focus, not hover only");
+  assert.match(term, /"aria-describedby": id/, "terms point at their explanation");
+  assert.match(term, /<span id=\{id\} role="tooltip" className="sr-only">/, "description always present for assistive tech");
+  assert.match(term, /onFocus: show/, "explanation shows on keyboard focus, not hover only");
   assert.match(term, /print-hidden/, "tooltips never print");
-  assert.match(term, /\bhidden\b/, "closed bubbles take no layout width");
-  assert.match(term, /export function clampTip/, "open bubbles are clamped inside the viewport");
-  assert.match(term, /onFocus=\{clampTip\}/, "clamped on keyboard focus too");
+  // Tester Feedback follow-up: portaled + fixed so no ancestor stacking
+  // context can trap it under later content; only mounted while open
+  // (closed bubbles take no layout width); clamped inside the viewport.
+  assert.match(term, /createPortal\([\s\S]{0,120}document\.body\)/, "bubble escapes ancestor stacking contexts");
+  assert.match(term, /fixed z-\[1000\]/);
+  assert.match(term, /Math\.max\(EDGE, Math\.min\(anchor\.left, vw - EDGE - width\)\)/, "open bubbles are clamped inside the viewport");
 
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
   for (const [what, re] of [
@@ -174,7 +177,7 @@ try {
     ["Evidence state", /<Term tip=\{evidenceLine\(d, memo\.scope\.adsJudged, "client"\)\}>Evidence<\/Term>/],
     ["Brief readiness", /<Term tip=\{TIP_BRIEF_READINESS\}>Brief readiness<\/Term>/],
     ["readiness badges", /<Term tip=\{test\.briefReadiness\.client\}>/],
-    ["Decision bars applied", /aria-describedby=\{barsTipId\}[\s\S]{0,300}Decision bars applied[\s\S]{0,80}<TipBubble id=\{barsTipId\}>/],
+    ["Decision bars applied", /\{\.\.\.barsTip\.triggerProps\}[\s\S]{0,200}Decision bars applied[\s\S]{0,80}<TipBubble id=\{barsTip\.id\} anchor=\{barsTip\.anchor\}>/],
   ] as const) {
     assert.match(report, re, `tooltip wired: ${what}`);
   }

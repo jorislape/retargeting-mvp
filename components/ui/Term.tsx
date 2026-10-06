@@ -1,65 +1,155 @@
 "use client";
 
-import { useId, type ReactNode, type SyntheticEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Report Clarity Pass — an inline explanation for a buyer-register term.
  *
  * Accessible by construction: the term is keyboard-focusable and points
- * at its explanation with aria-describedby, so screen readers announce
- * it and sighted keyboard users see it on focus (not hover only). The
- * bubble is display:none until hover/focus — so it never adds layout
- * width on narrow screens while closed — and is print-hidden, so the
- * PDF stays clean. Explanations reuse the report's existing client-
- * register wording; this component invents no definitions.
+ * at its explanation with aria-describedby. The description text always
+ * exists inline (screen-reader-only), so assistive tech announces it
+ * whether or not the visual bubble is open.
+ *
+ * Tester Feedback follow-up: the visual bubble is PORTALED to
+ * document.body with position: fixed. As an in-place child it lived
+ * inside whatever stacking context its ancestors created (the report
+ * masthead's entrance animation creates one), so a later sibling — the
+ * Next-move card — painted over it no matter its z-index. From the
+ * body it sits above everything; it flips above the trigger when there
+ * isn't room below and is clamped inside the viewport, so it never
+ * clips or causes horizontal scroll on a phone. It opens on hover AND
+ * keyboard focus, closes on leave/blur/Escape/scroll/resize, and is
+ * print-hidden, so the PDF stays clean. Explanations reuse the report's
+ * existing client-register wording; this component invents none.
  */
 
 const bubble =
-  "print-hidden pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-max max-w-[min(16rem,calc(100vw-1rem))] rounded-md border border-white/10 bg-zinc-900 px-2.5 py-1.5 text-left text-[11px] font-normal normal-case leading-snug tracking-normal text-zinc-200 shadow-lg group-hover:block group-focus-within:block";
+  "print-hidden pointer-events-none fixed z-[1000] w-max max-w-[min(16rem,calc(100vw-1rem))] rounded-md border border-white/10 bg-zinc-900 px-2.5 py-1.5 text-left text-[11px] font-normal normal-case leading-snug tracking-normal text-zinc-200 shadow-lg";
 
-/** Keeps an open bubble inside the viewport: on hover/focus of the
- *  trigger, find its bubble and shift it just enough to clear an 8px
- *  margin, so a term near the screen edge never causes horizontal
- *  scroll on a phone. Reads the DOM from the event — no refs. */
-export function clampTip(e: SyntheticEvent<HTMLElement>) {
-  const el = e.currentTarget.querySelector<HTMLElement>('[role="tooltip"]');
-  if (!el) return;
-  el.style.transform = "";
-  requestAnimationFrame(() => {
-    const r = el.getBoundingClientRect();
-    if (r.width === 0) return;
-    const vw = document.documentElement.clientWidth;
-    const pad = 8;
-    let shift = 0;
-    if (r.right > vw - pad) shift = vw - pad - r.right;
-    if (r.left + shift < pad) shift = pad - r.left;
-    if (shift !== 0) el.style.transform = `translateX(${Math.round(shift)}px)`;
-  });
+/** Viewport margin the bubble always keeps (px). */
+const EDGE = 8;
+/** Gap between trigger and bubble (px). */
+const GAP = 6;
+
+type Anchor = { top: number; bottom: number; left: number };
+
+/** Open/close state for one tooltip trigger. Spread `triggerProps` on
+ *  the focusable trigger and render <TipBubble id anchor> next to it. */
+export function useTip() {
+  const id = useId();
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const show = (e: SyntheticEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setAnchor({ top: r.top, bottom: r.bottom, left: r.left });
+  };
+  const hide = () => setAnchor(null);
+
+  useEffect(() => {
+    if (!anchor) return;
+    const close = () => setAnchor(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    // A fixed bubble would detach from its term on scroll — close instead.
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [anchor]);
+
+  return {
+    id,
+    anchor,
+    triggerProps: {
+      "aria-describedby": id,
+      onMouseEnter: show,
+      onMouseLeave: hide,
+      onFocus: show,
+      onBlur: hide,
+    },
+  };
 }
 
-/** The explanation bubble. Place it inside an element carrying `group`
- *  and `relative` whose focus/hover should reveal it. */
-export function TipBubble({ id, children }: { id: string; children: ReactNode }) {
+/** The visual bubble, positioned against the trigger's rect. Placement
+ *  is applied to the DOM in a layout effect (before paint) — measured,
+ *  flipped above when there's no room below, clamped horizontally. */
+function FloatingBubble({ anchor, children }: { anchor: Anchor; children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const vh = window.innerHeight;
+    const left = Math.max(EDGE, Math.min(anchor.left, vw - EDGE - width));
+    const below = anchor.bottom + GAP;
+    const top =
+      below + height > vh - EDGE && anchor.top - GAP - height >= EDGE
+        ? anchor.top - GAP - height
+        : below;
+    el.style.left = `${Math.round(left)}px`;
+    el.style.top = `${Math.round(top)}px`;
+    el.style.visibility = "visible";
+  }, [anchor]);
   return (
-    <span id={id} role="tooltip" className={bubble}>
+    <span ref={ref} aria-hidden="true" data-tip-bubble="" className={bubble} style={{ left: 0, top: 0, visibility: "hidden" }}>
       {children}
     </span>
   );
 }
 
+/** The explanation: an always-present screen-reader description (the
+ *  aria-describedby target) plus, while open, the portaled visual
+ *  bubble. */
+export function TipBubble({
+  id,
+  anchor,
+  children,
+}: {
+  id: string;
+  anchor: Anchor | null;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <span id={id} role="tooltip" className="sr-only">
+        {children}
+      </span>
+      {anchor && typeof document !== "undefined"
+        ? createPortal(<FloatingBubble anchor={anchor}>{children}</FloatingBubble>, document.body)
+        : null}
+    </>
+  );
+}
+
 /** A term with its explanation: focusable, described, hover/focus to show. */
 export function Term({ tip, children }: { tip: string; children: ReactNode }) {
-  const id = useId();
+  const t = useTip();
   return (
-    <span className="group relative inline-block" onMouseEnter={clampTip} onFocus={clampTip}>
+    <span className="inline-block">
       <span
         tabIndex={0}
-        aria-describedby={id}
+        {...t.triggerProps}
         className="cursor-help rounded-sm underline decoration-zinc-500 decoration-dotted underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         {children}
       </span>
-      <TipBubble id={id}>{tip}</TipBubble>
+      <TipBubble id={t.id} anchor={t.anchor}>
+        {tip}
+      </TipBubble>
     </span>
   );
 }

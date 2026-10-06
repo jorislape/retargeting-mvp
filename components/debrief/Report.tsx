@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/icons";
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
-import { clampTip, Term, TipBubble, withTerms } from "@/components/ui/Term";
+import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
 import { CLIENT_BRIEF_LEGEND, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
@@ -402,7 +402,7 @@ function DecisionCard({
 }) {
   const d = memo.decision;
   const client = view === "client";
-  const barsTipId = useId();
+  const barsTip = useTip();
   const avoid = client ? d.avoidNow.client : d.avoidNow.buyer;
   const limits = client ? d.limits.client : d.limits.buyer;
   // nextControlledTest is a single register; clientize defensively in
@@ -558,13 +558,13 @@ function DecisionCard({
         <>
           <details className="print-hidden mt-3">
             <summary
-              aria-describedby={barsTipId}
-              onMouseEnter={clampTip}
-              onFocus={clampTip}
-              className="group relative cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400"
+              {...barsTip.triggerProps}
+              className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400"
             >
               Decision bars applied
-              <TipBubble id={barsTipId}>{TIP_DECISION_BARS}</TipBubble>
+              <TipBubble id={barsTip.id} anchor={barsTip.anchor}>
+                {TIP_DECISION_BARS}
+              </TipBubble>
             </summary>
             {appliedCriteriaList}
           </details>
