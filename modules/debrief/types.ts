@@ -379,6 +379,12 @@ export interface ParsedAd {
   /** Meta's own reported CPM — read verbatim, never derived from
    *  spend/impressions. */
   cpm?: number | null;
+  /** Tester Feedback Fix 6 — Meta's Frequency (impressions per person)
+   *  and Reach, read verbatim. Display-only: never fed to the spend
+   *  gate, median, ranking, or the decision. null when the column is
+   *  absent or the cell blank. */
+  frequency?: number | null;
+  reach?: number | null;
 }
 
 export type GateReason = "judged" | "below_spend_gate" | "no_kpi_value";
@@ -535,6 +541,13 @@ export interface MemoWinnerLoserRow {
    *  MIN_OUTCOMES_FOR_SUPPORTED recorded conversions (count column
    *  present). Copy only — never changes action or evidenceState. */
   fewOutcomesNote?: string;
+  /** Tester Feedback Fix 6 — BUYER register only: "Frequency 1.9",
+   *  present when the export has a Frequency column. Display only. */
+  frequencyLabel?: string;
+  /** BUYER register only: present when frequency ≥
+   *  FREQUENCY_FATIGUE_NOTE_AT — "Frequency 5.1 — possible fatigue;
+   *  check the trend in Ads Manager." Never changes action/evidence. */
+  fatigueNote?: string;
 }
 
 /* ------------------------------------------------------------------ */

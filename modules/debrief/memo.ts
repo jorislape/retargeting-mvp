@@ -139,6 +139,7 @@ function buildRow(
       deltaPct: null,
       spendLabel: fmtMoney(ad.spend, analysis.currency),
       reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
+      ...frequencyFieldsFor(ad),
     };
   }
   return {
@@ -150,6 +151,25 @@ function buildRow(
     reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
     conversionLabel: conversionLabelFor(ad, analysis),
     ...fewOutcomesNoteFor(ad, analysis),
+    ...frequencyFieldsFor(ad),
+  };
+}
+
+/** Tester Feedback Fix 6: frequency at or above this gets a buyer-only
+ *  "possible fatigue" note. A practitioner rule of thumb, NOT a
+ *  measured threshold — one export can't show a fatigue trend, which
+ *  is why the note sends the reader to Ads Manager rather than
+ *  concluding anything. Never read by the gate, ranking or decision. */
+export const FREQUENCY_FATIGUE_NOTE_AT = 4;
+
+function frequencyFieldsFor(ad: RankedAd): { frequencyLabel?: string; fatigueNote?: string } {
+  if (ad.frequency == null) return {};
+  const f = ad.frequency.toFixed(1);
+  return {
+    frequencyLabel: `Frequency ${f}`,
+    ...(ad.frequency >= FREQUENCY_FATIGUE_NOTE_AT
+      ? { fatigueNote: `Frequency ${f} — possible fatigue; check the trend in Ads Manager.` }
+      : {}),
   };
 }
 

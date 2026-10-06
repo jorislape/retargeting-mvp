@@ -119,6 +119,12 @@ const ALIASES = {
   videoPlays3s: ["3 second video plays", "3 second video views"],
   thruPlays: ["thruplays", "thruplay"],
   videoPlays: ["video plays"],
+  /* Tester Feedback Fix 6: delivery context, display-only (like
+     impressions/cpm) — never read by gate, median, ranking or action.
+     Never resolved from a "cost per …" header ("Cost per 1,000 accounts
+     reached" contains "reach"). */
+  frequency: ["frequency"],
+  reach: ["reach"],
 } as const;
 
 /** Meta's per-campaign optimisation-event columns. They're resolved as
@@ -182,6 +188,9 @@ export interface ColumnMap {
   videoPlays3s: string | null;
   thruPlays: string | null;
   videoPlays: string | null;
+  /** Tester Feedback Fix 6 — optional, display-only delivery columns. */
+  frequency: string | null;
+  reach: string | null;
   /** 3-letter currency code pulled from the spend header, if present. */
   currency: string | null;
   /** KPI Source Column Disclosure: for each RESOLVED conversion field,
@@ -220,6 +229,7 @@ export function resolveColumns(headers: string[]): ColumnMap {
     contentViews: findHeader(headers, ALIASES.contentViews),
     cpm: findHeader(headers, ALIASES.cpm),
     ...hookMetricHeaders(headers),
+    ...deliveryHeaders(headers),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
     sources: resolveSources(headers),
   };
@@ -233,6 +243,15 @@ function hookMetricHeaders(headers: string[]) {
     videoPlays3s: findHeader(counts, ALIASES.videoPlays3s),
     thruPlays: findHeader(counts, ALIASES.thruPlays),
     videoPlays: findHeader(counts, ALIASES.videoPlays),
+  };
+}
+
+/** Tester Feedback Fix 6: Frequency / Reach, never from a cost-per header. */
+function deliveryHeaders(headers: string[]) {
+  const counts = headers.filter((h) => !/cost per/i.test(h));
+  return {
+    frequency: findHeader(counts, ALIASES.frequency),
+    reach: findHeader(counts, ALIASES.reach),
   };
 }
 

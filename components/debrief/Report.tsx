@@ -761,6 +761,16 @@ function AdTable({
                     )}
                   </>
                 )}
+                {/* Tester Feedback Fix 6 — buyer only, every density:
+                    delivery context, never part of the ranking. */}
+                {view !== "client" && ad.frequencyLabel && (
+                  <p className="mt-0.5 font-mono text-[11px] leading-relaxed text-zinc-500 tabular-nums">
+                    {ad.frequencyLabel}
+                  </p>
+                )}
+                {view !== "client" && ad.fatigueNote && (
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">{ad.fatigueNote}</p>
+                )}
               </td>
               <td className="py-3 pr-4 text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
                 {ad.valueLabel}
@@ -887,6 +897,14 @@ function AtMedianRows({
               </p>
               {!client && density === "standard" && ad.fewOutcomesNote && (
                 <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">{ad.fewOutcomesNote}</p>
+              )}
+              {!client && ad.frequencyLabel && (
+                <p className="mt-0.5 font-mono text-[11px] leading-relaxed text-zinc-500 tabular-nums">
+                  {ad.frequencyLabel}
+                </p>
+              )}
+              {!client && ad.fatigueNote && (
+                <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">{ad.fatigueNote}</p>
               )}
             </div>
             <p className="font-mono text-[13px] font-semibold tabular-nums text-zinc-100">

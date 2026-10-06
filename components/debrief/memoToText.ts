@@ -349,6 +349,17 @@ export function memoToText(
 
   // Report Foundation V1: the same topAdsShown value the on-screen
   // report is using, in both views — no more view-specific hardcoding.
+  /* One row format for winners / at-median / losers. Buyer-only
+     extras (Tester Feedback Fixes 4 & 6): frequency after the counts,
+     then the few-conversions and possible-fatigue notes. */
+  const adRow = (r: Memo["winners"][number]) => {
+    const buyer = view !== "client";
+    const freq = buyer && r.frequencyLabel ? ` | ${r.frequencyLabel}` : "";
+    const notes = buyer
+      ? [r.fewOutcomesNote, r.fatigueNote].filter(Boolean).map((n) => ` ${n}`).join("")
+      : "";
+    return `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)}) | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""}${freq} | ${r.reason}${notes}`;
+  };
   const winnerRows = memo.winners.slice(0, topAdsShown);
   const loserRows = memo.losers.rows.slice(0, topAdsShown);
 
@@ -369,7 +380,7 @@ export function memoToText(
   } else {
     winnerRows.forEach((w) => {
       lines.push(
-        `- ${w.name} | ${w.valueLabel} (${c(w.vsMedianLabel)}) | ${w.spendLabel}${w.conversionLabel ? ` | ${w.conversionLabel}` : ""} | ${w.reason}${view !== "client" && w.fewOutcomesNote ? ` ${w.fewOutcomesNote}` : ""}`
+        adRow(w)
       );
     });
     if (memo.winners.length > winnerRows.length) {
@@ -387,7 +398,7 @@ export function memoToText(
     lines.push(`${view === "client" ? memo.atMedian.clientLabel : memo.atMedian.buyerLabel}:`);
     memo.atMedian.rows.forEach((r) => {
       lines.push(
-        `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)}) | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""} | ${r.reason}${view !== "client" && r.fewOutcomesNote ? ` ${r.fewOutcomesNote}` : ""}`
+        adRow(r)
       );
     });
   }
@@ -408,7 +419,7 @@ export function memoToText(
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
   loserRows.forEach((l) => {
     lines.push(
-      `- ${l.name} | ${l.valueLabel} (${c(l.vsMedianLabel)}) | ${l.spendLabel}${l.conversionLabel ? ` | ${l.conversionLabel}` : ""} | ${l.reason}${view !== "client" && l.fewOutcomesNote ? ` ${l.fewOutcomesNote}` : ""}`
+      adRow(l)
     );
   });
   if (memo.losers.rows.length > loserRows.length) {

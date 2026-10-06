@@ -28,7 +28,8 @@ export function loadEngine() {
   const { resolveColumns } = r("modules/debrief/columns.js");
   const { extractAds } = r("modules/debrief/extract.js");
   const { analyze } = r("modules/debrief/analysis.js");
-  const { generateMemo } = r("modules/debrief/memo.js");
+  const memoModule = r("modules/debrief/memo.js");
+  const { generateMemo } = memoModule;
   const { buildSampleMemo } = r("modules/debrief/sample.js");
   const { memoToText } = r("components/debrief/memoToText.js");
 
@@ -50,6 +51,8 @@ export function loadEngine() {
   };
   return {
     run,
+    /** Compiled memo.ts exports (constants not importable under plain Node). */
+    memoExports: memoModule as Record<string, unknown>,
     buildSampleMemo: buildSampleMemo as () => Memo,
     memoToText: memoToText as (m: Memo, view: string, top: number, briefs: number[]) => string,
     cleanup: () => rmSync(dist, { recursive: true, force: true }) };

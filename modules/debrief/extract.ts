@@ -158,6 +158,9 @@ function upstreamFieldsForRow(row: Record<string, string>, columns: ColumnMap) {
     addToCart: columns.addToCart ? parseNumericCell(row[columns.addToCart]) : null,
     contentViews: columns.contentViews ? parseNumericCell(row[columns.contentViews]) : null,
     cpm: columns.cpm ? parseNumericCell(row[columns.cpm]) : null,
+    /* Tester Feedback Fix 6: delivery context, display-only. */
+    frequency: columns.frequency ? parseNumericCell(row[columns.frequency]) : null,
+    reach: columns.reach ? parseNumericCell(row[columns.reach]) : null,
   };
 }
 
