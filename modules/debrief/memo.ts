@@ -6,6 +6,7 @@ import {
   MIN_OUTCOMES_FOR_SUPPORTED,
   SCALE_TEST_MIN_DELTA_PCT,
   SHORT_WINDOW_DAYS,
+  spendGateSource,
 } from "./decision";
 import {
   fmtCount,
@@ -148,6 +149,24 @@ function buildRow(
     spendLabel: fmtMoney(ad.spend, analysis.currency),
     reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
     conversionLabel: conversionLabelFor(ad, analysis),
+    ...fewOutcomesNoteFor(ad, analysis),
+  };
+}
+
+/* Tester Feedback Fix 4: a ROAS/CPA value divides by the conversion
+   count, so a handful of conversions makes it jumpy. Buyer-register
+   note only; ratio KPIs only (for Purchases/Leads the count IS the
+   result); only when the count is in the export (missing ≠ few). */
+function fewOutcomesNoteFor(
+  ad: RankedAd,
+  analysis: AnalysisResult
+): { fewOutcomesNote?: string } {
+  if (analysis.kpi !== "roas" && analysis.kpi !== "cpa") return {};
+  const n = ad.conversions;
+  const nouns = outcomeNounsFor(analysis);
+  if (n == null || nouns == null || n <= 0 || n >= MIN_OUTCOMES_FOR_SUPPORTED) return {};
+  return {
+    fewOutcomesNote: `Based on ${n} ${n === 1 ? nouns.one : nouns.many} — under ${MIN_OUTCOMES_FOR_SUPPORTED}, so this ${kpiLabelFor(analysis)} can move a lot with a few more.`,
   };
 }
 
@@ -537,6 +556,8 @@ function buildNextTests(
   const kpiLabel = kpiLabelFor(analysis);
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : "the benchmark";
   const gateLabel = fmtMoney(spendGate, currency);
+  /* Tester Feedback Fix 4: setup lines say where the minimum comes from. */
+  const gateSetupLabel = `${gateLabel} (${spendGateSource(analysis, (v) => fmtMoney(v, currency)).short})`;
   const tests: MemoTest[] = [];
 
   const top = winners[0] ?? null;
@@ -716,7 +737,7 @@ function buildNextTests(
           ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of this leading angle. Adapt, don't copy."
           : ""
       }`,
-      setup: `Same audience, placement, and offer as the original. ~${gateLabel} per variant so each reaches the minimum spend. Change only the opening 3 seconds / first frame between variants.`,
+      setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the opening 3 seconds / first frame between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
       signals,
       hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" already leads this dataset at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend.`,
@@ -773,7 +794,7 @@ function buildNextTests(
           ? ` Your market notes point the same way (${market.hooks.join(", ")}) — directional support for the problem-led slot.`
           : ""
       }`,
-      setup: `Matched budget (~${gateLabel} per ad), same audience and placement across all three, so the angle is the only variable.`,
+      setup: `Matched budget (~${gateSetupLabel} per ad), same audience and placement across all three, so the angle is the only variable.`,
       winningLooksLike: `At least one angle clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
       hypothesis: `If we run three deliberately different angles at matched budget while holding audience, placement, and offer constant, we expect at least one to clear ${gateLabel} spend and beat ${medianLabel} — because no ad in the current dataset has separated from the median yet, so the next signal has to come from a new angle, not more spend behind an existing one.`,
@@ -817,7 +838,7 @@ function buildNextTests(
       tests.push({
         test: `Test one rebuilt version of "${worst.name}" before it gets more budget — it spent ${spent} with 0 ${zeroMany}.`,
         why: `It spent ${spent}, past the ~${gateLabel} minimum spend, with 0 ${zeroMany} — the weakest judged result in this export. The data shows that it didn't convert, not why, so one controlled rebuild is the cheapest way to learn whether anything in it is worth keeping.`,
-        setup: `Pause or reduce the original. One rebuild at ~${gateLabel}, same audience, placement, and offer — change one element of the creative so the result is readable.`,
+        setup: `Pause or reduce the original. One rebuild at ~${gateSetupLabel}, same audience, placement, and offer — change one element of the creative so the result is readable.`,
         winningLooksLike: `The rebuild records ${zeroMany} and reaches ${medianLabel} or better; if it records none again by ~${gateLabel}, retire the angle.`,
         signals,
         hypothesis: `If we rebuild "${worst.name}" while holding audience, offer, and placement constant, we want to test whether it records ${zeroMany} at all — because the original spent ${spent} with 0 ${zeroMany}.`,
@@ -853,7 +874,7 @@ function buildNextTests(
             ? " Problem-first hooks also repeat in your market notes — an observed pattern worth adapting to your own claim, not copying."
             : ""
         }`,
-        setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateLabel} with the same audience, placement, and offer — creative is the only change.`,
+        setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateSetupLabel} with the same audience, placement, and offer — creative is the only change.`,
         winningLooksLike: `The rebuild beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} and closes to within 20% of ${medianLabel}.`,
         signals,
         hypothesis: `If we rebuild "${worst.name}" leading with the problem instead of the discount, while holding the offer, audience, and placement constant, ${loserThin ? "we want to test whether it closes toward" : "we expect it to close toward"} ${medianLabel} — because the current version ran ${worstStats}, and an offer-led opening on a discount ad is a common reason a discount alone isn't earning attention.`,
@@ -894,7 +915,7 @@ function buildNextTests(
             ? " Give the reshoot a problem-first opening — a repeating pattern in your market notes (directional)."
             : ""
         }`,
-        setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateLabel}, same audience and offer.`,
+        setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateSetupLabel}, same audience and offer.`,
         winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
         signals,
         hypothesis: `If we reshoot "${worst.name}"'s message as ${winnerTag.tag} while holding the message, audience, and offer constant, ${loserThin ? "we want to test whether it approaches" : "we expect it to approach"} ${medianLabel} — because ${winnerTag.tag} ads already hold ${winnerTag.count}/${winners.length} winner slots in this dataset, while the loser ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)} on ${fmtMoney(worst.spend, currency)} spend.`,
@@ -935,7 +956,7 @@ function buildNextTests(
             ? " Your market notes flag problem-first hooks as a repeating pattern — directional, and the cheapest place to test it."
             : ""
         }`,
-        setup: `Reduce the original's spend. One rebuild at ~${gateLabel}, changing only the hook — same body, audience, and offer.`,
+        setup: `Reduce the original's spend. One rebuild at ~${gateSetupLabel}, changing only the hook — same body, audience, and offer.`,
         winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
         signals,
         hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, ${loserThin ? "we want to test whether it clearly beats" : "we expect it to clearly beat"} ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} — because at ${worstStats} it's the account's weakest judged ad, and changing only the opening is the cheapest controlled way to learn whether the result moves with it.`,
@@ -976,7 +997,7 @@ function buildNextTests(
       why: hasNameSignal
         ? `Nothing is clearly failing, so the next signal comes from challenging the dominant format rather than fixing losers.`
         : `Nothing is clearly failing and no format pattern is visible yet — a controlled format test creates the pattern data future debriefs need.`,
-      setup: `One challenger, one control, matched budget (~${gateLabel} each), same audience and offer.`,
+      setup: `One challenger, one control, matched budget (~${gateSetupLabel} each), same audience and offer.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
       hypothesis: `If we test ${challenger} against the current best ad at matched budget while holding message, audience, and offer constant, we expect the challenger to clear ${gateLabel} spend and beat ${medianLabel} — because no ad is clearly failing this period, so the next signal has to come from a controlled format comparison rather than fixing a loser.`,
@@ -1065,7 +1086,7 @@ function buildNextTests(
     tests.push({
       test: `Test "${top.name}"'s leading angle with a bundle offer variant (market signal).`,
       why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already leading at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
-      setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateLabel} until it reaches the minimum spend.`,
+      setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateSetupLabel} until it reaches the minimum spend.`,
       winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
       signals,
       hypothesis: `If we swap only the offer to a bundle while holding "${top.name}"'s creative and audience constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because bundle offers repeat in your market notes (directional) and the angle already leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel}, making an offer swap the cheapest adaptation to test.`,
@@ -1111,7 +1132,7 @@ function buildNextTests(
         : winnerTag
           ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive — a structured challenger shows whether the format or the message is doing the work.`
           : `No format is clearly winning${hasNameSignal ? "" : " and names carry no format signal"} — the fastest way to a pattern is one controlled format-vs-format test.${context.creativeNotes ? ` Use your notes ("${context.creativeNotes.slice(0, 60)}…") to pick the challenger.` : ""}`,
-      setup: `Launch the challenger at ~${gateLabel} alongside the control, same audience and offer, until both reach the minimum spend.`,
+      setup: `Launch the challenger at ~${gateSetupLabel} alongside the control, same audience and offer, until both reach the minimum spend.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
       hypothesis: `If we launch ${challenger} at matched budget alongside the current control while holding audience and offer constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because ${leadPastBar ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar but this debrief isn't committing a budget move on it yet, so a structured challenger builds comparison data while that evidence firms up` : winnerTag ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive enough to say the format itself is the reason` : "no format is clearly winning yet, so a controlled comparison is the fastest way to a real pattern"}.`,
@@ -1644,6 +1665,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       product: context.product || "Your account",
       kpiLabel: kpiLabelFor(analysis),
       spendGateLabel: fmtMoney(analysis.spendGate, currency),
+      spendGateSource: spendGateSource(analysis, (v) => fmtMoney(v, currency)),
       kpiExplainer: kpiExplainerFor(analysis),
       /* CPA Leads Label: the client register's plain label, present only
          when it differs (lead-based CPA) — standard memos are unchanged. */

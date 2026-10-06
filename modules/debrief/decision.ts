@@ -427,6 +427,50 @@ function kpiGapHold(
  * tracked in AnalysisResult. Two registers; the client register carries
  * no buyer jargon (kill/gate/benchmark/median/judged).
  */
+/**
+ * Tester Feedback Fix 4 — where the minimum spend to judge comes from,
+ * in plain words. The number itself is computed in analysis.ts and is
+ * NOT changed here; this only explains it (a tester found €164.03
+ * arbitrary). `short` fits a parenthetical, `buyer` is the full
+ * sentence tail, `client` is jargon-free (never "gate").
+ */
+export function spendGateSource(
+  analysis: AnalysisResult,
+  money: MoneyFormatter
+): { short: string; buyer: string; client: string } {
+  const notGuarantee = "a default, not a statistical guarantee";
+  const setTarget = "Set a target CPA to base it on 3× your CPA instead.";
+  switch (analysis.spendGateBasis) {
+    case "user_gate":
+      return { short: "the minimum you set", buyer: "the minimum you set", client: "the minimum you set" };
+    case "target_cpa": {
+      const target = money(analysis.spendGate / 3);
+      return {
+        short: "3× your target CPA",
+        buyer: `3× your ${target} target CPA`,
+        client: `three times your ${target} cost target`,
+      };
+    }
+    default: {
+      const mean = analysis.adsAnalyzed > 0 ? analysis.totalSpend / analysis.adsAnalyzed : 0;
+      const avg = money(mean);
+      // The fixed floor won: half the mean is lower than the gate.
+      if (mean * 0.5 < analysis.spendGate - 1e-9) {
+        return {
+          short: "Debrief's fixed floor",
+          buyer: `Debrief's fixed ${money(analysis.spendGate)} floor, because half the average spend per ad in this export (${avg} avg) is lower — ${notGuarantee}. ${setTarget}`,
+          client: `a fixed minimum Debrief uses for small accounts — a rule of thumb, not a guarantee`,
+        };
+      }
+      return {
+        short: "half this export's average spend per ad",
+        buyer: `half the average spend per ad in this export (${avg} avg) — ${notGuarantee}. ${setTarget}`,
+        client: `half the average spend per ad in this file (${avg}) — a rule of thumb, not a guarantee`,
+      };
+    }
+  }
+}
+
 export function buildLimits(
   analysis: AnalysisResult,
   flatField: boolean,
@@ -870,9 +914,19 @@ export function buildDecision(
       `"${top.name}" shows results but a recorded count of 0 ${nouns.many} — the file's columns may be measuring differently, so it's worth double-checking this ad's numbers before acting.`
     );
   }
+  /* Tester Feedback Fix 4: the default spend-floor/half-mean minimum
+     is the one bar a reader can't reconstruct — say where it comes
+     from. Target-CPA and user bars explain themselves (criteria list). */
+  const gateSourceBuyer: string[] = [];
+  const gateSourceClient: string[] = [];
+  if (analysis.spendGateBasis === "floor_or_mean") {
+    const src = spendGateSource(analysis, money);
+    gateSourceBuyer.push(`The ${gateLabel} minimum spend per ad is ${src.buyer}`);
+    gateSourceClient.push(`The ${gateLabel} minimum spend used to include an ad is ${src.client}.`);
+  }
   const limits = {
-    buyer: [...baseLimits.buyer, ...criteriaBuyer],
-    client: [...baseLimits.client, ...criteriaClient],
+    buyer: [...baseLimits.buyer, ...gateSourceBuyer, ...criteriaBuyer],
+    client: [...baseLimits.client, ...gateSourceClient, ...criteriaClient],
   };
 
   /* ---- Decision Criteria V2: the bars that participated in this
@@ -884,7 +938,7 @@ export function buildDecision(
         ? `Minimum spend to judge: ${gateLabel} per ad — your criterion`
         : analysis.spendGateBasis === "target_cpa"
           ? `Minimum spend to judge: ${gateLabel} per ad (3× your target CPA) — Debrief default rule`
-          : `Minimum spend to judge: ${gateLabel} per ad — Debrief default (spend floor / half of mean spend)`,
+          : `Minimum spend to judge: ${gateLabel} per ad — Debrief default: ${spendGateSource(analysis, money).buyer}`,
       source: userGate ? "user" : "debrief_default",
     },
     {

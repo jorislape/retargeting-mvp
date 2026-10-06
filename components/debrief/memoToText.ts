@@ -133,7 +133,11 @@ export function memoToText(
     `Ads analyzed: ${scope.adsAnalyzed} · Judged: ${scope.adsJudged} · Set aside: ${scope.adsSetAside}`
   );
   if (view !== "client" && scope.spendGateLabel) {
-    lines.push(`Minimum spend to judge (evidence gate): ${scope.spendGateLabel} per ad`);
+    lines.push(
+      `Minimum spend to judge (evidence gate): ${scope.spendGateLabel} per ad${
+        scope.spendGateSource ? ` (${scope.spendGateSource.short})` : ""
+      }`
+    );
   }
   lines.push(`Total spend: ${scope.totalSpendLabel} · ${view === "client" ? "Typical" : "Median"} ${viewKpiLabel}: ${scope.medianLabel}`);
   lines.push("");
@@ -365,7 +369,7 @@ export function memoToText(
   } else {
     winnerRows.forEach((w) => {
       lines.push(
-        `- ${w.name} | ${w.valueLabel} (${c(w.vsMedianLabel)}) | ${w.spendLabel}${w.conversionLabel ? ` | ${w.conversionLabel}` : ""} | ${w.reason}`
+        `- ${w.name} | ${w.valueLabel} (${c(w.vsMedianLabel)}) | ${w.spendLabel}${w.conversionLabel ? ` | ${w.conversionLabel}` : ""} | ${w.reason}${view !== "client" && w.fewOutcomesNote ? ` ${w.fewOutcomesNote}` : ""}`
       );
     });
     if (memo.winners.length > winnerRows.length) {
@@ -383,7 +387,7 @@ export function memoToText(
     lines.push(`${view === "client" ? memo.atMedian.clientLabel : memo.atMedian.buyerLabel}:`);
     memo.atMedian.rows.forEach((r) => {
       lines.push(
-        `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)}) | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""} | ${r.reason}`
+        `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)}) | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""} | ${r.reason}${view !== "client" && r.fewOutcomesNote ? ` ${r.fewOutcomesNote}` : ""}`
       );
     });
   }
@@ -404,7 +408,7 @@ export function memoToText(
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
   loserRows.forEach((l) => {
     lines.push(
-      `- ${l.name} | ${l.valueLabel} (${c(l.vsMedianLabel)}) | ${l.spendLabel}${l.conversionLabel ? ` | ${l.conversionLabel}` : ""} | ${l.reason}`
+      `- ${l.name} | ${l.valueLabel} (${c(l.vsMedianLabel)}) | ${l.spendLabel}${l.conversionLabel ? ` | ${l.conversionLabel}` : ""} | ${l.reason}${view !== "client" && l.fewOutcomesNote ? ` ${l.fewOutcomesNote}` : ""}`
     );
   });
   if (memo.losers.rows.length > loserRows.length) {

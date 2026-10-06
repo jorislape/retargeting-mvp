@@ -165,7 +165,8 @@ try {
 
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
   for (const [what, re] of [
-    ["Judged", /Judged: TIP_JUDGED/],
+    // Tester Feedback Fix 4 extends the Judged tip with the gate source (TIP_JUDGED stays the base/fallback).
+    ["Judged", /Judged: memo\.scope\.spendGateSource[\s\S]{0,200}TIP_JUDGED/],
     ["Set aside", /"Set aside": memo\.scope\.setAsideBreakdown/],
     ["Median <KPI>", /\[`Median \$\{viewKpiLabel\}`\]: TIP_MEDIAN/],
     ["judged spend", /phrase: "judged spend", tip: TIP_JUDGED_SPEND/],

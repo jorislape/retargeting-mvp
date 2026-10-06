@@ -754,6 +754,11 @@ function AdTable({
                         {ad.conversionLabel}
                       </p>
                     )}
+                    {view !== "client" && ad.fewOutcomesNote && (
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
+                        {ad.fewOutcomesNote}
+                      </p>
+                    )}
                   </>
                 )}
               </td>
@@ -880,6 +885,9 @@ function AtMedianRows({
                 {density === "standard" && ad.conversionLabel ? ` · ${ad.conversionLabel}` : ""}
                 {!client && density === "standard" ? ` · ${ad.reason}` : ""}
               </p>
+              {!client && density === "standard" && ad.fewOutcomesNote && (
+                <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">{ad.fewOutcomesNote}</p>
+              )}
             </div>
             <p className="font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
               {ad.valueLabel}
@@ -1487,7 +1495,10 @@ export function Report({
   const viewKpiLabel = client ? memo.scope.kpiLabelClient ?? memo.scope.kpiLabel : memo.scope.kpiLabel;
   /* Report Clarity Pass — buyer stat-row explanations (see TIP_*). */
   const statTips: Record<string, string> = {
-    Judged: TIP_JUDGED,
+    /* Tester Feedback Fix 4: the tooltip says where the minimum comes from. */
+    Judged: memo.scope.spendGateSource && memo.scope.spendGateLabel
+      ? `${TIP_JUDGED.replace(/\.$/, "")} — at least ${memo.scope.spendGateLabel}, ${memo.scope.spendGateSource.short}.`
+      : TIP_JUDGED,
     "Set aside": memo.scope.setAsideBreakdown
       ? `Ads with no ${viewKpiLabel} figure, or not enough spend to judge fairly — set aside rather than counted against.`
       : "Ads that did not have enough spend to judge fairly — set aside rather than counted against.",
@@ -1808,10 +1819,19 @@ export function Report({
           {!client && memo.scope.spendGateLabel && (
             <p className="mt-4 sm:mt-5 text-xs leading-relaxed text-zinc-400">
               <span className="font-medium text-zinc-300">
-                Minimum spend to judge (evidence gate):
+                {memo.scope.spendGateSource ? (
+                  <Term tip={`It's ${memo.scope.spendGateSource.buyer}`}>
+                    Minimum spend to judge (evidence gate):
+                  </Term>
+                ) : (
+                  "Minimum spend to judge (evidence gate):"
+                )}
               </span>{" "}
-              {memo.scope.spendGateLabel} per ad — below it, an ad is set
-              aside rather than judged.
+              {memo.scope.spendGateLabel} per ad
+              {/* Tester Feedback Fix 4: where the number comes from (the
+                  full explanation is the label's tooltip). */}
+              {memo.scope.spendGateSource ? ` (${memo.scope.spendGateSource.short})` : ""} — below
+              it, an ad is set aside rather than judged.
             </p>
           )}
         </header>

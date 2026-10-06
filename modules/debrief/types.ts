@@ -491,6 +491,10 @@ export interface MemoScope {
    *  buyer register's one plain-words definition ("Minimum spend to
    *  judge (evidence gate)"). Display only. */
   spendGateLabel?: string;
+  /** Tester Feedback Fix 4: where that minimum comes from, in plain
+   *  words (decision.ts spendGateSource). `short` for parentheticals,
+   *  `buyer` the full explanation, `client` jargon-free. Display only. */
+  spendGateSource?: { short: string; buyer: string; client: string };
   /** CPA Leads Label: client-register label ("cost per lead"), present
    *  only when it differs from kpiLabel. Report/text pick per view. */
   kpiLabelClient?: string;
@@ -521,6 +525,11 @@ export interface MemoWinnerLoserRow {
    *  KPIs when the CSV carried a count column. Display only — never a
    *  quality judgment, never estimated. Absent otherwise. */
   conversionLabel?: string;
+  /** Tester Feedback Fix 4 — BUYER register only: present when this
+   *  ratio-KPI (ROAS/CPA) read rests on fewer than
+   *  MIN_OUTCOMES_FOR_SUPPORTED recorded conversions (count column
+   *  present). Copy only — never changes action or evidenceState. */
+  fewOutcomesNote?: string;
 }
 
 /* ------------------------------------------------------------------ */
