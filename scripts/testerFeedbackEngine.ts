@@ -51,6 +51,8 @@ export function loadEngine() {
   };
   return {
     run,
+    /** Any compiled engine module, e.g. requireCompiled("modules/debrief/columns.js"). */
+    requireCompiled: r as (p: string) => Record<string, unknown>,
     /** Compiled memo.ts exports (constants not importable under plain Node). */
     memoExports: memoModule as Record<string, unknown>,
     buildSampleMemo: buildSampleMemo as () => Memo,

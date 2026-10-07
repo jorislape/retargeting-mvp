@@ -1458,6 +1458,7 @@ export function Report({
   onNewDebrief,
   onAddToQueue,
   creativeAssets = {},
+  unusedColumns = null,
 }: {
   memo: Memo;
   variant?: "generated" | "sample";
@@ -1474,6 +1475,11 @@ export function Report({
    *  bundled demo map for /sample). Presentation only: an empty map
    *  renders the report exactly as before the feature existed. */
   creativeAssets?: Record<string, CreativeAssetRef>;
+  /** Unused Columns Disclosure — export headers Debrief didn't map to
+   *  anything, from the API response (never part of the memo). Buyer
+   *  view only; never printed, copied or exported. null/absent → no
+   *  disclosure (the sample and Decision Queue pages pass none). */
+  unusedColumns?: { headers: string[]; total: number } | null;
 }) {
   /* White-label Report Customization V1A: one shared hook owns mode,
      identity fields, accent, and section visibility — session-only,
@@ -1851,6 +1857,34 @@ export function Report({
               {memo.scope.spendGateSource ? ` (${memo.scope.spendGateSource.short})` : ""} — below
               it, an ad is set aside rather than judged.
             </p>
+          )}
+          {/* Unused Columns Disclosure — buyer view only, collapsed,
+              print-hidden (so never in the PDF); memoToText never sees
+              it (not in the memo), so never in Copy/TXT either. */}
+          {!client && unusedColumns && unusedColumns.total > 0 && (
+            <details className="print-hidden mt-2 text-xs leading-relaxed text-zinc-400">
+              <summary className="cursor-pointer text-zinc-400 hover:text-zinc-300">
+                Columns in your export Debrief didn&apos;t use ({unusedColumns.total})
+              </summary>
+              <p className="mt-2 text-zinc-400">
+                They don&apos;t affect this read. Tell us if one of them matters for your decisions.
+              </p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {unusedColumns.headers.map((h) => (
+                  <li
+                    key={h}
+                    className="max-w-full break-words rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[11px] text-zinc-300"
+                  >
+                    {h}
+                  </li>
+                ))}
+              </ul>
+              {unusedColumns.total > unusedColumns.headers.length && (
+                <p className="mt-1.5 text-zinc-500">
+                  …and {unusedColumns.total - unusedColumns.headers.length} more not listed.
+                </p>
+              )}
+            </details>
           )}
         </header>
 

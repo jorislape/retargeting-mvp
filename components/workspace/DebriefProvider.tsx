@@ -220,6 +220,10 @@ interface DebriefContextValue {
    *  /api/debrief request. */
   creativeAssets: Record<string, CreativeAssetRef>;
   memo: Memo | null;
+  /** Unused Columns Disclosure — the last run's export headers Debrief
+   *  didn't map to anything (first UNUSED_COLUMNS_CAP + true total).
+   *  Session React state only, like memo; null until a run succeeds. */
+  unusedColumns: { headers: string[]; total: number } | null;
   error: DebriefApiError | null;
   generatedAt: number | null;
   /** Decision Queue / Multi-Account V1 — every completed Debrief added
@@ -343,6 +347,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
   const [memo, setMemo] = useState<Memo | null>(null);
   const [error, setError] = useState<DebriefApiError | null>(null);
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
+  const [unused, setUnused] = useState<{ headers: string[]; total: number } | null>(null);
 
   /* Decision Queue / Multi-Account V1 — see this file's header comment
      for the section above for the full contract. nextQueueIdRef is a
@@ -442,6 +447,11 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
         return;
       }
       setMemo(data.memo);
+      setUnused(
+        data.unusedColumns && Array.isArray(data.unusedColumns.headers)
+          ? { headers: data.unusedColumns.headers, total: Number(data.unusedColumns.total) || 0 }
+          : null
+      );
       setGeneratedAt(Date.now());
       setStatus("ready");
     } catch {
@@ -466,6 +476,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     setCreativeGroups({});
     clearCreativeAssets();
     setMemo(null);
+    setUnused(null);
     setError(null);
     setGeneratedAt(null);
   }, [clearCreativeAssets]);
@@ -481,6 +492,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       creativeGroups,
       creativeAssets,
       memo,
+      unusedColumns: unused,
       error,
       generatedAt,
       portfolio,
@@ -498,7 +510,7 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
       clearError,
       reset,
     }),
-    [status, file, previousFile, fields, competitorSources, formatOverrides, creativeGroups, creativeAssets, memo, error, generatedAt, portfolio, addToQueue, removeFromQueue, setFile, updateFields, setCreativeAsset, setSampleCreativeAssets, generate, clearError, reset]
+    [status, file, previousFile, fields, competitorSources, formatOverrides, creativeGroups, creativeAssets, memo, unused, error, generatedAt, portfolio, addToQueue, removeFromQueue, setFile, updateFields, setCreativeAsset, setSampleCreativeAssets, generate, clearError, reset]
   );
 
   return (

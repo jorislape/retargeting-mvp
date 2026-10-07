@@ -63,7 +63,13 @@ const decisionCardSrc = reportSrc.slice(decisionCardStart, decisionCardEnd);
   // guards that.
   const DETAILS_TAG = /<details\s+(?:className|key)=/g;
   const allDetailsInReport = (reportSrc.match(DETAILS_TAG) ?? []).length;
-  assert.equal(allDetailsInReport, 2, "exactly 2 native <details> JSX tags exist in Report.tsx");
+  // Unused Columns Disclosure (reviewed): the third <details> lives in
+  // the masthead, buyer-only, and is DELIBERATELY print-hidden with no
+  // print twin — the unused-column list must not appear in the PDF.
+  assert.equal(allDetailsInReport, 3, "exactly 3 native <details> JSX tags exist in Report.tsx");
+  const unusedDetails = reportSrc.match(/\{!client && unusedColumns && unusedColumns\.total > 0 && \(\s*<details className="([^"]*)"/);
+  assert.ok(unusedDetails, "the third is the unused-columns disclosure");
+  assert.match(unusedDetails![1], /\bprint-hidden\b/, "and it never prints");
   const detailsInDecisionCard = (decisionCardSrc.match(DETAILS_TAG) ?? []).length;
   assert.equal(detailsInDecisionCard, 2, "both live inside DecisionCard");
 
@@ -78,7 +84,7 @@ const decisionCardSrc = reportSrc.slice(decisionCardStart, decisionCardEnd);
   );
   assert.ok(!competitorDebriefResultSrc.includes("<details"), "the OTHER printable report (Competitor Debrief) has no <details> at all — nothing to fix there");
 
-  console.log("printDisclosureCorrectness: 1. exhaustive <details> inventory — exactly 2, both inside DecisionCard, both addressed");
+  console.log("printDisclosureCorrectness: 1. exhaustive <details> inventory — 2 inside DecisionCard (print twins) + the print-hidden unused-columns disclosure");
 }
 
 /* ===================== 2 & 3. Both <details> are print-hidden, each has a print-only twin ===================== */

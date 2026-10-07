@@ -18,6 +18,7 @@ import {
   resolveColumns,
   summarizeCreativeGroups,
   toTable,
+  unusedColumns,
   type CreativeFormatOverrides,
   type CreativeGroupAssignments,
   type DebriefApiError,
@@ -603,7 +604,12 @@ export async function POST(request: NextRequest) {
       );
       memo = { ...memo, comparison };
     }
-    return ok({ ok: true, memo });
+    /* Unused Columns Disclosure: the current export's headers Debrief
+       didn't map to anything — headers only (structural, and already
+       echoed back in error responses), returned to the uploader alone,
+       NEVER logged. Kept beside the memo, not inside it, so it never
+       reaches the sample memo or a Decision Queue snapshot. */
+    return ok({ ok: true, memo, unusedColumns: unusedColumns(headers, columns, rows) });
   } catch (error) {
     console.error("debrief: analysis failed", {
       message: error instanceof Error ? error.message : "unknown",

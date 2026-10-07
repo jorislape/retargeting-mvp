@@ -242,7 +242,9 @@ function hookMetricHeaders(headers: string[]) {
   return {
     videoPlays3s: findHeader(counts, ALIASES.videoPlays3s),
     thruPlays: findHeader(counts, ALIASES.thruPlays),
-    videoPlays: findHeader(counts, ALIASES.videoPlays),
+    /* "Video plays at 25%/50%/…" are retention checkpoints, not a
+       measure of the opening — never cited as a hook-level metric. */
+    videoPlays: findHeader(counts.filter((h) => !/video plays at \d/i.test(h)), ALIASES.videoPlays),
   };
 }
 
@@ -447,4 +449,47 @@ export function kpiSourcePreview(
       ? " Cost per lead = spend ÷ leads."
       : "";
   return `${parts.join("; ")}.${derived}`;
+}
+
+/** Unused Columns Disclosure: the most headers ever listed — a wide
+ *  export can carry 100+ columns; past this the list stops helping. */
+export const UNUSED_COLUMNS_CAP = 40;
+
+/**
+ * Unused Columns Disclosure — the export's headers that resolveColumns
+ * did NOT map to any ColumnMap field, so the buyer can see what Debrief
+ * ignored and say if one of them matters. Derived generically from the
+ * ColumnMap itself (every string-valued field except `currency`), so a
+ * new alias automatically moves its column out of this list.
+ *
+ * Excluded: headers already reported as "also found, not used"
+ * competing variants of a conversion field (columns.sources[*].ignored),
+ * blank headers, and columns whose every cell is empty. Order follows
+ * the export; duplicates collapse. Returns the first UNUSED_COLUMNS_CAP
+ * plus the true total. Headers only — structural, never cell values;
+ * the caller must never log them.
+ */
+export function unusedColumns(
+  headers: string[],
+  columns: ColumnMap,
+  rows: Record<string, string>[] = []
+): { headers: string[]; total: number } {
+  const used = new Set<string>();
+  for (const [key, value] of Object.entries(columns)) {
+    if (key === "currency" || key === "sources") continue;
+    if (typeof value === "string") used.add(value);
+  }
+  for (const src of Object.values(columns.sources)) {
+    src?.ignored.forEach((h) => used.add(h));
+  }
+  const seen = new Set<string>();
+  const unused: string[] = [];
+  for (const raw of headers) {
+    const h = raw.trim();
+    if (h === "" || used.has(h) || seen.has(h)) continue;
+    seen.add(h);
+    if (rows.length > 0 && rows.every((r) => (r[h] ?? "").trim() === "")) continue;
+    unused.push(h);
+  }
+  return { headers: unused.slice(0, UNUSED_COLUMNS_CAP), total: unused.length };
 }
