@@ -161,6 +161,9 @@ function upstreamFieldsForRow(row: Record<string, string>, columns: ColumnMap) {
     /* Tester Feedback Fix 6: delivery context, display-only. */
     frequency: columns.frequency ? parseNumericCell(row[columns.frequency]) : null,
     reach: columns.reach ? parseNumericCell(row[columns.reach]) : null,
+    /* Mixed Segment Warning: structure names, display-only (blank → null). */
+    adSetName: columns.adSetName ? row[columns.adSetName]?.trim() || null : null,
+    campaignName: columns.campaignName ? row[columns.campaignName]?.trim() || null : null,
   };
 }
 

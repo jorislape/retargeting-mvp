@@ -44,7 +44,8 @@ try {
     "A2,Camp 1,Set 2,280,8,8,35,700,1100,,\n" +
     "A3,Camp 2,Set 3,260,6,6,43.33,650,900,,\n";
   const e = unusedOf(extra);
-  assert.deepEqual(e, { headers: ["Campaign name", "Ad set name", "Landing page views", "Video plays at 25%"], total: 4 });
+  // Campaign / ad set names are read since Mixed Segment Warning — no longer unused.
+  assert.deepEqual(e, { headers: ["Landing page views", "Video plays at 25%"], total: 2 });
   const ex = run(extra, "cpa");
   assert.ok(ex.columns.sources && JSON.stringify(ex.columns.sources).includes('"ignored":["Purchases"]'),
     "the competing variant is the one reported as 'also found, not used' — so it isn't listed twice");
@@ -59,8 +60,8 @@ try {
   assert.equal(w.total, 50);
   assert.deepEqual(w.headers, many.slice(0, 40));
 
-  /* Sample: the memo has no such field and is untouched; its own export
-     carries two unused columns (only visible on a generator run). */
+  /* Sample: the memo has no such field and is untouched; every column of
+     its own export is read (campaign/ad set names included). */
   const s = buildSampleMemo();
   assert.ok(!("unusedColumns" in s));
   assert.ok(!/didn't use/.test(memoToText(s, "buyer", 5, [])));

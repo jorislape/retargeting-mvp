@@ -1,5 +1,7 @@
 import { ColumnMap, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
+import { detectSegmentSpread } from "./segmentSpread";
+import { fmtKpiValue } from "./format";
 import {
   AnalysisResult,
   DebriefContext,
@@ -191,6 +193,13 @@ export function analyze(
      already use — no new decision logic, just the mirrored sum. */
   const atPool = ranked.filter((a) => a.deltaFromMedian === 0);
 
+  /* Mixed Segment Warning — computed AFTER ranking from the ranked ads,
+     and only ever attached as a fact for one limits line. */
+  const spread = detectSegmentSpread(ranked, {
+    adSet: columns.adSetName != null,
+    campaign: columns.campaignName != null,
+  });
+
   const winners = winnerPool.slice(0, MAX_WINNERS_LOSERS);
   const losers = loserPool.slice(0, MAX_WINNERS_LOSERS);
 
@@ -245,6 +254,17 @@ export function analyze(
     ...(cpaBasis ? { cpaBasis } : {}),
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
+    ...(spread
+      ? {
+          mixedSegments: {
+            dimension: spread.dimension,
+            segments: spread.segments,
+            lowLabel: fmtKpiValue(spread.low, kpi, columns.currency),
+            highLabel: fmtKpiValue(spread.high, kpi, columns.currency),
+            ratio: spread.ratio,
+          },
+        }
+      : {}),
     /* Tester Feedback Fix 5: wording only; absent unless CPA w/o target. */
     ...(kpi === "cpa" && !(targetCpa != null && targetCpa > 0)
       ? { cpaWithoutTarget: { roasAvailable: requiredColumnsFor("roas", columns).length === 0 } }

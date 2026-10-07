@@ -522,6 +522,20 @@ export function buildLimits(
     );
   }
 
+  /* Mixed Segment Warning: one line when the export mixes ad sets (or
+     campaigns) far apart — copy only, never the action. */
+  if (analysis.mixedSegments) {
+    const m = analysis.mixedSegments;
+    const plural = m.dimension === "ad set" ? "ad sets" : "campaigns";
+    const apart = `${m.ratio.toFixed(1)}× apart`;
+    buyer.push(
+      `This export mixes ${m.segments} ${plural} whose typical ${kpiLabelFor(analysis)} ranges from ${m.lowLabel} to ${m.highLabel} (${apart}) — ranking them against one account median may compare unlike products. For a fairer read, export one ad set or campaign at a time.`
+    );
+    client.push(
+      `This file mixes ${m.segments} ${plural} whose typical ${kpiClientLabelFor(analysis)} ranges from ${m.lowLabel} to ${m.highLabel} (${apart}), so comparing every ad against one account-wide typical result may compare unlike products. A fairer read looks at one ad set or campaign at a time.`
+    );
+  }
+
   if (analysis.kpiGaps) {
     /* First-Run Fixes: some set-aside ads spent enough but have no KPI
        value — name each cause with its count instead of "too little

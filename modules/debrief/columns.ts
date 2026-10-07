@@ -125,6 +125,11 @@ const ALIASES = {
      reached" contains "reach"). */
   frequency: ["frequency"],
   reach: ["reach"],
+  /* Mixed Segment Warning: structural names, display-only — used only
+     to group judged ads for the mixed-segment limits line; never read
+     by gate, median, ranking or action. */
+  adSetName: ["ad set name"],
+  campaignName: ["campaign name"],
 } as const;
 
 /** Meta's per-campaign optimisation-event columns. They're resolved as
@@ -191,6 +196,9 @@ export interface ColumnMap {
   /** Tester Feedback Fix 6 — optional, display-only delivery columns. */
   frequency: string | null;
   reach: string | null;
+  /** Mixed Segment Warning — optional, display-only structure columns. */
+  adSetName: string | null;
+  campaignName: string | null;
   /** 3-letter currency code pulled from the spend header, if present. */
   currency: string | null;
   /** KPI Source Column Disclosure: for each RESOLVED conversion field,
@@ -230,6 +238,8 @@ export function resolveColumns(headers: string[]): ColumnMap {
     cpm: findHeader(headers, ALIASES.cpm),
     ...hookMetricHeaders(headers),
     ...deliveryHeaders(headers),
+    adSetName: findHeader(headers, ALIASES.adSetName),
+    campaignName: findHeader(headers, ALIASES.campaignName),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
     sources: resolveSources(headers),
   };

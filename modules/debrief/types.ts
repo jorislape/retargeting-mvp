@@ -385,6 +385,11 @@ export interface ParsedAd {
    *  absent or the cell blank. */
   frequency?: number | null;
   reach?: number | null;
+  /** Mixed Segment Warning — the row's ad set / campaign name, read
+   *  verbatim. Display-only: used solely to group judged ads for the
+   *  mixed-segment limits line, never by gate/median/ranking/action. */
+  adSetName?: string | null;
+  campaignName?: string | null;
 }
 
 /** zero_outcome_thin (Tester Feedback follow-up): a zero-conversion CPA
@@ -496,6 +501,18 @@ export interface AnalysisResult {
    *  relative to this account, not to profitability. roasAvailable:
    *  the export also carries ROAS / purchase value. Limits copy only. */
   cpaWithoutTarget?: { roasAvailable: boolean };
+  /** Mixed Segment Warning (segmentSpread.ts): present ONLY when judged
+   *  ads split into ≥2 ad sets (campaigns as fallback) of ≥2 ads whose
+   *  typical KPI is ≥ SEGMENT_SPREAD_MULTIPLE apart. Labels are pre-
+   *  formatted KPI values. Read only by buildLimits copy — never by the
+   *  gate, median, ranking, action or evidenceState. */
+  mixedSegments?: {
+    dimension: "ad set" | "campaign";
+    segments: number;
+    lowLabel: string;
+    highLabel: string;
+    ratio: number;
+  };
   /** Tester Feedback follow-up: zero-conversion CPA ads set aside under
    *  the zero-conversion spend bar (gate "zero_outcome_thin"). `needs`
    *  is that bar in money, or null when there was nothing to measure it
