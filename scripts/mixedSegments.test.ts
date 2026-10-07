@@ -94,8 +94,33 @@ try {
     "R1,Hi,300,1500\nR2,Hi,320,1600\nR3,Lo,300,600\nR4,Lo,310,620\n";
   assert.equal(run(roas, "roas").analysis.mixedSegments?.segments, 2, "5x vs 2x ROAS → flagged");
 
-  /* Sample: its ROAS memo is untouched (spread 1.24× < 1.5×). */
+  /* Count KPIs never trigger it, even at a 3× spread (Set A: 30/32/27
+     purchases vs Set B: 10/11/10). Lead-based CPA (cost per lead) does. */
+  const { SEGMENT_SPREAD_KPIS } = requireCompiled("modules/debrief/segmentSpread.js") as { SEGMENT_SPREAD_KPIS: string[] };
+  assert.deepEqual(SEGMENT_SPREAD_KPIS, ["roas", "cpa", "ctr", "cpc"]);
+  assert.equal(run(csv(FAR), "purchases").analysis.mixedSegments, undefined, "Purchases: never");
+  const farLeads = "Ad name,Ad set name,Amount spent (EUR),Leads,Cost per lead (EUR)\n" +
+    FAR.map(([n, , a, s, p]) => `${n},${a},${s},${p},${(s / p).toFixed(2)}`).join("\n") + "\n";
+  const leadsRun = run(farLeads, "leads");
+  assert.equal(leadsRun.analysis.mixedSegments, undefined, "Leads: never");
+  assert.ok(!leadsRun.memo.decision.limits.buyer.some((l) => l.startsWith("This export mixes")));
+  const cpl = run(farLeads, "cpa");
+  assert.equal(cpl.analysis.cpaBasis, "leads");
+  assert.ok(cpl.memo.decision.limits.buyer.some((l) => l.startsWith("This export mixes 2 ad sets whose typical CPL")), "cost per lead: yes");
+
+  /* Sample: its ROAS memo is untouched (spread 1.24× < 1.5×), and the
+     same data under Purchases / Leads (1.67× / 1.70×) no longer warns —
+     what "Load sample data" with those KPIs produces. */
   assert.equal(buildSampleMemo().decision.limits.buyer.some((l) => l.startsWith("This export mixes")), false);
+  const { SAMPLE_CSV_TEXT, SAMPLE_CONTEXT } = requireCompiled("modules/debrief/sampleCsv.js") as {
+    SAMPLE_CSV_TEXT: string;
+    SAMPLE_CONTEXT: Record<string, unknown>;
+  };
+  for (const kpi of ["purchases", "leads"]) {
+    const r = run(SAMPLE_CSV_TEXT, kpi, { ...SAMPLE_CONTEXT, kpi });
+    assert.equal(r.analysis.mixedSegments, undefined, `sample under ${kpi}: no warning`);
+    assert.ok(!/mixes \d+ ad sets/.test(r.buyerText + r.clientText), `sample under ${kpi}: no warning text`);
+  }
 
   /* Isolation: rules never read it; only buildLimits copy does. */
   const decision = readFileSync(join(ROOT, "modules/debrief/decision.ts"), "utf8");

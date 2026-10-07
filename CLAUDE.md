@@ -130,8 +130,9 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # lead_is_new / honest can't-read states), rendered as context
                   # beside the decision card's evidence line + in TXT; never an
                   # input to the decision or evidenceState
-  segmentSpread.ts# Mixed Segment Warning — decision-blind (creativeGroups.ts pattern):
-                  # groups judged ads by ad set (campaign fallback), and when ≥2 groups
+  segmentSpread.ts# Mixed Segment Warning — decision-blind (creativeGroups.ts pattern),
+                  # ratio KPIs only (ROAS/CPA/CTR/CPC — never Purchases/Leads, where a
+                  # gap mostly reflects spend): groups judged ads by ad set (campaign fallback), and when ≥2 groups
                   # of ≥2 ads have typical KPIs ≥ SEGMENT_SPREAD_MULTIPLE (1.5×) apart,
                   # analysis.mixedSegments feeds ONE limits line (both registers). Never
                   # read by the gate, median, ranking, action or evidenceState

@@ -195,7 +195,7 @@ export function analyze(
 
   /* Mixed Segment Warning — computed AFTER ranking from the ranked ads,
      and only ever attached as a fact for one limits line. */
-  const spread = detectSegmentSpread(ranked, {
+  const spread = detectSegmentSpread(ranked, kpi, {
     adSet: columns.adSetName != null,
     campaign: columns.campaignName != null,
   });

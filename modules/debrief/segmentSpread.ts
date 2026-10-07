@@ -11,7 +11,7 @@
  * gate, the median, ranking, the committed action or evidenceState —
  * decision.ts reads its result only inside buildLimits' copy.
  */
-import type { RankedAd } from "./types";
+import type { KpiKey, RankedAd } from "./types";
 
 /** A group needs at least this many judged ads (with a KPI value) for its
  *  own median to mean anything — one ad is an anecdote, not a level. */
@@ -22,6 +22,13 @@ export const MIN_ADS_PER_SEGMENT = 2;
  *  cost). 1.5× is a deliberately blunt, disclosed Debrief default — a
  *  prompt to check the mix, not a statistical test of heterogeneity. */
 export const SEGMENT_SPREAD_MULTIPLE = 1.5;
+
+/** The KPIs this warning applies to: ratio KPIs only (ROAS, CPA — incl.
+ *  lead-based CPA / cost per lead — CTR, CPC), where segments can sit at
+ *  genuinely different efficiency levels. Count KPIs (Purchases, Leads)
+ *  are excluded: a gap between ad sets there mostly reflects how much
+ *  each one spent, not how well it performs. */
+export const SEGMENT_SPREAD_KPIS: readonly KpiKey[] = ["roas", "cpa", "ctr", "cpc"];
 
 export interface SegmentSpread {
   dimension: "ad set" | "campaign";
@@ -41,6 +48,7 @@ function median(values: number[]): number {
 }
 
 /**
+ * Ratio KPIs only (SEGMENT_SPREAD_KPIS) — null for Purchases/Leads.
  * Groups JUDGED ads that have a KPI value by ad set (campaign when the
  * export has no ad set column), takes each qualifying group's median,
  * and returns the spread when it reaches SEGMENT_SPREAD_MULTIPLE —
@@ -50,8 +58,10 @@ function median(values: number[]): number {
  */
 export function detectSegmentSpread(
   ranked: readonly RankedAd[],
+  kpi: KpiKey,
   has: { adSet: boolean; campaign: boolean }
 ): SegmentSpread | null {
+  if (!SEGMENT_SPREAD_KPIS.includes(kpi)) return null;
   const dimension = has.adSet ? "ad set" : has.campaign ? "campaign" : null;
   if (!dimension) return null;
   const groups = new Map<string, number[]>();
