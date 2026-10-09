@@ -57,6 +57,9 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
                   <Link href="/privacy" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
                     Privacy
                   </Link>
+                  <Link href="/terms" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
+                    Terms
+                  </Link>
                   <a href="mailto:joris.adomas@gmail.com" className="underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200 hover:decoration-zinc-400">
                     joris.adomas@gmail.com
                   </a>
