@@ -391,12 +391,15 @@ const READINESS_LABEL: Record<"ready" | "directional" | "insufficient", string> 
 function BudgetMoveNames({
   move,
   client,
+  budgetVariantLabel,
 }: {
   move: NonNullable<Memo["decision"]["budgetMove"]>;
   client: boolean;
+  budgetVariantLabel?: "shift" | "scale" | "cut";
 }) {
   const [expanded, setExpanded] = useState(false);
   const SHOWN = 2;
+  const variant = budgetVariantLabel;
   const line = (label: string, ads: { name: string; spendLabel: string }[]) =>
     ads.length === 0 ? null : (
       <p className="text-xs leading-relaxed text-zinc-400">
@@ -422,10 +425,23 @@ function BudgetMoveNames({
         )}
       </p>
     );
+  /* Trust Pass 3d — the move made concrete: which ads lose budget,
+     which gains it, and how much currently sits on below-median ads
+     (an already-computed figure — no invented amounts). */
   return (
     <div className="mt-2 space-y-0.5">
-      {line(client ? "Moving budget away from" : "Budget from", move.from)}
-      {line(client ? "Moving budget into" : "Budget into", move.to)}
+      {line(client ? "Pausing or reducing" : "Pause or trim", move.from)}
+      {line(
+        client ? "Getting more budget" : variant === "scale" ? "Gets more budget" : "Receives the budget",
+        move.to
+      )}
+      {move.belowSpendLabel && (
+        <p className="text-xs leading-relaxed text-zinc-400">
+          {client
+            ? `About ${move.belowSpendLabel} is currently going to ads below the middle ad.`
+            : `About ${move.belowSpendLabel} currently on below-median ads.`}
+        </p>
+      )}
     </div>
   );
 }
@@ -520,7 +536,7 @@ function DecisionCard({
       <p className="mt-3 max-w-3xl text-[17px] font-semibold leading-snug text-zinc-50 sm:text-[19px]">
         {client ? d.clientHeadline : d.headline}
       </p>
-      {d.budgetMove && <BudgetMoveNames move={d.budgetMove} client={client} />}
+      {d.budgetMove && <BudgetMoveNames move={d.budgetMove} client={client} budgetVariantLabel={d.budgetVariant} />}
       {/* Decision & Comparison V2: "What we know" labels the evidence
           side of the card — the rationale and evidence-strength line —
           with "What we don't know" (the limits) as its counterpart
@@ -564,38 +580,10 @@ function DecisionCard({
             : memo.comparison.leaderConsistency.buyer}
         </p>
       )}
-      {/* Evidence Sufficiency V1 — a strong budget decision may coexist
-          with a creative pattern that isn't durable-established yet.
-          Renders ONLY when the committed call actually moves budget
-          toward the leader (never a cut, which doesn't rest on the
-          winner's pattern at all) AND that leader's own brief-readiness
-          hasn't cleared "ready" — surfacing the split explicitly rather
-          than letting the confident budget headline imply the creative
-          claim is equally proven. Reuses T1's own already-computed
-          readiness sentence verbatim (never a second, competing
-          explanation of the same fact). decision.ts stays fully
-          unaware this line exists — briefReadiness is read from
-          memo.nextTests, never fed back into `d`. */}
-      {d.action === "budget" &&
-        d.budgetVariant !== "cut" &&
-        memo.nextTests[0]?.briefReadiness &&
-        memo.nextTests[0].briefReadiness.state !== "ready" && (
-          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-400">
-            <span
-              className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${READINESS_COLOR[memo.nextTests[0].briefReadiness.state]}`}
-            >
-              {client ? (
-                "Ready for a creative brief?"
-              ) : (
-                <Term tip={TIP_BRIEF_READINESS}>Brief readiness</Term>
-              )}
-            </span>
-            {client ? " " : ": "}
-            {client
-              ? memo.nextTests[0].briefReadiness.client
-              : memo.nextTests[0].briefReadiness.buyer}
-          </p>
-        )}
+      {/* Trust Pass 3b — ONE strength label on the card: the evidence
+          line above (evidenceState). Brief readiness lives on each test
+          in the tests section; confidence.level only in the confidence
+          section (mapped from evidenceState — see memo.ts). */}
       {/* Decision Criteria V2 — whose bars decided. Buyer view only
           (the labels carry buyer vocabulary); user-provided criteria
           are visually tagged so a default is never presented as the
@@ -2363,6 +2351,20 @@ export function Report({
               <ClientTestCards tests={memo.nextTests} />
             </>
           ) : (
+          <>
+          {/* Trust Pass 3b: Brief readiness is explained here, with the
+              tests it qualifies — no longer as a second strength label
+              on the decision card. */}
+          {memo.nextTests.some((t) => t.briefReadiness) && (
+            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
+              <span className="font-medium text-zinc-300">
+                <Term tip={TIP_BRIEF_READINESS}>Brief readiness</Term>:
+              </span>{" "}
+              each test&apos;s badge says whether its idea has enough evidence
+              behind it to brief new creative on (Ready / Early signal / Not
+              enough evidence).
+            </p>
+          )}
           <ol className="mt-1 divide-y divide-white/[0.08]">
             {memo.nextTests.map((test, i) => (
               <TestRow
@@ -2384,6 +2386,7 @@ export function Report({
               />
             ))}
           </ol>
+          </>
           )}
 
           {/* Creative briefs: queue a test, turn it into a hand-off

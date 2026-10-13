@@ -125,6 +125,11 @@ components/debrief/
   the report caps only the display — "+N more … Show all" on screen,
   every row in print/PDF and TXT/Copy). Fewer than 3 qualifying ads is
   shown honestly as fewer than 3, never padded.
+- **One confidence scale** — the Next-move card shows only
+  `evidenceState`; the confidence section's level is mapped from it
+  (`CONFIDENCE_FROM_EVIDENCE` in `memo.ts`): supported → high, limited →
+  medium, insufficient → low. Brief readiness lives on each test, and a
+  test on an ad that doesn't clear the +30% scale bar is never "Ready".
 - **Combined below-benchmark spend** in the kill list is summed across
   *all* judged ads worse than the median, not just the displayed rows.
 - **Patterns/angle claims** are structural (spend comparisons, ad-name

@@ -1406,9 +1406,22 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
    or otherwise alter confidence.level, .reasons, or .notes. hasNameSignal
    is kept because it's a structural fact derived from ad NAMES across a
    group, not user prose. */
-function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
+/** Trust Pass 3b — ONE confidence scale. The card shows evidenceState;
+ *  the confidence section's level is that same read on a three-word
+ *  scale, never a second, independently-computed verdict:
+ *    supported → high · limited → medium · insufficient → low.
+ *  Reasons are drawn from the exact conditions behind evidenceState
+ *  (deriveEvidenceState in decision.ts). */
+export const CONFIDENCE_FROM_EVIDENCE = {
+  supported: "high",
+  limited: "medium",
+  insufficient: "low",
+} as const;
+
+function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo["confidence"] {
   const { adsJudged, adsAnalyzed, winners, losers, median, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
     analysis;
+  const flat = decision.evidenceShape === "flatness";
   const adsSetAside = spendSetAside(analysis);
   const notes: string[] = [];
   /* Evidence Confidence V2 (hoisted — also drives the level cap below):
@@ -1454,19 +1467,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
      label also caps confidence at medium — one consistent story; "high
      confidence" can never sit beside a thin-outcome-volume limit
      (volumeBelowFloor hoisted above, where it also feeds the notes). */
-  let level: "high" | "medium" | "low" = "high";
-  if (median == null || adsJudged < 5 || (winners.length === 0 && losers.length === 0)) {
-    level = "low";
-  } else if (
-    adsJudged < 10 ||
-    winners.length < 3 ||
-    losers.length < 3 ||
-    missingColumns.length > 0 ||
-    !hasNameSignal ||
-    volumeBelowFloor
-  ) {
-    level = "medium";
-  }
+  const level: "high" | "medium" | "low" = CONFIDENCE_FROM_EVIDENCE[decision.evidenceState];
 
   if (notes.length === 0) {
     notes.push("Data was complete enough that no caveats apply beyond the usual: more days of spend always sharpens the read.");
@@ -1480,7 +1481,16 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
   let clientWhy: string;
   const topPct = winners[0]?.deltaPct ?? null;
 
-  if (level === "high") {
+  if (level === "high" && flat) {
+    reasons.push(
+      `${adsJudged} of ${adsAnalyzed} ads reached the minimum spend — a fair sample to judge.`
+    );
+    reasons.push(
+      "Every judged ad sits close to the median — a consistent flat read, not a missing signal."
+    );
+    clientWhy =
+      "Confidence is high because most ads had enough spend to compare, and they performed consistently close to one another.";
+  } else if (level === "high") {
     reasons.push(
       `${adsJudged} of ${adsAnalyzed} ads reached the minimum spend — a fair sample to judge.`
     );
@@ -1502,7 +1512,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
         `Only ${adsJudged} ads reached the minimum spend — patterns can still shift as more spend lands.`
       );
     }
-    if (winners.length < 3 || losers.length < 3) {
+    if (!flat && (winners.length < 3 || losers.length < 3)) {
       reasons.push(
         `The winner/loser groups are small (${winners.length} vs ${losers.length}) — one ad can swing the read.`
       );
@@ -1513,6 +1523,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
       );
     }
     if (!hasNameSignal) {
+      // Context, not a cause of the level (evidenceState ignores names).
       reasons.push(
         "No clear ad-name pattern — the judgement leans on numbers alone."
       );
@@ -1540,7 +1551,7 @@ function buildConfidence(analysis: AnalysisResult): Memo["confidence"] {
         `Only ${adsJudged} ad${adsJudged === 1 ? "" : "s"} could be judged — too few to separate signal from noise.`
       );
     }
-    if (median != null && winners.length === 0 && losers.length === 0) {
+    if (median != null && adsJudged >= 5 && winners.length === 0 && losers.length === 0) {
       reasons.push("Nothing clearly won or lost this period.");
     }
     reasons.push(
@@ -1822,6 +1833,6 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
     avoid: buildAvoid(analysis, context, decision),
-    confidence: buildConfidence(analysis),
+    confidence: buildConfidence(analysis, decision),
   };
 }

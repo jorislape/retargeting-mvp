@@ -41,8 +41,8 @@ try {
     for (const name of [...BELOW, ...ABOVE]) assert.ok(txt.includes(name), `${label} TXT names ${name}`);
   }
   assert.match(memoToText(m, "buyer", 5, []), /\n\+1 more:\n- Clickbait_M|\n\+1 more:\n- Static_H/, "the 6th row follows a +1 more marker");
-  assert.match(t.buyerText, /Budget from: "Clickbait_M" \(\$384\.00\), .*"Static_H" \(\$379\.00\)/);
-  assert.match(t.clientText, /Moving budget away from: /);
+  assert.match(t.buyerText, /Pause or trim: "Clickbait_M" \(\$384\.00\), .*"Static_H" \(\$379\.00\)/);
+  assert.match(t.clientText, /Pausing or reducing: /); // labels made concrete in Trust Pass 3d
   // TL;DR "others" = every other below-median ad.
   assert.ok(m.tldr.some((l) => l.includes("and 5 other below-benchmark ads")));
 
@@ -53,7 +53,7 @@ try {
   assert.match(report, /i >= topAdsShown && !expanded \? "hidden print:table-row"/);
   assert.match(report, /i >= topAdsShown && !expanded \? "hidden print:flex"/);
   assert.match(report, /<MoreToggle\s+names=\{rows\.slice\(topAdsShown\)\.map\(\(a\) => a\.name\)\}/);
-  assert.match(report, /\{d\.budgetMove && <BudgetMoveNames move=\{d\.budgetMove\} client=\{client\} \/>\}/);
+  assert.match(report, /\{d\.budgetMove && <BudgetMoveNames move=\{d\.budgetMove\} client=\{client\}/);
   assert.match(report, /count: memo\.losers\.rows\.length,/);
   assert.match(report, /\+\{group\.count - group\.names\.length\} more — listed below/);
 

@@ -2,7 +2,7 @@
 // compare.ts: types.ts imports nothing, so this file's whole dependency
 // chain resolves under plain Node's type-stripping test runner
 // (scripts/briefReadiness.test.ts).
-import { MIN_OUTCOMES_FOR_SUPPORTED } from "./decision.ts";
+import { MIN_OUTCOMES_FOR_SUPPORTED, SCALE_TEST_MIN_DELTA_PCT } from "./decision.ts";
 import { outcomeNounsFor } from "./types.ts";
 import type {
   AnalysisResult,
@@ -133,6 +133,18 @@ export function deriveSignalVolumeReadiness(
       state: "directional",
       buyer: `Directional — "${top.name}" has ${n} ${nounMany}, past this read's minimal ${MIN_OUTCOMES_FOR_SUPPORTED}-${nounOne} floor but under the ${bar}-${nounOne} bar this read uses before calling the pattern established (${isUserBar ? "your criterion" : "Debrief default, practitioner-informed — set your own"}).`,
       client: `"${top.name}" is showing a real early sign, but we don't have enough results yet to call it a confirmed pattern.`,
+      criterion,
+    };
+  }
+  /* Trust Pass 3c: volume alone doesn't make a pattern — a lead that
+     doesn't clear the scale bar (+SCALE_TEST_MIN_DELTA_PCT%) is too
+     small to badge "Ready — real pattern". Capped at Early signal. */
+  if (top.deltaPct == null || top.deltaPct < SCALE_TEST_MIN_DELTA_PCT) {
+    const lead = top.deltaPct != null ? `${Math.round(top.deltaPct)}%` : "an unmeasured margin";
+    return {
+      state: "directional",
+      buyer: `Directional — "${top.name}" has ${n} ${nounMany}, but leads the median by ${lead}, under the ${SCALE_TEST_MIN_DELTA_PCT}% bar this read uses before treating a lead as an established creative pattern.`,
+      client: `"${top.name}" is ahead with plenty of results, but not by enough yet to call it a proven pattern.`,
       criterion,
     };
   }

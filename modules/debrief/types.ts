@@ -1020,6 +1020,10 @@ export interface MemoDecision {
   budgetMove?: {
     from: { name: string; spendLabel: string }[];
     to: { name: string; spendLabel: string }[];
+    /** Trust Pass 3d — analysis.belowBenchmarkSpend, formatted: "about
+     *  $X currently on below-median ads". Shift/cut only (a scale-only
+     *  move takes from no one). */
+    belowSpendLabel?: string;
   };
   headline: string;
   /** Jargon-free counterpart — no "kill/gate/benchmark/median/judged". */

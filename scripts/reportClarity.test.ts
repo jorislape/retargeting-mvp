@@ -189,8 +189,10 @@ try {
   const cardIdx = report.indexOf("<DecisionCard");
   assert.ok(defIdx > 0 && cardIdx > defIdx, "buyer definition renders above the Next-move card");
   assert.match(report.slice(defIdx - 400, defIdx), /!client && memo\.scope\.spendGateLabel/, "definition is buyer-only");
-  // Client card label.
-  assert.match(report, /"Ready for a creative brief\?"/);
+  // Client label — Trust Pass 3b moved readiness off the decision card;
+  // the client tests section carries it (cards + legend).
+  assert.match(report, /`Ready for a creative brief\? \$\{READINESS_LABEL/);
+  assert.match(report, />Ready for a creative brief\?<\/span>/);
   assert.ok(!report.includes('"Creative pattern"'), "old client label gone");
 
   // No "past the median" anywhere in shipped engine/report source.

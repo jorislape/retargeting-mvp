@@ -1080,6 +1080,17 @@ export function buildDecision(
     /* Trust Pass: the full from/to lists behind the headline's names. */
     const fromAds = analysis.losers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     const toAds = top ? [{ name: top.name, spendLabel: money(top.spend) }] : [];
+    /* Trust Pass 3d: the already-computed below-median spend, so the move
+       is concrete — no new percentage or amount is invented. */
+    const belowSpendLabel = money(analysis.belowBenchmarkSpend);
+    /* Trust Pass 3a: the card surfaces a "Next controlled test" whenever
+       nextTestFacts exist — so "don't pair this with a test" would
+       contradict it. The avoid line sequences the test instead. */
+    const testOnCard = nextTestFacts != null;
+    const sequenceTest = {
+      buyer: `Run the test below only after the budget move has ~${gateLabel} of fresh spend — one variable at a time.`,
+      client: `We'll start the test below only after the budget change has had about ${gateLabel} of new spend, so each result stays readable.`,
+    };
     const avoidBuyer: string[] = [];
     const avoidClient: string[] = [];
 
@@ -1099,8 +1110,8 @@ export function buildDecision(
     };
 
     if (scaleEligible && cutEligible) {
-      avoidBuyer.push("Don't pair this with a new creative test — one variable at a time.");
-      avoidClient.push("We're making this one change on its own so results stay readable.");
+      avoidBuyer.push(testOnCard ? sequenceTest.buyer : "Don't pair this with a new creative test — one variable at a time.");
+      avoidClient.push(testOnCard ? sequenceTest.client : "We're making this one change on its own so results stay readable.");
       return {
         ...evidence,
         limits: withEfficiencyScaleCaveat(
@@ -1109,7 +1120,7 @@ export function buildDecision(
         ),
         action: "budget",
         budgetVariant: "shift",
-        budgetMove: { from: fromAds, to: toAds },
+        budgetMove: { from: fromAds, to: toAds, belowSpendLabel },
         headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
         clientHeadline: `Move budget from the weakest ads into "${top!.name}", the clear leader.`,
         rationale: `"${top!.name}" is ${pct(top!.deltaPct!)}% better than the median ${kpiLabel} on ${money(top!.spend)}; ${analysis.belowBenchmarkCount} below-benchmark ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}).`,
@@ -1120,8 +1131,8 @@ export function buildDecision(
     }
 
     if (scaleEligible) {
-      avoidBuyer.push("No new creative test alongside the scale — one variable at a time.");
-      avoidClient.push("We're making this one change on its own so results stay readable.");
+      avoidBuyer.push(testOnCard ? sequenceTest.buyer : "No new creative test alongside the scale — one variable at a time.");
+      avoidClient.push(testOnCard ? sequenceTest.client : "We're making this one change on its own so results stay readable.");
       return {
         ...evidence,
         limits: withEfficiencyScaleCaveat(
@@ -1141,14 +1152,22 @@ export function buildDecision(
     }
 
     // cut-only
-    avoidBuyer.push("Don't move the freed budget into a new test yet — park it behind current ads.");
-    avoidClient.push("We're not starting anything new with the freed budget yet.");
+    avoidBuyer.push(
+      testOnCard
+        ? `Park the freed budget behind current ads; start the test below only after the cut has ~${gateLabel} of fresh spend.`
+        : "Don't move the freed budget into a new test yet — park it behind current ads."
+    );
+    avoidClient.push(
+      testOnCard
+        ? `The freed budget stays with the current ads; the test below starts once that change has had about ${gateLabel} of new spend.`
+        : "We're not starting anything new with the freed budget yet."
+    );
     return {
       ...evidence,
       limits: withMaterialActionVerificationGuardrail(evidence.limits),
       action: "budget",
       budgetVariant: "cut",
-      budgetMove: { from: fromAds, to: [] },
+      budgetMove: { from: fromAds, to: [], belowSpendLabel },
       headline: `Cut ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
       rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${

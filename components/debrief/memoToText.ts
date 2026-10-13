@@ -270,9 +270,17 @@ export function memoToText(
     const list = (ads: { name: string; spendLabel: string }[]) =>
       ads.map((a) => `"${a.name}" (${a.spendLabel})`).join(", ");
     if (d.budgetMove.from.length > 0)
-      lines.push(`${view === "client" ? "Moving budget away from" : "Budget from"}: ${list(d.budgetMove.from)}`);
+      lines.push(`${view === "client" ? "Pausing or reducing" : "Pause or trim"}: ${list(d.budgetMove.from)}`);
     if (d.budgetMove.to.length > 0)
-      lines.push(`${view === "client" ? "Moving budget into" : "Budget into"}: ${list(d.budgetMove.to)}`);
+      lines.push(
+        `${view === "client" ? "Getting more budget" : d.budgetVariant === "scale" ? "Gets more budget" : "Receives the budget"}: ${list(d.budgetMove.to)}`
+      );
+    if (d.budgetMove.belowSpendLabel)
+      lines.push(
+        view === "client"
+          ? `About ${d.budgetMove.belowSpendLabel} is currently going to ads below the middle ad.`
+          : `About ${d.budgetMove.belowSpendLabel} currently on below-median ads.`
+      );
   }
   lines.push(view === "client" ? d.clientRationale : d.rationale);
   lines.push(
