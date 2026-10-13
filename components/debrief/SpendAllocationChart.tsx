@@ -9,9 +9,9 @@ import {
  *  inline referenceName/caveat: small, invariant, and view-aware, so it
  *  lives in the component rather than the memo. */
 const SEGMENT_LABEL: Record<SpendAllocationSegmentId, { buyer: string; client: string }> = {
-  below: { buyer: "Below benchmark", client: "Below typical result" },
-  at: { buyer: "At median", client: "At typical result" },
-  above: { buyer: "Above benchmark", client: "Above typical result" },
+  below: { buyer: "Below benchmark", client: "Below the middle ad" },
+  at: { buyer: "At median", client: "Level with the middle ad" },
+  above: { buyer: "Above benchmark", client: "Above the middle ad" },
 };
 
 /**

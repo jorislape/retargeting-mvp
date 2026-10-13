@@ -77,8 +77,8 @@ try {
   // C. Existing rules (median, spend gate) remain unaffected by the
   // new rules appended after them.
   assert.equal(clientizeText("clears the spend gate"), "has enough spend to judge fairly");
-  assert.equal(clientizeText("below the median ROAS"), "below the typical ROAS");
-  assert.equal(clientizeText("at the median"), "at the typical result");
+  assert.equal(clientizeText("below the median ROAS"), "below the middle ad's ROAS"); // Trust Pass 2
+  assert.equal(clientizeText("at the median"), "at the middle ad");
 
   console.log("reportDensitySequencing: clientizeText proofs passed");
 

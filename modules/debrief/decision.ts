@@ -516,7 +516,7 @@ export function buildLimits(
       }`
     );
     client.push(
-      `No cost target was set, so ads are compared with this account's typical ${clientLabel}, not with what's profitable. A higher ${clientLabel} isn't automatically worse if ${differs}.${
+      `No cost target was set, so ads are compared with each other — against the middle ad's ${clientLabel} — not with what's profitable. A higher ${clientLabel} isn't automatically worse if ${differs}.${
         roas ? " This file also includes return on ad spend, which accounts for order value." : ""
       }`
     );
@@ -532,7 +532,7 @@ export function buildLimits(
       `This export mixes ${m.segments} ${plural} whose typical ${kpiLabelFor(analysis)} ranges from ${m.lowLabel} to ${m.highLabel} (${apart}) — ranking them against one account median may compare unlike products. For a fairer read, export one ad set or campaign at a time.`
     );
     client.push(
-      `This file mixes ${m.segments} ${plural} whose typical ${kpiClientLabelFor(analysis)} ranges from ${m.lowLabel} to ${m.highLabel} (${apart}), so comparing every ad against one account-wide typical result may compare unlike products. A fairer read looks at one ad set or campaign at a time.`
+      `This file mixes ${m.segments} ${plural} whose middle-ad ${kpiClientLabelFor(analysis)} ranges from ${m.lowLabel} to ${m.highLabel} (${apart}), so comparing every ad against one middle ad for the whole account may compare unlike products. A fairer read looks at one ad set or campaign at a time.`
     );
   }
 
@@ -1134,7 +1134,7 @@ export function buildDecision(
         headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% better than the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,
         rationale: `"${top!.name}" leads the ${kpiLabel} median by ${pct(top!.deltaPct!)}% on ${money(top!.spend)} of spend — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move. No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`,
-        clientRationale: `"${top!.name}" is delivering about ${pct(top!.deltaPct!)}% better ${kpiClient} than this account's typical result, with real spend behind it — it has earned more budget.`,
+        clientRationale: `"${top!.name}" is delivering about ${pct(top!.deltaPct!)}% better ${kpiClient} than the middle ad in this account, with real spend behind it — it has earned more budget.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
       };

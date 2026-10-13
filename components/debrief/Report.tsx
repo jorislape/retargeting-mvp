@@ -374,7 +374,7 @@ function firstClause(text: string): string {
 const TIP_JUDGED = "Ads that had enough spend to judge fairly.";
 const TIP_MEDIAN = "The account's midpoint result.";
 const TIP_JUDGED_SPEND = "The budget that's had a fair chance to perform.";
-const TIP_BELOW_BENCHMARK = "Performing under the account's typical result.";
+const TIP_BELOW_BENCHMARK = "Performing below the middle ad (the median).";
 const TIP_BRIEF_READINESS =
   "Whether this winner has enough results behind it to build the next creative brief on.";
 const TIP_DECISION_BARS =
@@ -779,6 +779,8 @@ function AdTable({
   density: "compact" | "standard";
 }) {
   const [expanded, setExpanded] = useState(false);
+  /* Trust Pass 2: the extra column exists only when a target is set. */
+  const hasTarget = rows.some((r) => r.vsTarget != null);
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[540px] text-sm">
@@ -794,8 +796,13 @@ function AdTable({
               Value
             </th>
             <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-              {view === "client" ? "vs typical" : "vs median"}
+              {view === "client" ? "vs middle ad" : "vs median"}
             </th>
+            {hasTarget && (
+              <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                vs target
+              </th>
+            )}
             <th className="py-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Spend
             </th>
@@ -861,6 +868,15 @@ function AdTable({
               >
                 {ad.vsMedianLabel}
               </td>
+              {hasTarget && (
+                <td
+                  className={`py-3 pr-4 text-right align-top font-mono text-xs font-semibold tabular-nums ${
+                    ad.vsTarget === "beats" ? "print-win text-emerald-400" : "print-loss text-red-400"
+                  }`}
+                >
+                  {ad.vsTarget === "beats" ? "✓ beats" : "✗ misses"}
+                </td>
+              )}
               <td className="py-3 text-right align-top font-mono text-xs tabular-nums text-zinc-400">
                 {ad.spendLabel}
               </td>
@@ -914,6 +930,11 @@ function ClientAdList({
                 {ad.spendLabel} spent
                 {density === "standard" && ad.conversionLabel ? ` · ${ad.conversionLabel}` : ""}
               </p>
+              {ad.vsTarget && (
+                <p className={`mt-0.5 text-xs font-medium ${ad.vsTarget === "beats" ? "print-win text-emerald-400" : "print-loss text-red-400"}`}>
+                  {ad.vsTarget === "beats" ? "✓ beats your target" : "✗ below your target"}
+                </p>
+              )}
             </div>
             <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">
               {ad.valueLabel}
@@ -988,6 +1009,11 @@ function AtMedianRows({
             <p className="font-mono text-xs font-semibold tabular-nums text-zinc-400">
               {client ? clientizeText(ad.vsMedianLabel) : ad.vsMedianLabel}
             </p>
+            {ad.vsTarget && (
+              <p className={`font-mono text-xs font-semibold ${ad.vsTarget === "beats" ? "print-win text-emerald-400" : "print-loss text-red-400"}`}>
+                {ad.vsTarget === "beats" ? (client ? "✓ beats your target" : "✓ beats target") : client ? "✗ below your target" : "✗ misses target"}
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -1010,15 +1036,21 @@ function ClientStatCards({ memo }: { memo: Memo }) {
      print-win keeps the best-performer green in the PDF. */
   const cards: { label: string; value: string; sub: string; tone?: string }[] =
     [
+      /* Trust Pass 2: the account's real result is the headline number;
+         the median is never presented as the account's "typical" KPI. */
+      ...(scope.accountKpiLabel
+        ? [
+            {
+              label: `Account ${scope.kpiLabelClient ?? scope.kpiLabel}`,
+              value: scope.accountKpiLabel,
+              sub: `${scope.accountKpiBasis ?? "across all ads"}${scope.accountKpiCoverage ? `, ${scope.accountKpiCoverage}` : ""}`,
+            },
+          ]
+        : []),
       {
         label: "Total spend",
         value: scope.totalSpendLabel,
         sub: "in the period reviewed",
-      },
-      {
-        label: `Typical ${scope.kpiLabelClient ?? scope.kpiLabel}`,
-        value: scope.medianLabel,
-        sub: "the account's midpoint result",
       },
       ...(best
         ? [
@@ -1085,7 +1117,7 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
       tint: "bg-emerald-400/[0.04]",
       count: memo.winners.length,
       names: memo.winners.slice(0, 3).map((a) => a.name),
-      meaning: "These ads performed above the typical result.",
+      meaning: "These ads performed above the middle ad.",
     },
     {
       title: "Needs improvement",
@@ -1094,7 +1126,7 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
       tint: "bg-red-400/[0.04]",
       count: memo.losers.rows.length,
       names: memo.losers.rows.slice(0, 3).map((a) => a.name),
-      meaning: "These ads performed below the typical result.",
+      meaning: "These ads performed below the middle ad.",
     },
     {
       title: "Not enough data yet",
@@ -1599,6 +1631,8 @@ export function Report({
   /* CPA Leads Label: "CPL" in Buyer view, "cost per lead" in Client view
      (scope.kpiLabelClient exists only when the two differ). */
   const viewKpiLabel = client ? memo.scope.kpiLabelClient ?? memo.scope.kpiLabel : memo.scope.kpiLabel;
+  /* "kill list" only when the committed decision actually cuts. */
+  const losersCut = memo.decision.action === "budget" && memo.decision.budgetVariant !== "scale";
   /* Report Clarity Pass — buyer stat-row explanations (see TIP_*). */
   const statTips: Record<string, string> = {
     /* Tester Feedback Fix 4: the tooltip says where the minimum comes from. */
@@ -1609,6 +1643,13 @@ export function Report({
       ? `Ads with no ${viewKpiLabel} figure, or not enough spend to judge fairly — set aside rather than counted against.`
       : "Ads that did not have enough spend to judge fairly — set aside rather than counted against.",
     [`Median ${viewKpiLabel}`]: TIP_MEDIAN,
+    ...(memo.scope.accountKpiBasis
+      ? {
+          [`Account ${viewKpiLabel}`]: `What the account delivered overall: ${memo.scope.accountKpiBasis}${
+            memo.scope.accountKpiCoverage ? `, ${memo.scope.accountKpiCoverage}` : ""
+          }.`,
+        }
+      : {}),
   };
   const accent = getAccentById(customization.accentId);
   const displayTitle = customization.reportTitle.trim() || memo.scope.product;
@@ -1883,20 +1924,27 @@ export function Report({
           {client ? (
             <ClientStatCards memo={memo} />
           ) : (
-          <div className="mt-5 sm:mt-6 grid grid-cols-2 gap-y-4 sm:gap-y-5 sm:grid-cols-5">
+          <div className="mt-5 sm:mt-6 grid grid-cols-2 gap-y-4 sm:gap-y-5 sm:grid-cols-3 lg:grid-cols-6">
             {[
               ["Analyzed", String(memo.scope.adsAnalyzed)],
               ["Judged", String(memo.scope.adsJudged)],
               ["Set aside", String(memo.scope.adsSetAside)],
               ["Total spend", memo.scope.totalSpendLabel],
-              [
-                `${client ? "Typical" : "Median"} ${viewKpiLabel}`,
-                memo.scope.medianLabel,
-              ],
+              /* Trust Pass 2: the account's real result BEFORE the median. */
+              ...(memo.scope.accountKpiLabel
+                ? [[`Account ${viewKpiLabel}`, memo.scope.accountKpiLabel]]
+                : []),
+              [`Median ${viewKpiLabel}`, memo.scope.medianLabel],
             ].map(([label, value], i) => (
               <div
                 key={label}
-                className={`min-w-0 ${i === 0 ? "" : "sm:border-l sm:border-white/10 sm:pl-5"}`}
+                className={`min-w-0 ${
+                  i === 0
+                    ? ""
+                    : i % 3 === 0
+                      ? "lg:border-l lg:border-white/10 lg:pl-5"
+                      : "sm:border-l sm:border-white/10 sm:pl-5"
+                }`}
               >
                 {/* Long values (e.g. "434,288.00 EUR") step down in size
                     and may wrap as a last resort — they must never spill
@@ -1938,6 +1986,15 @@ export function Report({
                   full explanation is the label's tooltip). */}
               {memo.scope.spendGateSource ? ` (${memo.scope.spendGateSource.short})` : ""} — below
               it, an ad is set aside rather than judged.
+            </p>
+          )}
+          {/* Trust Pass 2 — the user's own target, made visible: how many
+              judged ads beat it. Display only; the action ignores it. */}
+          {memo.scope.targetSummary && (
+            <p className="mt-2 text-xs leading-relaxed text-zinc-300">
+              {client
+                ? `Your target (${viewKpiLabel} ${memo.scope.targetSummary.targetLabel}): ${memo.scope.targetSummary.beat} of ${memo.scope.targetSummary.judged} ads with enough spend to compare beat it.`
+                : `Target ${viewKpiLabel} ${memo.scope.targetSummary.targetLabel}: ${memo.scope.targetSummary.beat} of ${memo.scope.targetSummary.judged} judged ads beat your target.`}
             </p>
           )}
           {/* Unused Columns Disclosure — buyer view only, collapsed,
@@ -2127,7 +2184,16 @@ export function Report({
         {/* ---- Winners / What worked ---- */}
         {sections.winners && (
         <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.winners))}>
-          <SectionHead n={sectionNumbers.winners!} title={client ? "What worked" : "Winners"} />
+          <SectionHead
+            n={sectionNumbers.winners!}
+            title={
+              /* Trust Pass 2: without a target this is a relative
+                 ranking, so the section says where the ads sit. */
+              memo.scope.targetSummary
+                ? client ? "What worked" : "Winners"
+                : client ? "Above the middle ad" : "Above median"
+            }
+          />
           {memo.leadingConversion && (
             <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
               {client ? memo.leadingConversion.client : memo.leadingConversion.buyer}
@@ -2154,7 +2220,7 @@ export function Report({
             section renumbers): the median ad is neither. Shown whenever
             either neighbouring section is. Print follows the DOM. ---- */}
         {memo.atMedian && (sections.winners || sections.underperformers) && (
-          <section className="animate-rise mt-12" aria-label={client ? "At the typical result" : "At the median"}>
+          <section className="animate-rise mt-12" aria-label={client ? "The middle ad" : "At the median"}>
             <AtMedianRows atMedian={memo.atMedian} client={client} density={customization.density} />
           </section>
         )}
@@ -2164,7 +2230,11 @@ export function Report({
         <section className="animate-rise mt-12" style={stagger(staggerFor(sectionNumbers.underperformers))}>
           <SectionHead
             n={sectionNumbers.underperformers!}
-            title={client ? "What underperformed" : "Losers / kill list"}
+            title={
+              memo.scope.targetSummary
+                ? client ? "What underperformed" : `Losers${losersCut ? " / kill list" : ""}`
+                : client ? "Below the middle ad" : `Below median${losersCut ? " / kill list" : ""}`
+            }
           />
           <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-300">
             {client ? memo.losers.clientInstruction : memo.losers.killInstruction}

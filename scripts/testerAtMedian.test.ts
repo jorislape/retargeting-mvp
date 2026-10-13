@@ -31,21 +31,21 @@ try {
   assert.equal(row.vsMedianLabel, "at median");
   assert.equal(row.deltaPct, 0);
   assert.equal(m.atMedian.buyerLabel, "At the median — this ad is the benchmark");
-  assert.match(m.atMedian.clientLabel, /^Performed exactly at the account's typical result/);
+  assert.match(m.atMedian.clientLabel, /^The middle ad — the one every other ad is compared against$/);
   assert.ok(!m.winners.some((w) => w.name === "Ad_H") && !m.losers.rows.some((l) => l.name === "Ad_H"));
 
   // Text export (= Copy) in both registers.
   assert.match(t.buyerText, /At the median — this ad is the benchmark:\n- Ad_H \| 18\.93 EUR \(at median\) \| 548\.99 EUR \| 29 purchases/);
-  assert.match(t.clientText, /Performed exactly at the account's typical result — this ad is the one that sets it:\n- Ad_H \| 18\.93 EUR \(at typical result\) \| 548\.99 EUR/);
-  const clientAtLines = t.clientText.split("\n").filter((l) => /Ad_H|typical result — this ad/.test(l));
+  assert.match(t.clientText, /The middle ad — the one every other ad is compared against:\n- Ad_H \| 18\.93 EUR \(at the middle ad\) \| 548\.99 EUR/);
+  const clientAtLines = t.clientText.split("\n").filter((l) => /Ad_H|The middle ad — the one/.test(l));
   for (const l of [...clientAtLines, ...clientStrings(m)])
     for (const w of ["benchmark", "median", "gate", "kill"]) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(l), `client "${w}": ${l}`);
 
   // Order: its own block after the winners section, before the losers section.
   const iAt = t.buyerText.indexOf("AT THE MEDIAN\nAt the median — this ad");
-  assert.ok(iAt > t.buyerText.indexOf("WINNERS") && iAt < t.buyerText.indexOf("LOSERS"));
+  assert.ok(iAt > t.buyerText.indexOf("ABOVE MEDIAN") && iAt < t.buyerText.indexOf("BELOW MEDIAN"));
   assert.match(t.buyerText, /\n\nAT THE MEDIAN\n/, "separate block, blank line before");
-  assert.match(t.clientText, /\n\nAT THE TYPICAL RESULT\nPerformed exactly/);
+  assert.match(t.clientText, /\n\nTHE MIDDLE AD\nThe middle ad — /);
 
   // Decision logic untouched: same call the tester saw on main.
   assert.equal(m.decision.action, "test");

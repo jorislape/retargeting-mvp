@@ -160,6 +160,7 @@ function buildRow(
       spendLabel: fmtMoney(ad.spend, analysis.currency),
       reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
       ...frequencyFieldsFor(ad),
+      ...vsTargetFor(ad, analysis, context),
     };
   }
   return {
@@ -172,7 +173,26 @@ function buildRow(
     conversionLabel: conversionLabelFor(ad, analysis),
     ...fewOutcomesNoteFor(ad, analysis),
     ...frequencyFieldsFor(ad),
+    ...vsTargetFor(ad, analysis, context),
   };
+}
+
+/* Trust Pass 2: an ad's position vs the user's own target — ROAS vs
+   target ROAS, CPA vs target CPA. Display only; the action rules never
+   read it. A zero-conversion CPA ad misses by definition. */
+function targetFor(analysis: AnalysisResult, context: DebriefContext): number | null {
+  if (analysis.kpi === "roas" && context.targetRoas != null && context.targetRoas > 0) return context.targetRoas;
+  if (analysis.kpi === "cpa" && context.targetCpa != null && context.targetCpa > 0) return context.targetCpa;
+  return null;
+}
+function beatsTarget(ad: RankedAd, analysis: AnalysisResult, target: number): boolean {
+  if (ad.kpiValue == null) return false;
+  return analysis.kpi === "roas" ? ad.kpiValue >= target : ad.kpiValue <= target;
+}
+function vsTargetFor(ad: RankedAd, analysis: AnalysisResult, context: DebriefContext): { vsTarget?: "beats" | "misses" } {
+  const target = targetFor(analysis, context);
+  if (target == null) return {};
+  return { vsTarget: beatsTarget(ad, analysis, target) ? "beats" : "misses" };
 }
 
 /** Tester Feedback Fix 6: frequency at or above this gets a buyer-only
@@ -214,7 +234,7 @@ function fewOutcomesNoteFor(
    "0% worse than median". Spread into the memo only when non-empty. */
 export const AT_MEDIAN_BUYER_LABEL = "At the median — this ad is the benchmark";
 export const AT_MEDIAN_CLIENT_LABEL =
-  "Performed exactly at the account's typical result — this ad is the one that sets it";
+  "The middle ad — the one every other ad is compared against";
 
 function buildAtMedian(
   analysis: AnalysisResult,
@@ -230,7 +250,7 @@ function buildAtMedian(
       clientLabel:
         ads.length === 1
           ? AT_MEDIAN_CLIENT_LABEL
-          : "Performed exactly at the account's typical result — these ads are the ones that set it",
+          : "The middle ads — the ones every other ad is compared against",
     },
   };
 }
@@ -1240,7 +1260,7 @@ function buildAvoid(
       }.`
     );
     client.push(
-      `We're not creating more discount-first ads until the message is rebuilt — the current one runs below the typical result.`
+      `We're not creating more discount-first ads until the message is rebuilt — the current one runs below the middle ad.`
     );
   } else {
     const loserTag = dominantTag(losers);
@@ -1249,7 +1269,7 @@ function buildAvoid(
         `Do not move budget into ${loserTag.tag} ads while they hold ${loserTag.count}/${losers.length} loser slots.`
       );
       client.push(
-        `We're not adding budget to ${loserTag.tag}-style ads while they run below the typical result.`
+        `We're not adding budget to ${loserTag.tag}-style ads while they run below the middle ad.`
       );
     }
   }
@@ -1330,7 +1350,7 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
 
   if (winners.length > 0) {
     const top = winners[0];
-    const lead = `Your strongest ad this period was "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} — ${scaleSide ? "clearly " : ""}ahead of the account's typical result (${median != null ? fmtKpiValue(median, kpi, currency) : "n/a"}).`;
+    const lead = `Your strongest ad this period was "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} — ${scaleSide ? "clearly " : ""}ahead of the middle ad (${median != null ? fmtKpiValue(median, kpi, currency) : "n/a"}).`;
     lines.push(
       scaleSide
         ? `${lead} It earns a larger share of the budget.`
@@ -1349,7 +1369,7 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
   }
 
   if (losers.length > 0) {
-    const facts = `${fmtCount(belowBenchmarkCount)} ad${belowBenchmarkCount === 1 ? "" : "s"} performed below the account's typical result, together accounting for ${fmtMoney(belowBenchmarkSpend, currency)} of spend.`;
+    const facts = `${fmtCount(belowBenchmarkCount)} ad${belowBenchmarkCount === 1 ? "" : "s"} performed below the middle ad, together accounting for ${fmtMoney(belowBenchmarkSpend, currency)} of spend.`;
     lines.push(
       cutSide
         ? `${facts} We're reducing or pausing their budgets so that money works harder.`
@@ -1623,13 +1643,13 @@ function buildSpendAllocation(analysis: AnalysisResult): MemoSpendAllocation | n
   let headlineClient: string;
   if (belowBenchmarkCount > 0) {
     headlineBuyer = `${roundPct(belowShare)}% of judged spend sits behind below-benchmark ads.`;
-    headlineClient = `${roundPct(belowShare)}% of this period's working budget went to ads below the typical result.`;
+    headlineClient = `${roundPct(belowShare)}% of this period's working budget went to ads below the middle ad.`;
   } else if (aboveBenchmarkCount > 0) {
     headlineBuyer = `${roundPct(aboveShare)}% of judged spend sits behind above-benchmark ads.`;
-    headlineClient = `${roundPct(aboveShare)}% of this period's working budget went to ads beating the typical result.`;
+    headlineClient = `${roundPct(aboveShare)}% of this period's working budget went to ads beating the middle ad.`;
   } else {
     headlineBuyer = "All judged spend sits at the median this period.";
-    headlineClient = "All of this period's working budget sits at the account's typical result.";
+    headlineClient = "All of this period's working budget sits on ads level with the middle ad.";
   }
 
   return {
@@ -1707,6 +1727,33 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       kpiLabel: kpiLabelFor(analysis),
       spendGateLabel: fmtMoney(analysis.spendGate, currency),
       spendGateSource: spendGateSource(analysis, (v) => fmtMoney(v, currency)),
+      ...(analysis.accountKpi
+        ? {
+            accountKpiLabel: fmtKpiValue(analysis.accountKpi.value, kpi, currency),
+            accountKpiBasis: ({
+              roas: "total purchase value ÷ total spend",
+              cpa: `total spend ÷ total ${outcomeNounsFor(analysis)?.many ?? "purchases"}`,
+              ctr: "total link clicks ÷ total impressions",
+              cpc: "total spend ÷ total link clicks",
+              purchases: "total purchases across all ads",
+              leads: "total leads across all ads",
+            } as const)[kpi],
+            ...(analysis.accountKpi.adsCovered < analysis.accountKpi.adsTotal
+              ? { accountKpiCoverage: `from ${analysis.accountKpi.adsCovered} of ${analysis.accountKpi.adsTotal} ads` }
+              : {}),
+          }
+        : {}),
+      ...((): { targetSummary?: NonNullable<Memo["scope"]["targetSummary"]> } => {
+        const target = targetFor(analysis, context);
+        if (target == null) return {};
+        return {
+          targetSummary: {
+            targetLabel: `${kpi === "roas" ? "≥" : "≤"} ${fmtKpiValue(target, kpi, currency)}`,
+            beat: analysis.rankedAds.filter((a) => beatsTarget(a, analysis, target)).length,
+            judged: analysis.rankedAds.length,
+          },
+        };
+      })(),
       kpiExplainer: kpiExplainerFor(analysis),
       /* CPA Leads Label: the client register's plain label, present only
          when it differs (lead-based CPA) — standard memos are unchanged. */
@@ -1752,8 +1799,8 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       clientInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing under the account's typical result, and that budget moves behind the ads that are working.`
-            : `The ads below performed under the account's typical result — together ${fmtMoney(analysis.belowBenchmarkSpend, currency)} of spend. We're not reducing their budgets yet; the decision above explains the next step.`
+            ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing below the middle ad, and that budget moves behind the ads that are working.`
+            : `The ads below performed below the middle ad — together ${fmtMoney(analysis.belowBenchmarkSpend, currency)} of spend. We're not reducing their budgets yet; the decision above explains the next step.`
           : "No ad underperformed badly enough to pause this period.",
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),
       setAsideNote: (() => {

@@ -17,7 +17,7 @@ const BUYER =
   "No target CPA set — ads are ranked against this account's median CPA, not against what's profitable. A higher CPA isn't automatically worse if order value or margin differs.";
 const ROAS_BUYER = " ROAS is available in this export and accounts for order value.";
 const CLIENT =
-  "No cost target was set, so ads are compared with this account's typical CPA, not with what's profitable. A higher CPA isn't automatically worse if order value or margin differs.";
+  "No cost target was set, so ads are compared with each other — against the middle ad's CPA — not with what's profitable. A higher CPA isn't automatically worse if order value or margin differs.";
 
 const { run, cleanup } = loadEngine();
 try {
@@ -59,7 +59,7 @@ try {
   assert.ok(l.memo.decision.limits.buyer.includes(
     "No target CPA set — ads are ranked against this account's median CPL, not against what's profitable. A higher CPL isn't automatically worse if lead quality or value differs."));
   assert.ok(l.memo.decision.limits.client.includes(
-    "No cost target was set, so ads are compared with this account's typical cost per lead, not with what's profitable. A higher cost per lead isn't automatically worse if lead quality or value differs."));
+    "No cost target was set, so ads are compared with each other — against the middle ad's cost per lead — not with what's profitable. A higher cost per lead isn't automatically worse if lead quality or value differs."));
 
   /* decision rules never branch on it (only buildLimits copy reads it). */
   const src = readFileSync(join(ROOT, "modules/debrief/decision.ts"), "utf8");

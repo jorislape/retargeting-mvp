@@ -426,7 +426,7 @@ function allStrings(cmp: MemoComparison): string[] {
   );
   assert.equal(ledBoth.leaderConsistency?.status, "led_both");
   assert.ok(ledBoth.leaderConsistency!.buyer.includes("also above the median last period"));
-  assert.ok(ledBoth.leaderConsistency!.client.includes("ahead of the typical result last period too"));
+  assert.ok(ledBoth.leaderConsistency!.client.includes("ahead of the middle ad last period too"));
 
   // Leader was below the previous median → lead_is_new.
   const newLead = buildComparison(

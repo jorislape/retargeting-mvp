@@ -36,10 +36,15 @@ export function clientizeText(text: string): string {
     .replace(/\s*\(evidence gate\)/gi, "")
     .replace(/\b(?:spend|evidence) gate\b/gi, "minimum spend to judge")
     .replace(/\bgate\b/gi, "minimum spend")
-    .replace(/\bmedian (ROAS|CPA|CPL|CTR|CPC|Leads|Purchases)\b/g, "typical $1")
+    /* Trust Pass 2: the client register calls the median "the middle
+       ad" — never "typical ROAS/CPA", which read as the account's own
+       result (a 2.31x median can sit beside a 1.32x account ROAS). */
+    .replace(/\bthe ([^\s()]+(?: [A-Z]{3})?) median (ROAS|CPA|CPL|CTR|CPC|Leads|Purchases)\b/g, "the middle ad's $2 ($1)")
+    .replace(/\b[Mm]edian (ROAS|CPA|CPL|CTR|CPC|Leads|Purchases)\b/g, "middle ad's $1")
     /* CPA Leads Label: buyer-register "CPL" reads as plain cost per lead. */
     .replace(/\bCPL\b/g, "cost per lead")
-    .replace(/\bmedian\b/g, "typical result")
+    .replace(/\bthe median\b/g, "the middle ad")
+    .replace(/\bmedian\b/g, "the middle ad")
     /* Tester Feedback follow-up: the signal "N thin-spend ads were set
        aside, not judged" reaches the client through here. */
     .replace(/\bwere set aside, not judged\b/g, "aren't included yet — too little spend")
@@ -168,7 +173,24 @@ export function memoToText(
       }`
     );
   }
-  lines.push(`Total spend: ${scope.totalSpendLabel} · ${view === "client" ? "Typical" : "Median"} ${viewKpiLabel}: ${scope.medianLabel}`);
+  /* Trust Pass 2: the account's real result first, then the median —
+     which the client register calls "the middle ad". */
+  const account = scope.accountKpiLabel
+    ? ` · Account ${viewKpiLabel}: ${scope.accountKpiLabel}${scope.accountKpiCoverage ? ` (${scope.accountKpiCoverage})` : ""}`
+    : "";
+  lines.push(
+    view === "client"
+      ? `Total spend: ${scope.totalSpendLabel}${account} · Middle ad's ${viewKpiLabel}: ${scope.medianLabel}`
+      : `Total spend: ${scope.totalSpendLabel}${account} · Median ${viewKpiLabel}: ${scope.medianLabel}`
+  );
+  if (scope.targetSummary) {
+    const ts = scope.targetSummary;
+    lines.push(
+      view === "client"
+        ? `Your target (${viewKpiLabel} ${ts.targetLabel}): ${ts.beat} of ${ts.judged} ads with enough spend to compare beat it.`
+        : `Target ${viewKpiLabel} ${ts.targetLabel}: ${ts.beat} of ${ts.judged} judged ads beat your target.`
+    );
+  }
   lines.push("");
 
   /* Period Comparison V2 — mirrors the on-screen order: what changed
@@ -328,13 +350,13 @@ export function memoToText(
       );
       const tally: string[] = [];
       if (group.aboveCount > 0) {
-        tally.push(`${group.aboveCount} ${view === "client" ? "above the typical result" : "above median"}`);
+        tally.push(`${group.aboveCount} ${view === "client" ? "above the middle ad" : "above median"}`);
       }
       if (group.atCount > 0) {
-        tally.push(`${group.atCount} ${view === "client" ? "at the typical result" : "at median"}`);
+        tally.push(`${group.atCount} ${view === "client" ? "at the middle ad" : "at median"}`);
       }
       if (group.belowCount > 0) {
-        tally.push(`${group.belowCount} ${view === "client" ? "below the typical result" : "below median"}`);
+        tally.push(`${group.belowCount} ${view === "client" ? "below the middle ad" : "below median"}`);
       }
       lines.push(tally.join(" · "));
       group.members.forEach((m) => {
@@ -400,7 +422,10 @@ export function memoToText(
     const notes = buyer
       ? [r.fewOutcomesNote, r.fatigueNote].filter(Boolean).map((n) => ` ${n}`).join("")
       : "";
-    return `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)}) | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""}${freq} | ${r.reason}${notes}`;
+    const target = r.vsTarget
+      ? ` | ${r.vsTarget === "beats" ? (buyer ? "✓ beats target" : "✓ beats your target") : buyer ? "✗ misses target" : "✗ below your target"}`
+      : "";
+    return `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)})${target} | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""}${freq} | ${r.reason}${notes}`;
   };
   /* Trust Pass: TXT/Copy lists EVERY row. The first topAdsShown match
      the on-screen table; a "+N more:" line marks where the screen
@@ -412,7 +437,14 @@ export function memoToText(
     });
   };
 
-  lines.push(view === "client" ? "WHAT WORKED" : "WINNERS");
+  /* Trust Pass 2: without a target, "winner/loser" overstates a
+     relative ranking — the sections say where the ads sit instead. */
+  const hasTarget = scope.targetSummary != null;
+  lines.push(
+    view === "client"
+      ? hasTarget ? "WHAT WORKED" : "ABOVE THE MIDDLE AD"
+      : hasTarget ? "WINNERS" : "ABOVE MEDIAN"
+  );
   // Evidence Inputs V1: the neutral leading-ad conversion line (or an
   // explicit "not in this export" line), active register.
   if (memo.leadingConversion) {
@@ -434,7 +466,7 @@ export function memoToText(
   // Tester Feedback Fixes: the ad(s) that ARE the median — neither a
   // winner nor a loser, so their own block between the two sections.
   if (memo.atMedian) {
-    lines.push(view === "client" ? "AT THE TYPICAL RESULT" : "AT THE MEDIAN");
+    lines.push(view === "client" ? "THE MIDDLE AD" : "AT THE MEDIAN");
     lines.push(`${view === "client" ? memo.atMedian.clientLabel : memo.atMedian.buyerLabel}:`);
     memo.atMedian.rows.forEach((r) => lines.push(adRow(r)));
     lines.push("");
@@ -447,10 +479,8 @@ export function memoToText(
     memo.decision.action === "budget" && memo.decision.budgetVariant !== "scale";
   lines.push(
     view === "client"
-      ? "WHAT UNDERPERFORMED"
-      : losersCut
-        ? "LOSERS / KILL LIST"
-        : "LOSERS / BELOW BENCHMARK"
+      ? hasTarget ? "WHAT UNDERPERFORMED" : "BELOW THE MIDDLE AD"
+      : `${hasTarget ? "LOSERS" : "BELOW MEDIAN"}${losersCut ? " / KILL LIST" : ""}`
   );
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
   pushRows(memo.losers.rows);

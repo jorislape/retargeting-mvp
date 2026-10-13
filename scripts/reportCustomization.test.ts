@@ -525,7 +525,7 @@ type PerformanceIdForTests = (typeof PERFORMANCE_SECTION_IDS)[number];
   const chartSrc = readFileSync(new URL("../components/debrief/PerformanceRankingChart.tsx", import.meta.url), "utf-8");
   assert.ok(
     /const referenceLabel = client\s*\? clientizeText\(chartRow\.row\.vsMedianLabel\)\s*:\s*chartRow\.row\.vsMedianLabel/.test(chartSrc),
-    "ranking row labels keep median in Buyer and use typical result only in Client"
+    "ranking row labels keep median in Buyer and use the middle ad only in Client"
   );
 }
 

@@ -49,7 +49,7 @@ function assertClose(actual: number, expected: number, message: string, toleranc
   // and before the numbered Winners section.
   const rankingIdx = reportSrc.indexOf("<PerformanceRankingChart");
   const allocationIdx = reportSrc.indexOf("<SpendAllocationChart");
-  const winnersIdx = reportSrc.indexOf('title={client ? "What worked" : "Winners"}');
+  const winnersIdx = reportSrc.indexOf("n={sectionNumbers.winners!}"); // Trust Pass 2: title now depends on the target
   assert.ok(rankingIdx > 0 && allocationIdx > rankingIdx && winnersIdx > allocationIdx, "placement: Performance Ranking -> Spend Allocation -> Winners");
 }
 
@@ -147,7 +147,7 @@ function assertClose(actual: number, expected: number, message: string, toleranc
     // share only. No above (56%) figure, no dollar amount, no ad count
     // — those live in the segment labels below, not repeated here.
     assert.equal(sa.headline.buyer, "35% of judged spend sits behind below-benchmark ads.");
-    assert.equal(sa.headline.client, "35% of this period's working budget went to ads below the typical result.");
+    assert.equal(sa.headline.client, "35% of this period's working budget went to ads below the middle ad.");
     assert.ok(!sa.headline.buyer.includes("56%"), "buyer headline never restates the above-side share");
     assert.ok(!sa.headline.client.includes("56%"), "client headline never restates the above-side share");
     assert.ok(!/\$/.test(sa.headline.buyer), "buyer headline carries no dollar amount");
@@ -178,8 +178,8 @@ function assertClose(actual: number, expected: number, message: string, toleranc
       "TXT export carries the additive spend-allocation line, buyer register"
     );
     assert.ok(
-      clientTxt.includes("Spend allocation: 56% above typical result, 9% at typical result, 35% below typical result"),
-      "TXT export client register swaps median -> typical result via clientizeText"
+      clientTxt.includes("Spend allocation: 56% above the middle ad, 9% at the middle ad, 35% below the middle ad"),
+      "TXT export client register swaps median -> the middle ad via clientizeText"
     );
 
     /* ---- Helper for synthetic engine runs (mirrors decision.test.ts) ---- */
@@ -310,7 +310,7 @@ function assertClose(actual: number, expected: number, message: string, toleranc
       );
       assert.equal(
         m.spendAllocation.headline.client,
-        "All of this period's working budget sits at the account's typical result.",
+        "All of this period's working budget sits on ads level with the middle ad.",
         "all-neutral client fallback headline"
       );
     }

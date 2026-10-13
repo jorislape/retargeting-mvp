@@ -86,7 +86,7 @@ try {
     assert.match(buyerText, /— CPL DEBRIEF/, "buyer text header names CPL");
     assert.match(buyerText, /Median CPL:/);
     assert.match(clientText, /— cost per lead PERFORMANCE REPORT/, "client text header names cost per lead");
-    assert.match(clientText, /Typical cost per lead:/);
+    assert.match(clientText, /Middle ad's cost per lead:/); // Trust Pass 2: never "typical"
     assert.ok(!/\bCPL\b/.test(clientText), "client text never shows the CPL acronym");
     // The only remaining "CPA" in the buyer text names the generator's
     // own "Target CPA" input field, which keeps its name.

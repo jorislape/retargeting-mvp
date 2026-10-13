@@ -290,7 +290,7 @@ export function buildComparison(
           ? " (unchanged)"
           : "";
     medianMovementBuyer = `Median ${fmt.kpiLabel} moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${pctLabel}.`;
-    medianMovementClient = `The account's typical ${fmt.kpiLabelClient ?? fmt.kpiLabel} result moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${
+    medianMovementClient = `The middle ad's ${fmt.kpiLabelClient ?? fmt.kpiLabel} moved from ${fmt.kpiValue(prevMedian)} to ${fmt.kpiValue(currMedian)}${
       direction === "unchanged" ? "" : ` — ${direction} than last period`
     }.`;
   } else {
@@ -301,7 +301,7 @@ export function buildComparison(
           ? "the previous period"
           : "the current period";
     medianMovementBuyer = `No benchmark could be computed for ${missing} (too few judged ads) — account-level movement is limited to spend and counts.`;
-    medianMovementClient = `There wasn't enough qualifying data in ${missing} to compare typical results — the comparison covers spend and ad counts.`;
+    medianMovementClient = `There wasn't enough qualifying data in ${missing} to compare the middle ads — the comparison covers spend and ad counts.`;
   }
   accountBuyer.push(medianMovementBuyer);
   accountClient.push(medianMovementClient);
@@ -364,21 +364,21 @@ export function buildComparison(
           `${label} — a top ad last period — is above the median again this period (${cj.deltaPct != null ? `${cj.deltaPct >= 0 ? "+" : ""}${Math.round(cj.deltaPct)}%` : "at the median"}).`
         );
         persistenceClient.push(
-          `${label}, a leading ad last period, is ahead of the typical result again this period.`
+          `${label}, a leading ad last period, is ahead of the middle ad again this period.`
         );
       } else if (cj.deltaFromMedian < 0) {
         persistenceBuyer.push(
           `${label} — a top ad last period — is below the median this period (${cj.deltaPct != null ? `${Math.round(cj.deltaPct)}%` : "under it"}).`
         );
         persistenceClient.push(
-          `${label}, a leading ad last period, is behind the typical result this period.`
+          `${label}, a leading ad last period, is behind the middle ad this period.`
         );
       } else {
         persistenceBuyer.push(
           `${label} — a top ad last period — sits exactly at the median this period.`
         );
         persistenceClient.push(
-          `${label}, a leading ad last period, is right at the typical result this period.`
+          `${label}, a leading ad last period, is level with the middle ad this period.`
         );
       }
     } else if (matchedKeys.has(k)) {
@@ -427,7 +427,7 @@ export function buildComparison(
         leaderConsistency = {
           status: "led_both",
           buyer: `the current leader ${label} was also above the median last period.`,
-          client: `${label} was ahead of the typical result last period too.`,
+          client: `${label} was ahead of the middle ad last period too.`,
         };
       } else {
         leaderConsistency = {

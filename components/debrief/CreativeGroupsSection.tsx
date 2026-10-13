@@ -50,15 +50,15 @@ function GroupCard({
   const tallyParts: string[] = [];
   if (aboveCount > 0) {
     tallyParts.push(
-      `${aboveCount} ${client ? "above the typical result" : "above median"}`
+      `${aboveCount} ${client ? "above the middle ad" : "above median"}`
     );
   }
   if (atCount > 0) {
-    tallyParts.push(`${atCount} ${client ? "at the typical result" : "at median"}`);
+    tallyParts.push(`${atCount} ${client ? "at the middle ad" : "at median"}`);
   }
   if (belowCount > 0) {
     tallyParts.push(
-      `${belowCount} ${client ? "below the typical result" : "below median"}`
+      `${belowCount} ${client ? "below the middle ad" : "below median"}`
     );
   }
 

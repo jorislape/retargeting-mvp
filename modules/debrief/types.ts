@@ -501,6 +501,10 @@ export interface AnalysisResult {
    *  relative to this account, not to profitability. roasAvailable:
    *  the export also carries ROAS / purchase value. Limits copy only. */
   cpaWithoutTarget?: { roasAvailable: boolean };
+  /** Trust Pass 2 (accountKpi.ts): the account's real result for the
+   *  KPI from totals across every analyzed ad, with coverage. Display
+   *  only — never read by the gate, median, ranking or decision. */
+  accountKpi?: { value: number; adsCovered: number; adsTotal: number };
   /** Mixed Segment Warning (segmentSpread.ts): present ONLY when judged
    *  ads split into ≥2 ad sets (campaigns as fallback) of ≥2 ads whose
    *  typical KPI is ≥ SEGMENT_SPREAD_MULTIPLE apart. Labels are pre-
@@ -534,6 +538,17 @@ export interface MemoScope {
    *  words (decision.ts spendGateSource). `short` for parentheticals,
    *  `buyer` the full explanation, `client` jargon-free. Display only. */
   spendGateSource?: { short: string; buyer: string; client: string };
+  /** Trust Pass 2 — the account's real KPI from totals ("1.32x"), plus
+   *  "from N of M ads" when some ads couldn't be counted. Absent when it
+   *  can't be computed from this export. */
+  accountKpiLabel?: string;
+  accountKpiCoverage?: string;
+  /** How the account figure is computed, in plain words ("total value ÷
+   *  total spend") — both registers. */
+  accountKpiBasis?: string;
+  /** Trust Pass 2 — present only when a target is set for this KPI:
+   *  "≥ 3.00x" / "≤ $25.00", and how many judged ads beat it. */
+  targetSummary?: { targetLabel: string; beat: number; judged: number };
   /** CPA Leads Label: client-register label ("cost per lead"), present
    *  only when it differs from kpiLabel. Report/text pick per view. */
   kpiLabelClient?: string;
@@ -569,6 +584,10 @@ export interface MemoWinnerLoserRow {
    *  MIN_OUTCOMES_FOR_SUPPORTED recorded conversions (count column
    *  present). Copy only — never changes action or evidenceState. */
   fewOutcomesNote?: string;
+  /** Trust Pass 2 — present only when a target is set for this KPI
+   *  (target ROAS for ROAS, target CPA for CPA): whether this judged ad
+   *  beats it. Display only — the target never changes the action. */
+  vsTarget?: "beats" | "misses";
   /** Tester Feedback Fix 6 — BUYER register only: "Frequency 1.9",
    *  present when the export has a Frequency column and the row has no
    *  fatigueNote (which carries the number itself). Display only. */

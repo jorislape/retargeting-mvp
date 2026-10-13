@@ -1405,7 +1405,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
 
     // Section order intact: the decision leads, everything else follows
     // in the pre-existing order.
-    const order = ["NEXT MOVE", "THE CALL", "WINNERS", "LOSERS / KILL LIST", "PATTERNS", "NEXT 3 TESTS", "CONFIDENCE:"];
+    const order = ["NEXT MOVE", "THE CALL", "ABOVE MEDIAN", "BELOW MEDIAN / KILL LIST", "PATTERNS", "NEXT 3 TESTS", "CONFIDENCE:"]; // Trust Pass 2: no target → relative section names
     const positions = order.map((h) => buyerText.indexOf(h));
     assert.ok(positions.every((p) => p >= 0), "all buyer section headers present");
     assert.deepEqual([...positions].sort((a, b) => a - b), positions, "buyer section order unchanged, NEXT MOVE first");
@@ -1926,12 +1926,12 @@ console.log("decision (stage 1 — rules): all assertions passed");
       assertCoherent(mBlocked, "blocked-scale");
       const mBlockedText: string = memoToText(mBlocked, "buyer", 5);
       assert.ok(
-        mBlockedText.includes("LOSERS / BELOW BENCHMARK") && !mBlockedText.includes("KILL LIST"),
+        /\nBELOW MEDIAN\n/.test(mBlockedText) && !mBlockedText.includes("KILL LIST"),
         "non-cut TXT export drops the kill-list framing"
       );
       const mTestText: string = memoToText(mTest, "buyer", 5);
       assert.ok(
-        mTestText.includes("LOSERS / BELOW BENCHMARK") && !mTestText.includes("KILL LIST"),
+        /\nBELOW MEDIAN\n/.test(mTestText) && !mTestText.includes("KILL LIST"),
         "test-action TXT export drops the kill-list framing"
       );
 
@@ -2134,7 +2134,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
         leaderConsistency: {
           status: "led_both" as const,
           buyer: 'the current leader "UGC_MorningRoutine_V1" was also above the median last period.',
-          client: '"UGC_MorningRoutine_V1" was ahead of the typical result last period too.',
+          client: '"UGC_MorningRoutine_V1" was ahead of the middle ad last period too.',
         },
         appeared: { names: [], total: 0 },
         disappeared: { names: [], total: 0 },
@@ -2150,7 +2150,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       );
       assert.ok(
         cmpClientText.includes("Across periods:") &&
-          cmpClientText.includes("ahead of the typical result last period too"),
+          cmpClientText.includes("ahead of the middle ad last period too"),
         "client TXT carries the jargon-free consistency line"
       );
       assert.ok(

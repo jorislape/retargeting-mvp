@@ -31,9 +31,9 @@ export function PerformanceRankingChart({
 
   const client = view === "client";
   const maxMagnitude = maxRankingMagnitude(rows);
-  const referenceName = client ? "Typical result" : "Median";
+  const referenceName = client ? "Middle ad" : "Median";
   const caveat = client
-    ? "This shows distance from the account's typical result — not why it happened, what happens next, or what to do about it on its own."
+    ? "This shows distance from the middle ad — not why it happened, what happens next, or what to do about it on its own."
     : "Distance from the median is descriptive evidence — not causal, not a future-performance claim, and not by itself the reason for the recommended action.";
 
   return (

@@ -109,7 +109,7 @@ ThinSpendAd,5.00,1,9.00`;
 
     const clientText = memoToText(memoWith, "client");
     assert.match(clientText, /CREATIVE GROUPS/, "Client Copy/TXT also includes creative groups (Buyer+Client inclusion decision)");
-    assert.match(clientText, /typical result/i, "Client register uses plain-language benchmark wording, not 'median'");
+    assert.match(clientText, /middle ad/i, "Client register calls the median \"the middle ad\", never 'median' (Trust Pass 2)");
 
     console.log("creativeGroupsIntegration: real-engine end-to-end + decision byte-identity + Copy/TXT confirmed");
 

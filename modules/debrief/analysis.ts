@@ -1,6 +1,7 @@
 import { ColumnMap, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import { detectSegmentSpread } from "./segmentSpread";
+import { computeAccountKpi } from "./accountKpi";
 import { fmtKpiValue } from "./format";
 import {
   AnalysisResult,
@@ -258,6 +259,11 @@ export function analyze(
     ...(cpaBasis ? { cpaBasis } : {}),
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
+    /* Trust Pass 2: the blended account result (display-only). */
+    ...((): { accountKpi?: NonNullable<AnalysisResult["accountKpi"]> } => {
+      const acct = computeAccountKpi(ads, kpi);
+      return acct ? { accountKpi: acct } : {};
+    })(),
     ...(spread
       ? {
           mixedSegments: {
