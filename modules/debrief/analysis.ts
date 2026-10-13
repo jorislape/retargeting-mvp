@@ -27,7 +27,6 @@ export const DEFAULT_SPEND_FLOOR = 10;
  *  call it"). A disclosed Debrief default, not a statistical test. */
 export const ZERO_CONVERSION_SPEND_MULTIPLE = 2;
 
-const MAX_WINNERS_LOSERS = 5;
 const MIN_ADS_FOR_NAME_SIGNAL = 4;
 const NAME_SIGNAL_SHARE = 0.5;
 
@@ -200,8 +199,13 @@ export function analyze(
     campaign: columns.campaignName != null,
   });
 
-  const winners = winnerPool.slice(0, MAX_WINNERS_LOSERS);
-  const losers = loserPool.slice(0, MAX_WINNERS_LOSERS);
+  /* Trust Pass: the FULL pools. The decision and the kill-list copy
+     always counted every below-median ad ("…and 4 more"), but the lists
+     were cut to 5, so a 6th ad was mentioned and shown nowhere. The
+     report caps only the DISPLAY now (customization.topAdsShown, with
+     "+N more … Show all" and full TXT/PDF listing). */
+  const winners = winnerPool;
+  const losers = loserPool;
 
   const missingColumns: string[] = [];
   if (!columns.adName) missingColumns.push("Ad name");

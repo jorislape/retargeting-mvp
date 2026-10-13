@@ -992,6 +992,16 @@ export interface MemoDecision {
    *  is only voiced under shift/scale, a kill imperative only under
    *  shift/cut. */
   budgetVariant?: "shift" | "scale" | "cut";
+  /** Trust Pass — present only when action is "budget": EVERY ad the
+   *  move takes budget from (all below-median judged ads, worst first)
+   *  and gives it to (the leading ad), with spend labels. The headline
+   *  may shorten to "…and N more"; this list is the full set the card,
+   *  TXT and PDF show. Names restate already-ranked facts — nothing new
+   *  is decided here. */
+  budgetMove?: {
+    from: { name: string; spendLabel: string }[];
+    to: { name: string; spendLabel: string }[];
+  };
   headline: string;
   /** Jargon-free counterpart — no "kill/gate/benchmark/median/judged". */
   clientHeadline: string;

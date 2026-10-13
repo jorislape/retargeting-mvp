@@ -385,6 +385,51 @@ const READINESS_LABEL: Record<"ready" | "directional" | "insufficient", string> 
   insufficient: "Not enough evidence",
 };
 
+/* Trust Pass — every ad a budget move names. The headline may say
+   "…and N more"; this line lists them: the first 2, then "+N more …
+   Show all" on screen, the complete list in print/PDF. */
+function BudgetMoveNames({
+  move,
+  client,
+}: {
+  move: NonNullable<Memo["decision"]["budgetMove"]>;
+  client: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const SHOWN = 2;
+  const line = (label: string, ads: { name: string; spendLabel: string }[]) =>
+    ads.length === 0 ? null : (
+      <p className="text-xs leading-relaxed text-zinc-400">
+        <span className="font-medium text-zinc-300">{label}:</span>{" "}
+        {ads.map((a, i) => (
+          <span key={a.name + i} className={i >= SHOWN && !expanded ? "hidden print:inline" : ""}>
+            {i > 0 ? ", " : ""}&ldquo;{a.name}&rdquo; ({a.spendLabel})
+          </span>
+        ))}
+        {ads.length > SHOWN && (
+          <span className="print-hidden">
+            {" "}
+            {expanded ? null : `+${ads.length - SHOWN} more `}
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              {expanded ? "Show fewer" : "Show all"}
+            </button>
+          </span>
+        )}
+      </p>
+    );
+  return (
+    <div className="mt-2 space-y-0.5">
+      {line(client ? "Moving budget away from" : "Budget from", move.from)}
+      {line(client ? "Moving budget into" : "Budget into", move.to)}
+    </div>
+  );
+}
+
 function DecisionCard({
   memo,
   view,
@@ -475,6 +520,7 @@ function DecisionCard({
       <p className="mt-3 max-w-3xl text-[17px] font-semibold leading-snug text-zinc-50 sm:text-[19px]">
         {client ? d.clientHeadline : d.headline}
       </p>
+      {d.budgetMove && <BudgetMoveNames move={d.budgetMove} client={client} />}
       {/* Decision & Comparison V2: "What we know" labels the evidence
           side of the card — the rationale and evidence-strength line —
           with "What we don't know" (the limits) as its counterpart
@@ -681,6 +727,38 @@ function DecisionCard({
   );
 }
 
+/* Trust Pass — "+N more: name1, name2 [Show all]" under a truncated
+   list. Screen only (print-hidden): in print/PDF every row renders, so
+   no ad the report counts is ever invisible on paper either. */
+function MoreToggle({
+  names,
+  expanded,
+  onToggle,
+}: {
+  names: string[];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  if (names.length === 0) return null;
+  return (
+    <p className="print-hidden mt-2 text-xs leading-relaxed text-zinc-400">
+      {expanded ? null : (
+        <>
+          +{names.length} more: <span className="break-words text-zinc-300">{names.join(", ")}</span>{" "}
+        </>
+      )}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="rounded-sm font-medium text-zinc-200 underline decoration-zinc-600 underline-offset-2 transition hover:text-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        {expanded ? "Show fewer" : "Show all"}
+      </button>
+    </p>
+  );
+}
+
 function AdTable({
   rows,
   tone,
@@ -692,16 +770,15 @@ function AdTable({
   tone: "win" | "loss";
   view: ReportView;
   /** Report Foundation V1 — same value used by the Client list and TXT
-   *  export; the engine may compute more rows than this (up to 5), so
-   *  an honest "N more" line follows when truncated. */
+   *  export. A DISPLAY cap (Trust Pass): rows past it are collapsed
+   *  behind "+N more … Show all" on screen and always print. */
   topAdsShown: 3 | 5;
   /** "compact" hides the reason/creative-format note and the
    *  conversion-count sub-line — name, value, vs-median, and spend
    *  (the table's actual columns) are never affected. */
   density: "compact" | "standard";
 }) {
-  const shown = rows.slice(0, topAdsShown);
-  const more = rows.length - shown.length;
+  const [expanded, setExpanded] = useState(false);
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[540px] text-sm">
@@ -725,10 +802,12 @@ function AdTable({
           </tr>
         </thead>
         <tbody>
-          {shown.map((ad, i) => (
+          {rows.map((ad, i) => (
             <tr
               key={ad.name + i}
-              className="border-b border-white/[0.06] transition-colors last:border-0 hover:bg-white/[0.02]"
+              className={`border-b border-white/[0.06] transition-colors last:border-0 hover:bg-white/[0.02] ${
+                i >= topAdsShown && !expanded ? "hidden print:table-row" : ""
+              }`}
             >
               <td
                 className={`py-3 pr-2 align-top font-mono text-xs font-semibold ${
@@ -789,12 +868,11 @@ function AdTable({
           ))}
         </tbody>
       </table>
-      {more > 0 && (
-        <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-          {more} more ad{more === 1 ? "" : "s"} {tone === "win" ? "cleared the benchmark" : "ran below it"} —
-          shown count set in Customize report.
-        </p>
-      )}
+      <MoreToggle
+        names={rows.slice(topAdsShown).map((a) => a.name)}
+        expanded={expanded}
+        onToggle={() => setExpanded((v) => !v)}
+      />
     </div>
   );
 }
@@ -815,19 +893,18 @@ function ClientAdList({
    *  other half of that same line) always stays. */
   density: "compact" | "standard";
 }) {
-  const top = rows.slice(0, topAdsShown);
-  const more = rows.length - top.length;
+  const [expanded, setExpanded] = useState(false);
   return (
     <div>
       <div className="divide-y divide-white/[0.06]">
-        {top.map((ad, i) => (
+        {rows.map((ad, i) => (
           <div
             key={ad.name + i}
-            className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 border-l-2 py-3 pl-4 ${
+            className={`flex-wrap items-center gap-x-4 gap-y-1.5 border-l-2 py-3 pl-4 ${
               tone === "win"
                 ? "print-win border-emerald-400/70"
                 : "print-loss border-red-400/60"
-            }`}
+            } ${i >= topAdsShown && !expanded ? "hidden print:flex" : "flex"}`}
           >
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold leading-snug text-zinc-100">
@@ -851,13 +928,11 @@ function ClientAdList({
           </div>
         ))}
       </div>
-      {more > 0 && (
-        <p className="pt-2.5 text-xs leading-relaxed text-zinc-400">
-          {more} more ad{more === 1 ? "" : "s"}{" "}
-          {tone === "win" ? "performed above" : "ran below"} the typical result —
-          full detail in the buyer memo.
-        </p>
-      )}
+      <MoreToggle
+        names={rows.slice(topAdsShown).map((a) => a.name)}
+        expanded={expanded}
+        onToggle={() => setExpanded((v) => !v)}
+      />
     </div>
   );
 }
@@ -1061,6 +1136,13 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
                   {name}
                 </li>
               ))}
+              {/* Trust Pass: the count and the names come from the same
+                  full list — anything past the first 3 is named below. */}
+              {group.count > group.names.length && (
+                <li className="text-xs leading-snug text-zinc-400">
+                  +{group.count - group.names.length} more — listed below
+                </li>
+              )}
             </ul>
           )}
           <p className="mt-2.5 text-[11px] leading-relaxed text-zinc-400">

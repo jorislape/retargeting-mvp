@@ -1077,6 +1077,9 @@ export function buildDecision(
 
   /* ---- B1: budget move (shift / scale / cut copy variants) ---- */
   if (scaleEligible || cutEligible) {
+    /* Trust Pass: the full from/to lists behind the headline's names. */
+    const fromAds = analysis.losers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
+    const toAds = top ? [{ name: top.name, spendLabel: money(top.spend) }] : [];
     const avoidBuyer: string[] = [];
     const avoidClient: string[] = [];
 
@@ -1106,6 +1109,7 @@ export function buildDecision(
         ),
         action: "budget",
         budgetVariant: "shift",
+        budgetMove: { from: fromAds, to: toAds },
         headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
         clientHeadline: `Move budget from the weakest ads into "${top!.name}", the clear leader.`,
         rationale: `"${top!.name}" is ${pct(top!.deltaPct!)}% better than the median ${kpiLabel} on ${money(top!.spend)}; ${analysis.belowBenchmarkCount} below-benchmark ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}).`,
@@ -1126,6 +1130,7 @@ export function buildDecision(
         ),
         action: "budget",
         budgetVariant: "scale",
+        budgetMove: { from: [], to: toAds },
         headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% better than the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,
         rationale: `"${top!.name}" leads the ${kpiLabel} median by ${pct(top!.deltaPct!)}% on ${money(top!.spend)} of spend — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move. No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`,
@@ -1143,6 +1148,7 @@ export function buildDecision(
       limits: withMaterialActionVerificationGuardrail(evidence.limits),
       action: "budget",
       budgetVariant: "cut",
+      budgetMove: { from: fromAds, to: [] },
       headline: `Cut ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
       rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${

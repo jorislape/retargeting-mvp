@@ -120,9 +120,11 @@ components/debrief/
   is set aside for spend; a blank cell is still set aside as "no value".
 - **Polarity** — ROAS/CTR/Leads/Purchases: higher is better. CPA/CPC:
   lower is better. (`HIGHER_IS_BETTER` in `types.ts`.)
-- **Winners/losers** = up to 5 judged ads strictly better/worse than
-  the median, ranked by distance from it. Fewer than 3 qualifying ads
-  is shown honestly as fewer than 3, never padded.
+- **Winners/losers** = ALL judged ads strictly better/worse than the
+  median, ranked by distance from it (the memo carries the full pools;
+  the report caps only the display — "+N more … Show all" on screen,
+  every row in print/PDF and TXT/Copy). Fewer than 3 qualifying ads is
+  shown honestly as fewer than 3, never padded.
 - **Combined below-benchmark spend** in the kill list is summed across
   *all* judged ads worse than the median, not just the displayed rows.
 - **Patterns/angle claims** are structural (spend comparisons, ad-name

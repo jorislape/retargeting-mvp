@@ -1647,9 +1647,11 @@ console.log("decision (stage 1 — rules): all assertions passed");
       const winner4th = memo.winners[3].name; // 4th-ranked — only shown when topAdsShown=5
       const loser4th = memo.losers.rows[3].name;
 
+      // Trust Pass: TXT lists EVERY row; at topAdsShown=3 the 4th+ rows
+      // follow a "+N more:" marker (where the screen collapses them).
       for (const [label, text] of [["buyer3", buyer3], ["client3", client3]] as const) {
-        assert.ok(!text.includes(`- ${winner4th} |`), `${label}: 4th-ranked winner row absent at topAdsShown=3`);
-        assert.ok(!text.includes(`- ${loser4th} |`), `${label}: 4th-ranked loser row absent at topAdsShown=3`);
+        assert.ok(text.includes(`+${memo.winners.length - 3} more:\n- ${winner4th} |`), `${label}: 4th-ranked winner listed after the +N more marker at topAdsShown=3`);
+        assert.ok(text.includes(`+${memo.losers.rows.length - 3} more:\n- ${loser4th} |`), `${label}: 4th-ranked loser listed after the +N more marker at topAdsShown=3`);
       }
       for (const [label, text] of [["buyer5", buyer5], ["client5", client5]] as const) {
         assert.ok(text.includes(`- ${winner4th} |`), `${label}: 4th-ranked winner row present at topAdsShown=5`);

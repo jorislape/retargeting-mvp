@@ -243,6 +243,15 @@ export function memoToText(
   // (CONFIDENCE:); this block shows evidenceState only, never the raw
   // evidenceShape enum.
   lines.push(view === "client" ? d.clientHeadline : d.headline);
+  /* Trust Pass: every ad the budget move names, in full. */
+  if (d.budgetMove) {
+    const list = (ads: { name: string; spendLabel: string }[]) =>
+      ads.map((a) => `"${a.name}" (${a.spendLabel})`).join(", ");
+    if (d.budgetMove.from.length > 0)
+      lines.push(`${view === "client" ? "Moving budget away from" : "Budget from"}: ${list(d.budgetMove.from)}`);
+    if (d.budgetMove.to.length > 0)
+      lines.push(`${view === "client" ? "Moving budget into" : "Budget into"}: ${list(d.budgetMove.to)}`);
+  }
   lines.push(view === "client" ? d.clientRationale : d.rationale);
   lines.push(
     `${view === "client" ? "How sure we are" : "Evidence"}: ${evidenceLine(d, scope.adsJudged, view)}`
@@ -393,8 +402,15 @@ export function memoToText(
       : "";
     return `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)}) | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""}${freq} | ${r.reason}${notes}`;
   };
-  const winnerRows = memo.winners.slice(0, topAdsShown);
-  const loserRows = memo.losers.rows.slice(0, topAdsShown);
+  /* Trust Pass: TXT/Copy lists EVERY row. The first topAdsShown match
+     the on-screen table; a "+N more:" line marks where the screen
+     collapses the rest behind "Show all", and the rest follow in full. */
+  const pushRows = (rows: Memo["winners"]) => {
+    rows.forEach((r, i) => {
+      if (i === topAdsShown && rows.length > topAdsShown) lines.push(`+${rows.length - topAdsShown} more:`);
+      lines.push(adRow(r));
+    });
+  };
 
   lines.push(view === "client" ? "WHAT WORKED" : "WINNERS");
   // Evidence Inputs V1: the neutral leading-ad conversion line (or an
@@ -411,19 +427,7 @@ export function memoToText(
         : "None cleared the benchmark this period."
     );
   } else {
-    winnerRows.forEach((w) => {
-      lines.push(
-        adRow(w)
-      );
-    });
-    if (memo.winners.length > winnerRows.length) {
-      const more = memo.winners.length - winnerRows.length;
-      lines.push(
-        view === "client"
-          ? `(${more} more performed above the typical result.)`
-          : `(${more} more ad${more === 1 ? "" : "s"} cleared the benchmark — shown count set in Customize report.)`
-      );
-    }
+    pushRows(memo.winners);
   }
   lines.push("");
 
@@ -449,19 +453,7 @@ export function memoToText(
         : "LOSERS / BELOW BENCHMARK"
   );
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
-  loserRows.forEach((l) => {
-    lines.push(
-      adRow(l)
-    );
-  });
-  if (memo.losers.rows.length > loserRows.length) {
-    const more = memo.losers.rows.length - loserRows.length;
-    lines.push(
-      view === "client"
-        ? `(${more} more ran below the typical result.)`
-        : `(${more} more ad${more === 1 ? "" : "s"} ran below it — shown count set in Customize report.)`
-    );
-  }
+  pushRows(memo.losers.rows);
   lines.push(
     view === "client"
       ? scope.adsSetAside > 0

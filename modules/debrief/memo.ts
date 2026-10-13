@@ -272,7 +272,9 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
   }
 
   if (losers.length > 0) {
-    const extra = belowBenchmarkCount - losers.length;
+    /* Trust Pass: losers is the full pool, so "others" are every other
+       below-median ad — all listed in the Losers section below. */
+    const extra = belowBenchmarkCount - 1;
     const alsoBelow = extra > 0 ? ` and ${extra} other below-benchmark ad${extra === 1 ? "" : "s"}` : "";
     lines.push(
       cutSide

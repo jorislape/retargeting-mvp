@@ -203,10 +203,10 @@ export interface ReportCustomization<SectionId extends string> {
   sections: Record<SectionId, boolean>;
   /** Report Foundation V1. Which of the 3 always-shown ad rows to show
    *  per winners/losers list — used identically by the Buyer report,
-   *  Client report, and TXT export (see memoToText.ts). Deliberately no
-   *  "all" option: the engine itself never computes more than 5
-   *  winners/losers (analysis.ts's MAX_WINNERS_LOSERS), so "all" would
-   *  be indistinguishable from "5" while implying something untrue. */
+   *  Client report, and TXT export (see memoToText.ts). A DISPLAY cap
+   *  only (Trust Pass): the memo carries every winner/loser; rows past
+   *  this count sit behind "+N more … Show all" on screen and are always
+   *  listed in full in print/PDF and TXT/Copy. */
   topAdsShown: TopAdsShown;
   /** "compact" hides secondary row sub-lines (the reason/creative-format
    *  note and the conversion-count line) while keeping the primary ad
