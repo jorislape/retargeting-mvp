@@ -501,6 +501,12 @@ export interface AnalysisResult {
    *  relative to this account, not to profitability. roasAvailable:
    *  the export also carries ROAS / purchase value. Limits copy only. */
   cpaWithoutTarget?: { roasAvailable: boolean };
+  /** Trust Pass 4: present ONLY when the KPI is a proxy (CTR, CPC) or a
+   *  raw count (Purchases, Leads). outcomeKpis = the outcome KPIs this
+   *  export can also compute (ROAS, CPA — CPA reads as cost per lead
+   *  when only lead columns exist). Non-empty ⇒ no budget move on the
+   *  proxy (decision.ts); empty ⇒ the move stands with a proxy caveat. */
+  proxyKpi?: { outcomeKpis: { kpi: "roas" | "cpa"; label: string; clientLabel: string }[] };
   /** Trust Pass 2 (accountKpi.ts): the account's real result for the
    *  KPI from totals across every analyzed ad, with coverage. Display
    *  only — never read by the gate, median, ranking or decision. */
@@ -1011,6 +1017,10 @@ export interface MemoDecision {
    *  is only voiced under shift/scale, a kill imperative only under
    *  shift/cut. */
   budgetVariant?: "shift" | "scale" | "cut";
+  /** Trust Pass 4 — present only when a budget move was withheld because
+   *  the KPI is a proxy/count and the export has an outcome KPI: the
+   *  one-click switch target ("Switch to ROAS"). */
+  kpiSwitch?: { kpi: "roas" | "cpa"; label: string };
   /** Trust Pass — present only when action is "budget": EVERY ad the
    *  move takes budget from (all below-median judged ads, worst first)
    *  and gives it to (the leading ad), with spend labels. The headline

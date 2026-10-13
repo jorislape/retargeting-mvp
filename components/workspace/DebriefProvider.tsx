@@ -251,7 +251,9 @@ interface DebriefContextValue {
   /** Bulk-set non-blob assets (the sample's bundled demo creatives).
    *  Replaces the whole map; revokes any existing object URLs first. */
   setSampleCreativeAssets: (assets: Record<string, CreativeAssetRef>) => void;
-  generate: () => Promise<void>;
+  /** Trust Pass 4: optional KPI override — the report's one-click
+   *  "Switch to ROAS/CPA" re-runs the same file on the outcome KPI. */
+  generate: (overrides?: { kpi?: KpiKey }) => Promise<void>;
   clearError: () => void;
   reset: () => void;
 }
@@ -384,15 +386,17 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     setFields((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  const generate = useCallback(async () => {
+  const generate = useCallback(async (overrides?: { kpi?: KpiKey }) => {
     if (!file) return;
     setError(null);
     setStatus("processing");
     const started = Date.now();
+    const kpi = overrides?.kpi ?? fields.kpi;
+    if (overrides?.kpi) setFields((prev) => ({ ...prev, kpi: overrides.kpi as KpiKey }));
 
     const body = new FormData();
     body.append("csv", file);
-    body.append("kpi", fields.kpi);
+    body.append("kpi", kpi);
     body.append("product", fields.product);
     body.append("offer", fields.offer);
     if (fields.targetCpa.trim() !== "") body.append("targetCpa", fields.targetCpa);

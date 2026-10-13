@@ -135,11 +135,33 @@ export type MoneyFormatter = (value: number) => string;
  * buildDecision itself computes scaleEligible via this function, so
  * the two can never drift.
  */
+/** Trust Pass 4 — the KPI is a proxy (CTR/CPC) or a raw count
+ *  (Purchases/Leads) AND the export also carries an outcome KPI
+ *  (ROAS/CPA). Budget moves are withheld then: a proxy ranks attention
+ *  or volume, not results (a CTR-led move once shifted budget from a
+ *  2.71x ROAS ad into a 0.66x one). */
+export function isProxyWithOutcome(analysis: AnalysisResult): boolean {
+  return (analysis.proxyKpi?.outcomeKpis.length ?? 0) > 0;
+}
+
+/** What each proxy/count KPI actually measures — the honest reason it
+ *  can't carry a budget move on its own. */
+const PROXY_MEASURES: Record<string, { buyer: string; client: string }> = {
+  ctr: { buyer: "CTR ranks attention, not results", client: "click-through rate, which shows attention rather than sales" },
+  cpc: { buyer: "CPC ranks click cost, not results", client: "cost per click, which shows what clicks cost rather than what they earned" },
+  purchases: { buyer: "Purchases counts results, not what each one cost", client: "the number of purchases, which doesn't show what each one cost" },
+  leads: { buyer: "Leads counts results, not what each one cost", client: "the number of leads, which doesn't show what each one cost" },
+};
+
 export function isScaleActionSupported(
   analysis: AnalysisResult,
   criteria?: DecisionCriteria
 ): boolean {
   if (analysis.adsJudged < DECISION_MIN_JUDGED) return false;
+  /* Trust Pass 4: never scale on a proxy/count KPI when the export can
+     judge results (ROAS/CPA) instead. Shared, so memo.ts's budget-test
+     slot can never disagree with the decision. */
+  if (isProxyWithOutcome(analysis)) return false;
   const top = analysis.winners[0] ?? null;
   if (top == null || top.deltaPct == null || top.deltaPct < SCALE_TEST_MIN_DELTA_PCT) {
     return false;
@@ -834,11 +856,20 @@ export function buildDecision(
   /* Tester Feedback Fix 2: a judged zero-conversion CPA ad (no value,
      deltaPct null) is by definition further behind than any bar — it
      qualifies on the "worst ad" half; the spend-share half still holds. */
-  const cutEligible =
+  const proxyHeld = isProxyWithOutcome(analysis);
+  const rawCutEligible =
     worst != null &&
     (worst.zeroConversions === true ||
       (worst.deltaPct != null && worst.deltaPct <= -SCALE_TEST_MIN_DELTA_PCT)) &&
     belowShare >= CUT_MIN_SPEND_SHARE_PCT;
+  const cutEligible = rawCutEligible && !proxyHeld;
+  /* Trust Pass 4: true only when the proxy rule is what stopped a move
+     the rules would otherwise have made. */
+  const proxyDowngraded = proxyHeld && (rawScaleEligible || rawCutEligible);
+  const proxyCopy = PROXY_MEASURES[analysis.kpi];
+  const outcomeKpis = analysis.proxyKpi?.outcomeKpis ?? [];
+  const outcomeNames = outcomeKpis.map((o) => o.label).join("/");
+  const outcomeClientNames = outcomeKpis.map((o) => o.clientLabel).join(" or ");
   const winnerShare =
     top != null && analysis.judgedSpend > 0
       ? (top.spend / analysis.judgedSpend) * 100
@@ -989,6 +1020,18 @@ export function buildDecision(
       );
     }
   }
+  /* Trust Pass 4: proxy-KPI caveats. With an outcome KPI available, say
+     why budget moves are held; without one, the move stands but its
+     basis is named. (The latter is appended in B1 below — it applies
+     only to a budget move.) */
+  if (proxyHeld && proxyCopy) {
+    gateSourceBuyer.push(
+      `${proxyCopy.buyer} — budget moves are held until the ads are read on ${outcomeNames}, which this export also supports.`
+    );
+    gateSourceClient.push(
+      `This report ranks ads by ${proxyCopy.client}, so we're not moving budget on it — the file also has ${outcomeClientNames}, which show actual results.`
+    );
+  }
   const limits = {
     buyer: [...baseLimits.buyer, ...gateSourceBuyer, ...criteriaBuyer],
     client: [...baseLimits.client, ...gateSourceClient, ...criteriaClient],
@@ -1077,6 +1120,20 @@ export function buildDecision(
 
   /* ---- B1: budget move (shift / scale / cut copy variants) ---- */
   if (scaleEligible || cutEligible) {
+    /* Trust Pass 4: a proxy KPI with NO outcome column in the export —
+       the move stands (nothing better to read), but its basis is named. */
+    if (analysis.proxyKpi && proxyCopy && !proxyHeld) {
+      evidence.limits = {
+        buyer: [
+          ...evidence.limits.buyer,
+          `This budget move is based on ${kpiLabel}, a proxy metric — ${proxyCopy.buyer.replace(/^\w+ /, "it ")}. The export has no ROAS or CPA column to check it against; confirm against purchases or revenue in Ads Manager before moving much budget.`,
+        ],
+        client: [
+          ...evidence.limits.client,
+          `This budget change is based on ${proxyCopy.client}. The file doesn't include sales figures, so check it against actual results before moving much budget.`,
+        ],
+      };
+    }
     /* Trust Pass: the full from/to lists behind the headline's names. */
     const fromAds = analysis.losers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     const toAds = top ? [{ name: top.name, spendLabel: money(top.spend) }] : [];
@@ -1208,6 +1265,28 @@ export function buildDecision(
   /* ---- T1: run the top test ---- */
   if (firstTestTitle != null && firstTestTitle.trim() !== "") {
     const testTitle = stripTrailingPeriod(firstTestTitle);
+    /* Trust Pass 4: the proxy rule withheld a move the rules would
+       otherwise have made — say exactly that, and offer the switch. */
+    if (proxyDowngraded && proxyCopy) {
+      const switchTo = outcomeKpis[0];
+      return {
+        ...evidence,
+        action: "test",
+        kpiSwitch: { kpi: switchTo.kpi, label: switchTo.label },
+        headline: `Run one test: ${testTitle}. No budget move on ${kpiLabel} — switch to ${outcomeNames} first.`,
+        clientHeadline: `Run one focused test next: ${testTitle}.`,
+        rationale: `${proxyCopy.buyer} — switch to ${outcomeNames} before moving budget. On ${kpiLabel} alone this would be a budget move (top ad ${top?.deltaPct != null ? `+${pct(top.deltaPct)}%` : "±0%"} vs the median, ${pct(belowShare)}% of judged spend below it), but this export also has ${outcomeNames}, which measure results.`,
+        clientRationale: `This report ranks ads by ${proxyCopy.client}. The file also has ${outcomeClientNames}, which show actual results — we'll read the ads on that before moving any budget.`,
+        avoidNow: {
+          buyer: [`No budget moves on ${kpiLabel} — re-run on ${outcomeNames} before shifting spend.`],
+          client: ["We're not moving budget until the ads are compared on actual results."],
+        },
+        reassess: {
+          buyer: `Re-run this debrief on ${switchTo.label} before any budget decision; reassess the test at the ${gatePhrase}.`,
+          client: `We'll re-check the ads on ${switchTo.clientLabel} before any budget change, and revisit the test once it has spent about ${gateLabel}${clientGateSuffix}.`,
+        },
+      };
+    }
     return {
       ...evidence,
       action: "test",

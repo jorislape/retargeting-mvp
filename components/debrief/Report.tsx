@@ -450,9 +450,12 @@ function DecisionCard({
   memo,
   view,
   expandLimits,
+  onSwitchKpi,
 }: {
   memo: Memo;
   view: ReportView;
+  /** Trust Pass 4 — present on the generator only. */
+  onSwitchKpi?: (kpi: "roas" | "cpa") => void;
   /** Decision & Comparison V2: when a comparison or a user-set
    *  criterion is in play, the limits are promoted from the collapsed
    *  <details> to an always-visible "What we don't know" list — those
@@ -537,6 +540,21 @@ function DecisionCard({
         {client ? d.clientHeadline : d.headline}
       </p>
       {d.budgetMove && <BudgetMoveNames move={d.budgetMove} client={client} budgetVariantLabel={d.budgetVariant} />}
+      {/* Trust Pass 4 — a budget move was withheld because this KPI is a
+          proxy/count and the export can judge results: one click re-runs
+          the same file on the outcome KPI (same style as the existing
+          KPI-switch buttons). Buyer view, generator only; never printed. */}
+      {!client && d.kpiSwitch && onSwitchKpi && (
+        <div className="print-hidden mt-3">
+          <button
+            type="button"
+            onClick={() => onSwitchKpi(d.kpiSwitch!.kpi)}
+            className={`cursor-pointer ${btnSecondary}`}
+          >
+            Switch to {d.kpiSwitch.label}
+          </button>
+        </div>
+      )}
       {/* Decision & Comparison V2: "What we know" labels the evidence
           side of the card — the rationale and evidence-strength line —
           with "What we don't know" (the limits) as its counterpart
@@ -1561,6 +1579,7 @@ export function Report({
   onAddToQueue,
   creativeAssets = {},
   unusedColumns = null,
+  onSwitchKpi,
 }: {
   memo: Memo;
   variant?: "generated" | "sample";
@@ -1582,6 +1601,9 @@ export function Report({
    *  view only; never printed, copied or exported. null/absent → no
    *  disclosure (the sample and Decision Queue pages pass none). */
   unusedColumns?: { headers: string[]; total: number } | null;
+  /** Trust Pass 4 — re-run the same file on an outcome KPI (generator
+   *  only; /sample and queue snapshots pass none, so no button there). */
+  onSwitchKpi?: (kpi: "roas" | "cpa") => void;
 }) {
   /* White-label Report Customization V1A: one shared hook owns mode,
      identity fields, accent, and section visibility — session-only,
@@ -2034,6 +2056,7 @@ export function Report({
         <DecisionCard
           memo={memo}
           view={view}
+          onSwitchKpi={onSwitchKpi}
           expandLimits={
             memo.comparison != null ||
             memo.decision.appliedCriteria.some((c) => c.source === "user")

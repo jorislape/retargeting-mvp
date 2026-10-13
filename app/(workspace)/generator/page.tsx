@@ -7,7 +7,7 @@ import { useDebrief } from "@/components/workspace/DebriefProvider";
 import { eyebrow, gradientText } from "@/components/ui/theme";
 
 export default function GeneratorPage() {
-  const { status, memo, unusedColumns, generatedAt, reset, creativeAssets, fields, addToQueue } =
+  const { status, memo, unusedColumns, generatedAt, reset, creativeAssets, fields, addToQueue, generate } =
     useDebrief();
 
   if (status === "ready" && memo) {
@@ -19,6 +19,7 @@ export default function GeneratorPage() {
         onAddToQueue={() => addToQueue(fields.accountLabel)}
         creativeAssets={creativeAssets}
         unusedColumns={unusedColumns}
+        onSwitchKpi={(kpi) => void generate({ kpi })}
       />
     );
   }

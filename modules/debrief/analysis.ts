@@ -259,6 +259,26 @@ export function analyze(
     ...(cpaBasis ? { cpaBasis } : {}),
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
+    /* Trust Pass 4: proxy/count KPI — which outcome KPIs the export
+       could compute instead (ROAS preferred). */
+    ...(kpi === "ctr" || kpi === "cpc" || kpi === "purchases" || kpi === "leads"
+      ? {
+          proxyKpi: {
+            outcomeKpis: [
+              ...(requiredColumnsFor("roas", columns).length === 0
+                ? [{ kpi: "roas" as const, label: "ROAS", clientLabel: "return on ad spend" }]
+                : []),
+              ...(requiredColumnsFor("cpa", columns).length === 0
+                ? [
+                    columns.costPerPurchase || columns.purchases
+                      ? { kpi: "cpa" as const, label: "CPA", clientLabel: "cost per purchase" }
+                      : { kpi: "cpa" as const, label: "CPA (cost per lead)", clientLabel: "cost per lead" },
+                  ]
+                : []),
+            ],
+          },
+        }
+      : {}),
     /* Trust Pass 2: the blended account result (display-only). */
     ...((): { accountKpi?: NonNullable<AnalysisResult["accountKpi"]> } => {
       const acct = computeAccountKpi(ads, kpi);
