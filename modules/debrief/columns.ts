@@ -159,6 +159,105 @@ const MORE_SPECIFIC: Partial<Record<ConversionField, ConversionField[]>> = {
   leads: ["costPerLead"],
 };
 
+/* ------------------------------------------------------------------ */
+/* Attribution & Intent 1 — attribution-split columns                  */
+/* ------------------------------------------------------------------ */
+
+/** The conversion fields Meta can split by attribution window
+ *  (Ads Manager → Compare attribution settings). */
+export type AttributionField = "purchases" | "purchaseValue" | "leads";
+/** The split columns found for one field. view = a view-through window
+ *  (1-day view preferred over 7-day view / 1-day engaged-view). */
+export interface AttributionSplit {
+  click7?: string;
+  click1?: string;
+  view?: string;
+}
+
+/**
+ * Supported attribution-split header patterns (case-insensitive):
+ *
+ *   <base> (<window>)        e.g. "Purchases (7-day click)"
+ *   <base> [<window>]        e.g. "Purchases [7-day click]"
+ *   …with an optional "attribution" / "attribution setting:" word inside
+ *   the bracket ("Purchases (7-day click attribution)", "Purchases
+ *   [Attribution setting: 1-day view]") and an optional trailing or inner
+ *   currency code ("Purchases conversion value (7-day click) (USD)").
+ *
+ *   <window> = 1-day click | 7-day click | 1-day view | 7-day view |
+ *              1-day engaged-view  ("day"/"days", hyphen or space).
+ *   <base>   = purchases: Purchases · Website purchases · On-Facebook
+ *              purchases · Results
+ *              purchaseValue: Purchases conversion value · Website
+ *              purchases conversion value · Purchase conversion value ·
+ *              Conversion value · Results value
+ *              leads: Leads · Website leads · On-Facebook leads
+ *
+ * Meta's exact export spelling isn't guaranteed, so anything outside
+ * these shapes is simply not treated as a split column (it stays an
+ * ordinary header). Split columns are NEVER read as the blended column
+ * or listed as its "also found, not used" competitor.
+ */
+const ATTRIBUTION_SUFFIX =
+  /^(.*?)\s*[([]\s*(?:attribution(?:\s+settings?)?\s*[:\-–]?\s*)?(1|7)[\s-]*days?[\s-]*(click|view|engaged[\s-]*view)(?:\s+attribution)?\s*[)\]]\s*$/i;
+const ATTRIBUTION_BASES: Record<AttributionField, readonly string[]> = {
+  purchases: ["purchases", "website purchases", "on facebook purchases", "results"],
+  purchaseValue: [
+    "purchases conversion value",
+    "website purchases conversion value",
+    "purchase conversion value",
+    "conversion value",
+    "results value",
+  ],
+  leads: ["leads", "website leads", "on facebook leads"],
+};
+
+/** Any header carrying an attribution-window suffix — including ones
+ *  Debrief doesn't read ("Cost per purchase (7-day click)", "Purchase
+ *  ROAS [1-day view]"). Such headers are kept out of normal alias
+ *  resolution, so a split is never mistaken for the blended column or
+ *  listed as its "also found, not used" competitor. */
+export function isAttributionSplitHeader(header: string): boolean {
+  return ATTRIBUTION_SUFFIX.test(header.replace(/\s*\(([A-Za-z]{3})\)\s*$/, ""));
+}
+
+export function parseAttributionHeader(
+  header: string
+): { field: AttributionField; window: "click7" | "click1" | "view"; viewRank: number } | null {
+  const noCurrency = header.replace(/\s*\(([A-Za-z]{3})\)\s*$/, "");
+  const m = noCurrency.match(ATTRIBUTION_SUFFIX);
+  if (!m) return null;
+  const base = normalize(m[1].replace(/\(([A-Za-z]{3})\)/g, ""));
+  const field = (Object.keys(ATTRIBUTION_BASES) as AttributionField[]).find((f) =>
+    ATTRIBUTION_BASES[f].includes(base)
+  );
+  if (!field) return null;
+  const days = m[2];
+  const kind = m[3].toLowerCase().replace(/[\s-]+/g, " ");
+  if (kind === "click") return { field, window: days === "7" ? "click7" : "click1", viewRank: 0 };
+  // 1-day view preferred, then 7-day view, then 1-day engaged-view.
+  return { field, window: "view", viewRank: kind === "view" ? (days === "1" ? 0 : 1) : 2 };
+}
+
+function resolveAttributionSplits(headers: string[]): Partial<Record<AttributionField, AttributionSplit>> {
+  const out: Partial<Record<AttributionField, AttributionSplit>> = {};
+  const viewRank: Partial<Record<AttributionField, number>> = {};
+  for (const h of headers) {
+    const p = parseAttributionHeader(h);
+    if (!p) continue;
+    const split = (out[p.field] ??= {});
+    if (p.window === "view") {
+      if (split.view == null || p.viewRank < (viewRank[p.field] ?? 99)) {
+        split.view = h;
+        viewRank[p.field] = p.viewRank;
+      }
+    } else if (split[p.window] == null) {
+      split[p.window] = h;
+    }
+  }
+  return out;
+}
+
 export interface ColumnSource {
   header: string;
   match: ColumnMatch;
@@ -205,9 +304,16 @@ export interface ColumnMap {
    *  the header used and how it matched. Never read by extract/analysis
    *  math — disclosure only. */
   sources: Partial<Record<ConversionField, ColumnSource>>;
+  /** Attribution & Intent 1 — attribution-split columns by field (click
+   *  7-day / 1-day, view-through). Empty object when none. */
+  attributionSplits: Partial<Record<AttributionField, AttributionSplit>>;
 }
 
-export function resolveColumns(headers: string[]): ColumnMap {
+export function resolveColumns(allHeaders: string[]): ColumnMap {
+  /* Attribution & Intent 1: split columns ("Purchases (7-day click)")
+     are resolved on their own and kept out of every normal alias lookup
+     — a split is never the blended column, nor its competitor. */
+  const headers = allHeaders.filter((h) => !isAttributionSplitHeader(h));
   /* The generic "spend" alias must never substring-match a ROAS column
      ("…return on ad spend") — resolve spend only among headers that
      aren't ROAS-shaped. Real spend headers are unaffected. */
@@ -242,7 +348,21 @@ export function resolveColumns(headers: string[]): ColumnMap {
     campaignName: findHeader(headers, ALIASES.campaignName),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
     sources: resolveSources(headers),
+    attributionSplits: resolveAttributionSplits(allHeaders),
   };
+}
+
+/** Every attribution-split header that was resolved, for the selected
+ *  KPI's fields (purchases/value for ROAS & purchase CPA, leads for CPL)
+ *  — or all of them when no KPI is given. */
+export function attributionSplitHeaders(columns: ColumnMap, fields?: AttributionField[]): string[] {
+  const out: string[] = [];
+  for (const f of fields ?? (Object.keys(columns.attributionSplits) as AttributionField[])) {
+    const s = columns.attributionSplits[f];
+    if (!s) continue;
+    for (const h of [s.click7, s.click1, s.view]) if (h) out.push(h);
+  }
+  return out;
 }
 
 /** Tester Feedback Fix 3: resolves the hook-level metric columns, never
@@ -433,6 +553,15 @@ function quoted(headers: string[]): string {
  *  selected KPI is read from, and which competing variants were found
  *  but not used. null for KPIs that read no conversion column (CTR/CPC)
  *  or when none resolved. Display only — same resolver the API uses. */
+/** The attribution fields relevant to a KPI (none for CTR/CPC). */
+export function attributionFieldsFor(kpi: KpiKey, cpaBasis?: CpaBasis): AttributionField[] {
+  if (kpi === "roas") return ["purchaseValue", "purchases"];
+  if (kpi === "cpa") return cpaBasis === "leads" ? ["leads"] : ["purchases", "leads"];
+  if (kpi === "purchases") return ["purchases"];
+  if (kpi === "leads") return ["leads"];
+  return [];
+}
+
 export function kpiSourcePreview(
   kpi: KpiKey,
   columns: ColumnMap,
@@ -452,6 +581,10 @@ export function kpiSourcePreview(
     }
     return [part];
   });
+  /* Attribution & Intent 1: name the attribution-split columns found for
+     this KPI (read or not — Item 2 decides what ranks on them). */
+  const splits = attributionSplitHeaders(columns, attributionFieldsFor(kpi, cpaBasis));
+  if (splits.length > 0) parts.push(`attribution split found: ${quoted(splits)}`);
   if (parts.length === 0) return null;
   /* CPA Leads Label: no direct cost column read ⇒ CPL is derived. */
   const derived =
@@ -492,6 +625,7 @@ export function unusedColumns(
   for (const src of Object.values(columns.sources)) {
     src?.ignored.forEach((h) => used.add(h));
   }
+  attributionSplitHeaders(columns).forEach((h) => used.add(h));
   const seen = new Set<string>();
   const unused: string[] = [];
   for (const raw of headers) {

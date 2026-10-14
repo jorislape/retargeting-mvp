@@ -572,6 +572,13 @@ export function buildLimits(
     buyer.push(sourceLines.buyer);
     client.push(sourceLines.client);
   }
+  /* Attribution & Intent 1: attribution-split columns, disclosed. */
+  if (analysis.attributionColumns) {
+    buyer.push(
+      `This export also splits conversions by attribution window (${analysis.attributionColumns.map((h) => `'${h}'`).join(", ")}); the ranking uses the blended column.`
+    );
+    client.push("The file also shows results split by whether people clicked the ad or only saw it.");
+  }
 
   /* Tester Feedback Fix 5: CPA with no target ranks ads against each
      other, not against profitability — say so, and point at ROAS when

@@ -508,6 +508,10 @@ export interface AnalysisResult {
    *  (3-second video plays / ThruPlays / video plays). Wording only —
    *  lets opening-variant tests cite them; absent when none present. */
   hookMetricColumns?: string[];
+  /** Attribution & Intent 1 — attribution-split headers found for this
+   *  KPI ("Purchases (7-day click)", "Purchases [1-day view]"). Absent
+   *  when none — standard exports are key-for-key unchanged. */
+  attributionColumns?: string[];
   /** Tester Feedback Fix 5: present ONLY when the KPI is CPA (incl.
    *  lead-based) and no target CPA was given — the ranking is then
    *  relative to this account, not to profitability. roasAvailable:

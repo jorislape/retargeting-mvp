@@ -1,4 +1,4 @@
-import { ColumnMap, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
+import { ColumnMap, attributionFieldsFor, attributionSplitHeaders, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import { detectSegmentSpread } from "./segmentSpread";
 import { computeAccountKpi } from "./accountKpi";
@@ -148,6 +148,9 @@ export function analyze(
       : undefined;
   const kpiSources = kpiColumnSourcesFor(kpi, columns, cpaBasis);
   const hookColumns = hookMetricColumns(columns);
+  /* Attribution & Intent 1: the attribution-split columns relevant to
+     this KPI (disclosure; Item 2 decides what ranks on them). */
+  const attributionColumns = attributionSplitHeaders(columns, attributionFieldsFor(kpi, cpaBasis));
   const { gate: spendGate, basis: spendGateBasis } = computeSpendGate(
     ads,
     targetCpa,
@@ -290,6 +293,7 @@ export function analyze(
     ...(cpaBasis ? { cpaBasis } : {}),
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
+    ...(attributionColumns.length > 0 ? { attributionColumns } : {}),
     /* Trust Pass 4: proxy/count KPI — which outcome KPIs the export
        could compute instead (ROAS preferred); First-Run Robustness 3a:
        plus where each judged ad sits on that outcome KPI, so no next
