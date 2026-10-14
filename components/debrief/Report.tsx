@@ -863,6 +863,12 @@ function AdTable({
                 {view !== "client" && ad.fatigueNote && (
                   <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">{ad.fatigueNote}</p>
                 )}
+                {/* Attribution & Intent 3 — display only. */}
+                {ad.viewThroughNote && (
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
+                    {view === "client" ? ad.viewThroughNote.client : ad.viewThroughNote.buyer}
+                  </p>
+                )}
               </td>
               <td className="py-3 pr-4 text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
                 {ad.valueLabel}
@@ -941,6 +947,9 @@ function ClientAdList({
                   {ad.vsTarget === "beats" ? "✓ beats your target" : "✗ below your target"}
                 </p>
               )}
+              {ad.viewThroughNote && (
+                <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">{ad.viewThroughNote.client}</p>
+              )}
             </div>
             <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">
               {ad.valueLabel}
@@ -1007,6 +1016,11 @@ function AtMedianRows({
               )}
               {!client && ad.fatigueNote && (
                 <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">{ad.fatigueNote}</p>
+              )}
+              {ad.viewThroughNote && (
+                <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
+                  {client ? ad.viewThroughNote.client : ad.viewThroughNote.buyer}
+                </p>
               )}
             </div>
             <p className="font-mono text-[13px] font-semibold tabular-nums text-zinc-100">

@@ -396,6 +396,9 @@ export interface ParsedAd {
    *  mixed-segment limits line, never by gate/median/ranking/action. */
   adSetName?: string | null;
   campaignName?: string | null;
+  /** Attribution & Intent 3 — click vs view-through conversion counts
+   *  (see extract.ts viewThroughForRow). Display-only. */
+  viewThrough?: { click: number; view: number };
 }
 
 /** zero_outcome_thin (Tester Feedback follow-up): a zero-conversion CPA
@@ -642,6 +645,10 @@ export interface MemoWinnerLoserRow {
    *  (target ROAS for ROAS, target CPA for CPA): whether this judged ad
    *  beats it. Display only — the target never changes the action. */
   vsTarget?: "beats" | "misses";
+  /** Attribution & Intent 3 — present only when this ad's view-through
+   *  share of conversions is above VIEW_THROUGH_FLAG_SHARE: buyer and
+   *  client wording. Display only — never changes the action. */
+  viewThroughNote?: { buyer: string; client: string };
   /** Tester Feedback Fix 6 — BUYER register only: "Frequency 1.9",
    *  present when the export has a Frequency column and the row has no
    *  fatigueNote (which carries the number itself). Display only. */

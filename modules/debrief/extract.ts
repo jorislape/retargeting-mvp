@@ -163,6 +163,28 @@ function conversionsForRow(
   }
 }
 
+/** Attribution & Intent 3: click vs view-through conversion counts for
+ *  the KPI's conversion type (purchases for ROAS/Purchases/purchase CPA,
+ *  leads for Leads/CPL) — present only when BOTH a click-only column
+ *  (7-day preferred) and a view-through column exist and both cells
+ *  parse. Display-only: never fed to the gate, median, ranking or
+ *  decision. */
+function viewThroughForRow(
+  row: Record<string, string>,
+  columns: ColumnMap,
+  kpi: KpiKey
+): { viewThrough?: { click: number; view: number } } {
+  const s = columns.attributionSplits;
+  const field =
+    kpi === "leads" ? "leads" : kpi === "cpa" ? (s.purchases ? "purchases" : "leads") : kpi === "roas" || kpi === "purchases" ? "purchases" : null;
+  const split = field ? s[field] : undefined;
+  const clickHeader = split?.click7 ?? split?.click1;
+  if (!split?.view || !clickHeader) return {};
+  const click = parseNumericCell(row[clickHeader]);
+  const view = parseNumericCell(row[split.view]);
+  return click != null && view != null ? { viewThrough: { click, view } } : {};
+}
+
 /** Evidence Diagnostic V1: raw upstream funnel fields, captured on
  *  EVERY ad regardless of the selected KPI — unlike ctr/cpc, which are
  *  only derived when the KPI itself is ctr/cpc, these are read for
@@ -222,6 +244,7 @@ export function extractAds(
           : {}),
         nameTags: extractNameTags(name),
         conversions: conversionsForRow(row, columns, kpi, click),
+        ...viewThroughForRow(row, columns, kpi),
         ...upstreamFieldsForRow(row, columns),
         /* Spreadsheet row number (header = row 1) — used only for the
            duplicate-name display label below. */

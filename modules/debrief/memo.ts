@@ -166,6 +166,7 @@ function buildRow(
       reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
       ...frequencyFieldsFor(ad),
       ...vsTargetFor(ad, analysis, context),
+      ...viewThroughNoteFor(ad, analysis),
     };
   }
   return {
@@ -179,6 +180,30 @@ function buildRow(
     ...fewOutcomesNoteFor(ad, analysis),
     ...frequencyFieldsFor(ad),
     ...vsTargetFor(ad, analysis, context),
+    ...viewThroughNoteFor(ad, analysis),
+  };
+}
+
+/** Attribution & Intent 3: an ad whose conversions are MORE than this
+ *  share view-through gets a "likely passive credit" note. 25% is a
+ *  practitioner rule of thumb from CAPI/tracking work (1-day view credit
+ *  inflates statics/retargeting), not a measured threshold — a prompt to
+ *  check the ad, never an input to ranking or the decision. Strictly
+ *  greater: exactly 25% is not flagged. */
+export const VIEW_THROUGH_FLAG_SHARE = 0.25;
+
+function viewThroughNoteFor(ad: RankedAd, analysis: AnalysisResult): { viewThroughNote?: { buyer: string; client: string } } {
+  const vt = ad.viewThrough;
+  if (!vt || vt.click + vt.view <= 0) return {};
+  const share = vt.view / (vt.click + vt.view);
+  if (!(share > VIEW_THROUGH_FLAG_SHARE)) return {};
+  const pctLabel = `${Math.round(share * 100)}%`;
+  const many = outcomeNounsFor(analysis)?.many ?? "conversions";
+  return {
+    viewThroughNote: {
+      buyer: `${pctLabel} of conversions are view-through — likely passive credit (retargeting/branded demand).`,
+      client: `${pctLabel} of this ad's ${many} came from people who saw it without clicking — some of that credit may be for ${many} that would have happened anyway.`,
+    },
   };
 }
 
