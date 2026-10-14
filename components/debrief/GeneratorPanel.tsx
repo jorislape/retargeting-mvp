@@ -1531,6 +1531,20 @@ export function GeneratorPanel() {
             </div>
           )}
 
+          {/* Attribution & Intent 5 — a short, collapsed hint: which extra
+              export columns give a stricter read (click-only ranking,
+              view-through and low-intent flags). Optional; never required. */}
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-medium text-zinc-400 transition hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
+              Want a stricter read?
+            </summary>
+            <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-zinc-400">
+              For a stricter read, add Compare attribution settings (7-day
+              click + 1-day view), 3-second video plays, ThruPlays and
+              Outbound clicks to your export.
+            </p>
+          </details>
+
           {/* Period Comparison V2 — optional previous-period export.
               Deliberately subordinate to the primary path: collapsed
               unless a file is already loaded, one plain file input, no
