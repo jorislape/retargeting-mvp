@@ -76,7 +76,11 @@ try {
 
   /* ---- Disclosure: preview + report ---- */
   const preview = cols.kpiSourcePreview("roas", cols.resolveColumns(SPLIT.split("\n")[0].split(",")));
-  assert.match(preview ?? "", /attribution split found: 'Purchases conversion value \(7-day click\)'/);
+  // Item 2: with a click-only value column the preview states the basis.
+  assert.equal(preview, "Ranked on 7-day click only (view-through excluded): 'Purchases conversion value (7-day click)' and 'Purchases (7-day click)'.");
+  // A view-only split is still just disclosed.
+  const viewOnly = cols.kpiSourcePreview("roas", cols.resolveColumns(["Ad name", "Amount spent (USD)", "Purchases conversion value", "Purchases conversion value [1-day view]"]));
+  assert.match(viewOnly ?? "", /attribution split found: 'Purchases conversion value \[1-day view\]'/);
   for (const csv of [SPLIT, BRACKETS]) {
     const r = run(csv, "roas");
     assert.equal(r.analysis.attributionColumns?.length, 6, "all six split columns detected, both formats");

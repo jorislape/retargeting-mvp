@@ -572,8 +572,19 @@ export function buildLimits(
     buyer.push(sourceLines.buyer);
     client.push(sourceLines.client);
   }
-  /* Attribution & Intent 1: attribution-split columns, disclosed. */
-  if (analysis.attributionColumns) {
+  /* Attribution & Intent 2: ranked on click-only — said in both
+     registers. Otherwise (Item 1) split columns are only disclosed. */
+  if (analysis.attributionBasis) {
+    const b = analysis.attributionBasis;
+    const many = outcomeNounsFor(analysis)?.many ?? "conversions";
+    const days = b.windowLabel === "7-day click" ? "7 days" : "1 day";
+    buyer.push(
+      `Ranked on ${b.windowLabel} conversions only; view-through excluded (${b.headers.map((h) => `'${h}'`).join(", ")}).`
+    );
+    client.push(
+      `Ads are compared only on ${many} made within ${days} of someone clicking the ad — ${many} credited just because someone saw it aren't counted.`
+    );
+  } else if (analysis.attributionColumns) {
     buyer.push(
       `This export also splits conversions by attribution window (${analysis.attributionColumns.map((h) => `'${h}'`).join(", ")}); the ranking uses the blended column.`
     );

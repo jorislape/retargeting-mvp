@@ -512,6 +512,11 @@ export interface AnalysisResult {
    *  KPI ("Purchases (7-day click)", "Purchases [1-day view]"). Absent
    *  when none — standard exports are key-for-key unchanged. */
   attributionColumns?: string[];
+  /** Attribution & Intent 2 — present ONLY when the KPI (ROAS/CPA/CPL)
+   *  was ranked on click-only columns (7-day click preferred). Every KPI
+   *  value, conversion count, the outcome floor and the zero rule then
+   *  read those columns; view-through is excluded. */
+  attributionBasis?: { windowLabel: "7-day click" | "1-day click"; headers: string[] };
   /** Tester Feedback Fix 5: present ONLY when the KPI is CPA (incl.
    *  lead-based) and no target CPA was given — the ranking is then
    *  relative to this account, not to profitability. roasAvailable:

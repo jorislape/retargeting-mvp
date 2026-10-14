@@ -1,4 +1,4 @@
-import { ColumnMap, attributionFieldsFor, attributionSplitHeaders, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
+import { ColumnMap, attributionFieldsFor, attributionSplitHeaders, clickBasisFor, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import { detectSegmentSpread } from "./segmentSpread";
 import { computeAccountKpi } from "./accountKpi";
@@ -294,6 +294,11 @@ export function analyze(
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
     ...(attributionColumns.length > 0 ? { attributionColumns } : {}),
+    /* Attribution & Intent 2: ranked on click-only (absent ⇒ blended). */
+    ...((): { attributionBasis?: NonNullable<AnalysisResult["attributionBasis"]> } => {
+      const click = clickBasisFor(kpi, columns);
+      return click ? { attributionBasis: { windowLabel: click.windowLabel, headers: click.headers } } : {};
+    })(),
     /* Trust Pass 4: proxy/count KPI — which outcome KPIs the export
        could compute instead (ROAS preferred); First-Run Robustness 3a:
        plus where each judged ad sits on that outcome KPI, so no next

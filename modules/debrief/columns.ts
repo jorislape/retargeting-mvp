@@ -553,6 +553,44 @@ function quoted(headers: string[]): string {
  *  selected KPI is read from, and which competing variants were found
  *  but not used. null for KPIs that read no conversion column (CTR/CPC)
  *  or when none resolved. Display only — same resolver the API uses. */
+/** Attribution & Intent 2 — what to rank on when click-only columns
+ *  exist for the selected KPI (ROAS / CPA / CPL only). 7-day click is
+ *  preferred over 1-day click. ROAS needs a click-only VALUE column;
+ *  CPA needs a click-only purchases (else leads) column. `count` is the
+ *  click-only conversion count used for the outcome floor, the zero-
+ *  conversion rule and every displayed count (null only when ROAS has a
+ *  click value but no click purchase count). null ⇒ blended, exactly as
+ *  before. */
+export interface ClickBasis {
+  window: "click7" | "click1";
+  windowLabel: "7-day click" | "1-day click";
+  value: string | null;
+  count: string | null;
+  countField: "purchases" | "leads" | null;
+  /** The headers ranked on, for disclosure. */
+  headers: string[];
+}
+
+export function clickBasisFor(kpi: KpiKey, columns: ColumnMap): ClickBasis | null {
+  const s = columns.attributionSplits;
+  const label = (w: "click7" | "click1") => (w === "click7" ? "7-day click" : "1-day click") as ClickBasis["windowLabel"];
+  if (kpi === "roas") {
+    const w = s.purchaseValue?.click7 ? "click7" : s.purchaseValue?.click1 ? "click1" : null;
+    if (!w) return null;
+    const value = s.purchaseValue![w]!;
+    const count = s.purchases?.[w] ?? null;
+    return { window: w, windowLabel: label(w), value, count, countField: count ? "purchases" : null, headers: [value, ...(count ? [count] : [])] };
+  }
+  if (kpi === "cpa") {
+    const w = s.purchases?.click7 || s.leads?.click7 ? "click7" : s.purchases?.click1 || s.leads?.click1 ? "click1" : null;
+    if (!w) return null;
+    const count = s.purchases?.[w] ?? s.leads?.[w] ?? null;
+    if (!count) return null;
+    return { window: w, windowLabel: label(w), value: null, count, countField: s.purchases?.[w] ? "purchases" : "leads", headers: [count] };
+  }
+  return null;
+}
+
 /** The attribution fields relevant to a KPI (none for CTR/CPC). */
 export function attributionFieldsFor(kpi: KpiKey, cpaBasis?: CpaBasis): AttributionField[] {
   if (kpi === "roas") return ["purchaseValue", "purchases"];
@@ -583,7 +621,11 @@ export function kpiSourcePreview(
   });
   /* Attribution & Intent 1: name the attribution-split columns found for
      this KPI (read or not — Item 2 decides what ranks on them). */
+  const click = clickBasisFor(kpi, columns);
   const splits = attributionSplitHeaders(columns, attributionFieldsFor(kpi, cpaBasis));
+  /* Ranked on click-only ⇒ the blended columns aren't read for the KPI,
+     so they aren't named either — only what the ranking actually uses. */
+  if (click) return `Ranked on ${click.windowLabel} only (view-through excluded): ${quoted(click.headers)}.`;
   if (splits.length > 0) parts.push(`attribution split found: ${quoted(splits)}`);
   if (parts.length === 0) return null;
   /* CPA Leads Label: no direct cost column read ⇒ CPL is derived. */

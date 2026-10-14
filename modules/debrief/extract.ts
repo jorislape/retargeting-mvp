@@ -1,4 +1,4 @@
-import { ColumnMap } from "./columns";
+import { ClickBasis, ColumnMap, clickBasisFor } from "./columns";
 import { parseNumericCell } from "./csv";
 import {
   CREATIVE_FORMAT_LABELS,
@@ -33,8 +33,20 @@ function kpiValueForRow(
   row: Record<string, string>,
   columns: ColumnMap,
   kpi: KpiKey,
-  spend: number
+  spend: number,
+  click: ClickBasis | null = null
 ): number | null {
+  /* Attribution & Intent 2: rank on click-only conversions/value when
+     the export has them — blended (view-through-inflated) columns and
+     Meta's blended cost/ROAS columns are not read for the KPI then. */
+  if (click && kpi === "roas") {
+    const value = parseNumericCell(row[click.value as string]);
+    return value != null && spend > 0 ? value / spend : null;
+  }
+  if (click && kpi === "cpa") {
+    const n = parseNumericCell(row[click.count as string]);
+    return n != null && n > 0 ? spend / n : null;
+  }
   switch (kpi) {
     case "purchases": {
       return columns.purchases ? parseNumericCell(row[columns.purchases]) : null;
@@ -130,8 +142,14 @@ function cpaZeroConversions(row: Record<string, string>, columns: ColumnMap): bo
 function conversionsForRow(
   row: Record<string, string>,
   columns: ColumnMap,
-  kpi: KpiKey
+  kpi: KpiKey,
+  click: ClickBasis | null = null
 ): number | null {
+  /* The same click-only count the KPI was ranked on (floor, zero rule,
+     displayed counts all agree). */
+  if (click && (kpi === "roas" || kpi === "cpa")) {
+    return click.count ? parseNumericCell(row[click.count]) : kpi === "roas" ? conversionsForRow(row, columns, kpi) : null;
+  }
   switch (kpi) {
     case "leads":
       return columns.leads ? parseNumericCell(row[columns.leads]) : null;
@@ -175,6 +193,9 @@ export function extractAds(
   columns: ColumnMap,
   kpi: KpiKey
 ): ParsedAd[] {
+  /* Attribution & Intent 2: click-only basis for ROAS/CPA/CPL when the
+     export has it (7-day preferred); null ⇒ blended, as before. */
+  const click = clickBasisFor(kpi, columns);
   const ads = rows
     .map((row, index) => {
       const spend = columns.spend ? (parseNumericCell(row[columns.spend]) ?? 0) : 0;
@@ -186,7 +207,7 @@ export function extractAds(
          an empty cell stays null. */
       const rawId = columns.adId ? row[columns.adId] : undefined;
       const id = rawId && rawId.trim() !== "" ? rawId.trim() : null;
-      const kpiValue = kpiValueForRow(row, columns, kpi, spend);
+      const kpiValue = kpiValueForRow(row, columns, kpi, spend, click);
       return {
         name,
         id,
@@ -194,18 +215,32 @@ export function extractAds(
         kpiValue,
         /* Tester Feedback Fix 2 — key present only when true, so other
            ads (and every non-CPA run) are key-for-key unchanged. */
-        ...(kpi === "cpa" && kpiValue == null && cpaZeroConversions(row, columns)
+        ...(kpi === "cpa" &&
+        kpiValue == null &&
+        (click ? parseNumericCell(row[click.count as string]) === 0 : cpaZeroConversions(row, columns))
           ? { zeroConversions: true as const }
           : {}),
         nameTags: extractNameTags(name),
-        conversions: conversionsForRow(row, columns, kpi),
+        conversions: conversionsForRow(row, columns, kpi, click),
         ...upstreamFieldsForRow(row, columns),
         /* Spreadsheet row number (header = row 1) — used only for the
            duplicate-name display label below. */
         fileRow: index + 2,
         /* CPA Leads Label — internal, stripped below. */
-        cpaRowBasis: kpi === "cpa" ? cpaBasisForRow(row, columns) : null,
-        leadCount: kpi === "cpa" && columns.leads ? parseNumericCell(row[columns.leads]) : null,
+        cpaRowBasis:
+          kpi === "cpa"
+            ? click
+              ? parseNumericCell(row[click.count as string]) != null
+                ? click.countField === "leads" ? ("lead" as const) : ("purchase" as const)
+                : null
+              : cpaBasisForRow(row, columns)
+            : null,
+        leadCount:
+          kpi === "cpa"
+            ? click
+              ? click.countField === "leads" ? parseNumericCell(row[click.count as string]) : null
+              : columns.leads ? parseNumericCell(row[columns.leads]) : null
+            : null,
       };
     })
     .filter((ad) => ad.spend > 0 || ad.kpiValue != null); // drop fully-blank rows

@@ -1816,8 +1816,12 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
         ? {
             accountKpiLabel: fmtKpiValue(analysis.accountKpi.value, kpi, currency),
             accountKpiBasis: ({
-              roas: "total purchase value ÷ total spend",
-              cpa: `total spend ÷ total ${outcomeNounsFor(analysis)?.many ?? "purchases"}`,
+              roas: analysis.attributionBasis
+                ? `${analysis.attributionBasis.windowLabel} purchase value ÷ total spend`
+                : "total purchase value ÷ total spend",
+              cpa: analysis.attributionBasis
+                ? `total spend ÷ ${analysis.attributionBasis.windowLabel} ${outcomeNounsFor(analysis)?.many ?? "purchases"}`
+                : `total spend ÷ total ${outcomeNounsFor(analysis)?.many ?? "purchases"}`,
               ctr: "total link clicks ÷ total impressions",
               cpc: "total spend ÷ total link clicks",
               purchases: "total purchases across all ads",
