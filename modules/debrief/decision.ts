@@ -144,6 +144,43 @@ export function isProxyWithOutcome(analysis: AnalysisResult): boolean {
   return (analysis.proxyKpi?.outcomeKpis.length ?? 0) > 0;
 }
 
+/** The cut rule's own facts (worst ad ≥ the bar behind — or a judged
+ *  zero-conversion ad — and ≥ CUT_MIN_SPEND_SHARE_PCT of judged spend
+ *  below the median). Shared so memo.ts can tell a SHIFT is committed
+ *  without re-deriving the rule (First-Run Robustness 3c). */
+function isRawCutEligible(analysis: AnalysisResult): boolean {
+  const worst = analysis.losers[0] ?? null;
+  const belowShare =
+    analysis.judgedSpend > 0 ? (analysis.belowBenchmarkSpend / analysis.judgedSpend) * 100 : 0;
+  return (
+    worst != null &&
+    (worst.zeroConversions === true ||
+      (worst.deltaPct != null && worst.deltaPct <= -SCALE_TEST_MIN_DELTA_PCT)) &&
+    belowShare >= CUT_MIN_SPEND_SHARE_PCT
+  );
+}
+
+/** True when the committed call can contain a cut (cut or shift). With
+ *  isScaleActionSupported, memo.ts knows a shift is committed. */
+export function isCutActionSupported(analysis: AnalysisResult): boolean {
+  return (
+    analysis.adsJudged >= DECISION_MIN_JUDGED &&
+    isRawCutEligible(analysis) &&
+    !isProxyWithOutcome(analysis)
+  );
+}
+
+/** First-Run Robustness 3a — in a proxy run with an outcome column,
+ *  the proxy's top ad sits BELOW median on the outcome KPI (e.g. the
+ *  CTR leader is a 0.66x-ROAS ad). Then no test may be built on it:
+ *  the first test moves to the outcome leader (memo.ts), and the card
+ *  watches the outcome KPI. Shared so both read one rule. */
+export function isProxyOutcomeConflict(analysis: AnalysisResult): boolean {
+  const oc = analysis.proxyKpi?.outcome;
+  const top = analysis.winners[0];
+  return oc != null && top != null && oc.belowMedian.includes(top.name);
+}
+
 /** What each proxy/count KPI actually measures — the honest reason it
  *  can't carry a budget move on its own. */
 const PROXY_MEASURES: Record<string, { buyer: string; client: string }> = {
@@ -903,11 +940,7 @@ export function buildDecision(
      deltaPct null) is by definition further behind than any bar — it
      qualifies on the "worst ad" half; the spend-share half still holds. */
   const proxyHeld = isProxyWithOutcome(analysis);
-  const rawCutEligible =
-    worst != null &&
-    (worst.zeroConversions === true ||
-      (worst.deltaPct != null && worst.deltaPct <= -SCALE_TEST_MIN_DELTA_PCT)) &&
-    belowShare >= CUT_MIN_SPEND_SHARE_PCT;
+  const rawCutEligible = isRawCutEligible(analysis);
   const cutEligible = rawCutEligible && !proxyHeld;
   /* Trust Pass 4: true only when the proxy rule is what stopped a move
      the rules would otherwise have made. */
@@ -1130,7 +1163,12 @@ export function buildDecision(
   ];
 
   const nextControlledTest = nextTestFacts
-    ? { preserve: nextTestFacts.preserve, change: nextTestFacts.change, watch: kpiLabel }
+    ? {
+        preserve: nextTestFacts.preserve,
+        change: nextTestFacts.change,
+        /* 3a: an outcome-led test watches the outcome KPI. */
+        watch: isProxyOutcomeConflict(analysis) ? analysis.proxyKpi!.outcome!.label : kpiLabel,
+      }
     : undefined;
   const evidence: Pick<MemoDecision, "evidenceState" | "limits" | "appliedCriteria"> &
     Partial<Pick<MemoDecision, "evidenceShape" | "nextControlledTest">> = {
@@ -1255,7 +1293,7 @@ export function buildDecision(
         budgetMove: { from: fromAds, to: toAds, belowSpendLabel },
         headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
         clientHeadline: `Move budget from the weakest ads into "${top!.name}", the clear leader.`,
-        rationale: `"${top!.name}" is ${pct(top!.deltaPct!)}% better than the median ${kpiLabel} on ${money(top!.spend)}; ${analysis.belowBenchmarkCount} below-benchmark ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}).`,
+        rationale: `"${top!.name}" is ${pct(top!.deltaPct!)}% better than the median ${kpiLabel} on ${money(top!.spend)}; ${analysis.belowBenchmarkCount} below-median ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}).`,
         clientRationale: `"${top!.name}" is clearly ahead while several ads sit well behind — moving budget captures that gap now.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
@@ -1276,7 +1314,7 @@ export function buildDecision(
         budgetMove: { from: [], to: toAds },
         headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% better than the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,
-        rationale: `"${top!.name}" leads the ${kpiLabel} median by ${pct(top!.deltaPct!)}% on ${money(top!.spend)} of spend — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move. No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`,
+        rationale: `"${top!.name}" leads the ${kpiLabel} median by ${pct(top!.deltaPct!)}% on ${money(top!.spend)} of spend — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move. ${belowShare >= CUT_MIN_SPEND_SHARE_PCT ? `No cut: ${pct(belowShare)}% of judged spend sits below the median, but the weakest ad isn't ${SCALE_TEST_MIN_DELTA_PCT}% behind it.` : `No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`}`,
         clientRationale: `"${top!.name}" is delivering about ${pct(top!.deltaPct!)}% better ${kpiClient} than the middle ad in this account, with real spend behind it — it has earned more budget.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
@@ -1370,7 +1408,7 @@ export function buildDecision(
       rationale:
         outcomeBlockedScale && nouns != null && top != null
           ? `Top ad +${pct(top.deltaPct!)}% clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar but has ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} — below your ${minOutcome}-${nouns.one} scaling minimum; below-benchmark spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. The strongest evidence-backed move is a test, not a budget change.`
-          : `Top ad ${top?.deltaPct != null ? `+${pct(top.deltaPct)}%` : "±0%"} vs the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar; below-benchmark spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. Neither clears, so the strongest evidence-backed move is a test, not a budget change.`,
+          : `Top ad ${top?.deltaPct != null ? `+${pct(top.deltaPct)}%` : "±0%"} vs the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar; below-median spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. Neither clears, so the strongest evidence-backed move is a test, not a budget change.`,
       clientRationale:
         outcomeBlockedScale && nouns != null
           ? `No ad has both a clear enough lead and the ${minOutcome} ${nouns.many} you require before scaling — the fastest path to a confident move is one focused test.`

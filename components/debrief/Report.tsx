@@ -567,7 +567,7 @@ function DecisionCard({
           ? d.clientRationale
           : withTerms(d.rationale, [
               { phrase: "judged spend", tip: TIP_JUDGED_SPEND },
-              { phrase: "below-benchmark", tip: TIP_BELOW_BENCHMARK },
+              { phrase: "below-median", tip: TIP_BELOW_BENCHMARK },
             ])}
       </p>
       <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">

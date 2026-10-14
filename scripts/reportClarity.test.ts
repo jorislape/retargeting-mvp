@@ -173,7 +173,7 @@ try {
     ["Set aside", /"Set aside": memo\.scope\.setAsideBreakdown/],
     ["Median <KPI>", /\[`Median \$\{viewKpiLabel\}`\]: TIP_MEDIAN/],
     ["judged spend", /phrase: "judged spend", tip: TIP_JUDGED_SPEND/],
-    ["below-benchmark", /phrase: "below-benchmark", tip: TIP_BELOW_BENCHMARK/],
+    ["below-median", /phrase: "below-median", tip: TIP_BELOW_BENCHMARK/],
     ["Evidence state", /<Term tip=\{evidenceLine\(d, memo\.scope\.adsJudged, "client"\)\}>Evidence<\/Term>/],
     ["Brief readiness", /<Term tip=\{TIP_BRIEF_READINESS\}>Brief readiness<\/Term>/],
     ["readiness badges", /<Term tip=\{test\.briefReadiness\.client\}>/],

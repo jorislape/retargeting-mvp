@@ -146,7 +146,7 @@ function assertClose(actual: number, expected: number, message: string, toleranc
     // Copy Hierarchy Polish: ONE short clause — the below-benchmark
     // share only. No above (56%) figure, no dollar amount, no ad count
     // — those live in the segment labels below, not repeated here.
-    assert.equal(sa.headline.buyer, "35% of judged spend sits behind below-benchmark ads.");
+    assert.equal(sa.headline.buyer, "35% of judged spend sits behind below-median ads.");
     assert.equal(sa.headline.client, "35% of this period's working budget went to ads below the middle ad.");
     assert.ok(!sa.headline.buyer.includes("56%"), "buyer headline never restates the above-side share");
     assert.ok(!sa.headline.client.includes("56%"), "client headline never restates the above-side share");
@@ -268,7 +268,7 @@ function assertClose(actual: number, expected: number, message: string, toleranc
       assert.ok(m.spendAllocation.segments.some((s: { id: string }) => s.id === "above"), "above segment present");
       // No losers -> the headline falls back to the above-side clause
       // (the only story left to tell), never the all-neutral sentence.
-      assert.equal(m.spendAllocation.headline.buyer, "15% of judged spend sits behind above-benchmark ads.");
+      assert.equal(m.spendAllocation.headline.buyer, "15% of judged spend sits behind above-median ads.");
       assert.ok(!m.spendAllocation.headline.buyer.includes("$"), "above-only headline still carries no dollar amount");
     }
 
@@ -286,8 +286,8 @@ function assertClose(actual: number, expected: number, message: string, toleranc
       assert.ok(!m.spendAllocation.segments.some((s: { id: string }) => s.id === "above"), "above segment omitted, not zero-width");
       // A present below segment always wins the headline (even with no
       // above segment) — never the all-neutral fallback sentence.
-      assert.equal(m.spendAllocation.headline.buyer, "25% of judged spend sits behind below-benchmark ads.");
-      assert.ok(m.spendAllocation.headline.buyer.includes("below-benchmark"), "headline states the below-benchmark clause");
+      assert.equal(m.spendAllocation.headline.buyer, "25% of judged spend sits behind below-median ads.");
+      assert.ok(m.spendAllocation.headline.buyer.includes("below-median"), "headline states the below-median clause");
     }
 
     // All ads exactly at the median: one neutral bar, nothing else.

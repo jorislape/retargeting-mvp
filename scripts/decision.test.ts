@@ -1764,10 +1764,13 @@ console.log("decision (stage 1 — rules): all assertions passed");
            leader" permission, exactly when the committed decision is a
            shift/scale — never under test, hold, cut-only, or a
            criteria-withheld scale. */
+        /* First-Run Robustness 3c: a SHIFT already moves budget into the
+           leader, so the separate scale test appears only for a
+           scale-only call (never beside a shift). */
         assert.equal(
           m.nextTests.some((t) => t.test.startsWith("Scale ")),
-          scaleSide,
-          `${label}: T3 scale action iff the decision scales`
+          m.decision.action === "budget" && m.decision.budgetVariant === "scale",
+          `${label}: T3 scale action iff the decision is a scale-only move`
         );
         assert.equal(
           m.avoid.buyer.some((l) => l.startsWith("Do not scale anything except")),
@@ -2166,9 +2169,11 @@ console.log("decision (stage 1 — rules): all assertions passed");
 
       /* Positive controls: real shift/scale decisions retain the scale
          language everywhere it belongs. */
+      // First-Run Robustness 3c: the shift IS the budget move — no
+      // separate "Scale …" test beside it.
       assert.ok(
-        memo.nextTests.some((t: { test: string }) => t.test.startsWith('Scale "UGC_MorningRoutine_V1"')),
-        "shift sample keeps the T3 scale action"
+        !memo.nextTests.some((t: { test: string }) => t.test.startsWith('Scale "UGC_MorningRoutine_V1"')),
+        "shift sample has no separate T3 scale action"
       );
       assert.ok(
         memo.avoid.buyer.some((l: string) => l.startsWith("Do not scale anything except")),

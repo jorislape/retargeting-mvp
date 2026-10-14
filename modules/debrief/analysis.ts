@@ -3,6 +3,7 @@ import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import { detectSegmentSpread } from "./segmentSpread";
 import { computeAccountKpi } from "./accountKpi";
 import { fmtKpiValue } from "./format";
+import { extractAds } from "./extract";
 import {
   AnalysisResult,
   DebriefContext,
@@ -290,24 +291,11 @@ export function analyze(
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
     /* Trust Pass 4: proxy/count KPI — which outcome KPIs the export
-       could compute instead (ROAS preferred). */
+       could compute instead (ROAS preferred); First-Run Robustness 3a:
+       plus where each judged ad sits on that outcome KPI, so no next
+       test is built on an ad that's below median on results. */
     ...(kpi === "ctr" || kpi === "cpc" || kpi === "purchases" || kpi === "leads"
-      ? {
-          proxyKpi: {
-            outcomeKpis: [
-              ...(requiredColumnsFor("roas", columns).length === 0
-                ? [{ kpi: "roas" as const, label: "ROAS", clientLabel: "return on ad spend" }]
-                : []),
-              ...(requiredColumnsFor("cpa", columns).length === 0
-                ? [
-                    columns.costPerPurchase || columns.purchases
-                      ? { kpi: "cpa" as const, label: "CPA", clientLabel: "cost per purchase" }
-                      : { kpi: "cpa" as const, label: "CPA (cost per lead)", clientLabel: "cost per lead" },
-                  ]
-                : []),
-            ],
-          },
-        }
+      ? { proxyKpi: buildProxyKpi(kpi, columns, rawRows, ranked) }
       : {}),
     /* Trust Pass 2: the blended account result (display-only). */
     ...((): { accountKpi?: NonNullable<AnalysisResult["accountKpi"]> } => {
@@ -329,6 +317,61 @@ export function analyze(
     ...(kpi === "cpa" && !(targetCpa != null && targetCpa > 0)
       ? { cpaWithoutTarget: { roasAvailable: requiredColumnsFor("roas", columns).length === 0 } }
       : {}),
+  };
+}
+
+/** Trust Pass 4 + First-Run Robustness 3a — the outcome KPIs a proxy/
+ *  count run could use instead, and (for the preferred one) where each
+ *  judged ad sits against its own median. Read only by the next-test
+ *  builder and decision copy — never the gate, median or ranking. */
+function buildProxyKpi(
+  kpi: KpiKey,
+  columns: ColumnMap,
+  rawRows: Record<string, string>[],
+  ranked: RankedAd[]
+): NonNullable<AnalysisResult["proxyKpi"]> {
+  const outcomeKpis: NonNullable<AnalysisResult["proxyKpi"]>["outcomeKpis"] = [
+    ...(requiredColumnsFor("roas", columns).length === 0
+      ? [{ kpi: "roas" as const, label: "ROAS", clientLabel: "return on ad spend" }]
+      : []),
+    ...(requiredColumnsFor("cpa", columns).length === 0
+      ? [
+          columns.costPerPurchase || columns.purchases
+            ? { kpi: "cpa" as const, label: "CPA", clientLabel: "cost per purchase" }
+            : { kpi: "cpa" as const, label: "CPA (cost per lead)", clientLabel: "cost per lead" },
+        ]
+      : []),
+  ];
+  const pref = outcomeKpis[0];
+  if (!pref || ranked.length === 0) return { outcomeKpis };
+  // Same rows, same extraction ⇒ same (disambiguated) names, same order.
+  const byName = new Map(extractAds(rawRows, columns, pref.kpi).map((a) => [a.name, a]));
+  const values = ranked.map((r) => {
+    const o = byName.get(r.name);
+    // A zero-purchase ad has no CPA but is unambiguously the worst result.
+    return { name: r.name, value: o?.kpiValue ?? null, zero: o?.zeroConversions === true };
+  });
+  const known = values.filter((v) => v.value != null).map((v) => v.value as number);
+  const med = median(known);
+  if (med == null) return { outcomeKpis };
+  const higher = HIGHER_IS_BETTER[pref.kpi];
+  const better = (v: number) => (higher ? v > med : v < med);
+  const worse = (v: number) => (higher ? v < med : v > med);
+  const belowMedian = values.filter((v) => v.zero || (v.value != null && worse(v.value))).map((v) => v.name);
+  const aboveMedian = values.filter((v) => v.value != null && better(v.value)).map((v) => v.name);
+  const best = values
+    .filter((v) => v.value != null)
+    .sort((a, b) => (higher ? (b.value as number) - (a.value as number) : (a.value as number) - (b.value as number)))[0];
+  return {
+    outcomeKpis,
+    outcome: {
+      kpi: pref.kpi,
+      label: pref.label,
+      medianLabel: fmtKpiValue(med, pref.kpi, columns.currency),
+      leader: best ? { name: best.name, valueLabel: fmtKpiValue(best.value as number, pref.kpi, columns.currency) } : null,
+      belowMedian,
+      aboveMedian,
+    },
   };
 }
 

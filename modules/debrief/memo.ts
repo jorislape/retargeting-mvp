@@ -3,6 +3,8 @@ import {
   buildDecision,
   isOutcomeVolumeBelowFloor,
   isScaleActionSupported,
+  isProxyOutcomeConflict,
+  isCutActionSupported,
   MIN_OUTCOMES_FOR_SUPPORTED,
   SCALE_TEST_MIN_DELTA_PCT,
   SHORT_WINDOW_DAYS,
@@ -628,8 +630,19 @@ function buildNextTests(
   const gateSetupLabel = `${gateLabel} (${spendGateSource(analysis, (v) => fmtMoney(v, currency)).short})`;
   const tests: MemoTest[] = [];
 
-  const top = winners[0] ?? null;
-  const worst = losers[0] ?? null; // losers arrive sorted worst-first
+  /* First-Run Robustness 3a: in a proxy run (CTR/CPC/Purchases/Leads)
+     with an outcome column, never build a test on an ad that's below
+     median on the outcome KPI, nor "rebuild" an ad that's above it. The
+     first test then moves to the outcome leader (see T1 below); the
+     rebuild test is dropped rather than retargeted — its copy calls the
+     ad "the account's weakest judged ad", which only losers[0] is. */
+  const outcome = analysis.proxyKpi?.outcome ?? null;
+  const proxyConflict = isProxyOutcomeConflict(analysis);
+  const top = proxyConflict ? null : winners[0] ?? null;
+  const worstCandidate = losers[0] ?? null; // losers arrive sorted worst-first
+  const worst =
+    worstCandidate && outcome && outcome.aboveMedian.includes(worstCandidate.name) ? null : worstCandidate;
+  const skipRebuild = worstCandidate != null && worst == null;
   const winnerTag = dominantTag(winners);
 
   /* Evidence Sufficiency V1 — Brief Readiness. Computed once (per test
@@ -786,7 +799,47 @@ function buildNextTests(
         : "Based on your own performance data — no market notes were provided.";
 
   /* T1 — iterate the proven winner (creative). */
-  if (top) {
+  const outcomeLeader =
+    proxyConflict && outcome?.leader
+      ? analysis.rankedAds.find((a) => a.name === outcome.leader!.name) ?? null
+      : null;
+  if (proxyConflict && outcome && outcome.leader && outcomeLeader) {
+    /* 3a: the proxy leaders sit below median on results — build the
+       first test on the OUTCOME leader instead, and say why. No brief
+       readiness: its volume/lead read was measured on the proxy. */
+    const L = outcome.leader;
+    const signals = sig(
+      `"${L.name}" leads on ${outcome.label} at ${L.valueLabel}; the ${outcome.label} median is ${outcome.medianLabel}.`,
+      `On ${kpiLabel}, the leading ads sit below the median on ${outcome.label}.`,
+      gateSignal
+    );
+    const outcomeMetric = `${outcome.label} ${outcome.kpi === "roas" ? "above" : "below"} ${outcome.medianLabel} once the ~${gateLabel} minimum spend is reached.`;
+    tests.push({
+      test: `Brief 2 new variants of "${L.name}" — the leader on ${outcome.label} — varying only the opening.`,
+      why: `On ${kpiLabel}, the leading ads sit below the median on ${outcome.label} (${outcome.medianLabel}), so a test built on them would chase ${kpiLabel} rather than results. "${L.name}" leads on ${outcome.label} at ${L.valueLabel} — one way to test whether that angle has more headroom: vary only the opening. ${openingEvidence}`,
+      setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the opening 3 seconds / first frame between variants.`,
+      winningLooksLike: `At least one variant beats ${outcome.medianLabel} ${outcome.label} within 7 days — read it on ${outcome.label}, not ${kpiLabel}.`,
+      signals,
+      hypothesis: `If we change only the opening while holding "${L.name}"'s angle, ${offerLabel}, and audience constant, we want to test whether at least one variant beats ${outcome.medianLabel} ${outcome.label} — because "${L.name}" leads this export on ${outcome.label} at ${L.valueLabel}.`,
+      brief: {
+        title: `Opening variants of "${L.name}"`,
+        objective: `Learn whether the leading ${outcome.label} angle has more headroom by varying only the opening.`,
+        basedOn: signals,
+        concept: `Two variants of the ${outcome.label} leader: identical angle, offer, and audience — only the opening changes.`,
+        hooks: [
+          `Cold-open on the angle's payoff moment — the outcome "${L.name}" sells, before any context.`,
+          `Question open: turn the angle's core promise for ${product} into a direct question in the first line.`,
+          "Text-led open: the angle's strongest existing line as bold on-screen text before any footage.",
+        ],
+        assetDirection: directionFor(outcomeLeader.nameTags[0]),
+        keepConstant: `The angle, ${offerLabel}, audience, and placements of "${L.name}" — the configuration it ran while it led on ${outcome.label}.`,
+        change: "Only the opening 3 seconds / first frame — nothing else.",
+        successMetric: outcomeMetric,
+        guardrails: briefGuardrails(false),
+        basisNote: basisNote(false),
+      },
+    });
+  } else if (top) {
     const format = winnerTag && top.nameTags.includes(winnerTag.tag) ? `${winnerTag.tag} ` : "";
     const founderLed =
       (market?.has("founder-led") ?? false) && !isFounderLed(top);
@@ -1051,7 +1104,7 @@ function buildNextTests(
         },
       });
     }
-  } else {
+  } else if (!skipRebuild) {
     const challenger = winnerTag
       ? FORMAT_CHALLENGERS[winnerTag.tag] ?? "a new creative format"
       : "a new creative format";
@@ -1102,9 +1155,14 @@ function buildNextTests(
      withholds (too few judged ads, or below the user's own outcome
      minimum) falls through to the creative challenger instead. */
   const scaleJustified = isScaleActionSupported(analysis, criteria);
+  /* First-Run Robustness 3c: scale + cut ⇒ the committed call is a
+     SHIFT that already moves budget into the leader — a separate "scale
+     by a single moderate step" test would be a second, conflicting
+     budget move. The slot goes to the creative challenger instead. */
+  const shiftCommitted = scaleJustified && isCutActionSupported(analysis);
   const leadPastBar =
     top != null && top.deltaPct != null && top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT;
-  if (scaleJustified) {
+  if (scaleJustified && top && !shiftCommitted) {
     const signals = sig(
       topSignal,
       `The lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`
@@ -1153,7 +1211,7 @@ function buildNextTests(
     );
     tests.push({
       test: `Test "${top.name}"'s leading angle with a bundle offer variant (market signal).`,
-      why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already leading at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't confirm competitor performance.`,
+      why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already leading at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't show how competitors' ads performed.`,
       setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateSetupLabel} until it reaches the minimum spend.`,
       winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
       signals,
@@ -1195,7 +1253,9 @@ function buildNextTests(
     );
     tests.push({
       test: `Test ${challenger} against your ${winnerTag ? `${winnerTag.tag} ads` : "current best ad"} as the control.`,
-      why: leadPastBar
+      why: shiftCommitted
+        ? `The shift above is this debrief's one budget move — it already moves budget into "${top!.name}". Alongside it, a structured challenger against it as the control builds the next comparison; launch it once the shift has ~${gateLabel} of fresh spend.`
+        : leadPastBar
         ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar, but this debrief doesn't commit a budget move yet (see Next move) — a structured challenger builds comparison data while that evidence firms up.`
         : winnerTag
           ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive — a structured challenger shows whether the format or the message is doing the work.`
@@ -1203,7 +1263,7 @@ function buildNextTests(
       setup: `Launch the challenger at ~${gateSetupLabel} alongside the control, same audience and offer, until both reach the minimum spend.`,
       winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
       signals,
-      hypothesis: `If we launch ${challenger} at matched budget alongside the current control while holding audience and offer constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because ${leadPastBar ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar but this debrief isn't committing a budget move on it yet, so a structured challenger builds comparison data while that evidence firms up` : winnerTag ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive enough to say the format itself is the reason` : "no format is clearly winning yet, so a controlled comparison is the fastest way to a real pattern"}.`,
+      hypothesis: `If we launch ${challenger} at matched budget alongside the current control while holding audience and offer constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because ${shiftCommitted ? `the shift above is already the budget move, so the next signal has to come from a controlled creative comparison` : leadPastBar ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar but this debrief isn't committing a budget move on it yet, so a structured challenger builds comparison data while that evidence firms up` : winnerTag ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive enough to say the format itself is the reason` : "no format is clearly winning yet, so a controlled comparison is the fastest way to a real pattern"}.`,
       brief: {
         title: `Format challenger: ${challenger}`,
         objective:
@@ -1667,10 +1727,10 @@ function buildSpendAllocation(analysis: AnalysisResult): MemoSpendAllocation | n
   let headlineBuyer: string;
   let headlineClient: string;
   if (belowBenchmarkCount > 0) {
-    headlineBuyer = `${roundPct(belowShare)}% of judged spend sits behind below-benchmark ads.`;
+    headlineBuyer = `${roundPct(belowShare)}% of judged spend sits behind below-median ads.`;
     headlineClient = `${roundPct(belowShare)}% of this period's working budget went to ads below the middle ad.`;
   } else if (aboveBenchmarkCount > 0) {
-    headlineBuyer = `${roundPct(aboveShare)}% of judged spend sits behind above-benchmark ads.`;
+    headlineBuyer = `${roundPct(aboveShare)}% of judged spend sits behind above-median ads.`;
     headlineClient = `${roundPct(aboveShare)}% of this period's working budget went to ads beating the middle ad.`;
   } else {
     headlineBuyer = "All judged spend sits at the median this period.";

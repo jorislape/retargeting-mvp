@@ -518,7 +518,20 @@ export interface AnalysisResult {
    *  export can also compute (ROAS, CPA — CPA reads as cost per lead
    *  when only lead columns exist). Non-empty ⇒ no budget move on the
    *  proxy (decision.ts); empty ⇒ the move stands with a proxy caveat. */
-  proxyKpi?: { outcomeKpis: { kpi: "roas" | "cpa"; label: string; clientLabel: string }[] };
+  proxyKpi?: {
+    outcomeKpis: { kpi: "roas" | "cpa"; label: string; clientLabel: string }[];
+    /** First-Run Robustness 3a — the preferred outcome KPI read over the
+     *  SAME judged ads: their outcome median, leader, and which ads sit
+     *  below / above it. Absent when no outcome KPI or no values. */
+    outcome?: {
+      kpi: "roas" | "cpa";
+      label: string;
+      medianLabel: string;
+      leader: { name: string; valueLabel: string } | null;
+      belowMedian: string[];
+      aboveMedian: string[];
+    };
+  };
   /** Trust Pass 2 (accountKpi.ts): the account's real result for the
    *  KPI from totals across every analyzed ad, with coverage. Display
    *  only — never read by the gate, median, ranking or decision. */
