@@ -19,6 +19,9 @@ import {
   summarizeCreativeGroups,
   toTable,
   unusedColumns,
+  checkExport,
+  MAX_FILE_BYTES,
+  MAX_DATA_ROWS,
   type CreativeFormatOverrides,
   type CreativeGroupAssignments,
   type DebriefApiError,
@@ -51,15 +54,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
-const MAX_DATA_ROWS = 5000;
 /** Creative Grouping V1 — a generous but bounded cap on labels per ad,
  *  purely defensive (the UI never encourages anywhere near this many). */
 const MAX_GROUPS_PER_AD = 20;
 const KPI_VALUES: KpiKey[] = ["roas", "cpa", "ctr", "cpc", "leads", "purchases"];
-/** Cap the headers echoed back in errors — enough to debug any real
- *  Ads Manager export without ballooning the response. */
-const MAX_ECHOED_COLUMNS = 40;
 
 function ok(body: unknown) {
   return NextResponse.json(body, {
@@ -147,6 +145,14 @@ async function parsePreviousPeriod(
         matrix.length === 0
           ? "Try exporting again from Meta Ads Manager as CSV, not XLSX."
           : "Export a shorter date range, or run the comparison without it.",
+    });
+  }
+  /* First-Run Robustness: one column = an unrecognised separator. */
+  if ((matrix[0]?.length ?? 0) <= 1) {
+    return bad({
+      title: "Previous period: only one column found",
+      message: "The previous-period file looks like a semicolon/regional CSV using a separator Debrief couldn't recognise.",
+      fix: "Re-export it from Meta Ads Manager as CSV (comma-, semicolon- or tab-separated).",
     });
   }
   const { headers, rows } = toTable(matrix);
@@ -445,95 +451,15 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  /* Binary sniff: control characters in the first chunk mean this is
-     an XLSX/zip/binary file, not a CSV — say so before the parser
-     produces garbage headers. */
-  if (/[\u0000-\u0008\u000E-\u001F]/.test(text.slice(0, 2000))) {
-    return fail(400, {
-      title: "CSV could not be read",
-      message: "Debrief could not read this file as a standard CSV.",
-      fix: "Try exporting again from Meta Ads Manager as CSV, not XLSX.",
-    });
-  }
-
-  const matrix = parseCsv(text);
-  if (matrix.length === 0) {
-    return fail(400, {
-      title: "CSV could not be read",
-      message: "Debrief could not read this file as a standard CSV.",
-      fix: "Try exporting again from Meta Ads Manager as CSV, not XLSX.",
-    });
-  }
-  if (matrix.length - 1 > MAX_DATA_ROWS) {
-    return fail(400, {
-      title: "Too many rows",
-      message: `This CSV has more than ${MAX_DATA_ROWS.toLocaleString()} ad rows.`,
-      fix: "Export a shorter date range, or split the export and run it in parts.",
-    });
-  }
-
-  const { headers, rows } = toTable(matrix);
-  if (headers.length === 0) {
-    return fail(400, {
-      title: "CSV could not be read",
-      message: "Debrief couldn't find a header row in this file.",
-      fix: "Try exporting again from Meta Ads Manager as CSV, not XLSX.",
-    });
-  }
-  const detectedColumns = headers.slice(0, MAX_ECHOED_COLUMNS);
-
-  if (rows.length === 0) {
-    return fail(400, {
-      title: "No ad rows found",
-      message: "The CSV appears to have headers but no ad rows.",
-      fix: EXPORT_AT_AD_LEVEL,
-      detectedColumns,
-    });
-  }
-
-  const columns = resolveColumns(headers);
-
-  /* Ad name is what makes the debrief readable (and what pattern hints
-     key off) — a CSV without it is almost always a campaign- or
-     adset-level export, so guide the user there instead of running
-     with generic labels. */
-  if (!columns.adName) {
-    return fail(400, {
-      title: "Ad name column not found",
-      message: "I couldn't find an Ad name / Creative name column.",
-      fix: "Export at ad level and include Ad name.",
-      detectedColumns,
-    });
-  }
-
-  const missing = requiredColumnsFor(context.kpi, columns);
-  if (missing.length > 0) {
-    if (missing.includes("Amount spent")) {
-      return fail(400, {
-        title: "Spend column not found",
-        message: "I couldn't find an Amount Spent / Spend column in this CSV.",
-        fix: "Export from Meta Ads Manager with Amount spent included, or rename your spend column to Amount spent.",
-        detectedColumns,
-      });
-    }
-    /* Spend exists but the selected KPI's column doesn't — say which
-       KPIs WOULD work with this exact file. */
-    const kpiLabel = KPI_LABELS[context.kpi];
-    const suggestedKpis = KPI_VALUES.filter(
-      (k) => k !== context.kpi && requiredColumnsFor(k, columns).length === 0
-    );
-    const suggestionText =
-      suggestedKpis.length > 0
-        ? ` Debrief did find columns for ${suggestedKpis.map((k) => KPI_LABELS[k]).join(", ")} — switching the KPI would work with this file.`
-        : "";
-    return fail(400, {
-      title: `${kpiLabel} column not found`,
-      message: `You selected ${kpiLabel}, but this CSV does not include a ${kpiLabel}-like column (looked for: ${missing.join(", ")}).`,
-      fix: `Include ${missing.join(", ")} in your Meta export, or switch the KPI.${suggestionText}`,
-      detectedColumns,
-      suggestedKpis,
-    });
-  }
+  /* First-Run Robustness: one shared validation path (fileCheck.ts) —
+     the same checks, in the same order, with the same copy the file
+     card runs on drop: binary/XLSX, empty, a single column (unrecognised
+     separator), too many rows, no header/rows, no Ad name, no spend, no
+     column for the selected KPI (with switch suggestions). Semicolon/tab
+     separators and decimal commas are normalized while parsing. */
+  const checked = checkExport(text, context.kpi);
+  if (!checked.ok) return fail(400, checked.error);
+  const { headers, rows, columns, detectedColumns } = checked.value;
 
   /* Overrides touch only the format tags on matched ads — spend, KPI
      values, the gate, the median, and ranking read the same numbers

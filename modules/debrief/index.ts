@@ -41,3 +41,5 @@ export {
   SAMPLE_CSV_TEXT,
 } from "./sampleCsv";
 export * from "./types";
+export { checkExport, checkExportKpi, checkExportStructure, MAX_FILE_BYTES, MAX_DATA_ROWS, type ExportStructure, type CheckResult } from "./fileCheck";
+export { detectDelimiter, parseCsvDetailed, type CsvDelimiter } from "./csv";

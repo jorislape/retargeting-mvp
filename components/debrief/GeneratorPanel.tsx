@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { CompetitorSource, CreativeGroupAssignments, KpiKey } from "@/modules/debrief";
+import type { CompetitorSource, CreativeGroupAssignments, DebriefApiError, ExportStructure, KpiKey } from "@/modules/debrief";
 import {
   assessMarketNotes,
   CREATIVE_FORMAT_OPTIONS,
@@ -18,6 +18,9 @@ import {
   outcomeNounsForKpi,
   parseCsv,
   parseNumericCell,
+  checkExportKpi,
+  checkExportStructure,
+  MAX_FILE_BYTES,
   chooseAutoKpi,
   EXPORT_AT_AD_LEVEL,
   kpiSourcePreview,
@@ -573,6 +576,15 @@ export function GeneratorPanel() {
      *  one entry, whose disambiguatedName equals the raw name. */
     executionsByName: Record<string, { executionKey: string; disambiguatedName: string }[]>;
   } | null>(null);
+  /* First-Run Robustness: the shared file check (fileCheck.ts), run on
+     drop — the SAME checks and copy the API runs. Keyed to the File so a
+     stale result never shows for a newer file. `structure` is kept so
+     the KPI part re-checks instantly when the KPI changes. */
+  const [fileCheckState, setFileCheckState] = useState<{
+    forFile: File;
+    structure: ExportStructure | null;
+    error: DebriefApiError | null;
+  } | null>(null);
   /* "Review creative formats" list expansion past the first 25 ads —
      keyed to the File object so a new file starts collapsed without an
      effect-driven reset. */
@@ -598,12 +610,18 @@ export function GeneratorPanel() {
   };
 
   useEffect(() => {
-    if (!file || file.size > 5 * 1024 * 1024) return;
+    if (!file) return;
     let cancelled = false;
-    file
-      .text()
+    /* An oversized file is never read — the size check fails first. */
+    (file.size > MAX_FILE_BYTES ? Promise.resolve("") : file.text())
       .then((text) => {
         if (cancelled) return;
+        const checked = checkExportStructure(text, file.size);
+        if (!checked.ok) {
+          setFileCheckState({ forFile: file, structure: null, error: checked.error });
+          return;
+        }
+        setFileCheckState({ forFile: file, structure: checked.value, error: null });
         const matrix = parseCsv(text);
         const headers = matrix[0] ?? [];
         const columns = resolveColumns(headers);
@@ -710,8 +728,16 @@ export function GeneratorPanel() {
         }
       })
       .catch(() => {
-        /* Unreadable here just means no preview — the API gives the
-           real, structured error on run. */
+        if (cancelled) return;
+        setFileCheckState({
+          forFile: file,
+          structure: null,
+          error: {
+            title: "CSV could not be read",
+            message: "Debrief could not read this file as a standard CSV.",
+            fix: "Try exporting again from Meta Ads Manager as CSV, not XLSX.",
+          },
+        });
       });
     return () => {
       cancelled = true;
@@ -1096,7 +1122,17 @@ export function GeneratorPanel() {
   /* First-Run Fixes: Product / industry is optional — it only labels the
      report, and the engine already falls back to "Your account". */
   const contextDone = fields.product.trim() !== "";
-  const canSubmit = !!file;
+  /* First-Run Robustness: Generate only once the file has passed the
+     shared check for the selected KPI — never for an unusable file. */
+  const fileCheck = file && fileCheckState?.forFile === file ? fileCheckState : null;
+  const fileError: DebriefApiError | null = fileCheck
+    ? fileCheck.error ??
+      (fileCheck.structure
+        ? ((r) => (r.ok ? null : r.error))(checkExportKpi(fileCheck.structure, fields.kpi))
+        : null)
+    : null;
+  const fileUsable = fileCheck != null && fileError == null;
+  const canSubmit = !!file && fileUsable;
   // Verify's own "done" reflects BOTH optional inputs it hosts — format
   // corrections and Creative Groups — not just whichever was added
   // first. A user who only assigned groups previously saw "Optional
@@ -1218,9 +1254,9 @@ export function GeneratorPanel() {
           <StageHeader
             n="1"
             title="Start here"
-            done={!!file}
-            status={file ? "Complete" : "Required"}
-            statusTone={file ? "accent" : "muted"}
+            done={fileUsable}
+            status={!file ? "Required" : fileUsable ? "Complete" : fileError ? "Needs attention" : "Checking…"}
+            statusTone={fileUsable ? "accent" : "muted"}
             hint="Connect Meta, upload a CSV, or try the sample — pick one to begin."
           />
 
@@ -1371,8 +1407,8 @@ export function GeneratorPanel() {
                 <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-zinc-100">
                   {file.name}
                 </p>
-                <span className="font-mono text-[11px] text-zinc-400">
-                  {fmtBytes(file.size)} · ready
+                <span className={`font-mono text-[11px] ${fileError ? "text-amber-300" : "text-zinc-400"}`}>
+                  {fmtBytes(file.size)} · {fileUsable ? "ready" : fileError ? "can't be used yet" : "checking…"}
                 </span>
                 <button
                   type="button"
@@ -1383,9 +1419,41 @@ export function GeneratorPanel() {
                   Remove
                 </button>
               </div>
+              {/* First-Run Robustness: an unusable file says why right here,
+                  with the same how-to-fix copy the API uses — and the
+                  one-click KPI switch when another KPI would work. */}
+              {fileError && (
+                <div role="alert" className="mt-3 rounded-md border border-amber-300/30 bg-amber-300/[0.06] px-3 py-2.5">
+                  <p className="text-[13px] font-semibold text-amber-200">{fileError.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-300">{fileError.message}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-300">
+                    <span className="font-semibold text-zinc-100">How to fix: </span>
+                    {fileError.fix}
+                  </p>
+                  {fileError.suggestedKpis && fileError.suggestedKpis.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {fileError.suggestedKpis.map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => chooseKpiManually(k)}
+                          className={`cursor-pointer ${btnSecondary}`}
+                        >
+                          Switch to {KPI_LABELS[k]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {fileError.detectedColumns && fileError.detectedColumns.length > 0 && (
+                    <p className="mt-2 break-words font-mono text-[11px] leading-relaxed text-zinc-400">
+                      Columns detected: {fileError.detectedColumns.join(" · ")}
+                    </p>
+                  )}
+                </div>
+              )}
               {/* Lightweight structural preview — catches a missing-KPI
                   column BEFORE the run instead of after it. */}
-              {preview && (
+              {preview && !fileError && (
                 <>
                 <p
                   aria-live="polite"
@@ -3204,7 +3272,7 @@ export function GeneratorPanel() {
                     <span className="font-mono text-zinc-200">{file.name}</span>
                     {" · "}
                     {KPI_OPTIONS.find((o) => o.value === fields.kpi)?.label}
-                    {" · ready"}
+                    {fileUsable ? " · ready" : fileError ? " · fix the file in stage 1 first" : " · checking…"}
                   </>
                 ) : (
                   "Load data in stage 1 to run."

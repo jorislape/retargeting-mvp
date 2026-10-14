@@ -277,7 +277,7 @@ try {
 /* ===================== 3. UI wiring (source scans) ===================== */
 {
   const gen = readFileSync(join(ROOT, "components/debrief/GeneratorPanel.tsx"), "utf8");
-  assert.match(gen, /const canSubmit = !!file;/, "Generate needs data only — product is optional");
+  assert.match(gen, /const canSubmit = !!file && fileUsable;/, "Generate needs a usable file only — product is optional (First-Run Robustness: the file must pass the shared check)");
   assert.ok(!gen.includes("Product / industry *"), "no required marker on Product / industry");
   assert.match(gen, /\(optional\)/);
 
