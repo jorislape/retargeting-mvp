@@ -863,10 +863,15 @@ function AdTable({
                 {view !== "client" && ad.fatigueNote && (
                   <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">{ad.fatigueNote}</p>
                 )}
-                {/* Attribution & Intent 3 — display only. */}
+                {/* Attribution & Intent 3 + 4 — display only. */}
                 {ad.viewThroughNote && (
                   <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
                     {view === "client" ? ad.viewThroughNote.client : ad.viewThroughNote.buyer}
+                  </p>
+                )}
+                {ad.lowIntentNote && (
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
+                    {view === "client" ? ad.lowIntentNote.client : ad.lowIntentNote.buyer}
                   </p>
                 )}
               </td>
@@ -950,6 +955,9 @@ function ClientAdList({
               {ad.viewThroughNote && (
                 <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">{ad.viewThroughNote.client}</p>
               )}
+              {ad.lowIntentNote && (
+                <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">{ad.lowIntentNote.client}</p>
+              )}
             </div>
             <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">
               {ad.valueLabel}
@@ -1020,6 +1028,11 @@ function AtMedianRows({
               {ad.viewThroughNote && (
                 <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
                   {client ? ad.viewThroughNote.client : ad.viewThroughNote.buyer}
+                </p>
+              )}
+              {ad.lowIntentNote && (
+                <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
+                  {client ? ad.lowIntentNote.client : ad.lowIntentNote.buyer}
                 </p>
               )}
             </div>

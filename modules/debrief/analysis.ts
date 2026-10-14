@@ -1,6 +1,7 @@
 import { ColumnMap, attributionFieldsFor, attributionSplitHeaders, clickBasisFor, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import { detectSegmentSpread } from "./segmentSpread";
+import { detectLowIntent } from "./intentFlags";
 import { computeAccountKpi } from "./accountKpi";
 import { fmtKpiValue } from "./format";
 import { extractAds } from "./extract";
@@ -217,6 +218,9 @@ export function analyze(
      already use — no new decision logic, just the mirrored sum. */
   const atPool = ranked.filter((a) => a.deltaFromMedian === 0);
 
+  /* Attribution & Intent 4 — display-only, from the ranked ads. */
+  const lowIntent = detectLowIntent(ranked);
+
   /* Mixed Segment Warning — computed AFTER ranking from the ranked ads,
      and only ever attached as a fact for one limits line. */
   const spread = detectSegmentSpread(ranked, kpi, {
@@ -294,6 +298,7 @@ export function analyze(
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
     ...(attributionColumns.length > 0 ? { attributionColumns } : {}),
+    ...(lowIntent ? { lowIntent } : {}),
     /* Attribution & Intent 2: ranked on click-only (absent ⇒ blended). */
     ...((): { attributionBasis?: NonNullable<AnalysisResult["attributionBasis"]> } => {
       const click = clickBasisFor(kpi, columns);

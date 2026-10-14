@@ -454,8 +454,8 @@ export function memoToText(
     const buyer = view !== "client";
     const freq = buyer && r.frequencyLabel ? ` | ${r.frequencyLabel}` : "";
     const notes = buyer
-      ? [r.fewOutcomesNote, r.fatigueNote, r.viewThroughNote?.buyer].filter(Boolean).map((n) => ` ${n}`).join("")
-      : r.viewThroughNote ? ` ${r.viewThroughNote.client}` : "";
+      ? [r.fewOutcomesNote, r.fatigueNote, r.viewThroughNote?.buyer, r.lowIntentNote?.buyer].filter(Boolean).map((n) => ` ${n}`).join("")
+      : [r.viewThroughNote?.client, r.lowIntentNote?.client].filter(Boolean).map((n) => ` ${n}`).join("");
     const target = r.vsTarget
       ? ` | ${r.vsTarget === "beats" ? (buyer ? "✓ beats target" : "✓ beats your target") : buyer ? "✗ misses target" : "✗ below your target"}`
       : "";

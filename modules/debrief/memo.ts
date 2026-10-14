@@ -167,6 +167,7 @@ function buildRow(
       ...frequencyFieldsFor(ad),
       ...vsTargetFor(ad, analysis, context),
       ...viewThroughNoteFor(ad, analysis),
+      ...lowIntentNoteFor(ad, analysis),
     };
   }
   return {
@@ -181,6 +182,7 @@ function buildRow(
     ...frequencyFieldsFor(ad),
     ...vsTargetFor(ad, analysis, context),
     ...viewThroughNoteFor(ad, analysis),
+    ...lowIntentNoteFor(ad, analysis),
   };
 }
 
@@ -203,6 +205,16 @@ function viewThroughNoteFor(ad: RankedAd, analysis: AnalysisResult): { viewThrou
     viewThroughNote: {
       buyer: `${pctLabel} of conversions are view-through — likely passive credit (retargeting/branded demand).`,
       client: `${pctLabel} of this ad's ${many} came from people who saw it without clicking — some of that credit may be for ${many} that would have happened anyway.`,
+    },
+  };
+}
+
+function lowIntentNoteFor(ad: RankedAd, analysis: AnalysisResult): { lowIntentNote?: { buyer: string; client: string } } {
+  if (!analysis.lowIntent?.includes(ad.name)) return {};
+  return {
+    lowIntentNote: {
+      buyer: "Stops the scroll but doesn't drive clicks — high engagement, low purchase intent.",
+      client: "Grabs attention, but few viewers go on to click through — interest isn't turning into buying intent yet.",
     },
   };
 }

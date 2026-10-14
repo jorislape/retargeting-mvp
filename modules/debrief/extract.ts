@@ -203,6 +203,10 @@ function upstreamFieldsForRow(row: Record<string, string>, columns: ColumnMap) {
     reach: columns.reach ? parseNumericCell(row[columns.reach]) : null,
     /* Mixed Segment Warning: structure names, display-only (blank → null). */
     adSetName: columns.adSetName ? row[columns.adSetName]?.trim() || null : null,
+    /* Attribution & Intent 4: engagement → intent signals, display-only. */
+    videoPlays3s: columns.videoPlays3s ? parseNumericCell(row[columns.videoPlays3s]) : null,
+    thruPlays: columns.thruPlays ? parseNumericCell(row[columns.thruPlays]) : null,
+    outboundClicks: columns.outboundClicks ? parseNumericCell(row[columns.outboundClicks]) : null,
     campaignName: columns.campaignName ? row[columns.campaignName]?.trim() || null : null,
   };
 }

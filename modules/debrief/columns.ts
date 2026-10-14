@@ -128,6 +128,9 @@ const ALIASES = {
   /* Mixed Segment Warning: structural names, display-only — used only
      to group judged ads for the mixed-segment limits line; never read
      by gate, median, ranking or action. */
+  /* Attribution & Intent 4: outbound clicks (Low Intent flag's outbound
+     CTR) — display-only; never "Cost per outbound click". */
+  outboundClicks: ["outbound clicks"],
   adSetName: ["ad set name"],
   campaignName: ["campaign name"],
 } as const;
@@ -296,6 +299,8 @@ export interface ColumnMap {
   frequency: string | null;
   reach: string | null;
   /** Mixed Segment Warning — optional, display-only structure columns. */
+  /** Attribution & Intent 4 — optional, display-only. */
+  outboundClicks: string | null;
   adSetName: string | null;
   campaignName: string | null;
   /** 3-letter currency code pulled from the spend header, if present. */
@@ -344,6 +349,7 @@ export function resolveColumns(allHeaders: string[]): ColumnMap {
     cpm: findHeader(headers, ALIASES.cpm),
     ...hookMetricHeaders(headers),
     ...deliveryHeaders(headers),
+    outboundClicks: findHeader(headers.filter((h) => !/cost per/i.test(h)), ALIASES.outboundClicks),
     adSetName: findHeader(headers, ALIASES.adSetName),
     campaignName: findHeader(headers, ALIASES.campaignName),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,

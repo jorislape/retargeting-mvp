@@ -399,6 +399,11 @@ export interface ParsedAd {
   /** Attribution & Intent 3 — click vs view-through conversion counts
    *  (see extract.ts viewThroughForRow). Display-only. */
   viewThrough?: { click: number; view: number };
+  /** Attribution & Intent 4 — read verbatim, display-only (Low Intent
+   *  flag in intentFlags.ts). null when the column is absent/blank. */
+  videoPlays3s?: number | null;
+  thruPlays?: number | null;
+  outboundClicks?: number | null;
 }
 
 /** zero_outcome_thin (Tester Feedback follow-up): a zero-conversion CPA
@@ -520,6 +525,9 @@ export interface AnalysisResult {
    *  value, conversion count, the outcome floor and the zero rule then
    *  read those columns; view-through is excluded. */
   attributionBasis?: { windowLabel: "7-day click" | "1-day click"; headers: string[] };
+  /** Attribution & Intent 4 — judged ads flagged Low Intent. Present only
+   *  when ≥ MIN_ADS_FOR_INTENT judged ads have the needed columns. */
+  lowIntent?: string[];
   /** Tester Feedback Fix 5: present ONLY when the KPI is CPA (incl.
    *  lead-based) and no target CPA was given — the ranking is then
    *  relative to this account, not to profitability. roasAvailable:
@@ -649,6 +657,10 @@ export interface MemoWinnerLoserRow {
    *  share of conversions is above VIEW_THROUGH_FLAG_SHARE: buyer and
    *  client wording. Display only — never changes the action. */
   viewThroughNote?: { buyer: string; client: string };
+  /** Attribution & Intent 4 — present only for an ad flagged Low Intent
+   *  (top-quartile hook rate, bottom-quartile outbound CTR or hold rate).
+   *  Display only — never changes the action. */
+  lowIntentNote?: { buyer: string; client: string };
   /** Tester Feedback Fix 6 — BUYER register only: "Frequency 1.9",
    *  present when the export has a Frequency column and the row has no
    *  fatigueNote (which carries the number itself). Display only. */
