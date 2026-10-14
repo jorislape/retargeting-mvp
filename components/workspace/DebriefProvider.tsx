@@ -83,6 +83,10 @@ export interface GeneratorFields {
      Empty = Debrief defaults. */
   spendGateOverride: string;
   minOutcomeCount: string;
+  /** First-Run Robustness 2 — the user's own minimum purchases/leads
+   *  before an ad is judged (set beside the KPI picker; hidden for
+   *  CTR/CPC). Empty = today's behaviour exactly; never sent then. */
+  minJudgeOutcomes: string;
   /* Evidence Sufficiency V1 — Brief Readiness's own two criteria.
      Separate from minOutcomeCount above (a different question — is an
      observed win/loss worth briefing creative against, not whether
@@ -118,6 +122,7 @@ const DEFAULT_FIELDS: GeneratorFields = {
   objective: "",
   spendGateOverride: "",
   minOutcomeCount: "",
+  minJudgeOutcomes: "",
   minBriefOutcomeCount: "",
   minLossSpendMultiple: "",
 };
@@ -414,6 +419,11 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     // Decision Criteria V2: same contract — sent only when set.
     if (fields.spendGateOverride.trim() !== "") {
       body.append("spendGateOverride", fields.spendGateOverride);
+    }
+    /* Only for outcome KPIs — a value typed while ROAS was selected is
+       never sent once the KPI is CTR/CPC. */
+    if (fields.minJudgeOutcomes.trim() !== "" && kpi !== "ctr" && kpi !== "cpc") {
+      body.append("minJudgeOutcomes", fields.minJudgeOutcomes);
     }
     if (fields.minOutcomeCount.trim() !== "") {
       body.append("minOutcomeCount", fields.minOutcomeCount);

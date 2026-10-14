@@ -20,7 +20,7 @@ import {
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
-import { CLIENT_BRIEF_LEGEND, clientDataUsedSentence, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { CLIENT_BRIEF_LEGEND, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
@@ -2261,13 +2261,7 @@ export function Report({
           )}
           <p className="mt-4 text-xs leading-relaxed text-zinc-400">
             {client
-              ? memo.scope.setAsideBreakdown
-                ? /* First-Run Fixes: split by cause when some ads have
-                     no KPI figure at all — never "not enough spend" for those. */
-                  `${memo.scope.setAsideBreakdown.spend > 0 ? `${memo.scope.setAsideBreakdown.spend} ad${memo.scope.setAsideBreakdown.spend === 1 ? " did" : "s did"} not have enough spend to compare fairly; ` : ""}${memo.scope.setAsideBreakdown.noValue} had no ${viewKpiLabel} figure in the file — set aside rather than counted against.`
-                : memo.scope.adsSetAside > 0
-                  ? `${memo.scope.adsSetAside} ad${memo.scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
-                  : "Every ad had enough spend to compare fairly."
+              ? clientSetAsideLine(memo.scope, viewKpiLabel)
               : memo.losers.setAsideNote}
           </p>
         </section>

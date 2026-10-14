@@ -1750,6 +1750,40 @@ export function GeneratorPanel() {
             </div>
           </fieldset>
 
+          {/* First-Run Robustness 2 — the conversion floor depends on the
+              account (practitioners named 10, 30, 100+), so it sits next
+              to the KPI, not buried in Refine. Outcome KPIs only; empty
+              keeps today's behaviour exactly. */}
+          {(() => {
+            const nouns =
+              fields.kpi === "cpa" && cplInPreview ? { one: "lead", many: "leads" } : outcomeNounsForKpi(fields.kpi);
+            if (nouns == null) return null;
+            return (
+              <div className="mt-4 max-w-sm">
+                <label htmlFor="minJudgeOutcomes" className={fieldLabel}>
+                  Minimum {nouns.many} before an ad is judged
+                  <span className="ml-1 font-normal text-zinc-400">(optional)</span>
+                </label>
+                <input
+                  id="minJudgeOutcomes"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  value={fields.minJudgeOutcomes}
+                  onChange={(e) => updateFields({ minJudgeOutcomes: e.target.value })}
+                  placeholder="e.g. 10"
+                  className={`mt-1.5 ${inputBase}`}
+                />
+                <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                  Ads with fewer {nouns.many} are set aside — named in the
+                  report, never counted as winners or losers. Leave empty to
+                  judge by spend only.
+                </p>
+              </div>
+            );
+          })()}
+
           {/* Input Honesty V1: one compact, always-visible statement of
               what actually drives the analysis vs. what's report
               context only — set once here rather than repeated per

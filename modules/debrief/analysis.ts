@@ -13,6 +13,7 @@ import {
   KpiKey,
   ParsedAd,
   RankedAd,
+  outcomeNounsFor,
 } from "./types";
 
 /** Absolute minimum spend to trust an ad's numbers when no target CPA
@@ -151,7 +152,25 @@ export function analyze(
     targetCpa,
     context.spendGateOverride
   );
-  const firstPass = gateAds(ads, spendGate);
+  /* First-Run Robustness 2: the user's own outcome minimum, applied
+     right after the spend gate and BEFORE the median — a set-aside ad
+     never shapes the benchmark. Outcome KPIs only; an ad whose count
+     isn't in the export is never treated as zero (judged, disclosed).
+     Zero-conversion CPA ads keep their own spend-based rule. */
+  const floorNouns = outcomeNounsFor({ kpi, cpaBasis });
+  const floorMin =
+    context.minJudgeOutcomes != null && context.minJudgeOutcomes > 0 && floorNouns
+      ? Math.floor(context.minJudgeOutcomes)
+      : null;
+  let floorUnverifiable = 0;
+  const firstPass: GatedAd[] = gateAds(ads, spendGate).map((a) => {
+    if (floorMin == null || a.gate !== "judged" || a.zeroConversions) return a;
+    if (a.conversions == null) {
+      floorUnverifiable += 1;
+      return a;
+    }
+    return a.conversions < floorMin ? { ...a, gate: "below_outcome_floor" } : a;
+  });
   /* Zero-conversion CPA ads never enter the median (Tester Feedback
      Fix 2) — it's computed from the ads that have a value. */
   const benchmark = median(
@@ -171,6 +190,7 @@ export function analyze(
       : a
   );
   const zeroThin = gated.filter((a) => a.gate === "zero_outcome_thin");
+  const floorAside = gated.filter((a) => a.gate === "below_outcome_floor");
   const judged = gated.filter((a) => a.gate === "judged");
   const kpiGaps = computeKpiGaps(gated, kpi, rawRows, columns);
 
@@ -248,6 +268,16 @@ export function analyze(
        standard export's AnalysisResult is unchanged key-for-key. */
     ...(kpiSources.length > 0 ? { kpiColumnSources: kpiSources } : {}),
     ...(kpiGaps ? { kpiGaps } : {}),
+    ...(floorMin != null && floorNouns
+      ? {
+          outcomeFloor: {
+            min: floorMin,
+            nouns: floorNouns,
+            setAside: floorAside.map((a) => ({ name: a.name, count: a.conversions as number })),
+            unverifiable: floorUnverifiable,
+          },
+        }
+      : {}),
     ...(zeroThin.length > 0
       ? {
           zeroOutcomeThin: {
@@ -328,6 +358,7 @@ function computeKpiGaps(
       a.gate === "zero_outcome_thin"
   ).length;
   const missing = noValueAds.length - zeroOutcome;
+  const belowOutcomeFloor = gated.filter((a) => a.gate === "below_outcome_floor").length;
   let suggestedKpi: KpiKey | null = null;
   let suggestedCpaBasis: "leads" | undefined;
   if (missing * 2 >= gated.length) {
@@ -340,6 +371,7 @@ function computeKpiGaps(
     noValue: noValueAds.length,
     zeroOutcome,
     belowGateWithValue,
+    ...(belowOutcomeFloor > 0 ? { belowOutcomeFloor } : {}),
     suggestedKpi,
     ...(suggestedCpaBasis ? { suggestedCpaBasis } : {}),
   };

@@ -348,6 +348,13 @@ function gapParts(gaps: KpiGaps, kpiLabel: string, kpiClient: string, outcomeMan
       client: "didn't have enough spend to include yet",
     });
   }
+  if (gaps.belowOutcomeFloor && outcomeMany) {
+    parts.push({
+      n: gaps.belowOutcomeFloor,
+      buyer: `had fewer ${outcomeMany} than your minimum`,
+      client: `had fewer ${outcomeMany} than the minimum you set`,
+    });
+  }
   const render = (register: "buyer" | "client") =>
     joinAnd(
       parts.map((p, i) =>
@@ -405,6 +412,9 @@ function kpiGapHold(
         `${gaps.belowGateWithValue}${buyerParts.length > 0 ? " more" : ""} didn't reach the ${gatePhrase}`
       );
     }
+    if (gaps.belowOutcomeFloor && outcomeMany) {
+      buyerParts.push(`${gaps.belowOutcomeFloor} had fewer ${outcomeMany} than your minimum`);
+    }
     headline = `Hold — only ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads could be judged: ${joinAnd(buyerParts)}. This call needs ${DECISION_MIN_JUDGED}.`;
   }
   if (suggest) headline += ` Try ${suggest}.`;
@@ -426,6 +436,9 @@ function kpiGapHold(
     clientParts.push(
       `${gaps.belowGateWithValue}${clientParts.length > 0 ? " more" : ""} ${gaps.belowGateWithValue === 1 ? "hasn't" : "haven't"} had enough spend to compare fairly`
     );
+  }
+  if (gaps.belowOutcomeFloor && outcomeMany) {
+    clientParts.push(`${gaps.belowOutcomeFloor} had fewer ${outcomeMany} than the minimum you set`);
   }
   let clientHeadline = `Hold — ${joinAnd(clientParts)}, so there isn't enough to compare yet.`;
   if (suggestClient) clientHeadline += ` Switching the report to ${suggestClient} would use the results this file does have.`;
@@ -571,10 +584,15 @@ export function buildLimits(
     const one = analysis.kpiGaps.noValue + analysis.kpiGaps.belowGateWithValue === 1;
     buyer.push(`${parts.buyer} — set aside, so no conclusion is drawn about ${one ? "it" : "them"} either way.`);
     client.push(`${parts.client}, so ${one ? "it's" : "they're"} not part of this read.`);
-  } else if (analysis.adsSetAside - (analysis.zeroOutcomeThin?.ads.length ?? 0) > 0) {
+  } else if (
+    analysis.adsSetAside - (analysis.zeroOutcomeThin?.ads.length ?? 0) - (analysis.outcomeFloor?.setAside.length ?? 0) >
+    0
+  ) {
     /* Zero-conversion ads under their spend bar get their own named
-       lines in buildDecision (they need the money formatter). */
-    const n = analysis.adsSetAside - (analysis.zeroOutcomeThin?.ads.length ?? 0);
+       lines in buildDecision (they need the money formatter); ads under
+       the user's outcome minimum get theirs just below. */
+    const n =
+      analysis.adsSetAside - (analysis.zeroOutcomeThin?.ads.length ?? 0) - (analysis.outcomeFloor?.setAside.length ?? 0);
     buyer.push(
       n === 1
         ? "1 ad had too little spend to judge and was set aside — no conclusion is drawn about it either way."
@@ -586,6 +604,34 @@ export function buildLimits(
         : `${n} ads didn't have enough spend to include yet, so they're not part of this read.`
     );
   }
+  /* First-Run Robustness 2: the user's own outcome minimum — every ad
+     it set aside, named; and the ads it couldn't be checked against. */
+  const floor = analysis.outcomeFloor;
+  if (floor) {
+    const noun = (n: number) => (n === 1 ? floor.nouns.one : floor.nouns.many);
+    if (floor.setAside.length > 0) {
+      buyer.push(
+        floor.setAside
+          .map((a) => `"${a.name}" set aside — ${a.count} ${noun(a.count)}, below your ${floor.min} minimum`)
+          .join("; ") + "."
+      );
+      client.push(
+        floor.setAside
+          .map((a) => `"${a.name}" isn't included yet — ${a.count} ${noun(a.count)} so far, below the ${floor.min} you set`)
+          .join("; ") + "."
+      );
+    }
+    if (floor.unverifiable > 0) {
+      const u = floor.unverifiable;
+      buyer.push(
+        `Your ${floor.min}-${floor.nouns.one} minimum couldn't be checked for ${u} ad${u === 1 ? "" : "s"} — the export has no ${floor.nouns.one} count for ${u === 1 ? "it" : "them"}, so ${u === 1 ? "it was" : "they were"} judged as usual.`
+      );
+      client.push(
+        `The minimum of ${floor.min} ${floor.nouns.many} you set couldn't be checked for ${u} ad${u === 1 ? "" : "s"}, so ${u === 1 ? "it was" : "they were"} compared as usual.`
+      );
+    }
+  }
+
   if (!analysis.hasCreativeNotes && !analysis.hasNameSignal) {
     buyer.push(
       "No creative notes or clear ad-name pattern — this is a metrics-only read, so it can't say which creative attribute is behind any difference."
@@ -1049,6 +1095,14 @@ export function buildDecision(
           : `Minimum spend to judge: ${gateLabel} per ad — Debrief default: ${spendGateSource(analysis, money).buyer}`,
       source: userGate ? "user" : "debrief_default",
     },
+    ...(analysis.outcomeFloor
+      ? [
+          {
+            label: `Minimum ${analysis.outcomeFloor.nouns.many} to judge an ad: ${analysis.outcomeFloor.min} — your criterion`,
+            source: "user" as const,
+          },
+        ]
+      : []),
     {
       label: `Minimum sample: ≥${DECISION_MIN_JUDGED} judged ads before any call — Debrief default`,
       source: "debrief_default",
@@ -1110,8 +1164,29 @@ export function buildDecision(
        judged ads" is actually the reason. */
     ...(analysis.kpiGaps && analysis.adsJudged < DECISION_MIN_JUDGED
       ? kpiGapHold(analysis, analysis.kpiGaps, gatePhrase)
-      : {}),
+      : !analysis.kpiGaps && analysis.outcomeFloor && analysis.outcomeFloor.setAside.length > 0 && analysis.adsJudged < DECISION_MIN_JUDGED
+        ? floorHold(analysis.outcomeFloor)
+        : {}),
   });
+  /* First-Run Robustness 2: when the user's outcome minimum is what
+     leaves too few ads, say so — not "too little spend". */
+  function floorHold(
+    floor: NonNullable<AnalysisResult["outcomeFloor"]>
+  ): Pick<MemoDecision, "headline" | "clientHeadline" | "reassess"> {
+    const k = floor.setAside.length;
+    const spendOnly =
+      analysis.adsSetAside - k - (analysis.zeroOutcomeThin?.ads.length ?? 0);
+    return {
+      headline: `Hold — only ${analysis.adsJudged} of ${analysis.adsAnalyzed} ads could be judged: ${k} ${k === 1 ? "has" : "have"} fewer than your ${floor.min}-${floor.nouns.one} minimum${
+        spendOnly > 0 ? `, and ${spendOnly} more didn't reach the ${gatePhrase}` : ""
+      }. This call needs ${DECISION_MIN_JUDGED}.`,
+      clientHeadline: `Hold — ${k} ad${k === 1 ? "" : "s"} ${k === 1 ? "has" : "have"} fewer ${floor.nouns.many} than the minimum you set, so there isn't enough to compare yet.`,
+      reassess: {
+        buyer: `Reassess when ≥${DECISION_MIN_JUDGED} ads have ≥${floor.min} ${floor.nouns.many} and reach the ${gatePhrase} — or lower your minimum.`,
+        client: `We'll revisit once at least ${DECISION_MIN_JUDGED} ads have ${floor.min}+ ${floor.nouns.many} each.`,
+      },
+    };
+  }
 
   /* ---- H1: too few judged ads ---- */
   if (analysis.adsJudged < DECISION_MIN_JUDGED) {

@@ -61,7 +61,10 @@ function spendSetAside(analysis: AnalysisResult): number {
      minimum spend — they're named separately (zeroThinLines), never
      counted as "below the minimum". */
   const thin = analysis.zeroOutcomeThin?.ads.length ?? 0;
-  return (analysis.kpiGaps ? analysis.kpiGaps.belowGateWithValue : analysis.adsSetAside) - thin;
+  /* Ads under the user's outcome minimum are named separately too
+     (KpiGaps already counts them in their own bucket). */
+  const floor = analysis.kpiGaps ? 0 : analysis.outcomeFloor?.setAside.length ?? 0;
+  return (analysis.kpiGaps ? analysis.kpiGaps.belowGateWithValue : analysis.adsSetAside) - thin - floor;
 }
 
 /** Tester Feedback follow-up: one buyer line per zero-conversion CPA ad
@@ -1440,6 +1443,13 @@ function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo
       `${adsSetAside} of ${adsAnalyzed} ads ${adsSetAside === 1 ? "was" : "were"} set aside for insufficient spend (below ${fmtMoney(spendGate, currency)}) — excluded from winners/losers, not penalized.`
     );
   }
+  if (analysis.outcomeFloor && analysis.outcomeFloor.setAside.length > 0) {
+    const f = analysis.outcomeFloor;
+    const k = f.setAside.length;
+    notes.push(
+      `${k} of ${adsAnalyzed} ads ${k === 1 ? "was" : "were"} set aside by your minimum of ${f.min} ${f.nouns.many} — excluded from winners/losers, not penalized.`
+    );
+  }
   if (analysis.kpiGaps) {
     const { noValue } = analysis.kpiGaps;
     notes.push(
@@ -1789,6 +1799,15 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
             },
           }
         : {}),
+      ...(analysis.outcomeFloor && analysis.outcomeFloor.setAside.length > 0
+        ? {
+            outcomeFloorAside: {
+              count: analysis.outcomeFloor.setAside.length,
+              many: analysis.outcomeFloor.nouns.many,
+              min: analysis.outcomeFloor.min,
+            },
+          }
+        : {}),
       totalSpendLabel: fmtMoney(analysis.totalSpend, currency),
       medianLabel: median != null ? fmtKpiValue(median, kpi, currency) : "Not enough data",
     },
@@ -1824,13 +1843,21 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
         const spendLine =
           spendCount > 0
             ? `${spendCount} ad${spendCount === 1 ? "" : "s"} had too little spend (below ${fmtMoney(analysis.spendGate, currency)}) to judge fairly — set aside, not penalized.`
-            : thinLines.length > 0
+            : thinLines.length > 0 || (analysis.outcomeFloor?.setAside.length ?? 0) > 0
               ? ""
               : "No ads were set aside for low spend.";
         const base = analysis.kpiGaps
           ? `${spendLine} ${analysis.kpiGaps.noValue} had no ${kpiLabelFor(analysis)} value — also set aside, not penalized.`
           : spendLine;
-        return [base, ...thinLines].filter((s) => s.trim() !== "").join(" ").trim();
+        /* First-Run Robustness 2: each ad under the user's outcome minimum. */
+        const floor = analysis.outcomeFloor;
+        const floorLines = floor
+          ? floor.setAside.map(
+              (a) =>
+                `"${a.name}" set aside — ${a.count} ${a.count === 1 ? floor.nouns.one : floor.nouns.many}, below your ${floor.min} minimum.`
+            )
+          : [];
+        return [base, ...thinLines, ...floorLines].filter((s) => s.trim() !== "").join(" ").trim();
       })(),
     },
     patterns: buildPatterns(analysis),

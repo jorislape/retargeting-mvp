@@ -54,6 +54,32 @@ export function clientizeText(text: string): string {
     .replace(/\bjudged ad\b/g, "ad with enough spend to judge fairly");
 }
 
+/** The client set-aside line under the underperformers list — shared
+ *  by the report and TXT (First-Run Robustness 2). Without a KPI gap or
+ *  an outcome minimum it is word-for-word the line it always was. */
+export function clientSetAsideLine(scope: Memo["scope"], kpiLabel: string): string {
+  const f = scope.outcomeFloorAside;
+  const floorPart = (first: boolean) =>
+    f ? `${f.count}${first ? ` ad${f.count === 1 ? "" : "s"}` : ""} ${f.count === 1 ? "has" : "have"} fewer ${f.many} than the ${f.min} you set` : "";
+  const b = scope.setAsideBreakdown;
+  if (b) {
+    const parts = [
+      ...(b.spend > 0 ? [`${b.spend} ad${b.spend === 1 ? " did" : "s did"} not have enough spend to compare fairly`] : []),
+      `${b.noValue} had no ${kpiLabel} figure in the file`,
+      ...(f ? [floorPart(false)] : []),
+    ];
+    return `${parts.join("; ")} — set aside rather than counted against.`;
+  }
+  const spendN = scope.adsSetAside - (f?.count ?? 0);
+  const parts = [
+    ...(spendN > 0 ? [`${spendN} ad${spendN === 1 ? " did" : "s did"} not have enough spend to judge fairly`] : []),
+    ...(f ? [floorPart(spendN <= 0)] : []),
+  ];
+  return parts.length > 0
+    ? `${parts.join("; ")} — set aside rather than counted against.`
+    : "Every ad had enough spend to compare fairly.";
+}
+
 /** Tester Feedback follow-up — the client register's "data used"
  *  sentence, shared by the report and TXT so they can't drift; never
  *  says "judged", and singular/plural agree ("1 ad … it isn't"). */
@@ -494,9 +520,7 @@ export function memoToText(
   pushRows(memo.losers.rows);
   lines.push(
     view === "client"
-      ? scope.adsSetAside > 0
-        ? `${scope.adsSetAside} ad${scope.adsSetAside === 1 ? " did" : "s did"} not have enough spend to judge fairly — set aside rather than counted against.`
-        : "Every ad had enough spend to compare fairly."
+      ? clientSetAsideLine(scope, scope.kpiLabelClient ?? scope.kpiLabel)
       : memo.losers.setAsideNote
   );
   lines.push("");

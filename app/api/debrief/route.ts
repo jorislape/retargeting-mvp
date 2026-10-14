@@ -283,6 +283,21 @@ export async function POST(request: NextRequest) {
     }
     spendGateOverride = parsed;
   }
+  /* First-Run Robustness 2 — the user's own minimum purchases/leads
+     before an ad is judged. Absent/blank ⇒ null ⇒ today's behaviour. */
+  const minJudgeRaw = form.get("minJudgeOutcomes");
+  let minJudgeOutcomes: number | null = null;
+  if (typeof minJudgeRaw === "string" && minJudgeRaw.trim() !== "") {
+    const parsed = Number(minJudgeRaw);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1_000_000) {
+      return fail(400, {
+        title: "Invalid minimum to judge an ad",
+        message: "The minimum purchases/leads before an ad is judged must be a positive number.",
+        fix: "Enter a positive whole number, or leave the field blank to judge ads by spend only.",
+      });
+    }
+    minJudgeOutcomes = Math.floor(parsed);
+  }
   const minOutcomeRaw = form.get("minOutcomeCount");
   let minOutcomeCount: number | null = null;
   if (typeof minOutcomeRaw === "string" && minOutcomeRaw.trim() !== "") {
@@ -368,6 +383,7 @@ export async function POST(request: NextRequest) {
     objective: parseObjective(form.get("objective")),
     spendGateOverride,
     minOutcomeCount,
+    ...(minJudgeOutcomes != null ? { minJudgeOutcomes } : {}),
     minBriefOutcomeCount,
     minLossSpendMultiple,
   };

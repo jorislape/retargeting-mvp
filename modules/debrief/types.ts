@@ -272,6 +272,12 @@ export interface AppliedCriterion {
 /** Context the user fills in alongside the CSV — never stored. */
 export interface DebriefContext extends DecisionInputContext {
   kpi: KpiKey;
+  /** First-Run Robustness 2 — the user's OWN minimum purchases/leads
+   *  before an ad is judged (outcome KPIs only: ROAS, CPA, Purchases,
+   *  Leads). Unset/null ⇒ today's behaviour exactly. Different from
+   *  DecisionCriteria.minOutcomeCount (which only gates a scale move on
+   *  the leading ad): this sets low-count ads ASIDE, like low-spend ads. */
+  minJudgeOutcomes?: number | null;
   /** Report-identification and framing context only (interpolated into
    *  headings and test/brief copy) — never analyzed, never affects
    *  scoring, ranking, action, or evidenceState. Required only so the
@@ -396,7 +402,9 @@ export interface ParsedAd {
  *  ad past the spend gate whose spend is still under
  *  ZERO_CONVERSION_SPEND_MULTIPLE × max(median CPA, target CPA) — too
  *  little spend yet for "0" to mean anything; set aside, not judged. */
-export type GateReason = "judged" | "below_spend_gate" | "no_kpi_value" | "zero_outcome_thin";
+/** below_outcome_floor (First-Run Robustness 2): fewer verifiable
+ *  purchases/leads than the user's own minJudgeOutcomes. */
+export type GateReason = "judged" | "below_spend_gate" | "no_kpi_value" | "zero_outcome_thin" | "below_outcome_floor";
 
 export interface GatedAd extends ParsedAd {
   gate: GateReason;
@@ -427,6 +435,10 @@ export interface KpiGaps {
    *  gate, plus zero-conversion CPA ads under the zero-conversion spend
    *  bar (gate "zero_outcome_thin"). */
   belowGateWithValue: number;
+  /** First-Run Robustness 2 — ads set aside by the user's outcome
+   *  minimum (present only when > 0). Partition: adsJudged + noValue +
+   *  belowGateWithValue + (belowOutcomeFloor ?? 0) === adsAnalyzed. */
+  belowOutcomeFloor?: number;
   /** The KPI this export reads best with (kpiUsability's preferredUsableKpi
    *  — same choice the generator's auto-switch makes), offered only when
    *  most ads simply lack the selected KPI's column data. */
@@ -528,6 +540,17 @@ export interface AnalysisResult {
    *  is that bar in money, or null when there was nothing to measure it
    *  against (no median CPA and no target). Absent when none. */
   zeroOutcomeThin?: { ads: { name: string; spend: number }[]; needs: number | null };
+  /** First-Run Robustness 2 — present ONLY when the user set
+   *  minJudgeOutcomes and the KPI has an outcome count. setAside: ads
+   *  set aside under it (gate "below_outcome_floor"), with their count;
+   *  unverifiable: judged ads whose count isn't in the export (never
+   *  treated as zero — judged as usual and disclosed). */
+  outcomeFloor?: {
+    min: number;
+    nouns: { one: string; many: string };
+    setAside: { name: string; count: number }[];
+    unverifiable: number;
+  };
   /** CPA Leads Label — present only when kpi is CPA and every CPA value
    *  came from lead data. Drives labels/nouns via kpiLabelFor & co. */
   cpaBasis?: CpaBasis;
@@ -555,6 +578,9 @@ export interface MemoScope {
   /** Trust Pass 2 — present only when a target is set for this KPI:
    *  "≥ 3.00x" / "≤ $25.00", and how many judged ads beat it. */
   targetSummary?: { targetLabel: string; beat: number; judged: number };
+  /** First-Run Robustness 2 — present only when the user's outcome
+   *  minimum set ads aside: how many, the noun, and the bar. */
+  outcomeFloorAside?: { count: number; many: string; min: number };
   /** CPA Leads Label: client-register label ("cost per lead"), present
    *  only when it differs from kpiLabel. Report/text pick per view. */
   kpiLabelClient?: string;
