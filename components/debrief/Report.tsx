@@ -108,13 +108,22 @@ const PRINT_TABLE_ROWS = 3;
 /** Decision bars printed before "+N more" (user criteria always print). */
 const PRINT_CRITERIA_SHOWN = 5;
 
-/** Evidence limits printed before "+N more — see full list online / TXT"
+/** Evidence limits printed before "+N more — full list in the appendix"
  *  (client: the permanent caveat plus one). */
 const PRINT_LIMITS_SHOWN = { buyer: 4, client: 2 } as const;
 
-function PrintMore({ count, inline = false }: { count: number; inline?: boolean }) {
+/* Real-account review: a PDF has no "online" version — whatever print
+   collapses is listed in the print-only appendix on the last page(s).
+   These predicates are the ONE definition of what the body prints, so
+   the appendix lists exactly the rest. */
+const criterionPrinted = (c: Memo["decision"]["appliedCriteria"][number], i: number) =>
+  i < PRINT_CRITERIA_SHOWN || c.source === "user";
+
+/** `inAppendix` false: the client PDF never lists every ad, so its
+ *  collapsed name lists just count what's left. */
+function PrintMore({ count, inline = false, inAppendix = true }: { count: number; inline?: boolean; inAppendix?: boolean }) {
   if (count <= 0) return null;
-  const text = `+${count} more — see full list online / TXT`;
+  const text = inAppendix ? `+${count} more — full list in the appendix` : `+${count} more`;
   return inline ? (
     <span className="print-only-inline"> {text}</span>
   ) : (
@@ -479,7 +488,7 @@ function BudgetMoveNames({
             {i > 0 ? ", " : ""}&ldquo;<AdName name={a.name} />&rdquo; ({a.spendLabel})
           </span>
         ))}
-        {ads.length > SHOWN && !expanded && <PrintMore inline count={ads.length - SHOWN} />}
+        {ads.length > SHOWN && !expanded && <PrintMore inline count={ads.length - SHOWN} inAppendix={!client} />}
         {ads.length > SHOWN && (
           <span className="print-hidden">
             {" "}
@@ -557,9 +566,9 @@ function DecisionCard({
         <li
           key={i}
           /* Fix 6: print keeps the first PRINT_CRITERIA_SHOWN bars and
-             every user criterion; the rest are online / TXT. */
+             every user criterion; the rest are in the appendix. */
           className={`flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500 ${
-            i >= PRINT_CRITERIA_SHOWN && criterion.source !== "user" ? "print:hidden" : ""
+            criterionPrinted(criterion, i) ? "" : "print:hidden"
           }`}
         >
           <span
@@ -711,7 +720,7 @@ function DecisionCard({
             </p>
             {appliedCriteriaList}
             <PrintMore
-              count={d.appliedCriteria.filter((c, i) => i >= PRINT_CRITERIA_SHOWN && c.source !== "user").length}
+              count={d.appliedCriteria.filter((c, i) => !criterionPrinted(c, i)).length}
             />
           </div>
         </>
@@ -825,13 +834,14 @@ function DecisionCard({
 
 /* Real-account fix 6 — the printed counterpart of "+N more … Show all":
    rows past the on-screen cap stay collapsed on paper (a real account's
-   lists ran the PDF to 25 pages); the full list lives online and in TXT. */
+   lists ran the PDF to 25 pages); the full list is in the print appendix. */
 /* Real-account fix 8 — "Patterns by naming": one compact table per
    naming key (spend, outcomes, blended KPI per value). Buyer only, inside
    Patterns; descriptive, never a cause. */
 /** Naming keys / values per key printed before "+N more" (fix 6). */
 const PRINT_NAMING_KEYS = 2;
 const PRINT_NAMING_ROWS = 3;
+const namingRowPrinted = (ki: number, ri: number) => ki < PRINT_NAMING_KEYS && ri < PRINT_NAMING_ROWS;
 
 function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }) {
   const th = "py-1.5 pr-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400";
@@ -861,7 +871,7 @@ function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }
                 {k.rows.map((r, ri) => (
                   <tr
                     key={r.value}
-                    className={`border-b border-white/[0.06] last:border-0 ${ri >= PRINT_NAMING_ROWS ? "print:hidden" : ""}`}
+                    className={`border-b border-white/[0.06] last:border-0 ${namingRowPrinted(ki, ri) ? "" : "print:hidden"}`}
                   >
                     <td className="py-1.5 pr-3 text-[13px] font-medium text-zinc-200 [overflow-wrap:anywhere]">
                       {r.value} <span className="font-normal text-zinc-500">· {r.ads}</span>
@@ -1075,6 +1085,139 @@ function AdTable({
   );
 }
 
+/** Appendix ad names: middle-truncated harder than the body. */
+const APPENDIX_NAME_MAX = 50;
+
+/* Real-account review — the print-only appendix. Buyer: one compact
+   table of every judged ad (name, spend, outcomes, KPI) grouped by the
+   role the report gives it, on its own page. Then whatever else print
+   collapsed above (evidence limits, decision bars, naming values). The
+   client PDF never lists every ad (top performers only), so its
+   appendix carries only the collapsed limits. Restates memo fields. */
+function PrintAppendix({
+  memo,
+  view,
+  showAds,
+  showNaming,
+}: {
+  memo: Memo;
+  view: ReportView;
+  showAds: boolean;
+  showNaming: boolean;
+}) {
+  const client = view === "client";
+  const d = memo.decision;
+  const to = new Set(d.budgetMove?.to.map((a) => a.name) ?? []);
+  const from = new Set(d.budgetMove?.from.map((a) => a.name) ?? []);
+  const label = {
+    receives: client ? "Gets more budget" : "Receives",
+    above: client ? "Above the middle ad" : "Above median",
+    at: client ? "Middle" : "At median",
+    trim: client ? "Reduce / pause" : "Pause / trim",
+    below: client ? "Below the middle ad" : "Below median",
+  };
+  const rows = showAds
+    ? [
+        ...memo.winners.map((r) => ({ r, group: to.has(r.name) ? label.receives : label.above })),
+        ...(memo.atMedian?.rows ?? []).map((r) => ({ r, group: label.at })),
+        ...memo.losers.rows.map((r) => ({ r, group: from.has(r.name) ? label.trim : label.below })),
+      ]
+    : [];
+  const outcomeHeader = rows.some(({ r }) => r.conversionLabel)
+    ? rows.some(({ r }) => /\blead/.test(r.conversionLabel ?? "")) ? "Leads" : "Purchases"
+    : null;
+  const kpiHeader = client ? memo.scope.kpiLabelClient ?? memo.scope.kpiLabel : memo.scope.kpiLabel;
+  const moreLimits = (client ? d.limits.client : d.limits.buyer).slice(PRINT_LIMITS_SHOWN[client ? "client" : "buyer"]);
+  const bars = client ? [] : d.appliedCriteria.filter((c, i) => !criterionPrinted(c, i));
+  const naming =
+    showNaming && memo.namingPatterns
+      ? memo.namingPatterns.keys.flatMap((k, ki) =>
+          k.rows.filter((_, ri) => !namingRowPrinted(ki, ri)).map((r) => ({ key: k.key, r }))
+        )
+      : [];
+  if (rows.length === 0 && moreLimits.length === 0 && bars.length === 0 && naming.length === 0) return null;
+
+  const th = "py-0.5 pr-2 text-left text-[8px] font-semibold uppercase tracking-[0.06em] text-zinc-400";
+  const td = "py-px pr-2 align-top font-mono text-[8px] leading-tight tabular-nums text-zinc-400";
+  const head = "print-section-label mt-3 mb-1 text-[9px] font-bold uppercase tracking-[0.08em]";
+  return (
+    <section aria-label="Appendix" className={`print-only ${rows.length > 0 ? "print-appendix" : "mt-3"}`}>
+      <p className={head}>Appendix{rows.length > 0 ? ` — all ${rows.length} judged ads` : ""}</p>
+      {rows.length > 0 && (
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className={th}>Ad</th>
+              <th className={th}>{client ? "Group" : "Role"}</th>
+              <th className={`${th} text-right`}>Spend</th>
+              {outcomeHeader && <th className={`${th} text-right`}>{outcomeHeader}</th>}
+              <th className={`${th} pr-0 text-right`}>{kpiHeader}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ r, group }, i) => (
+              <tr key={r.name + i} className="print-avoid-break">
+                <td className={`${td} font-sans text-zinc-300`} title={r.name}>{middleTruncate(r.name, APPENDIX_NAME_MAX)}</td>
+                <td className={`${td} font-sans whitespace-nowrap`}>{group}</td>
+                <td className={`${td} text-right whitespace-nowrap`}>{r.spendLabel}</td>
+                {outcomeHeader && <td className={`${td} text-right`}>{r.conversionLabel?.replace(/\s.*$/, "") ?? "—"}</td>}
+                <td className={`${td} pr-0 text-right whitespace-nowrap`}>{r.valueLabel}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {moreLimits.length > 0 && (
+        <>
+          <p className={head}>{client ? "What we still can't conclude (continued)" : "Evidence limits (continued)"}</p>
+          <ul className="space-y-0.5">
+            {moreLimits.map((line, i) => (
+              <li key={i} className="text-[8px] leading-snug text-zinc-500"><Names text={line} /></li>
+            ))}
+          </ul>
+        </>
+      )}
+      {bars.length > 0 && (
+        <>
+          <p className={head}>Decision bars applied (continued)</p>
+          <ul className="space-y-0.5">
+            {bars.map((c, i) => (
+              <li key={i} className="text-[9px] leading-snug text-zinc-500">Default — {c.label}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {naming.length > 0 && memo.namingPatterns && (
+        <>
+          <p className={head}>Patterns by naming (continued)</p>
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className={th}>Key</th>
+                <th className={th}>Value · ads</th>
+                <th className={`${th} text-right`}>Spend</th>
+                {memo.namingPatterns.outcomeLabel && <th className={`${th} text-right`}>{memo.namingPatterns.outcomeLabel}</th>}
+                <th className={`${th} pr-0 text-right`}>{memo.namingPatterns.kpiLabel}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {naming.map(({ key, r }) => (
+                <tr key={key + r.value}>
+                  <td className={td}>{key}</td>
+                  <td className={`${td} font-sans`}>{r.value} · {r.ads}</td>
+                  <td className={`${td} text-right`}>{r.spendLabel}</td>
+                  {memo.namingPatterns!.outcomeLabel && <td className={`${td} text-right`}>{r.outcomesLabel}</td>}
+                  <td className={`${td} pr-0 text-right`}>{r.kpiValueLabel}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </section>
+  );
+}
+
 /* Client view: the top N as ruled entries — a reading list, not a
    data table. */
 function ClientAdList({
@@ -1098,7 +1241,7 @@ function ClientAdList({
           Summary's worked / needs-improvement split; these per-section
           lists stay on screen and in TXT. */}
       <p className="print-only text-xs leading-relaxed text-zinc-400">
-        {rows.length} ad{rows.length === 1 ? "" : "s"} — see full list online / TXT
+        {rows.length} ad{rows.length === 1 ? "" : "s"} in this group — the {tone === "win" ? "strongest" : "weakest"} are named in the Summary.
       </p>
       <div className="divide-y divide-white/[0.06] print:hidden">
         {rows.map((ad, i) => (
@@ -2803,6 +2946,13 @@ export function Report({
             {generatedAt ? ` on ${new Date(generatedAt).toLocaleString()}` : ""}.
           </p>
         </footer>
+
+        <PrintAppendix
+          memo={memo}
+          view={view}
+          showAds={!client && (sections.winners || sections.underperformers)}
+          showNaming={sections.patterns && !client}
+        />
       </article>
 
       <ReportCustomizationPanel

@@ -5,8 +5,8 @@
  * kill-list copy counted the full pools, so a 6th below-median ad was
  * mentioned ("…and 4 more", in the spend total) and shown nowhere. Now
  * the memo carries the full pools; the report caps only the display
- * ("+N more … Show all"; in print, Real-account fix 6: "+N more — see
- * full list online / TXT" — every collapsed row still counted), TXT/Copy
+ * ("+N more … Show all"; in print, Real-account fix 6: "+N more — full
+ * list in the appendix" — every collapsed row still counted), TXT/Copy
  * lists every row,
  * and the budget decision carries the full from/to list.
  */
@@ -57,7 +57,7 @@ try {
   assert.ok(!/rows\.slice\(0, topAdsShown\)/.test(report), "tables no longer drop rows");
   assert.match(report, /i >= topAdsShown && !expanded \? "hidden" : i >= PRINT_TABLE_ROWS && !expanded \? "print:hidden" : ""/);
   assert.match(report, /<PrintMore count=\{expanded \? 0 : rows\.length - Math\.min\(topAdsShown, PRINT_TABLE_ROWS\)\} \/>/);
-  assert.match(report, /\+\$\{count\} more — see full list online \/ TXT/);
+  assert.match(report, /\+\$\{count\} more — full list in the appendix/);
   assert.match(report, /<MoreToggle\s+names=\{rows\.slice\(topAdsShown\)\.map\(\(a\) => a\.name\)\}/);
   assert.match(report, /\{d\.budgetMove && <BudgetMoveNames move=\{d\.budgetMove\} client=\{client\}/);
   assert.match(report, /count: memo\.losers\.rows\.length,/);

@@ -328,10 +328,13 @@ Run `scripts/fixtures/agency-naming-convention.csv` (ROAS).
       lists, test titles and client cards show names middle-truncated
       (~60 chars, "start…end"), full name on hover. Tables show full names
       wrapping. Copy/TXT keep full names.
-- [ ] **PDF length**: Print / Save PDF (A4). Buyer ≤ 6 pages, client ≤ 4
-      (Chromium: 6 / 4 on the fixture, Patterns by naming on; a real 341-ad account went from
-      25 / 15 to 6 / 4). Collapsed lists print "+N more — see full list
-      online / TXT" (ad tables print their top 3 rows); names are middle-truncated (~40 chars); each test
+- [ ] **PDF length**: Print / Save PDF (A4). Buyer ≤ 7 pages, client ≤ 4
+      (Chromium: 7 / 4 on the fixture and on a real 341-ad account, which
+      started at 25 / 15). Collapsed lists print "+N more — full list in the
+      appendix" (ad tables print their top 3 rows). The buyer appendix starts
+      on its own page: every judged ad once (name ≤50 chars, role, spend,
+      outcomes, KPI), then any collapsed limits / decision bars / naming
+      values; the client appendix carries only collapsed limits. Names are middle-truncated (~40 chars); each test
       prints only its title, Hypothesis and Win (client: title + Success);
       the client PDF names ads once, in the Summary split. Repeat in
       Safari's print preview — its pagination differs from Chromium's.

@@ -4,9 +4,11 @@
  * its full reasoning, and 160-char names wrapped across lines.
  *
  * Page counts need a real browser (measured manually, TESTING.md: the
- * agency fixture prints at 6 buyer / 4 client pages in Chromium). This
+ * agency fixture prints at 7 buyer / 4 client pages in Chromium, the
+ * last buyer page(s) being the appendix). This
  * pins the print rules that produce them: "+N more" lists stay
- * collapsed with a print-only "+N more — see full list online / TXT";
+ * collapsed with a print-only "+N more — full list in the appendix"
+ * (a PDF has no "online" version) and the appendix lists them;
  * names are middle-truncated tighter in print; tests print title +
  * Hypothesis + Win only; limits print a capped list; the client PDF
  * names its ads once (Summary split) instead of three times.
@@ -24,13 +26,38 @@ const between = (from: string, to: string) => report.slice(report.indexOf(from),
 
 /* ---- "+N more" stays collapsed in print, with a pointer ---- */
 assert.ok(!/\? "hidden print:(table-row|flex|inline)"/.test(report), "no collapsed row is forced back into print");
-assert.match(report, /const text = `\+\$\{count\} more — see full list online \/ TXT`;/);
+assert.match(report, /const text = inAppendix \? `\+\$\{count\} more — full list in the appendix` : `\+\$\{count\} more`;/);
+assert.ok(!/online/i.test(report.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "")), "no print text points 'online'");
 assert.equal((report.match(/<PrintMore count=\{expanded \? 0 : rows\.length - Math\.min\(topAdsShown, PRINT_TABLE_ROWS\)\} \/>/g) ?? []).length, 1, "ad table");
 assert.match(report, /const PRINT_TABLE_ROWS = 3;/, "tables print their top 3 rows");
 assert.match(report, /i >= PRINT_TABLE_ROWS && !expanded \? "print:hidden" : ""/);
 assert.match(report, /const PRINT_CRITERIA_SHOWN = 5;/, "decision bars: first 5 + every user criterion");
-assert.match(report, /i >= PRINT_CRITERIA_SHOWN && criterion\.source !== "user" \? "print:hidden" : ""/);
-assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline count=\{ads\.length - SHOWN\} \/>\}/, "Pause / Receives lists");
+assert.match(report, /criterionPrinted\(criterion, i\) \? "" : "print:hidden"/);
+assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline count=\{ads\.length - SHOWN\} inAppendix=\{!client\} \/>\}/, "Pause / Receives lists");
+
+/* ---- The appendix: what print collapses, listed on the last page(s) ---- */
+{
+  const app = between("function PrintAppendix(", "/* Client view: the top N");
+  assert.match(report, /const APPENDIX_NAME_MAX = 50;/);
+  assert.match(app, /middleTruncate\(r\.name, APPENDIX_NAME_MAX\)/);
+  // Every judged ad once, in the role the report gives it.
+  assert.match(app, /memo\.winners\.map\(\(r\) => \(\{ r, group: to\.has\(r\.name\) \? label\.receives : label\.above \}\)\)/);
+  assert.match(app, /\(memo\.atMedian\?\.rows \?\? \[\]\)\.map\(\(r\) => \(\{ r, group: label\.at \}\)\)/);
+  assert.match(app, /memo\.losers\.rows\.map\(\(r\) => \(\{ r, group: from\.has\(r\.name\) \? label\.trim : label\.below \}\)\)/);
+  assert.match(app, /trim: client \? "Reduce \/ pause" : "Pause \/ trim"/);
+  // Columns: name, role, spend, outcomes, KPI.
+  for (const col of [/r\.spendLabel/, /r\.conversionLabel\?\.replace/, /r\.valueLabel/]) assert.match(app, col);
+  // Exactly the rest of what the body collapses — the same predicates.
+  assert.match(app, /const moreLimits = .*\.slice\(PRINT_LIMITS_SHOWN\[client \? "client" : "buyer"\]\)/);
+  assert.match(app, /d\.appliedCriteria\.filter\(\(c, i\) => !criterionPrinted\(c, i\)\)/);
+  assert.match(app, /k\.rows\.filter\(\(_, ri\) => !namingRowPrinted\(ki, ri\)\)/);
+  assert.match(report, /className=\{`border-b border-white\/\[0\.06\] last:border-0 \$\{namingRowPrinted\(ki, ri\) \? "" : "print:hidden"\}`\}/);
+  // Buyer only lists every ad; the client PDF stays top-performers-only.
+  assert.match(report, /<PrintAppendix\s+memo=\{memo\}\s+view=\{view\}\s+showAds=\{!client && \(sections\.winners \|\| sections\.underperformers\)\}\s+showNaming=\{sections\.patterns && !client\}/);
+  assert.ok(report.indexOf("<PrintAppendix") > report.indexOf("</footer>"), "after the sign-off");
+  assert.match(app, /className=\{`print-only \$\{rows\.length > 0 \? "print-appendix" : "mt-3"\}`\}/);
+  assert.match(css, /\.print-appendix \{\s*break-before: page;\s*\}/, "the ads appendix starts its own page");
+}
 assert.match(css, /\.print-only-inline \{\s*display: none;\s*\}/);
 assert.match(css, /\.print-only-inline \{\s*display: inline !important;\s*\}/);
 
@@ -61,7 +88,7 @@ assert.match(report, /const PRINT_LIMITS_SHOWN = \{ buyer: 4, client: 2 \} as co
 assert.match(report, /\{limitsList\}\s*<PrintMore count=\{limits\.length - printLimits\} \/>/);
 
 /* ---- Client PDF names its ads once ---- */
-assert.match(between("function ClientAdList(", "function AtMedianRows("), /ad\{rows\.length === 1 \? "" : "s"\} — see full list online \/ TXT/);
+assert.match(between("function ClientAdList(", "function AtMedianRows("), /ad\{rows\.length === 1 \? "" : "s"\} in this group — the \{tone === "win" \? "strongest" : "weakest"\} are named in the Summary\./);
 assert.match(report, /\{sections\.executiveSummary && !client && <ExecutiveSummary/);
 /* Real-account review: the summary is page 1 — in the masthead, right
    after the stat row — and its labels never break mid-word. */
@@ -79,7 +106,7 @@ assert.match(report, /<div className=\{client \? "print:hidden" : undefined\}>\s
 assert.match(report, /const PRINT_NAMING_KEYS = 2;\s*const PRINT_NAMING_ROWS = 3;/);
 const naming = between("function NamingPatternsTable(", "/* Trust Pass");
 assert.match(naming, /ki >= PRINT_NAMING_KEYS \? "print:hidden" : ""/);
-assert.match(naming, /ri >= PRINT_NAMING_ROWS \? "print:hidden" : ""/);
+assert.match(naming, /namingRowPrinted\(ki, ri\) \? "" : "print:hidden"/);
 assert.match(naming, /<PrintMore count=\{k\.rows\.length - PRINT_NAMING_ROWS\} \/>/);
 assert.match(naming, /<PrintMore count=\{np\.keys\.length - PRINT_NAMING_KEYS\} \/>/);
 assert.match(report, /sm:grid-cols-2 \$\{memo\.namingPatterns \? "print:hidden" : ""\}/, "share lists screen-only beside the table");
