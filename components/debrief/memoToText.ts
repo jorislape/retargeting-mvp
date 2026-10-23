@@ -515,15 +515,10 @@ export function memoToText(
     lines.push("");
   }
 
-  /* Criteria Coherence fix: "KILL LIST" naming only when the committed
-     decision actually contains a cut (shift/cut variants) — otherwise
-     the section is descriptive and the header says so. */
-  const losersCut =
-    memo.decision.action === "budget" && memo.decision.budgetVariant !== "scale";
   lines.push(
     view === "client"
       ? hasTarget ? "WHAT UNDERPERFORMED" : "BELOW THE MIDDLE AD"
-      : `${hasTarget ? "LOSERS" : "BELOW MEDIAN"}${losersCut ? " / KILL LIST" : ""}`
+      : hasTarget ? "LOSERS" : "BELOW MEDIAN"
   );
   lines.push(view === "client" ? memo.losers.clientInstruction : memo.losers.killInstruction);
   pushRows(memo.losers.rows);

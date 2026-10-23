@@ -302,6 +302,9 @@ export interface DebriefContext extends DecisionInputContext {
   /** Optional pasted market/competitor notes (V1: manual input only).
    *  Directional context for the memo — never a performance claim. */
   marketContext: string;
+  /** Real-account fix 7 — the uploaded file's name without extension:
+   *  the report title when there's no product and no account name. */
+  sourceName?: string;
   /** Decision Criteria V2 — user's custom evidence gate: spend per ad
    *  (in the account currency) an ad must reach before it's judged.
    *  Replaces the default gate computation when set (spendGateBasis
@@ -505,6 +508,9 @@ export interface AnalysisResult {
    *  the export rows behind the analyzed ads, and any breakdown columns
    *  (Day, Age, Placement, …) that caused the repetition. */
   mergedRows?: { rows: number; breakdowns: string[] };
+  /** Real-account fix 7 — the export's "Account name" value(s), for the
+   *  report title. Absent when the column is missing or blank. */
+  accountName?: string;
   /** KPI Source Column Disclosure — present ONLY when a conversion
    *  column behind the selected KPI was a partial or "Results" match
    *  (standard exact exports omit the key entirely, so the sample and

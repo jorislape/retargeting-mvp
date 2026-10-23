@@ -1408,7 +1408,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
 
     // Section order intact: the decision leads, everything else follows
     // in the pre-existing order.
-    const order = ["NEXT MOVE", "THE CALL", "ABOVE MEDIAN", "BELOW MEDIAN / KILL LIST", "PATTERNS", "NEXT 3 TESTS", "CONFIDENCE:"]; // Trust Pass 2: no target → relative section names
+    const order = ["NEXT MOVE", "THE CALL", "ABOVE MEDIAN", "BELOW MEDIAN", "PATTERNS", "NEXT 3 TESTS", "CONFIDENCE:"]; // Trust Pass 2: no target → relative section names
     const positions = order.map((h) => buyerText.indexOf(h));
     assert.ok(positions.every((p) => p >= 0), "all buyer section headers present");
     assert.deepEqual([...positions].sort((a, b) => a - b), positions, "buyer section order unchanged, NEXT MOVE first");
@@ -1678,7 +1678,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
        this block, plus four crafted datasets that land on each action
        shape. The imperatives under test:
          buyer  "move budget toward it"   ⇔ budget shift/scale only
-         buyer  "Kill or shrink"          ⇔ budget shift/cut only
+         buyer  "Trim or pause"           ⇔ budget shift/cut only
          client "earns a larger share"    ⇔ budget shift/scale only
          client "reducing or pausing"     ⇔ budget shift/cut only
          "we're testing"/"run the creative tests" never under a hold. ---- */
@@ -1710,7 +1710,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
            descriptive variant. Both registers. */
         const hasLosers = m.losers.rows.length > 0;
         assert.equal(
-          m.losers.killInstruction.startsWith("Cut spend on the ads below"),
+          m.losers.killInstruction.startsWith("Trim the weakest ads below and raise the receivers in steps"),
           cutSide && hasLosers,
           `${label}: buyer losers instruction cuts iff the decision cuts`
         );
@@ -1737,7 +1737,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
           `${label}: buyer winner imperative iff shift/scale (action=${action}, variant=${budgetVariant})`
         );
         assert.equal(
-          tldr.includes("Kill or shrink"),
+          tldr.includes("Trim or pause"),
           cutSide && m.tldr.length > 0 && !tldr.includes("No ad is clearly underperforming"),
           `${label}: buyer kill imperative iff shift/cut`
         );
@@ -1820,9 +1820,9 @@ console.log("decision (stage 1 — rules): all assertions passed");
       // imperatives are present and correct.
       assert.equal(memo.decision.budgetVariant, "shift", "sample decision variant is shift");
       assert.ok(memo.tldr[0].includes("move budget toward it"), "sample TLDR keeps the winner imperative");
-      assert.ok(memo.tldr[1].startsWith("Kill or shrink"), "sample TLDR keeps the kill imperative");
+      assert.ok(memo.tldr[1].startsWith("Trim or pause"), "sample TLDR keeps the kill imperative");
       assert.ok(
-        memo.losers.killInstruction.startsWith("Cut spend on the ads below"),
+        memo.losers.killInstruction.startsWith("Trim the weakest ads below and raise the receivers in steps"),
         "shift decision keeps the losers-section cut imperative"
       );
       assertCoherent(memo, "sample/shift");
@@ -1875,7 +1875,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       const mCut = runEngine(cutOnlyCsv, "roas");
       assert.equal(mCut.decision.action, "budget", "cut dataset lands on budget");
       assert.equal(mCut.decision.budgetVariant, "cut", "cut-only variant");
-      assert.ok(mCut.tldr[1].startsWith("Kill or shrink"), "cut-only keeps the kill imperative");
+      assert.ok(mCut.tldr[1].startsWith("Trim or pause"), "cut-only keeps the kill imperative");
       assertCoherent(mCut, "cut-only");
 
       // Insufficient hold (4 judged ads): no imperatives anywhere, and

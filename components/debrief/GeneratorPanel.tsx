@@ -1098,7 +1098,8 @@ export function GeneratorPanel() {
   // report needs a label. Offer and Objective are optional; neither
   // gates submission.
   /* First-Run Fixes: Product / industry is optional — it only labels the
-     report, and the engine already falls back to "Your account". */
+     report, and the engine falls back to the export's account name,
+     then the file name (Real-account fix 7). */
   const contextDone = fields.product.trim() !== "";
   /* First-Run Robustness: Generate only once the file has passed the
      shared check for the selected KPI — never for an unusable file. */
@@ -1844,7 +1845,7 @@ export function GeneratorPanel() {
               <p className="mt-1.5 text-xs text-zinc-400">
                 Used to label and frame the report. It is not analyzed and
                 does not affect scoring. Left blank, the report is titled
-                &ldquo;Your account&rdquo;.
+                with the export&rsquo;s account name, or else the file name.
               </p>
             </div>
             <div>

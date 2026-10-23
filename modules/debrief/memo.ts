@@ -367,13 +367,13 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
     const extra = belowBenchmarkCount - 1;
     const alsoBelow = extra > 0
       ? cutSide
-        ? ` and ${extra} other below-benchmark ad${extra === 1 ? "" : "s"}`
+        ? ` and ${extra} other below-median ad${extra === 1 ? "" : "s"}`
         : ` and ${extra} other ad${extra === 1 ? "" : "s"}`
       : "";
     lines.push(
       cutSide
-        ? `Kill or shrink "${losers[0].name}"${alsoBelow} — combined ${fmtMoney(belowBenchmarkSpend, currency)} spent below the benchmark.`
-        : `"${losers[0].name}"${alsoBelow} sit${extra > 0 ? "" : "s"} below the benchmark — combined ${fmtMoney(belowBenchmarkSpend, currency)}, though no cut clears this memo's bars yet (see Next move).`
+        ? `Trim or pause "${losers[0].name}"${alsoBelow} — combined ${fmtMoney(belowBenchmarkSpend, currency)} spent below the median.`
+        : `"${losers[0].name}"${alsoBelow} sit${extra > 0 ? "" : "s"} below the median — combined ${fmtMoney(belowBenchmarkSpend, currency)}, though no cut clears this memo's bars yet (see Next move).`
     );
   } else {
     lines.push(`No ad is clearly underperforming enough to kill outright.`);
@@ -570,7 +570,6 @@ const isFounderLed = (ad: RankedAd): boolean =>
  *  structured challenger to the winning format, so the test creates
  *  new pattern data instead of iterating in place. Deterministic. */
 const FORMAT_CHALLENGERS: Record<string, string> = {
-  ugc: "a founder/expert explainer video",
   testimonial: "the same testimonial format with a different customer segment",
   video: "a static distilled from the video's strongest claim",
   static: "a 15-second video cut of the top static",
@@ -584,6 +583,59 @@ const FORMAT_CHALLENGERS: Record<string, string> = {
   "product shot": "the product shown in real use instead of the studio shot",
   comparison: "the winning claim stated on its own, without the comparison frame",
 };
+
+/** Real-account fix 7 — the creative formats a challenger is drawn from,
+ *  in tie-break order, and how a challenger built in each is phrased. */
+const CHALLENGER_FORMATS = ["ugc", "video", "static", "carousel"] as const;
+const CHALLENGER_PHRASE: Record<(typeof CHALLENGER_FORMATS)[number], string> = {
+  ugc: "a creator-shot UGC version of the control's message",
+  video: "a video version of the control's message",
+  static: "a static-image version of the control's message",
+  carousel: "a carousel version of the control's message",
+};
+
+/**
+ * Real-account fix 7 — the format challenger is grounded in THIS
+ * account, never a stock suggestion (a real export with UGC winners was
+ * told to test "a founder/expert explainer video" it had never run):
+ *  1. a format that already places among the winners, other than the
+ *     control's (most winner slots first) — "worth more budget?"; else
+ *  2. a format clearly missing — no judged ad carries it, while the
+ *     names do carry format tags — "never tested"; else
+ *  3. the control tag's structural challenger (FORMAT_CHALLENGERS), or
+ *     a plain "different creative format".
+ * `basis` (1 and 2 only) says which, in one clause, for the why/signals.
+ */
+function chooseChallenger(
+  winners: readonly RankedAd[],
+  judged: readonly RankedAd[],
+  controlTag: string | null,
+  fallback: string
+): { text: string; format: string | null; basis: string | null } {
+  const count = (ads: readonly RankedAd[], f: string) => ads.filter((a) => a.nameTags.includes(f)).length;
+  const inWinners = CHALLENGER_FORMATS.filter((f) => f !== controlTag && count(winners, f) > 0).sort(
+    (a, b) => count(winners, b) - count(winners, a)
+  );
+  if (inWinners.length > 0) {
+    const f = inWinners[0];
+    return {
+      text: CHALLENGER_PHRASE[f],
+      format: f,
+      basis: `${formatLabel(f)} already places among your winners (${count(winners, f)}/${winners.length})`,
+    };
+  }
+  const tagged = judged.some((a) => a.nameTags.some((t) => (CHALLENGER_FORMATS as readonly string[]).includes(t)));
+  const missing = tagged ? CHALLENGER_FORMATS.filter((f) => f !== controlTag && count(judged, f) === 0) : [];
+  if (missing.length > 0) {
+    const f = missing[0];
+    return {
+      text: CHALLENGER_PHRASE[f],
+      format: f,
+      basis: `the account has no ${formatLabel(f)} ads among the judged ones yet`,
+    };
+  }
+  return { text: (controlTag && FORMAT_CHALLENGERS[controlTag]) ?? fallback, format: null, basis: null };
+}
 
 /** Shot / asset direction per creative format — structural direction
  *  only (what to show, how to open), never invented claims, quotes,
@@ -708,6 +760,12 @@ function buildNextTests(
   const worst =
     worstCandidate && outcome && outcome.aboveMedian.includes(worstCandidate.name) ? null : worstCandidate;
   const skipRebuild = worstCandidate != null && worst == null;
+  /* Real-account fix 7: a static ad has no "opening 3 seconds" — its
+     opening is the headline and first visual. */
+  const openingUnit = (name: string) =>
+    analysis.rankedAds.find((a) => a.name === name)?.nameTags.includes("static")
+      ? "headline / first visual"
+      : "opening 3 seconds / first frame";
   const winnerTag = dominantTag(winners);
 
   /* Evidence Sufficiency V1 — Brief Readiness. Computed once (per test
@@ -882,7 +940,7 @@ function buildNextTests(
     tests.push({
       test: `Brief 2 new variants of "${L.name}" — the leader on ${outcome.label} — varying only the opening.`,
       why: `On ${kpiLabel}, the leading ads sit below the median on ${outcome.label} (${outcome.medianLabel}), so a test built on them would chase ${kpiLabel} rather than results. "${L.name}" leads on ${outcome.label} at ${L.valueLabel} — one way to test whether that angle has more headroom: vary only the opening. ${openingEvidence}`,
-      setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the opening 3 seconds / first frame between variants.`,
+      setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the ${openingUnit(L.name)} between variants.`,
       winningLooksLike: `At least one variant beats ${outcome.medianLabel} ${outcome.label} within 7 days — read it on ${outcome.label}, not ${kpiLabel}.`,
       signals,
       hypothesis: `If we change only the opening while holding "${L.name}"'s angle, ${offerLabel}, and audience constant, we want to test whether at least one variant beats ${outcome.medianLabel} ${outcome.label} — because "${L.name}" leads this export on ${outcome.label} at ${L.valueLabel}.`,
@@ -898,7 +956,7 @@ function buildNextTests(
         ],
         assetDirection: directionFor(outcomeLeader.nameTags[0]),
         keepConstant: `The angle, ${offerLabel}, audience, and placements of "${L.name}" — the configuration it ran while it led on ${outcome.label}.`,
-        change: "Only the opening 3 seconds / first frame — nothing else.",
+        change: `Only the ${openingUnit(L.name)} — nothing else.`,
         successMetric: outcomeMetric,
         guardrails: briefGuardrails(false),
         basisNote: basisNote(false),
@@ -923,7 +981,7 @@ function buildNextTests(
           ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of this leading angle. Adapt, don't copy."
           : ""
       }`,
-      setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the opening 3 seconds / first frame between variants.`,
+      setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the ${openingUnit(top.name)} between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
       signals,
       hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" already leads this dataset at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend.`,
@@ -958,7 +1016,7 @@ function buildNextTests(
         keepConstant: `The angle, ${offerLabel}, audience, and placements of "${top.name}" — the configuration it ran while it out-performed; the test isolates whether the angle is the reason.`,
         change: founderLed
           ? "Only the opening: one variant gets a new hook, the other gets the founder-led front."
-          : "Only the opening 3 seconds / first frame — nothing else.",
+          : `Only the ${openingUnit(top.name)} — nothing else.`,
         successMetric,
         guardrails: briefGuardrails(founderLed),
         basisNote: basisNote(founderLed),
@@ -1170,12 +1228,12 @@ function buildNextTests(
       });
     }
   } else if (!skipRebuild) {
-    const challenger = winnerTag
-      ? FORMAT_CHALLENGERS[winnerTag.tag] ?? "a new creative format"
-      : "a new creative format";
+    const pick = chooseChallenger(winners, analysis.rankedAds, winnerTag?.tag ?? null, "a new creative format");
+    const challenger = pick.text;
     const signals = sig(
       "No judged ad is failing clearly this period.",
       tagSignal,
+      pick.basis && `Challenger: ${pick.basis}.`,
       gateSignal
     );
     tests.push({
@@ -1200,7 +1258,7 @@ function buildNextTests(
         ],
         assetDirection: [
           `Build: ${challenger}.`,
-          ...ASSET_DIRECTION.video.slice(0, 4),
+          ...(ASSET_DIRECTION[pick.format ?? "video"] ?? ASSET_DIRECTION.video).slice(0, 4),
         ],
         keepConstant: "Message, audience, offer, and budget parity with the control.",
         change: "The format only.",
@@ -1318,12 +1376,17 @@ function buildNextTests(
       },
     });
   } else {
-    const challenger = winnerTag
-      ? FORMAT_CHALLENGERS[winnerTag.tag] ?? "a deliberately different creative format"
-      : "a deliberately different creative format";
+    const pick = chooseChallenger(
+      winners,
+      analysis.rankedAds,
+      winnerTag?.tag ?? null,
+      "a deliberately different creative format"
+    );
+    const challenger = pick.text;
     const signals = sig(
       tagSignal ?? "No format is clearly winning yet.",
       topSignal,
+      pick.basis && `Challenger: ${pick.basis}.`,
       gateSignal
     );
     tests.push({
@@ -1352,7 +1415,7 @@ function buildNextTests(
         ],
         assetDirection: [
           `Build: ${challenger}.`,
-          ...ASSET_DIRECTION.video.slice(0, 4),
+          ...(ASSET_DIRECTION[pick.format ?? "video"] ?? ASSET_DIRECTION.video).slice(0, 4),
         ],
         keepConstant: "Message, audience, offer, and budget parity with the control.",
         change: "The format only.",
@@ -1406,7 +1469,13 @@ function buildAvoid(
     );
   } else {
     const loserTag = dominantTag(losers);
-    if (loserTag && loserTag.count >= 2) {
+    /* Real-account fix 7: only when NO ad of that format sits in the top
+       half of the judged ranking — a format that also places near the
+       top isn't failing as a format (a real export warned off UGC while
+       UGC ads led it). */
+    const ranked = [...analysis.rankedAds].sort((a, b) => b.deltaFromMedian - a.deltaFromMedian);
+    const topHalf = ranked.slice(0, Math.ceil(ranked.length / 2));
+    if (loserTag && loserTag.count >= 2 && !topHalf.some((a) => a.nameTags.includes(loserTag.tag))) {
       buyer.push(
         `Do not move budget into ${loserTag.tag} ads while they hold ${loserTag.count}/${losers.length} loser slots.`
       );
@@ -1424,11 +1493,17 @@ function buildAvoid(
   const scaleSide = decision.action === "budget" && decision.budgetVariant !== "cut";
   if (top && top.deltaPct != null) {
     if (scaleSide) {
+      /* Real-account fix 2: the ads the move goes INTO — the receivers,
+         which may not be the raw leader and may be up to three. */
+      const to = decision.budgetMove?.to.map((t) => t.name) ?? [top.name];
+      const quoted = to.map((n) => `"${n}"`);
+      const list = quoted.length <= 1 ? quoted.join("") : `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]}`;
+      const where = to.length === 1 && to[0] === top.name ? "the leading ad" : to.length === 1 ? "that ad" : "those ads";
       buyer.push(
-        `Do not scale anything except "${top.name}" yet — the clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before broader budget moves.`
+        `Do not scale anything except ${list} yet — the clearest budget signal is concentrated in ${where}; investigate the remaining gaps through controlled creative tests before broader budget moves.`
       );
       client.push(
-        `We're only increasing budget behind "${top.name}" for now — the clearest case for more budget is the leading ad. For the remaining ads, controlled creative tests are safer than broader budget changes.`
+        `We're only increasing budget behind ${list} for now — the clearest case for more budget is ${where}. For the remaining ads, controlled creative tests are safer than broader budget changes.`
       );
     } else if (top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT) {
       buyer.push(
@@ -1883,7 +1958,9 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     creativeGroups: null,
     spendAllocation: buildSpendAllocation(analysis),
     scope: {
-      product: context.product || "Your account",
+      /* Real-account fix 7: the user's product, else the export's account
+         name, else the file name ("Hanzo Ads Apr 2025"), never a blank. */
+      product: context.product || analysis.accountName || context.sourceName || "Your account",
       kpiLabel: kpiLabelFor(analysis),
       spendGateLabel: fmtMoney(analysis.spendGate, currency),
       spendGateSource: spendGateSource(analysis, (v) => fmtMoney(v, currency)),
@@ -1966,13 +2043,13 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       killInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `Cut spend on the ads below and move it behind your winners. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} is going to ${fmtCount(analysis.belowBenchmarkCount)} below-benchmark ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total.`
-            : `The ads below ran under the benchmark — combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} across ${fmtCount(analysis.belowBenchmarkCount)} ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total. No cut clears this memo's bars yet (see Next move).`
-          : "No ad fell clearly below the benchmark this period.",
+            ? `Trim the weakest ads below and raise the receivers in steps. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} sits on ${fmtCount(analysis.belowBenchmarkCount)} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} — context, not the amount to move.`
+            : `The ads below ran under the median — combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} across ${fmtCount(analysis.belowBenchmarkCount)} ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total. No cut clears this memo's bars yet (see Next move).`
+          : "No ad fell clearly below the median this period.",
       clientInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing below the middle ad, and that budget moves behind the ads that are working.`
+            ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing below the middle ad, and we add budget to the ads that are working in steps.`
             : `The ads below performed below the middle ad — together ${fmtMoney(analysis.belowBenchmarkSpend, currency)} of spend. We're not reducing their budgets yet; the decision above explains the next step.`
           : "No ad underperformed badly enough to pause this period.",
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),

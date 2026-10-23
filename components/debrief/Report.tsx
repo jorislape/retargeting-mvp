@@ -161,7 +161,7 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
   const candidates: { label: string; value: string | undefined }[] = [
     { label: "Verdict", value: (client ? memo.clientSummary : memo.tldr)[0] },
     {
-      label: client ? "Main action" : "Kill / reduce",
+      label: client ? "Main action" : "Trim / reduce",
       value: client ? memo.losers.clientInstruction : memo.losers.killInstruction,
     },
     { label: "Top recommended test", value: memo.nextTests[0]?.test },
@@ -1774,8 +1774,6 @@ export function Report({
   /* CPA Leads Label: "CPL" in Buyer view, "cost per lead" in Client view
      (scope.kpiLabelClient exists only when the two differ). */
   const viewKpiLabel = client ? memo.scope.kpiLabelClient ?? memo.scope.kpiLabel : memo.scope.kpiLabel;
-  /* "kill list" only when the committed decision actually cuts. */
-  const losersCut = memo.decision.action === "budget" && memo.decision.budgetVariant !== "scale";
   /* Report Clarity Pass — buyer stat-row explanations (see TIP_*). */
   const statTips: Record<string, string> = {
     /* Tester Feedback Fix 4: the tooltip says where the minimum comes from. */
@@ -2388,8 +2386,8 @@ export function Report({
             n={sectionNumbers.underperformers!}
             title={
               memo.scope.targetSummary
-                ? client ? "What underperformed" : `Losers${losersCut ? " / kill list" : ""}`
-                : client ? "Below the middle ad" : `Below median${losersCut ? " / kill list" : ""}`
+                ? client ? "What underperformed" : "Losers"
+                : client ? "Below the middle ad" : "Below median"
             }
           />
           <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-300">

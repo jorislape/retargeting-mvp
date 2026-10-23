@@ -290,6 +290,15 @@ export function analyze(
     hasNameSignal: hasNameSignal(winnerPool, loserPool),
     hasCreativeNotes: context.creativeNotes.trim().length > 0,
     missingColumns,
+    /* Real-account fix 7: the report title when the export names its
+       account (absent otherwise — the memo falls back to the filename). */
+    ...((): { accountName?: string } => {
+      const col = columns.accountName;
+      if (!col) return {};
+      const names = [...new Set(rawRows.map((r) => r[col]?.trim()).filter((v): v is string => !!v))];
+      if (names.length === 0) return {};
+      return { accountName: names.length > 2 ? `${names.slice(0, 2).join(" / ")} +${names.length - 2}` : names.join(" / ") };
+    })(),
     /* Real-account fix 3: names whose rows extract.ts merged into one
        creative (rowsMerged > 1). Drives the limits disclosure only. */
     duplicateAdNames: ads.filter((a) => (a.rowsMerged ?? 1) > 1).map((a) => a.name),

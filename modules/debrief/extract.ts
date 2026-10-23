@@ -11,9 +11,9 @@ import {
  *  — never presented as a confirmed angle, only as a structural signal
  *  when it's consistent across several ads (see analysis.ts). */
 const NAME_TAGS: { tag: string; pattern: RegExp }[] = [
-  { tag: "video", pattern: /\bvideo\b/i },
+  { tag: "video", pattern: /\bvideo\b|\bvid\b/i },
   { tag: "ugc", pattern: /\bugc\b/i },
-  { tag: "static", pattern: /\bstatic\b|\bimage\b/i },
+  { tag: "static", pattern: /\bstatic\b|\bimage\b|\bimg\b/i },
   { tag: "carousel", pattern: /\bcarousel\b/i },
   { tag: "testimonial", pattern: /\btestimonial|review\b/i },
   { tag: "before/after", pattern: /before.?after/i },

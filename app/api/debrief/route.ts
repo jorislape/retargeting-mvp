@@ -377,6 +377,13 @@ export async function POST(request: NextRequest) {
        the memo only. Read into memory for this request like the rest of
        the context; never logged, never stored. */
     marketContext: String(form.get("marketContext") ?? "").trim().slice(0, 2000),
+    /* Real-account fix 7: the upload's name, minus extension — the report
+       title fallback. Structural, returned only to the uploader; never
+       logged. */
+    ...((): { sourceName?: string } => {
+      const base = file.name.replace(/\.[A-Za-z0-9]{1,5}$/, "").trim().slice(0, 120);
+      return base ? { sourceName: base } : {};
+    })(),
     controlledTest: parseTriState(form.get("controlledTest")),
     trackingChanged: parseChanged(form.get("trackingChanged")),
     setupChanged: parseChanged(form.get("setupChanged")),

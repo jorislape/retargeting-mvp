@@ -68,9 +68,11 @@ try {
   for (const [label, txt] of sources)
     for (const re of CLIENT_BLOCK) assert.ok(!re.test(txt), `${label}: client says ${txt.match(new RegExp(`[^\\n]{0,40}${re.source}[^\\n]{0,20}`, "i"))?.[0]}`);
 
-  /* ---- Section names follow the target; kill list only with a cut ---- */
+  /* ---- Section names follow the target; no "kill list" label at all
+     (Real-account fix 7) ---- */
   assert.match(ecom.buyerText, /\nABOVE MEDIAN\n/);
-  assert.match(ecom.buyerText, /\nBELOW MEDIAN \/ KILL LIST\n/, "shift contains a cut");
+  assert.match(ecom.buyerText, /\nBELOW MEDIAN\n/, "shift: plain section name");
+  assert.ok(!/KILL LIST/.test(ecom.buyerText));
   assert.match(ecom.clientText, /\nABOVE THE MIDDLE AD\n/);
   const tested = run(TESTER_CSV, "cpa");
   assert.equal(tested.memo.decision.action, "test");

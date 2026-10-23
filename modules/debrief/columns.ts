@@ -133,6 +133,7 @@ const ALIASES = {
   outboundClicks: ["outbound clicks"],
   adSetName: ["ad set name"],
   campaignName: ["campaign name"],
+  accountName: ["account name"],
 } as const;
 
 /** Meta's per-campaign optimisation-event columns. They're resolved as
@@ -303,6 +304,8 @@ export interface ColumnMap {
   outboundClicks: string | null;
   adSetName: string | null;
   campaignName: string | null;
+  /** Real-account fix 7 — "Account name", when exported: the report title. */
+  accountName: string | null;
   /** 3-letter currency code pulled from the spend header, if present. */
   currency: string | null;
   /** KPI Source Column Disclosure: for each RESOLVED conversion field,
@@ -368,6 +371,7 @@ export function resolveColumns(allHeaders: string[]): ColumnMap {
     outboundClicks: findHeader(headers.filter((h) => !/cost per/i.test(h)), ALIASES.outboundClicks),
     adSetName: findHeader(headers, ALIASES.adSetName),
     campaignName: findHeader(headers, ALIASES.campaignName),
+    accountName: findHeader(headers, ALIASES.accountName),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
     sources: resolveSources(headers),
     attributionSplits: resolveAttributionSplits(allHeaders),
