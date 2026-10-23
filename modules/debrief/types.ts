@@ -574,6 +574,14 @@ export interface AnalysisResult {
    *  the zero-conversion spend bar (gate "zero_outcome_thin"). `needs`
    *  is that bar in money, or null when there was nothing to measure it
    *  against (no median CPA and no target). Absent when none. */
+  /** Real-account fix 4 — present only when the judged ads span more
+   *  than one funnel stage (TOFU/MOFU/BOFU, read from ad, campaign or ad
+   *  set names). Copy only: one limits line, never the action. */
+  funnelMix?: {
+    stages: { stage: "TOFU" | "MOFU" | "BOFU"; judged: number; medianLabel: string | null }[];
+    /** Judged ads with no readable stage. */
+    unknown: number;
+  };
   zeroOutcomeThin?: {
     ads: { name: string; spend: number }[];
     needs: number | null;

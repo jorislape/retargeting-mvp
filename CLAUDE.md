@@ -138,6 +138,13 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # of ≥2 ads have typical KPIs ≥ SEGMENT_SPREAD_MULTIPLE (1.5×) apart,
                   # analysis.mixedSegments feeds ONE limits line (both registers). Never
                   # read by the gate, median, ranking, action or evidenceState
+  funnelStages.ts # Mixed Funnel Stages (Real-account fix 4) — decision-blind, same
+                  # pattern as segmentSpread.ts: reads TOFU/MOFU/BOFU from the ad name
+                  # (own token, e.g. "[STG]TOFU"), else campaign, else ad set name;
+                  # when judged ads span >1 stage, analysis.funnelMix feeds ONE limits
+                  # line (per-stage counts + medians, "run once per stage"). Exists
+                  # because the segment warning needs an ad set/campaign column that
+                  # agency exports often lack. Never read by gate/median/ranking/action
   memo.ts         # assembles the memo — templated, not an LLM call (see below).
                   # generateMemo always sets comparison: null — the route builds
                   # the comparison from the optional second file and attaches it

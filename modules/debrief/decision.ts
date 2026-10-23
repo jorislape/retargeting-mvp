@@ -725,6 +725,23 @@ export function buildLimits(
     );
   }
 
+  /* Real-account fix 4: judged ads span funnel stages — one median
+     compares cold prospecting with warm retargeting. Copy only. */
+  if (analysis.funnelMix) {
+    const f = analysis.funnelMix;
+    const label = kpiLabelFor(analysis);
+    const parts = f.stages.map(
+      (s) => `${s.stage} (${s.judged} ad${s.judged === 1 ? "" : "s"}${s.medianLabel ? `, median ${s.medianLabel}` : ""})`
+    );
+    const unknown = f.unknown > 0 ? `, plus ${f.unknown} with no stage in the name` : "";
+    buyer.push(
+      `Judged ads mix funnel stages — ${joinPlain(parts)}${unknown}. Prospecting and retargeting ads aren't comparable on one ${label} median; for a fairer read, run the debrief once per stage (filter the export by stage).`
+    );
+    client.push(
+      `This file mixes ads aimed at new audiences with ads aimed at people who already know the brand (${f.stages.map((s) => s.stage).join(", ")}). Those usually perform very differently, so a fairer read looks at each group separately.`
+    );
+  }
+
   if (analysis.kpiGaps) {
     /* First-Run Fixes: some set-aside ads spent enough but have no KPI
        value — name each cause with its count instead of "too little

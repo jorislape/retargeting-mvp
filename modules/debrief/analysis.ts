@@ -1,6 +1,7 @@
 import { ColumnMap, attributionFieldsFor, attributionSplitHeaders, clickBasisFor, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import { detectSegmentSpread } from "./segmentSpread";
+import { detectFunnelMix } from "./funnelStages";
 import { detectLowIntent } from "./intentFlags";
 import { computeAccountKpi } from "./accountKpi";
 import { fmtKpiValue } from "./format";
@@ -248,6 +249,9 @@ export function analyze(
     campaign: columns.campaignName != null,
   });
 
+  /* Real-account fix 4 — display-only, from the ranked ads. */
+  const funnel = detectFunnelMix(ranked);
+
   /* Trust Pass: the FULL pools. The decision and the kill-list copy
      always counted every below-median ad ("…and 4 more"), but the lists
      were cut to 5, so a 6th ad was mentioned and shown nowhere. The
@@ -342,6 +346,18 @@ export function analyze(
       const acct = computeAccountKpi(ads, kpi);
       return acct ? { accountKpi: acct } : {};
     })(),
+    ...(funnel
+      ? {
+          funnelMix: {
+            stages: funnel.stages.map((s) => ({
+              stage: s.stage,
+              judged: s.judged,
+              medianLabel: s.median != null ? fmtKpiValue(s.median, kpi, columns.currency) : null,
+            })),
+            unknown: funnel.unknown,
+          },
+        }
+      : {}),
     ...(spread
       ? {
           mixedSegments: {
