@@ -2084,13 +2084,13 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       killInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `Trim the weakest ads below and raise the receivers in steps. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} sits on ${fmtCount(analysis.belowBenchmarkCount)} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} — context, not the amount to move.`
+            ? `${decision.budgetVariant === "cut" ? "Trim the weakest ads below; the freed budget stays with the current ads" : "Trim the weakest ads below and raise the receivers in steps"}. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} sits on ${fmtCount(analysis.belowBenchmarkCount)} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} — context, not the amount to move.`
             : `The ads below ran under the median — combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} across ${fmtCount(analysis.belowBenchmarkCount)} ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total. No cut clears this memo's bars yet (see Next move).`
           : "No ad fell clearly below the median this period.",
       clientInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing below the middle ad, and we add budget to the ads that are working in steps.`
+            ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing below the middle ad${decision.budgetVariant === "cut" ? ". The freed budget stays with the current ads for now." : ", and we add budget to the ads that are working in steps."}`
             : `The ads below performed below the middle ad — together ${fmtMoney(analysis.belowBenchmarkSpend, currency)} of spend. We're not reducing their budgets yet; the decision above explains the next step.`
           : "No ad underperformed badly enough to pause this period.",
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),

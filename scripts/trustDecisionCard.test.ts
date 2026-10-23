@@ -63,7 +63,7 @@ try {
     if (d.action === "budget") {
       assert.ok(d.budgetMove);
       if (d.budgetVariant !== "scale") {
-        assert.match(buyer, new RegExp(`About ${d.budgetMove!.belowSpendLabel!.replace(/[$.]/g, "\\$&")} currently sits on below-median ads — context, not the amount to move`));
+        assert.match(buyer, new RegExp(`About ${d.budgetMove!.belowSpendLabel!.replace(/[$.]/g, "\\$&")} currently sits on below-median ads — context, not the amount to ${d.budgetVariant === "cut" ? "cut" : "move"}`));
         assert.match(buyer, /\nPause or trim: /);
         assert.match(client, /\nPausing or reducing: /);
       }

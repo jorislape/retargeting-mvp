@@ -1423,7 +1423,9 @@ export function buildDecision(
   }
 
   /* ---- B1: budget move (shift / scale / cut copy variants) ---- */
-  if (scaleEligible || (cutEligible && !receiverBlocked)) {
+  /* Real-account fix 2 follow-up: no receiver + a cut that clears is a
+     Trim (cut-only) — a test only when neither bar clears. */
+  if (scaleEligible || cutEligible) {
     /* Trust Pass 4: a proxy KPI with NO outcome column in the export —
        the move stands (nothing better to read), but its basis is named. */
     if (analysis.proxyKpi && proxyCopy && !proxyHeld) {
@@ -1550,9 +1552,13 @@ export function buildDecision(
       action: "budget",
       budgetVariant: "cut",
       budgetMove: { from: fromAds, to: [], belowSpendLabel },
-      headline: `Cut ${loserNames(analysis)}; hold everything else steady.`,
+      headline: `Trim ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
-      rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). No winner clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar, so the move is stopping the leak — not scaling.`,
+      rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${
+        receiverBlocked && top != null
+          ? `No ad qualifies to receive budget — "${top.name}" leads by ${pct(top.deltaPct!)}% but has ${floorGaps(top)}, under the receiver floor (${floorPhrase}) — so the move is trimming the leak, not scaling.`
+          : `No winner clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar, so the move is stopping the leak — not scaling.`
+      }`,
       clientRationale: `The weakest ads are far behind the rest and are using ${pct(belowShare)}% of the budget that's had a fair chance to perform — pausing them stops the leak without touching what works.`,
       avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
       reassess,

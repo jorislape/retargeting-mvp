@@ -189,7 +189,7 @@ function assertContract(d: MemoDecision, label: string) {
   assert.equal(at24.action, "test", "24% share misses the cut bar → test");
   const at25 = buildDecision(mk(25), "Fallback test.", money);
   assert.equal(at25.action, "budget", "25% share exactly clears the cut bar");
-  assert.ok(at25.headline.startsWith("Cut "), "cut-only variant");
+  assert.ok(at25.headline.startsWith("Trim "), "cut-only variant");
   assert.equal(at25.budgetVariant, "cut", "cut-only sets budgetVariant cut");
   assert.ok(at25.headline.includes("and 2 more"), "loser names honest about the remainder");
   assert.ok(at25.rationale.includes(`${CUT_MIN_SPEND_SHARE_PCT}`) || at25.rationale.includes("25"), "rationale carries the share");
@@ -826,7 +826,7 @@ const GUARDRAIL_CLIENT =
   const cutBase = buildDecision(cutOnly, "T", money, null);
   const cutEff = buildDecision(cutOnly, "T", money, null, { objective: "efficiency" });
   assert.equal(cutEff.action, "budget", "precondition: this fixture is a cut action");
-  assert.ok(cutBase.headline.startsWith("Cut "), "precondition: cut-only variant");
+  assert.ok(cutBase.headline.startsWith("Trim "), "precondition: cut-only variant");
   assert.deepEqual(cutEff.limits, cutBase.limits, "efficiency caveat does NOT fire on a cut-only action");
 
   // objective=growth + KPI ctr/cpc → framing/limits only, both KPIs.
@@ -1032,9 +1032,10 @@ console.log("decision (stage 1 — rules): all assertions passed");
     "no purchase-count bar is listed for a KPI with no purchase count"
   );
 
-  /* Real-account fix 2: a lead past the bar that NO ad can receive is a
-     test — even when the cut side alone would clear (the spec: "If none
-     pass, the decision is Test, not Shift"), with a one-line reason. */
+  /* Real-account fix 2 (follow-up): a lead past the bar that NO ad can
+     receive, with the cut bar cleared, is a Trim — the losers named, no
+     receiver, and the passed-over leader explained. (The neither-clears
+     case is `blocked` above: a test.) */
   const cutBlocked = buildDecision(
     fixture({
       winners: [{ ...ad("W", 400, 80), conversions: 3 }],
@@ -1049,11 +1050,13 @@ console.log("decision (stage 1 — rules): all assertions passed");
     undefined,
     { minOutcomeCount: 50 }
   );
-  assert.equal(cutBlocked.action, "test", "no receiver ⇒ test, not a budget move");
-  assert.ok(cutBlocked.headline.includes("No ad has enough evidence to receive budget yet"));
+  assert.equal(cutBlocked.action, "budget", "no receiver + cut bar ⇒ trim");
+  assert.equal(cutBlocked.budgetVariant, "cut");
+  assert.ok(cutBlocked.headline.startsWith('Trim "L1" and "L2"'));
+  assert.deepEqual(cutBlocked.budgetMove?.to, [], "no receiver");
   assert.ok(
-    cutBlocked.rationale.startsWith('No budget move: "W" leads by 80% but has 3 purchases'),
-    "one-line reason names the leader's gap, never a false 'nothing cleared'"
+    cutBlocked.rationale.includes('No ad qualifies to receive budget — "W" leads by 80% but has 3 purchases'),
+    "names the leader's gap, never a false 'nothing cleared the bar'"
   );
   assertContract(cutBlocked, "criteria:cut-blocked");
 }
@@ -1710,7 +1713,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
            descriptive variant. Both registers. */
         const hasLosers = m.losers.rows.length > 0;
         assert.equal(
-          m.losers.killInstruction.startsWith("Trim the weakest ads below and raise the receivers in steps"),
+          m.losers.killInstruction.startsWith("Trim the weakest ads below"),
           cutSide && hasLosers,
           `${label}: buyer losers instruction cuts iff the decision cuts`
         );

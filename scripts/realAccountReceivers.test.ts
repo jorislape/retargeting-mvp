@@ -82,19 +82,30 @@ try {
     assert.deepEqual(m.budgetMove!.to.map((x) => x.name), ["R1", "R2", "R3"], "capped at 3, best first");
   }
 
-  /* ---- None passes ⇒ Test with a one-line reason (even if a cut would clear) ---- */
+  /* ---- No receiver + the cut bar clears ⇒ Trim (losers named, no receiver) ---- */
   {
     const thin =
       "Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" +
       ["Thin,200,6,2000", "A,400,20,800", "B,400,20,800", "C,400,20,760", "D,400,20,720", "E,400,8,200", "F,400,6,150"].join("\n") + "\n";
     const t = run(thin, "roas");
     const td = t.memo.decision;
-    assert.equal(td.action, "test", "no receiver ⇒ no budget move");
-    assert.match(td.headline, /No ad has enough evidence to receive budget yet\.$/);
-    assert.match(td.rationale, /^No budget move: "Thin" leads by \d+% but has 6 purchases, and no ad past the 30% bar clears the receiver floor \(≥10 purchases and ≥ [\d.,]+ EUR spent \(the minimum spend\)\)\./);
-    assert.equal(td.rationale.split(". ").length <= 2, true, "one line of reason + the closing sentence");
+    assert.equal(td.action, "budget");
+    assert.equal(td.budgetVariant, "cut");
+    assert.match(td.headline, /^Trim "F", "E" and 1 more; hold everything else steady\.$/);
+    assert.deepEqual(td.budgetMove?.to, []);
+    assert.match(td.rationale, /No ad qualifies to receive budget — "Thin" leads by \d+% but has 6 purchases, under the receiver floor \(≥10 purchases and ≥ [\d.,]+ EUR spent \(the minimum spend\)\) — so the move is trimming the leak, not scaling\./);
     for (const s of clientStrings(t.memo))
       for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
+  }
+  /* ---- No receiver and no cut ⇒ Test with a one-line reason ---- */
+  {
+    const neither =
+      "Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" +
+      ["Thin,200,6,2000", "A,400,20,800", "B,400,20,800", "C,400,20,780", "D,400,20,760", "E,400,18,700", "F,400,18,690"].join("\n") + "\n";
+    const td = run(neither, "roas").memo.decision;
+    assert.equal(td.action, "test", "neither bar clears ⇒ test");
+    assert.match(td.headline, /No ad has enough evidence to receive budget yet\.$/);
+    assert.match(td.rationale, /^No budget move: "Thin" leads by \d+% but has 6 purchases, and no ad past the 30% bar clears the receiver floor/);
   }
 
   /* ---- The user's own scaling minimum replaces the default 10 ---- */

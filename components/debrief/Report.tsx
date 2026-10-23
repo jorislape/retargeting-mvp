@@ -500,7 +500,7 @@ function BudgetMoveNames({
       )}
       {move.belowSpendLabel && (
         <p className="text-xs leading-relaxed text-zinc-400">
-          {belowSpendLine(move.belowSpendLabel, client)}
+          {belowSpendLine(move.belowSpendLabel, client, move.to.length === 0)}
         </p>
       )}
     </div>

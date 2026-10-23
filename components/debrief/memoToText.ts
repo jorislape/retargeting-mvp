@@ -28,7 +28,12 @@ export const CLIENT_BRIEF_LEGEND =
 /** Real-account fix 2 — the below-median total under a budget move,
  *  shared by the report and TXT. Descriptive only: it says where money
  *  sits, never that the whole amount moves. */
-export function belowSpendLine(label: string, client: boolean): string {
+export function belowSpendLine(label: string, client: boolean, trimOnly = false): string {
+  if (trimOnly) {
+    return client
+      ? `About ${label} is currently going to ads below the middle ad — we trim the weakest; the freed budget stays with the current ads for now.`
+      : `About ${label} currently sits on below-median ads — context, not the amount to cut: trim the weakest; no ad qualifies to receive budget yet.`;
+  }
   return client
     ? `About ${label} is currently going to ads below the middle ad — we trim the weakest and add budget to the leaders in steps, not all at once.`
     : `About ${label} currently sits on below-median ads — context, not the amount to move: trim the weakest and raise the receivers in steps.`;
@@ -313,8 +318,8 @@ export function memoToText(
     if (d.budgetMove.belowSpendLabel)
       lines.push(
         view === "client"
-          ? belowSpendLine(d.budgetMove.belowSpendLabel, true)
-          : belowSpendLine(d.budgetMove.belowSpendLabel, false)
+          ? belowSpendLine(d.budgetMove.belowSpendLabel, true, d.budgetMove.to.length === 0)
+          : belowSpendLine(d.budgetMove.belowSpendLabel, false, d.budgetMove.to.length === 0)
       );
   }
   lines.push(view === "client" ? d.clientRationale : d.rationale);
