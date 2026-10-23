@@ -1,5 +1,6 @@
 import {
   analysisWindowDays,
+  budgetReceivers,
   buildDecision,
   isOutcomeVolumeBelowFloor,
   isScaleActionSupported,
@@ -1210,7 +1211,17 @@ function buildNextTests(
   const shiftCommitted = scaleJustified && isCutActionSupported(analysis);
   const leadPastBar =
     top != null && top.deltaPct != null && top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT;
-  if (scaleJustified && top && !shiftCommitted) {
+  /* Real-account fix 2: budget goes to the receivers — the best ads past
+     the bar AND the receiver evidence floor — which may not be the raw
+     leader. Every budget sentence below names them, never `top`. */
+  const receivers = budgetReceivers(analysis, criteria);
+  const quoted = receivers.map((r) => `"${r.name}"`);
+  const receiverList =
+    quoted.length <= 1 ? quoted.join("") : `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]}`;
+  const scaleTarget = receivers[0] ?? null;
+  if (scaleJustified && scaleTarget && !shiftCommitted) {
+    const top = scaleTarget;
+    const topSignal = `"${top.name}" ${top === winners[0] ? "leads" : "runs"} at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend.`;
     const signals = sig(
       topSignal,
       `The lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`
@@ -1302,7 +1313,7 @@ function buildNextTests(
     tests.push({
       test: `Test ${challenger} against your ${winnerTag ? `${winnerTag.tag} ads` : "current best ad"} as the control.`,
       why: shiftCommitted
-        ? `The shift above is this debrief's one budget move — it already moves budget into "${top!.name}". Alongside it, a structured challenger against it as the control builds the next comparison; launch it once the shift has ~${gateLabel} of fresh spend.`
+        ? `The shift above is this debrief's one budget move — it already moves budget into ${receiverList}. Alongside it, a structured challenger against it as the control builds the next comparison; launch it once the shift has ~${gateLabel} of fresh spend.`
         : leadPastBar
         ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar, but this debrief doesn't commit a budget move yet (see Next move) — a structured challenger builds comparison data while that evidence firms up.`
         : winnerTag

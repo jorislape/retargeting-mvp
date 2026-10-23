@@ -16,6 +16,7 @@ import type {
   KpiGaps,
   MemoDecision,
   Objective,
+  RankedAd,
 } from "./types.ts";
 
 /**
@@ -199,20 +200,74 @@ export function isScaleActionSupported(
      judge results (ROAS/CPA) instead. Shared, so memo.ts's budget-test
      slot can never disagree with the decision. */
   if (isProxyWithOutcome(analysis)) return false;
-  const top = analysis.winners[0] ?? null;
-  if (top == null || top.deltaPct == null || top.deltaPct < SCALE_TEST_MIN_DELTA_PCT) {
-    return false;
-  }
-  const nouns = outcomeNounsFor(analysis);
-  const minOutcome =
-    criteria?.minOutcomeCount != null && criteria.minOutcomeCount > 0
-      ? criteria.minOutcomeCount
-      : null;
-  const topOutcomes = top.conversions ?? null;
-  if (minOutcome != null && nouns != null && topOutcomes != null && topOutcomes < minOutcome) {
-    return false;
-  }
-  return true;
+  /* Real-account fix 2: a budget move needs an ad that can RECEIVE it. */
+  return budgetReceivers(analysis, criteria).length > 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Real-account fix 2 — budget receiver evidence floor                 */
+/* ------------------------------------------------------------------ */
+
+/** An ad that receives budget must have spent at least this multiple of
+ *  the minimum spend to judge — clearing the gate once is enough to be
+ *  ranked, not enough to be trusted with more money. (A real export
+ *  shifted 7,889 EUR from 43 ads into one ad with 68 EUR / 8 purchases.) */
+export const RECEIVER_MIN_GATE_MULTIPLE = 2;
+
+/** At most this many ads share a shift/scale. */
+export const MAX_BUDGET_RECEIVERS = 3;
+
+/** The outcome count a receiver needs: the user's own scaling minimum
+ *  when set, else the MIN_OUTCOMES_FOR_SUPPORTED noise floor. */
+export function receiverOutcomeMin(criteria?: DecisionCriteria): number {
+  return criteria?.minOutcomeCount != null && criteria.minOutcomeCount > 0
+    ? criteria.minOutcomeCount
+    : MIN_OUTCOMES_FOR_SUPPORTED;
+}
+
+/** True when the ad clears the receiver evidence floor: spend ≥
+ *  RECEIVER_MIN_GATE_MULTIPLE × the minimum spend, and — when the KPI has
+ *  an outcome count AND the export carries it — ≥ receiverOutcomeMin
+ *  outcomes. An unverifiable count never blocks (missing ≠ zero); it is
+ *  disclosed in the limits instead. */
+export function passesReceiverFloor(
+  ad: Pick<RankedAd, "spend" | "conversions">,
+  analysis: AnalysisResult,
+  criteria?: DecisionCriteria
+): boolean {
+  if (ad.spend < RECEIVER_MIN_GATE_MULTIPLE * analysis.spendGate) return false;
+  if (outcomeNounsFor(analysis) == null || ad.conversions == null) return true;
+  return ad.conversions >= receiverOutcomeMin(criteria);
+}
+
+/**
+ * The ads a shift/scale moves budget INTO: the best above-median ads that
+ * clear the scale bar (≥ SCALE_TEST_MIN_DELTA_PCT better than the median)
+ * AND the receiver evidence floor, best first, at most
+ * MAX_BUDGET_RECEIVERS. When the leader fails the floor, the next ad that
+ * passes takes its place; empty ⇒ no budget move (the call is a test).
+ * The single source for decision.ts, memo.ts's budget-test slot and the
+ * brief-readiness badge.
+ */
+export function budgetReceivers(analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd[] {
+  return analysis.winners
+    .filter(
+      (a) =>
+        a.deltaPct != null &&
+        a.deltaPct >= SCALE_TEST_MIN_DELTA_PCT &&
+        passesReceiverFloor(a, analysis, criteria)
+    )
+    .slice(0, MAX_BUDGET_RECEIVERS);
+}
+
+/** Quoted receiver names: "A", "A" and "B", or "A", "B" and "C". */
+function receiverNames(receivers: readonly RankedAd[]): string {
+  return joinPlain(receivers.map((a) => `"${a.name}"`));
+}
+
+function joinPlain(parts: string[]): string {
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 function pct(value: number): number {
@@ -995,6 +1050,14 @@ export function buildDecision(
      can never drift from the decision (its adsJudged clause is
      redundant here — H1 already returned before B1 reads this). */
   const scaleEligible = isScaleActionSupported(analysis, criteria);
+  /* Real-account fix 2: the ads a move goes INTO, and whether the leader
+     itself was passed over for failing the receiver floor. A lead past
+     the bar with NO ad able to receive budget is a test, not a move. */
+  const receivers = budgetReceivers(analysis, criteria);
+  const lead = receivers[0] ?? null;
+  const receiverMin = receiverOutcomeMin(criteria);
+  const receiverSpendLabel = money(RECEIVER_MIN_GATE_MULTIPLE * analysis.spendGate);
+  const topBelowFloor = top != null && !passesReceiverFloor(top, analysis, criteria);
   const belowShare =
     analysis.judgedSpend > 0
       ? (analysis.belowBenchmarkSpend / analysis.judgedSpend) * 100
@@ -1012,10 +1075,21 @@ export function buildDecision(
   const outcomeKpis = analysis.proxyKpi?.outcomeKpis ?? [];
   const outcomeNames = outcomeKpis.map((o) => o.label).join("/");
   const outcomeClientNames = outcomeKpis.map((o) => o.clientLabel).join(" or ");
+  const receiverBlocked = rawScaleEligible && !proxyHeld && receivers.length === 0;
   const winnerShare =
-    top != null && analysis.judgedSpend > 0
-      ? (top.spend / analysis.judgedSpend) * 100
+    lead != null && analysis.judgedSpend > 0
+      ? (lead.spend / analysis.judgedSpend) * 100
       : 0;
+  /* What the passed-over leader lacks, in the receiver floor's terms. */
+  const floorGaps = (ad: RankedAd): string => {
+    const gaps: string[] = [];
+    if (nouns != null && ad.conversions != null && ad.conversions < receiverMin) {
+      gaps.push(`${ad.conversions} ${ad.conversions === 1 ? nouns.one : nouns.many}`);
+    }
+    if (ad.spend < RECEIVER_MIN_GATE_MULTIPLE * analysis.spendGate) gaps.push(`${money(ad.spend)} of spend`);
+    return gaps.join(" on ");
+  };
+  const floorPhrase = `${nouns != null ? `≥${receiverMin} ${nouns.many}${minOutcome != null ? " (your minimum)" : ""} and ` : ""}≥ ${receiverSpendLabel} spent (${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend)`;
 
   /* ---- flat-field fact (hoisted above the rule branches so every
      return path can label the evidence; B1 and H2 are mutually
@@ -1061,7 +1135,15 @@ export function buildDecision(
       `The minimum of ${minOutcome} ${nouns.many} you set couldn't be checked — this export doesn't include ${nouns.one} counts — so it wasn't applied.`
     );
   }
-  if (outcomeBlockedScale && minOutcome != null && nouns != null && top != null) {
+  if (rawScaleEligible && !proxyHeld && topBelowFloor && lead != null && top != null) {
+    criteriaBuyer.push(
+      `"${top.name}" leads by ${pct(top.deltaPct!)}% but has ${floorGaps(top)} — under the receiver floor (${floorPhrase}), so budget goes to ${receiverNames(receivers)} instead.`
+    );
+    criteriaClient.push(
+      `"${top.name}" is ahead, but on too little spend and too few results to put more budget behind it yet — the extra budget goes to ads with a longer track record.`
+    );
+  }
+  if (outcomeBlockedScale && receiverBlocked && minOutcome != null && nouns != null && top != null) {
     criteriaBuyer.push(
       `"${top.name}" is ${pct(top.deltaPct!)}% better than the median — over the ${SCALE_TEST_MIN_DELTA_PCT}% bar — but recorded ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many}, below your ${minOutcome}-${nouns.one} minimum for a scaling decision, so no scale move is recommended.`
     );
@@ -1209,7 +1291,11 @@ export function buildDecision(
       source: "debrief_default",
     },
     {
-      label: `Budget-move bar: top ad ≥${SCALE_TEST_MIN_DELTA_PCT}% better than the median — Debrief default`,
+      label: `Budget-move bar: an ad receiving budget is ≥${SCALE_TEST_MIN_DELTA_PCT}% better than the median — Debrief default`,
+      source: "debrief_default",
+    },
+    {
+      label: `Receiver floor: ${nouns != null && minOutcome == null ? `≥${receiverMin} ${nouns.many} and ` : ""}≥ ${receiverSpendLabel} spent (${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend) before an ad receives budget; up to ${MAX_BUDGET_RECEIVERS} receivers — Debrief default`,
       source: "debrief_default",
     },
     {
@@ -1300,7 +1386,7 @@ export function buildDecision(
   }
 
   /* ---- B1: budget move (shift / scale / cut copy variants) ---- */
-  if (scaleEligible || cutEligible) {
+  if (scaleEligible || (cutEligible && !receiverBlocked)) {
     /* Trust Pass 4: a proxy KPI with NO outcome column in the export —
        the move stands (nothing better to read), but its basis is named. */
     if (analysis.proxyKpi && proxyCopy && !proxyHeld) {
@@ -1317,7 +1403,7 @@ export function buildDecision(
     }
     /* Trust Pass: the full from/to lists behind the headline's names. */
     const fromAds = analysis.losers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
-    const toAds = top ? [{ name: top.name, spendLabel: money(top.spend) }] : [];
+    const toAds = receivers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     /* Trust Pass 3d: the already-computed below-median spend, so the move
        is concrete — no new percentage or amount is invented. */
     const belowSpendLabel = money(analysis.belowBenchmarkSpend);
@@ -1335,13 +1421,28 @@ export function buildDecision(
     if (scaleEligible && winnerShare >= CONCENTRATION_GUARDRAIL_PCT) {
       // Copy-only guardrail — the action below is unchanged by this.
       avoidBuyer.push(
-        `Don't consolidate further — "${top!.name}" already holds ${pct(winnerShare)}% of judged spend; scale in steps.`
+        `Don't consolidate further — "${lead!.name}" already holds ${pct(winnerShare)}% of judged spend; scale in steps.`
       );
       avoidClient.push(
         `We're increasing the leader's budget in steps, not all at once — it already carries ${pct(winnerShare)}% of the working budget.`
       );
     }
 
+    /* Real-account fix 2: each receiver's own evidence, so the move is
+       visibly earned — and the below-median total is described as where
+       money sits, never as the amount to move. */
+    const many = receivers.length > 1;
+    const receiverFacts = receivers
+      .map(
+        (r) =>
+          `"${r.name}" is ${pct(r.deltaPct!)}% better than the median ${kpiLabel} on ${money(r.spend)}${
+            nouns != null && r.conversions != null ? ` with ${r.conversions} ${r.conversions === 1 ? nouns.one : nouns.many}` : ""
+          }`
+      )
+      .join("; ");
+    const passedOver = topBelowFloor && top != null && lead != null && top !== lead
+      ? ` "${top.name}" leads but sits under the receiver floor, so it isn't scaled.`
+      : "";
     const reassess = {
       buyer: `Reassess once the new allocation has ≥${gateLabel} of fresh spend behind it.`,
       client: `We'll revisit after the new setup has about ${gateLabel} of new spend to show results.`,
@@ -1359,10 +1460,12 @@ export function buildDecision(
         action: "budget",
         budgetVariant: "shift",
         budgetMove: { from: fromAds, to: toAds, belowSpendLabel },
-        headline: `Shift budget from ${loserNames(analysis)} into "${top!.name}".`,
-        clientHeadline: `Move budget from the weakest ads into "${top!.name}", the clear leader.`,
-        rationale: `"${top!.name}" is ${pct(top!.deltaPct!)}% better than the median ${kpiLabel} on ${money(top!.spend)}; ${analysis.belowBenchmarkCount} below-median ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}).`,
-        clientRationale: `"${top!.name}" is clearly ahead while several ads sit well behind — moving budget captures that gap now.`,
+        headline: `Shift budget in steps from ${loserNames(analysis)} into ${receiverNames(receivers)}.`,
+        clientHeadline: many
+          ? `Trim the weakest ads and step up budget on the ${receivers.length} clear leaders.`
+          : `Trim the weakest ads and step up budget on "${lead!.name}", the clear leader.`,
+        rationale: `${receiverFacts}.${passedOver} ${analysis.belowBenchmarkCount} below-median ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}) — where the money sits, not the amount to move: trim the weakest first and raise ${many ? "the receivers" : "the receiver"} in steps, re-reading after each.`,
+        clientRationale: `${many ? "These ads are" : `"${lead!.name}" is`} clearly ahead with real results behind ${many ? "them" : "it"} while several ads sit well behind — trimming the weakest and stepping up the leader${many ? "s" : ""} captures that gap without betting everything at once.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
       };
@@ -1380,10 +1483,14 @@ export function buildDecision(
         action: "budget",
         budgetVariant: "scale",
         budgetMove: { from: [], to: toAds },
-        headline: `Scale "${top!.name}" — ${pct(top!.deltaPct!)}% better than the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
-        clientHeadline: `Increase spend on "${top!.name}" — it's clearly outperforming.`,
-        rationale: `"${top!.name}" leads the ${kpiLabel} median by ${pct(top!.deltaPct!)}% on ${money(top!.spend)} of spend — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move. ${belowShare >= CUT_MIN_SPEND_SHARE_PCT ? `No cut: ${pct(belowShare)}% of judged spend sits below the median, but the weakest ad isn't ${SCALE_TEST_MIN_DELTA_PCT}% behind it.` : `No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`}`,
-        clientRationale: `"${top!.name}" is delivering about ${pct(top!.deltaPct!)}% better ${kpiClient} than the middle ad in this account, with real spend behind it — it has earned more budget.`,
+        headline: many
+          ? `Scale ${receiverNames(receivers)} in steps — each over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`
+          : `Scale "${lead!.name}" in steps — ${pct(lead!.deltaPct!)}% better than the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
+        clientHeadline: `Increase spend on ${receiverNames(receivers)} in steps — ${many ? "they're" : "it's"} clearly outperforming.`,
+        rationale: `${receiverFacts} — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.${passedOver} ${belowShare >= CUT_MIN_SPEND_SHARE_PCT ? `No cut: ${pct(belowShare)}% of judged spend sits below the median, but the weakest ad isn't ${SCALE_TEST_MIN_DELTA_PCT}% behind it.` : `No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`}`,
+        clientRationale: many
+          ? `These ads are delivering clearly better ${kpiClient} than the middle ad in this account, with real spend and results behind them — they've earned more budget, added in steps.`
+          : `"${lead!.name}" is delivering about ${pct(lead!.deltaPct!)}% better ${kpiClient} than the middle ad in this account, with real spend behind it — it has earned more budget, added in steps.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
       };
@@ -1408,11 +1515,7 @@ export function buildDecision(
       budgetMove: { from: fromAds, to: [], belowSpendLabel },
       headline: `Cut ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
-      rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${
-        outcomeBlockedScale && nouns != null
-          ? `The top ad clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar but sits below your ${minOutcome}-${nouns.one} scaling minimum, so the move is stopping the leak — not scaling.`
-          : `No winner clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar, so the move is stopping the leak — not scaling.`
-      }`,
+      rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). No winner clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar, so the move is stopping the leak — not scaling.`,
       clientRationale: `The weakest ads are far behind the rest and are using ${pct(belowShare)}% of the budget that's had a fair chance to perform — pausing them stops the leak without touching what works.`,
       avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
       reassess,
@@ -1471,25 +1574,28 @@ export function buildDecision(
     return {
       ...evidence,
       action: "test",
-      headline: `Run one test: ${testTitle}. Nothing has earned a budget move yet.`,
+      /* Real-account fix 2: a lead past the bar that no ad can receive
+         says exactly why in one line — the floor and what the leader has. */
+      headline: receiverBlocked
+        ? `Run one test: ${testTitle}. No ad has enough evidence to receive budget yet.`
+        : `Run one test: ${testTitle}. Nothing has earned a budget move yet.`,
       clientHeadline: `Run one focused test next: ${testTitle}.`,
       rationale:
-        outcomeBlockedScale && nouns != null && top != null
-          ? `Top ad +${pct(top.deltaPct!)}% clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar but has ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} — below your ${minOutcome}-${nouns.one} scaling minimum; below-benchmark spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. The strongest evidence-backed move is a test, not a budget change.`
+        receiverBlocked && top != null
+          ? `No budget move: "${top.name}" leads by ${pct(top.deltaPct!)}% but has ${floorGaps(top)}, and no ad past the ${SCALE_TEST_MIN_DELTA_PCT}% bar clears the receiver floor (${floorPhrase}). The strongest evidence-backed move is a test, not a budget change.`
           : `Top ad ${top?.deltaPct != null ? `+${pct(top.deltaPct)}%` : "±0%"} vs the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar; below-median spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. Neither clears, so the strongest evidence-backed move is a test, not a budget change.`,
-      clientRationale:
-        outcomeBlockedScale && nouns != null
-          ? `No ad has both a clear enough lead and the ${minOutcome} ${nouns.many} you require before scaling — the fastest path to a confident move is one focused test.`
-          : "No single ad is far enough ahead or behind to justify moving budget yet — the fastest path to a clear winner is one focused test.",
+      clientRationale: receiverBlocked
+        ? `The leading ad is ahead, but on too little spend and too few results to safely put more budget behind it — the fastest path to a confident move is one focused test.`
+        : "No single ad is far enough ahead or behind to justify moving budget yet — the fastest path to a clear winner is one focused test.",
       avoidNow: {
         buyer: [
-          outcomeBlockedScale && nouns != null
-            ? `No budget moves yet — the leader hasn't reached your ${minOutcome}-${nouns.one} scaling minimum.`
+          receiverBlocked
+            ? `No budget moves yet — no ad clears the receiver floor (${floorPhrase}).`
             : `No budget moves yet — nothing has cleared the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         ],
         client: [
-          outcomeBlockedScale && nouns != null
-            ? `We're not moving budget yet — the leading ad hasn't reached the ${minOutcome} ${nouns.many} you require first.`
+          receiverBlocked
+            ? "We're not moving budget yet — no ad has enough spend and results behind it to receive more."
             : "We're not moving budget yet — no ad has separated enough yet.",
         ],
       },

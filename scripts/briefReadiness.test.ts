@@ -122,14 +122,28 @@ function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
   assert.ok(r!.buyer.includes(String(BRIEF_READY_MIN_OUTCOMES)));
 }
 {
-  // At/above the default -> ready.
+  // At/above the default -> ready (spend clears the receiver floor:
+  // ≥ 2× the 100 minimum spend).
   const r = deriveSignalVolumeReadiness(
-    fixture({ winners: [ad("W", 100, 40, 50)] }),
+    fixture({ winners: [ad("W", 200, 40, 50)] }),
     undefined,
     "purchase",
     "purchases"
   );
   assert.equal(r?.state, "ready");
+}
+{
+  // Real-account fix 2: "Ready" respects the budget receiver floor — an
+  // ad with plenty of outcomes but under 2× the minimum spend is capped
+  // at directional, with the reason named.
+  const r = deriveSignalVolumeReadiness(
+    fixture({ winners: [ad("W", 199, 40, 60)] }),
+    undefined,
+    "purchase",
+    "purchases"
+  );
+  assert.equal(r?.state, "directional");
+  assert.ok(r!.buyer.includes("under 2× the minimum spend"));
 }
 {
   // 4. Missing conversions NEVER become zero: null count -> directional
@@ -164,7 +178,7 @@ function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
   // provenance reflects it.
   const criteria: DecisionCriteria = { minBriefOutcomeCount: 20 };
   const r = deriveSignalVolumeReadiness(
-    fixture({ winners: [ad("W", 100, 40, 25)] }),
+    fixture({ winners: [ad("W", 200, 40, 25)] }),
     criteria,
     "purchase",
     "purchases"

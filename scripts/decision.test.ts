@@ -212,7 +212,7 @@ function assertContract(d: MemoDecision, label: string) {
     money
   );
   assert.equal(d.action, "budget");
-  assert.ok(d.headline.startsWith("Shift budget from"), "shift variant when both bars clear");
+  assert.ok(d.headline.startsWith("Shift budget in steps from"), "shift variant when both bars clear");
   assert.equal(d.budgetVariant, "shift", "shift sets budgetVariant shift");
   assert.ok(d.headline.includes('"Hero"') && d.clientHeadline.includes('"Hero"'), "both registers commit to the same leader");
   assert.ok(d.rationale.includes("45%") && d.rationale.includes("35%"), "rationale cites winner delta and spend share");
@@ -965,8 +965,8 @@ console.log("decision (stage 1 — rules): all assertions passed");
     "limits carry the withheld-scale explanation"
   );
   assert.ok(
-    blocked.avoidNow.buyer[0].includes("50-purchase"),
-    "avoidNow cites the user's minimum instead of the % bar"
+    blocked.avoidNow.buyer[0].includes("≥50 purchases (your minimum)"),
+    "avoidNow cites the user's minimum (as the receiver floor) instead of the % bar"
   );
   assert.ok(
     blocked.appliedCriteria.some(
@@ -1032,8 +1032,9 @@ console.log("decision (stage 1 — rules): all assertions passed");
     "no purchase-count bar is listed for a KPI with no purchase count"
   );
 
-  /* Cut still eligible while scale is blocked → cut-only branch, with
-     the honest 'clears the % bar but below your minimum' wording. */
+  /* Real-account fix 2: a lead past the bar that NO ad can receive is a
+     test — even when the cut side alone would clear (the spec: "If none
+     pass, the decision is Test, not Shift"), with a one-line reason. */
   const cutBlocked = buildDecision(
     fixture({
       winners: [{ ...ad("W", 400, 80), conversions: 3 }],
@@ -1048,11 +1049,11 @@ console.log("decision (stage 1 — rules): all assertions passed");
     undefined,
     { minOutcomeCount: 50 }
   );
-  assert.equal(cutBlocked.action, "budget", "cut side unaffected by the scaling minimum");
-  assert.ok(cutBlocked.headline.startsWith("Cut "), "cut-only variant fires");
+  assert.equal(cutBlocked.action, "test", "no receiver ⇒ test, not a budget move");
+  assert.ok(cutBlocked.headline.includes("No ad has enough evidence to receive budget yet"));
   assert.ok(
-    cutBlocked.rationale.includes("below your 50-purchase scaling minimum"),
-    "cut rationale never falsely claims no winner cleared the % bar"
+    cutBlocked.rationale.startsWith('No budget move: "W" leads by 80% but has 3 purchases'),
+    "one-line reason names the leader's gap, never a false 'nothing cleared'"
   );
   assertContract(cutBlocked, "criteria:cut-blocked");
 }
@@ -1108,12 +1109,14 @@ console.log("decision (stage 1 — rules): all assertions passed");
   assert.equal(withheld.action, "test", "user bar withholds the scale");
   assert.equal(withheld.evidenceState, "supported", "…while the evidence label stays supported");
 
-  /* Action invariance: only the outcome volume differs → the ACTION is
-     identical; only the evidence label and limits change. */
+  /* Real-account fix 2 (intended change): the noise floor is now ALSO
+     the receiver floor — a leader under 10 outcomes can't receive
+     budget, so with no other receiver the call is a test. Above it the
+     scale move stands. The evidence label and limits behave as before. */
   const thin = buildDecision(supportedShape(8), "Fallback test.", money);
   const thick = buildDecision(supportedShape(40), "Fallback test.", money);
-  assert.equal(thin.action, thick.action, "volume qualification never changes the action");
-  assert.equal(thin.action, "budget", "both land on the scale move");
+  assert.equal(thin.action, "test", "under the receiver floor ⇒ no budget move");
+  assert.equal(thick.action, "budget", "above it ⇒ the scale move");
   assert.equal(thin.evidenceState, "limited", "thin volume: evidence limited");
   assert.equal(thick.evidenceState, "supported", "thick volume: evidence supported");
   assert.ok(
@@ -1308,7 +1311,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // The pin documented in sampleCsv.ts's invariants header.
     assert.equal(memo.decision.action, "budget", "sample decision is a budget move");
     assert.ok(
-      memo.decision.headline.startsWith("Shift budget from") &&
+      memo.decision.headline.startsWith("Shift budget in steps from") &&
         memo.decision.headline.includes('"UGC_MorningRoutine_V1"'),
       "sample decision shifts into the documented leader"
     );
@@ -2031,7 +2034,10 @@ console.log("decision (stage 1 — rules): all assertions passed");
           .map((n) => `${n},200,10,2.0,2026-06-01,2026-06-30`)
           .join("\n") + "\n";
       const mZero = runEngine(zeroCountCsv, "roas");
-      assert.equal(mZero.decision.action, "budget", "warning never changes the action");
+      /* Real-account fix 2: 0 recorded purchases can't clear the
+         receiver floor, so no budget move goes INTO it — the floor
+         decides that; the warning below is still copy only. */
+      assert.equal(mZero.decision.action, "test", "a 0-purchase leader can't receive budget");
       assert.ok(
         mZero.decision.limits.buyer.some(
           (l: string) => l.includes("recorded purchase count of 0") && l.includes("attribution")

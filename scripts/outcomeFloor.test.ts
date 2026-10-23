@@ -50,7 +50,10 @@ try {
     for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
   // The decision changes only because the field is set.
   assert.equal(base.memo.decision.budgetVariant, "shift");
-  assert.equal(d.budgetVariant, "scale", "fewer judged ads ⇒ a different call");
+  /* Real-account fix 2: with 7 judged ads the leader (300 spend) sits
+     under 2× the minimum spend, and no other ad past the 30% bar can
+     receive budget ⇒ a test. */
+  assert.equal(d.action, "test", "fewer judged ads ⇒ a different call");
 
   /* ---- CTR/CPC: not applicable, memo unchanged ---- */
   for (const kpi of ["ctr", "cpc"]) {

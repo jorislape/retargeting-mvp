@@ -28,12 +28,14 @@ try {
   assert.equal(m.losers.rows.length, 6, "memo rows = the count the copy uses");
   assert.equal(m.winners.length, 6);
 
-  // The decision moves budget from all six, into the leader — named.
+  // The decision moves budget from all six, into the receiver — named.
+  // Real-account fix 2: Hero_UGC_A leads but spent 300 < 2× the 171
+  // minimum spend, so Demo_C (374 spend, 24 purchases, +44%) receives.
   assert.equal(m.decision.action, "budget");
   assert.equal(m.decision.budgetVariant, "shift");
   assert.deepEqual(m.decision.budgetMove?.from.map((x) => x.name).sort(), [...BELOW].sort());
-  assert.deepEqual(m.decision.budgetMove?.to.map((x) => x.name), ["Hero_UGC_A"]);
-  assert.match(m.decision.headline, /and 4 more into "Hero_UGC_A"/);
+  assert.deepEqual(m.decision.budgetMove?.to.map((x) => x.name), ["Demo_C"]);
+  assert.match(m.decision.headline, /and 4 more into "Demo_C"/);
 
   // Every below-median ad appears in buyer TXT, client TXT, and at the
   // client's 3-row display cap too (the rest after "+N more:").

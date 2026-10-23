@@ -10,7 +10,7 @@
  * (c) A test built on an ad that doesn't clear the +30% scale bar is
  *     never badged "Ready" — capped at Early signal (directional).
  * (d) The budget move is concrete: ads to pause/trim, the ad receiving
- *     budget, and "about $X currently on below-median ads" (the
+ *     budget, and "about $X currently sits on below-median ads" (the
  *     already-computed figure — nothing invented).
  */
 import assert from "node:assert/strict";
@@ -63,7 +63,7 @@ try {
     if (d.action === "budget") {
       assert.ok(d.budgetMove);
       if (d.budgetVariant !== "scale") {
-        assert.match(buyer, new RegExp(`About ${d.budgetMove!.belowSpendLabel!.replace(/[$.]/g, "\\$&")} currently on below-median ads\\.`));
+        assert.match(buyer, new RegExp(`About ${d.budgetMove!.belowSpendLabel!.replace(/[$.]/g, "\\$&")} currently sits on below-median ads — context, not the amount to move`));
         assert.match(buyer, /\nPause or trim: /);
         assert.match(client, /\nPausing or reducing: /);
       }

@@ -25,6 +25,15 @@ export type ReportView = "buyer" | "client";
 export const CLIENT_BRIEF_LEGEND =
   "Ready means the winning idea has enough results behind it to build new creative on; Early signal means it looks promising but needs more results; Not enough evidence means it's too early to brief on.";
 
+/** Real-account fix 2 — the below-median total under a budget move,
+ *  shared by the report and TXT. Descriptive only: it says where money
+ *  sits, never that the whole amount moves. */
+export function belowSpendLine(label: string, client: boolean): string {
+  return client
+    ? `About ${label} is currently going to ads below the middle ad — we trim the weakest and add budget to the leaders in steps, not all at once.`
+    : `About ${label} currently sits on below-median ads — context, not the amount to move: trim the weakest and raise the receivers in steps.`;
+}
+
 export function clientizeText(text: string): string {
   return text
     .replace(/clears the spend gate/g, "has enough spend to judge fairly")
@@ -304,8 +313,8 @@ export function memoToText(
     if (d.budgetMove.belowSpendLabel)
       lines.push(
         view === "client"
-          ? `About ${d.budgetMove.belowSpendLabel} is currently going to ads below the middle ad.`
-          : `About ${d.budgetMove.belowSpendLabel} currently on below-median ads.`
+          ? belowSpendLine(d.budgetMove.belowSpendLabel, true)
+          : belowSpendLine(d.budgetMove.belowSpendLabel, false)
       );
   }
   lines.push(view === "client" ? d.clientRationale : d.rationale);

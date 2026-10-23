@@ -20,7 +20,7 @@ import {
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
-import { CLIENT_BRIEF_LEGEND, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { belowSpendLine, CLIENT_BRIEF_LEGEND, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
@@ -437,9 +437,7 @@ function BudgetMoveNames({
       )}
       {move.belowSpendLabel && (
         <p className="text-xs leading-relaxed text-zinc-400">
-          {client
-            ? `About ${move.belowSpendLabel} is currently going to ads below the middle ad.`
-            : `About ${move.belowSpendLabel} currently on below-median ads.`}
+          {belowSpendLine(move.belowSpendLabel, client)}
         </p>
       )}
     </div>

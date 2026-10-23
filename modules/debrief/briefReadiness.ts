@@ -2,7 +2,12 @@
 // compare.ts: types.ts imports nothing, so this file's whole dependency
 // chain resolves under plain Node's type-stripping test runner
 // (scripts/briefReadiness.test.ts).
-import { MIN_OUTCOMES_FOR_SUPPORTED, SCALE_TEST_MIN_DELTA_PCT } from "./decision.ts";
+import {
+  MIN_OUTCOMES_FOR_SUPPORTED,
+  passesReceiverFloor,
+  RECEIVER_MIN_GATE_MULTIPLE,
+  SCALE_TEST_MIN_DELTA_PCT,
+} from "./decision.ts";
 import { outcomeNounsFor } from "./types.ts";
 import type {
   AnalysisResult,
@@ -145,6 +150,16 @@ export function deriveSignalVolumeReadiness(
       state: "directional",
       buyer: `Directional — "${top.name}" has ${n} ${nounMany}, but leads the median by ${lead}, under the ${SCALE_TEST_MIN_DELTA_PCT}% bar this read uses before treating a lead as an established creative pattern.`,
       client: `"${top.name}" is ahead with plenty of results, but not by enough yet to call it a proven pattern.`,
+      criterion,
+    };
+  }
+  /* Real-account fix 2: "Ready" never outruns the budget receiver floor
+     — an ad too thin to receive budget is too thin to brief as proven. */
+  if (!passesReceiverFloor(top, analysis, criteria)) {
+    return {
+      state: "directional",
+      buyer: `Directional — "${top.name}" has ${n} ${nounMany} but ${top.spend < RECEIVER_MIN_GATE_MULTIPLE * analysis.spendGate ? `under ${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend` : "too few for your scaling minimum"} — the same floor an ad needs before it receives budget, so it isn't treated as an established pattern yet.`,
+      client: `"${top.name}" is ahead with plenty of results, but on too little spend yet to call it a proven pattern.`,
       criterion,
     };
   }
