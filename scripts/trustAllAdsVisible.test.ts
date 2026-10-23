@@ -55,8 +55,8 @@ try {
      and names come from the same full list. */
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
   assert.ok(!/rows\.slice\(0, topAdsShown\)/.test(report), "tables no longer drop rows");
-  assert.match(report, /i >= topAdsShown && !expanded \? "hidden" : ""/);
-  assert.match(report, /<PrintMore count=\{expanded \? 0 : rows\.length - topAdsShown\} \/>/);
+  assert.match(report, /i >= topAdsShown && !expanded \? "hidden" : i >= PRINT_TABLE_ROWS && !expanded \? "print:hidden" : ""/);
+  assert.match(report, /<PrintMore count=\{expanded \? 0 : rows\.length - Math\.min\(topAdsShown, PRINT_TABLE_ROWS\)\} \/>/);
   assert.match(report, /\+\$\{count\} more — see full list online \/ TXT/);
   assert.match(report, /<MoreToggle\s+names=\{rows\.slice\(topAdsShown\)\.map\(\(a\) => a\.name\)\}/);
   assert.match(report, /\{d\.budgetMove && <BudgetMoveNames move=\{d\.budgetMove\} client=\{client\}/);

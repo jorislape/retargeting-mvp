@@ -25,7 +25,11 @@ const between = (from: string, to: string) => report.slice(report.indexOf(from),
 /* ---- "+N more" stays collapsed in print, with a pointer ---- */
 assert.ok(!/\? "hidden print:(table-row|flex|inline)"/.test(report), "no collapsed row is forced back into print");
 assert.match(report, /const text = `\+\$\{count\} more — see full list online \/ TXT`;/);
-assert.equal((report.match(/<PrintMore count=\{expanded \? 0 : rows\.length - topAdsShown\} \/>/g) ?? []).length, 1, "ad table");
+assert.equal((report.match(/<PrintMore count=\{expanded \? 0 : rows\.length - Math\.min\(topAdsShown, PRINT_TABLE_ROWS\)\} \/>/g) ?? []).length, 1, "ad table");
+assert.match(report, /const PRINT_TABLE_ROWS = 3;/, "tables print their top 3 rows");
+assert.match(report, /i >= PRINT_TABLE_ROWS && !expanded \? "print:hidden" : ""/);
+assert.match(report, /const PRINT_CRITERIA_SHOWN = 5;/, "decision bars: first 5 + every user criterion");
+assert.match(report, /i >= PRINT_CRITERIA_SHOWN && criterion\.source !== "user" \? "print:hidden" : ""/);
 assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline count=\{ads\.length - SHOWN\} \/>\}/, "Pause / Receives lists");
 assert.match(css, /\.print-only-inline \{\s*display: none;\s*\}/);
 assert.match(css, /\.print-only-inline \{\s*display: inline !important;\s*\}/);

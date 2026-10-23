@@ -102,6 +102,12 @@ function FullAdName({ name }: { name: string }) {
   );
 }
 
+/** Ad-table rows printed before "+N more" (unless expanded on screen). */
+const PRINT_TABLE_ROWS = 3;
+
+/** Decision bars printed before "+N more" (user criteria always print). */
+const PRINT_CRITERIA_SHOWN = 5;
+
 /** Evidence limits printed before "+N more — see full list online / TXT"
  *  (client: the permanent caveat plus one). */
 const PRINT_LIMITS_SHOWN = { buyer: 4, client: 2 } as const;
@@ -548,7 +554,11 @@ function DecisionCard({
       {d.appliedCriteria.map((criterion, i) => (
         <li
           key={i}
-          className="flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500"
+          /* Fix 6: print keeps the first PRINT_CRITERIA_SHOWN bars and
+             every user criterion; the rest are online / TXT. */
+          className={`flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500 ${
+            i >= PRINT_CRITERIA_SHOWN && criterion.source !== "user" ? "print:hidden" : ""
+          }`}
         >
           <span
             className={`shrink-0 rounded-sm border px-1 py-px text-[9px] font-semibold uppercase tracking-[0.08em] ${
@@ -698,6 +708,9 @@ function DecisionCard({
               Decision bars applied
             </p>
             {appliedCriteriaList}
+            <PrintMore
+              count={d.appliedCriteria.filter((c, i) => i >= PRINT_CRITERIA_SHOWN && c.source !== "user").length}
+            />
           </div>
         </>
       )}
@@ -963,7 +976,7 @@ function AdTable({
             <tr
               key={ad.name + i}
               className={`border-b border-white/[0.06] transition-colors last:border-0 hover:bg-white/[0.02] ${
-                i >= topAdsShown && !expanded ? "hidden" : ""
+                i >= topAdsShown && !expanded ? "hidden" : i >= PRINT_TABLE_ROWS && !expanded ? "print:hidden" : ""
               }`}
             >
               <td
@@ -1055,7 +1068,7 @@ function AdTable({
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
       />
-      <PrintMore count={expanded ? 0 : rows.length - topAdsShown} />
+      <PrintMore count={expanded ? 0 : rows.length - Math.min(topAdsShown, PRINT_TABLE_ROWS)} />
     </div>
   );
 }

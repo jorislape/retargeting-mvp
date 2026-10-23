@@ -331,7 +331,7 @@ Run `scripts/fixtures/agency-naming-convention.csv` (ROAS).
 - [ ] **PDF length**: Print / Save PDF (A4). Buyer ≤ 6 pages, client ≤ 4
       (Chromium: 6 / 4 on the fixture, Patterns by naming on; a real 341-ad account went from
       25 / 15 to 6 / 4). Collapsed lists print "+N more — see full list
-      online / TXT"; names are middle-truncated (~40 chars); each test
+      online / TXT" (ad tables print their top 3 rows); names are middle-truncated (~40 chars); each test
       prints only its title, Hypothesis and Win (client: title + Success);
       the client PDF names ads once, in the Summary split. Repeat in
       Safari's print preview — its pagination differs from Chromium's.
