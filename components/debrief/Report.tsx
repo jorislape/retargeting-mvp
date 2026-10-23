@@ -2354,6 +2354,13 @@ export function Report({
               it, an ad is set aside rather than judged.
             </p>
           )}
+          {/* Real-account review — most ads never got a fair read. Buyer
+              only, near the top; display only (amber = warning). */}
+          {!client && memo.spreadThin && (
+            <p className="mt-3 max-w-3xl border-l-2 border-amber-300/50 pl-3 text-xs leading-relaxed text-zinc-300">
+              {memo.spreadThin}
+            </p>
+          )}
           {/* Trust Pass 2 — the user's own target, made visible: how many
               judged ads beat it. Display only; the action ignores it. */}
           {memo.scope.targetSummary && (

@@ -18,6 +18,7 @@ import {
   ParsedAd,
   RankedAd,
   outcomeNounsFor,
+  outcomeNounsForKpi,
 } from "./types";
 
 /** Absolute minimum spend to trust an ad's numbers when no target CPA
@@ -44,6 +45,11 @@ function median(values: number[]): number | null {
     ? sorted[mid]
     : (sorted[mid - 1] + sorted[mid]) / 2;
 }
+
+/** Real-account review: share of analyzed ads set aside for low spend
+ *  (or no purchases yet on low spend) at which the report says spend is
+ *  spread too thin for a fair read. */
+export const SPREAD_THIN_SHARE = 0.5;
 
 /** Total spend ÷ total conversions across every ad (Real-account fix
  *  1's zero-purchase bar for ROAS). null when no ad recorded any. */
@@ -354,6 +360,20 @@ export function analyze(
     ...(kpi === "ctr" || kpi === "cpc" || kpi === "purchases" || kpi === "leads"
       ? { proxyKpi: buildProxyKpi(kpi, columns, rawRows, ranked) }
       : {}),
+    /* Real-account review: most ads never got a fair read (display
+       only — never read by the gate, median, ranking or decision). */
+    ...((): { spreadThin?: NonNullable<AnalysisResult["spreadThin"]> } => {
+      const thin = gated.filter((a) => a.gate === "below_spend_gate" || a.gate === "zero_outcome_thin");
+      if (ads.length === 0 || thin.length < SPREAD_THIN_SHARE * ads.length) return {};
+      return {
+        spreadThin: {
+          thin: thin.length,
+          total: ads.length,
+          avgSpend: thin.reduce((sum, a) => sum + a.spend, 0) / thin.length,
+          costPerOutcome: outcomeNounsForKpi(kpi) != null ? accountCostPerOutcome(ads) : null,
+        },
+      };
+    })(),
     /* Trust Pass 2: the blended account result (display-only). */
     ...((): { accountKpi?: NonNullable<AnalysisResult["accountKpi"]> } => {
       const acct = computeAccountKpi(ads, kpi);

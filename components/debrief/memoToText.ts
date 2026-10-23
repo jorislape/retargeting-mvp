@@ -231,6 +231,8 @@ export function memoToText(
         : `Target ${viewKpiLabel} ${ts.targetLabel}: ${ts.beat} of ${ts.judged} judged ads beat your target.`
     );
   }
+  /* Real-account review: buyer only, near the top. */
+  if (view !== "client" && memo.spreadThin) lines.push(memo.spreadThin);
   lines.push("");
 
   /* Period Comparison V2 — mirrors the on-screen order: what changed

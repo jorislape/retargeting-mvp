@@ -499,6 +499,19 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
   return { winners: winnerNotes, losers: loserNotes };
 }
 
+/** Real-account review — one insight line when most ads never got a
+ *  fair read. Restates analysis.spreadThin; never a decision input. */
+function buildSpreadThin(analysis: AnalysisResult): { spreadThin?: string } {
+  const t = analysis.spreadThin;
+  if (!t) return {};
+  const nouns = outcomeNounsFor(analysis);
+  const avg = `avg ${fmtMoney(t.avgSpend, analysis.currency)} per ad`;
+  const vs = t.costPerOutcome != null && nouns != null ? ` vs ${fmtMoney(t.costPerOutcome, analysis.currency)} cost per ${nouns.one}` : "";
+  return {
+    spreadThin: `Spend is spread thin: ${fmtCount(t.thin)} of ${fmtCount(t.total)} ads never reached the minimum spend (${avg}${vs}). Fewer ads per ad set would give each a fair read.`,
+  };
+}
+
 /** Real-account fix 8 — formats analysis.namingPatterns for the report
  *  and TXT. Absent key when there's no convention (byte-identical). */
 function buildNamingPatterns(analysis: AnalysisResult): { namingPatterns?: MemoNamingPatterns } {
@@ -2234,6 +2247,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     },
     patterns: buildPatterns(analysis),
     ...buildNamingPatterns(analysis),
+    ...buildSpreadThin(analysis),
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
     avoid: buildAvoid(analysis, context, decision),

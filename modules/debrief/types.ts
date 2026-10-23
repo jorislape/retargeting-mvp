@@ -608,6 +608,13 @@ export interface AnalysisResult {
       aboveMedian: string[];
     };
   };
+  /** Real-account review — present ONLY when ≥ SPREAD_THIN_SHARE of
+   *  analyzed ads were set aside for low spend / no purchases on low
+   *  spend. avgSpend = the average spend of those set-aside ads;
+   *  costPerOutcome =
+   *  account cost per purchase/lead (null for CTR/CPC or no outcomes).
+   *  Display only — one insight line near the top of the buyer view. */
+  spreadThin?: { thin: number; total: number; avgSpend: number; costPerOutcome: number | null };
   /** Trust Pass 2 (accountKpi.ts): the account's real result for the
    *  KPI from totals across every analyzed ad, with coverage. Display
    *  only — never read by the gate, median, ranking or decision. */
@@ -1288,6 +1295,10 @@ export interface Memo {
   /** Real-account fix 8 — "Patterns by naming" (buyer view + buyer TXT;
    *  absent unless the ad names follow a convention). */
   namingPatterns?: MemoNamingPatterns;
+  /** Real-account review — "Spend is spread thin: …" (buyer view near
+   *  the top + buyer TXT; absent unless analysis.spreadThin). Display
+   *  only. */
+  spreadThin?: string;
   /** Present only when the user pasted market/competitor context. */
   marketSignal: MemoMarketSignal | null;
   nextTests: MemoTest[];
