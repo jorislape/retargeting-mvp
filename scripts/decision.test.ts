@@ -180,7 +180,8 @@ function assertContract(d: MemoDecision, label: string) {
   const mk = (share: number) =>
     fixture({
       winners: [ad("W", 200, 10)],
-      losers: [ad("L1", share * 10, -35), ad("L2", 50, -32)],
+      // The full pool (Trust Pass): the trim list and its count come from it.
+      losers: [ad("L1", share * 10, -35), ad("L2", 50, -32), ad("L3", 50, -31), ad("L4", 50, -30)],
       judgedSpend: 1000,
       belowBenchmarkSpend: share * 10, // share% of judgedSpend
       belowBenchmarkCount: 4,
@@ -193,7 +194,7 @@ function assertContract(d: MemoDecision, label: string) {
   assert.equal(at25.budgetVariant, "cut", "cut-only sets budgetVariant cut");
   // >2 trimmed ads ⇒ count form; the names live in budgetMove.from.
   assert.ok(at25.headline.startsWith("Trim 4 below-median ads;"), "count form honest about the full total");
-  assert.deepEqual(at25.budgetMove?.from.map((x) => x.name), ["L1", "L2"]);
+  assert.deepEqual(at25.budgetMove?.from.map((x) => x.name), ["L1", "L2", "L3", "L4"]);
   assert.ok(at25.rationale.includes(`${CUT_MIN_SPEND_SHARE_PCT}`) || at25.rationale.includes("25"), "rationale carries the share");
   assertContract(at24, "cut@24");
   assertContract(at25, "cut@25");
@@ -1330,7 +1331,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // The pin documented in sampleCsv.ts's invariants header.
     assert.equal(memo.decision.action, "budget", "sample decision is a budget move");
     assert.ok(
-      memo.decision.headline === "Shift budget in steps from 5 below-median ads into 3 ads with 31+ purchases each." &&
+      memo.decision.headline === "Shift budget in steps from 4 ads well below the median into 3 ads with 31+ purchases each." &&
         memo.decision.budgetMove?.to[0].name === "UGC_MorningRoutine_V1",
       "sample decision shifts into the documented leader"
     );

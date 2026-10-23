@@ -404,12 +404,38 @@ export function trimOrder(analysis: AnalysisResult): RankedAd[] {
     .map((x) => x.ad);
 }
 
+/**
+ * Real-account review: the trim list — trimOrder minus near-median ads
+ * (within FLAT_FIELD_DELTA_PCT of the median: "Near median — hold").
+ * Zero-outcome ads always count. Display/copy only: the cut bar still
+ * reads every below-median ad.
+ */
+export function trimCandidates(analysis: AnalysisResult): RankedAd[] {
+  return trimOrder(analysis).filter((a) => !isNearMedian(a));
+}
+
+/** A below-median ad within FLAT_FIELD_DELTA_PCT of the median. */
+export function isNearMedian(ad: RankedAd): boolean {
+  return !ad.zeroConversions && ad.deltaPct != null && ad.deltaPct < 0 && ad.deltaPct >= -FLAT_FIELD_DELTA_PCT;
+}
+
+/** "N below-median ads", or — when near-median holds were left out —
+ *  "N ads well below the median". */
+export function trimCountLabel(analysis: AnalysisResult): string {
+  const n = trimCandidates(analysis).length;
+  const held = analysis.losers.length - n;
+  return held > 0
+    ? `${n} ad${n === 1 ? "" : "s"} well below the median`
+    : `${n} below-median ad${n === 1 ? "" : "s"}`;
+}
+
 /** Up to two quoted loser names, honest about any remainder — the
  *  remainder counts ALL below-median ads (belowBenchmarkCount), not
  *  just the display slice, matching the kill-list spend rule. */
 function loserNames(analysis: AnalysisResult): string {
-  const shown = trimOrder(analysis).slice(0, 2).map((a) => `"${a.name}"`);
-  const more = analysis.belowBenchmarkCount - shown.length;
+  const trims = trimCandidates(analysis);
+  const shown = trims.slice(0, 2).map((a) => `"${a.name}"`);
+  const more = trims.length - shown.length;
   if (more > 0) return `${shown.join(", ")} and ${more} more`;
   return shown.join(" and ");
 }
@@ -1665,7 +1691,7 @@ function decide(
       };
     }
     /* Trust Pass: the full from/to lists behind the headline's names. */
-    const fromAds = trimOrder(analysis).map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
+    const fromAds = trimCandidates(analysis).map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     const toAds = receivers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     /* Trust Pass 3d: the already-computed below-median spend, so the move
        is concrete — no new percentage or amount is invented. */
@@ -1705,7 +1731,8 @@ function decide(
       .join("; ");
     /* Real-account follow-up: >2 trimmed ads or >1 receiver ⇒ the
        headline counts; the names stay in the Pause / Receives lines. */
-    const countForm = analysis.belowBenchmarkCount > 2 || receivers.length > 1;
+    const trimCount = trimCandidates(analysis).length;
+    const countForm = trimCount > 2 || receivers.length > 1;
     const minReceiverOutcomes =
       nouns != null && receivers.length > 0 && receivers.every((r) => r.conversions != null)
         ? Math.min(...receivers.map((r) => r.conversions as number))
@@ -1714,7 +1741,15 @@ function decide(
       receivers.length > 1
         ? `${receivers.length} ads${minReceiverOutcomes != null ? ` with ${minReceiverOutcomes}+ ${nouns!.many} each` : ""}`
         : receiverNames(receivers);
-    const losersCounted = `${analysis.belowBenchmarkCount} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"}`;
+    const losersCounted = trimCountLabel(analysis);
+    /* Real-account review: near-median ads aren't trims — say so once. */
+    const held = analysis.losers.length - trimCount;
+    const heldNote =
+      held === 1
+        ? ` 1 of them sits within ${FLAT_FIELD_DELTA_PCT}% of the median — a near-median hold, not a trim.`
+        : held > 1
+          ? ` ${held} of them sit within ${FLAT_FIELD_DELTA_PCT}% of the median — near-median holds, not trims.`
+          : "";
     const passedOver = topBelowFloor && top != null && lead != null && top !== lead
       ? ` "${top.name}" leads but sits under the receiver floor, so it isn't scaled.`
       : "";
@@ -1741,7 +1776,7 @@ function decide(
         clientHeadline: many
           ? `Trim the weakest ads and step up budget on the ${receivers.length} clear leaders.`
           : `Trim the weakest ads and step up budget on "${lead!.name}", the clear leader.`,
-        rationale: `${receiverFacts}.${passedOver} ${analysis.belowBenchmarkCount} below-median ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}) — where the money sits, not the amount to move: trim the weakest first and raise ${many ? "the receivers" : "the receiver"} in steps, re-reading after each.`,
+        rationale: `${receiverFacts}.${passedOver} ${analysis.belowBenchmarkCount} below-median ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}) — where the money sits, not the amount to move: trim the weakest first and raise ${many ? "the receivers" : "the receiver"} in steps, re-reading after each.${heldNote}`,
         clientRationale: `${many ? "These ads are" : `"${lead!.name}" is`} clearly ahead with real results behind ${many ? "them" : "it"} while several ads sit well behind — trimming the weakest and stepping up the leader${many ? "s" : ""} captures that gap without betting everything at once.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
@@ -1791,8 +1826,8 @@ function decide(
       budgetVariant: "cut",
       budgetMove: { from: fromAds, to: [], belowSpendLabel },
       headline:
-        analysis.belowBenchmarkCount > 2
-          ? `Trim ${analysis.belowBenchmarkCount} below-median ads; hold everything else steady.`
+        trimCandidates(analysis).length > 2
+          ? `Trim ${trimCountLabel(analysis)}; hold everything else steady.`
           : `Trim ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
       rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${

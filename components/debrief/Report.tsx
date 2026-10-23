@@ -1067,6 +1067,11 @@ function AdTable({
                     {view === "client" ? ad.trimNote.client : ad.trimNote.buyer}
                   </p>
                 )}
+                {ad.holdNote && (
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
+                    {view === "client" ? ad.holdNote.client : ad.holdNote.buyer}
+                  </p>
+                )}
               </td>
               <td className="py-3 pr-4 text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
                 {ad.valueLabel}
@@ -1139,13 +1144,14 @@ function PrintAppendix({
     above: client ? "Above the middle ad" : "Above median",
     at: client ? "Middle" : "At median",
     trim: client ? "Reduce / pause" : "Pause / trim",
+    hold: client ? "Close to the middle ad" : "Near median — hold",
     below: client ? "Below the middle ad" : "Below median",
   };
   const rows = showAds
     ? [
         ...memo.winners.map((r) => ({ r, group: to.has(r.name) ? label.receives : label.above })),
         ...(memo.atMedian?.rows ?? []).map((r) => ({ r, group: label.at })),
-        ...memo.losers.rows.map((r) => ({ r, group: from.has(r.name) ? label.trim : label.below })),
+        ...memo.losers.rows.map((r) => ({ r, group: from.has(r.name) ? label.trim : r.holdNote ? label.hold : label.below })),
       ]
     : [];
   const outcomeHeader = rows.some(({ r }) => r.conversionLabel)
@@ -1302,6 +1308,9 @@ function ClientAdList({
               )}
               {ad.trimNote && (
                 <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">{ad.trimNote.client}</p>
+              )}
+              {ad.holdNote && (
+                <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">{ad.holdNote.client}</p>
               )}
             </div>
             <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">

@@ -46,7 +46,7 @@ assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline co
   // Every judged ad once, in the role the report gives it.
   assert.match(app, /memo\.winners\.map\(\(r\) => \(\{ r, group: to\.has\(r\.name\) \? label\.receives : label\.above \}\)\)/);
   assert.match(app, /\(memo\.atMedian\?\.rows \?\? \[\]\)\.map\(\(r\) => \(\{ r, group: label\.at \}\)\)/);
-  assert.match(app, /memo\.losers\.rows\.map\(\(r\) => \(\{ r, group: from\.has\(r\.name\) \? label\.trim : label\.below \}\)\)/);
+  assert.match(app, /memo\.losers\.rows\.map\(\(r\) => \(\{ r, group: from\.has\(r\.name\) \? label\.trim : r\.holdNote \? label\.hold : label\.below \}\)\)/);
   assert.match(app, /trim: client \? "Reduce \/ pause" : "Pause \/ trim"/);
   // Columns: name, role, spend, outcomes, KPI.
   for (const col of [/r\.spendLabel/, /r\.conversionLabel\?\.replace/, /r\.valueLabel/]) assert.match(app, col);

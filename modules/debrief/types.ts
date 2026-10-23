@@ -760,6 +760,9 @@ export interface MemoWinnerLoserRow {
    *  `short` is the Pause / trim list form. Display only — never the
    *  ranking or the action. */
   trimNote?: { buyer: string; client: string; short: { buyer: string; client: string } };
+  /** Real-account review — below-median rows within FLAT_FIELD_DELTA_PCT
+   *  of the median: "Near median — hold". Left out of the trim list. */
+  holdNote?: { buyer: string; client: string };
   /** Real-account review — above-median rows, ROAS with a purchase count:
    *  evidence-adjusted ROAS (pulled toward the median by few purchases),
    *  the table's sort key. Buyer view only. */

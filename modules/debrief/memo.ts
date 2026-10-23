@@ -18,10 +18,13 @@ import {
   SHORT_WINDOW_DAYS,
   spendGateSource,
   trimOrder,
+  trimCandidates,
+  isNearMedian,
   byEvidence,
   evidenceAdjustedKpi,
   passedOverReason,
   passesReceiverFloor,
+  FLAT_FIELD_DELTA_PCT,
   zeroThinCopy,
 } from "./decision";
 import {
@@ -311,6 +314,12 @@ function trimNoteFor(
   };
 }
 
+/** Real-account review — a below-median ad within the flat band. */
+const NEAR_MEDIAN_HOLD = {
+  buyer: `Near median — hold (within ${FLAT_FIELD_DELTA_PCT}% of the median; not a trim).`,
+  client: "Close to the middle ad — keeping it as is.",
+};
+
 /** The buyer view's "adj." value: ROAS shrunk toward the median by
  *  purchase volume (decision.ts evidenceAdjustedKpi). ROAS only. */
 function adjFor(ad: RankedAd, analysis: AnalysisResult, criteria: DecisionCriteria): { adjValueLabel?: string } {
@@ -471,7 +480,16 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
         ? ` and ${extra} other below-median ad${extra === 1 ? "" : "s"}`
         : ` and ${extra} other ad${extra === 1 ? "" : "s"}`
       : "";
-    lines.push(
+    /* Real-account review: near-median ads (within the flat band) are
+       holds, not trims — a cut names only the trim list. */
+    const trims = trimCandidates(analysis);
+    const held = losers.length - trims.length;
+    if (cutSide && held > 0) {
+      const more = trims.length - 1;
+      lines.push(
+        `Trim or pause "${trims[0].name}"${more > 0 ? ` and ${more} other ad${more === 1 ? "" : "s"} well below the median` : ""} — combined ${fmtMoney(trims.reduce((s, a) => s + a.spend, 0), currency)}; ${held} near-median ad${held === 1 ? "" : "s"} hold${held === 1 ? "s" : ""}.`
+      );
+    } else lines.push(
       cutSide
         ? `Trim or pause "${firstTrim.name}"${alsoBelow} — combined ${fmtMoney(belowBenchmarkSpend, currency)} spent below the median.`
         : `"${firstTrim.name}"${alsoBelow} sit${extra > 0 ? "" : "s"} below the median — combined ${fmtMoney(belowBenchmarkSpend, currency)}, though no cut clears this memo's bars yet (see Next move).`
@@ -2317,7 +2335,10 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     leadingConversion: buildLeadingConversion(analysis),
     losers: {
       /* Real-account review: listed by money at stake, not by KPI. */
-      rows: trimOrder(analysis).map((ad) => ({ ...buildRow(ad, analysis, context), ...trimNoteFor(ad, analysis, context) })),
+      rows: trimOrder(analysis).map((ad) => ({
+        ...buildRow(ad, analysis, context),
+        ...(isNearMedian(ad) ? { holdNote: NEAR_MEDIAN_HOLD } : trimNoteFor(ad, analysis, context)),
+      })),
       /* Losers Coherence fix (same contract as buildTldr): the cut
          imperative is voiced ONLY when the committed decision actually
          contains a cut (budgetVariant "cut" or "shift"). Scale-only,

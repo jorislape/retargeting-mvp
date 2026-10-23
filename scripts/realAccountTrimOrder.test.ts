@@ -121,9 +121,10 @@ try {
         for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(str), `client "${w}": ${str}`);
     }
 
-    // Sample: two lower-gap rows gain the note; nothing in the top 3 ⇒ no hint.
+    // Sample: the 1.28x row gains the note (2.12x is a near-median hold);
+    // nothing in the top 3 ⇒ no hint.
     const sample = buildSampleMemo();
-    assert.deepEqual(sample.losers.rows.map((x) => Boolean(x.trimNote)), [false, false, false, true, true]);
+    assert.deepEqual(sample.losers.rows.map((x) => Boolean(x.trimNote)), [false, false, false, true, false]);
     assert.equal(sample.decision.trimTargetHint, undefined);
 
     // Report renders all three surfaces.
@@ -131,6 +132,39 @@ try {
     assert.match(report, /\{a\.note \? <span className="text-amber-300\/80"> — \{client \? a\.note\.client : a\.note\.buyer\}<\/span> : null\}/);
     assert.match(report, /\{client \? d\.trimTargetHint\.client : d\.trimTargetHint\.buyer\}/);
     assert.match(report, /\{view === "client" \? ad\.trimNote\.client : ad\.trimNote\.buyer\}/);
+  }
+
+  /* ---- Near median (within 15%) is a hold, not a trim ---- */
+  {
+    // Median 3.0x: Near_A 2.7x (−10%) and Near_B 2.6x (−13%) hold;
+    // Far_C 2.4x (−20%) and the rest are trims.
+    const csv2 =
+      H +
+      ["Top_A,400,30,1600", "Top_B,400,28,1500", "Top_C,400,25,1400", "Mid_D,400,20,1200", "Mid_E,400,20,1200", "Mid_F,400,20,1200",
+       "Near_A,900,20,2430", "Near_B,800,20,2080", "Far_C,400,10,960", "Bad_D,400,5,400", "Bad_E,400,4,300"].join("\n") + "\n";
+    const n = run(csv2, "roas");
+    const d = n.memo.decision;
+    assert.equal(n.analysis.median, 3);
+    assert.deepEqual(d.budgetMove!.from.map((x) => x.name).sort(), ["Bad_D", "Bad_E", "Far_C"], "holds are not in Pause / trim");
+    assert.match(d.headline, /^Shift budget in steps from 3 ads well below the median into /, "the count leaves the holds out");
+    assert.match(d.rationale, / 2 of them sit within 15% of the median — near-median holds, not trims\.$/);
+    const holds = n.memo.losers.rows.filter((x) => x.holdNote).map((x) => x.name).sort();
+    assert.deepEqual(holds, ["Near_A", "Near_B"]);
+    for (const h of n.memo.losers.rows.filter((x) => x.holdNote)) {
+      assert.equal(h.holdNote!.buyer, "Near median — hold (within 15% of the median; not a trim).");
+      assert.equal(h.trimNote, undefined, "a hold carries no trim note");
+    }
+    assert.match(n.memo.tldr[1], /^Trim or pause "[^"]+" and 2 other ads well below the median — combined [\d,.]+ EUR; 2 near-median ads hold\.$/);
+    assert.ok(n.buyerText.includes("Near median — hold"));
+    // The cut bar still reads every below-median ad (the decision is unchanged).
+    assert.equal(d.budgetVariant, "shift");
+    // No hold ⇒ the old wording, unchanged.
+    assert.match(m.decision.headline, /from 4 below-median ads/);
+
+    // The appendix labels them; the report renders the note.
+    const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
+    assert.match(report, /hold: client \? "Close to the middle ad" : "Near median — hold"/);
+    assert.match(report, /\{view === "client" \? ad\.holdNote\.client : ad\.holdNote\.buyer\}/);
   }
 
   console.log("real-account trim order: all assertions passed");

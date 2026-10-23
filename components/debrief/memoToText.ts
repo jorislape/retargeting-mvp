@@ -473,8 +473,8 @@ export function memoToText(
     const buyer = view !== "client";
     const freq = buyer && r.frequencyLabel ? ` | ${r.frequencyLabel}` : "";
     const notes = buyer
-      ? [r.fewOutcomesNote, r.fatigueNote, r.viewThroughNote?.buyer, r.lowIntentNote?.buyer, r.trimNote?.buyer].filter(Boolean).map((n) => ` ${n}`).join("")
-      : [r.viewThroughNote?.client, r.lowIntentNote?.client, r.trimNote?.client].filter(Boolean).map((n) => ` ${n}`).join("");
+      ? [r.fewOutcomesNote, r.fatigueNote, r.viewThroughNote?.buyer, r.lowIntentNote?.buyer, r.trimNote?.buyer, r.holdNote?.buyer].filter(Boolean).map((n) => ` ${n}`).join("")
+      : [r.viewThroughNote?.client, r.lowIntentNote?.client, r.trimNote?.client, r.holdNote?.client].filter(Boolean).map((n) => ` ${n}`).join("");
     const target = r.vsTarget
       ? ` | ${r.vsTarget === "beats" ? (buyer ? "✓ beats target" : "✓ beats your target") : buyer ? "✗ misses target" : "✗ below your target"}`
       : "";
