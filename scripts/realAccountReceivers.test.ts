@@ -86,6 +86,20 @@ try {
     assert.ok(!(t1.briefReadiness?.buyer ?? "").includes(leader.name), "readiness judges the primary receiver");
     assert.ok(!(t1.evidenceDiagnostic?.buyer ?? "").includes(leader.name));
   }
+  /* ---- Confidence "Why" and caveats cite the receivers, never the
+     passed-over leader's 8 purchases ---- */
+  {
+    const counts = to.map((n) => a.rankedAds.find((x) => x.name === n)!.conversions);
+    const conf = r.memo.confidence;
+    const list = counts.length === 1 ? `${counts[0]}` : `${counts.slice(0, -1).join(", ")} and ${counts[counts.length - 1]}`;
+    assert.ok(conf.reasons.includes(`The ${counts.length} ads receiving budget have ${list} purchases.`), "receivers' counts in the Why");
+    for (const line of [...conf.reasons, ...conf.notes, ...d.limits.buyer, ...d.limits.client]) {
+      assert.ok(!/(leading ad|top winner) has 8 /i.test(line), `no passed-over-leader volume caveat: ${line}`);
+      assert.ok(!/8 recorded results?/.test(line), line);
+    }
+    assert.ok(!d.limits.buyer.some((l) => l.includes("noise floor this read requires")), "the receivers clear the noise floor");
+  }
+
   /* No passed-over leader ⇒ T1 stays on the leader, no watch note. */
   {
     const e = run(readFileSync(join(ROOT, "scripts/fixtures/ecom-13ads.csv"), "utf8"), "roas").memo;

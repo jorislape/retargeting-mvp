@@ -1695,7 +1695,11 @@ export const CONFIDENCE_FROM_EVIDENCE = {
   insufficient: "low",
 } as const;
 
-function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo["confidence"] {
+function buildConfidence(
+  analysis: AnalysisResult,
+  decision: MemoDecision,
+  criteria?: DecisionCriteria
+): Memo["confidence"] {
   const { adsJudged, adsAnalyzed, winners, losers, median, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
     analysis;
   const flat = decision.evidenceShape === "flatness";
@@ -1705,8 +1709,19 @@ function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo
      when the volume floor or short-window qualifier binds, that fact IS
      a caveat, so it joins the notes and the "no caveats apply" fallback
      below structurally cannot fire alongside it. */
-  const volumeBelowFloor = isOutcomeVolumeBelowFloor(analysis);
+  const volumeBelowFloor = isOutcomeVolumeBelowFloor(analysis, criteria);
   const windowDays = analysisWindowDays(analysis);
+  /* Real-account follow-up: the volume story is about the ad the read
+     stands on — the primary receiver when the leader was passed over —
+     and a Shift/Scale cites every receiver's own count. */
+  const subject = evidenceLead(analysis, criteria);
+  const subjectRole = subject != null && subject !== winners[0] ? "The primary receiving ad" : "The leading ad";
+  const receiverAds =
+    decision.action === "budget"
+      ? (decision.budgetMove?.to ?? [])
+          .map((t) => analysis.rankedAds.find((a) => a.name === t.name))
+          .filter((a): a is RankedAd => a != null)
+      : [];
 
   if (adsSetAside > 0) {
     notes.push(
@@ -1735,10 +1750,10 @@ function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo
   if (median == null) {
     notes.push("Not enough ads reached the minimum spend to compute a reliable benchmark.");
   }
-  if (volumeBelowFloor && winners[0]?.conversions != null) {
-    const n = Math.round(winners[0].conversions);
+  if (volumeBelowFloor && subject?.conversions != null) {
+    const n = Math.round(subject.conversions);
     notes.push(
-      `The leading ad has ${n} recorded result${n === 1 ? "" : "s"} — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-result noise floor, so thin outcome volume is the main caveat on this read.`
+      `${subjectRole} has ${n} recorded result${n === 1 ? "" : "s"} — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-result noise floor, so thin outcome volume is the main caveat on this read.`
     );
   }
   if (windowDays != null && windowDays < SHORT_WINDOW_DAYS) {
@@ -1763,7 +1778,7 @@ function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo
      client view. */
   const reasons: string[] = [];
   let clientWhy: string;
-  const topPct = winners[0]?.deltaPct ?? null;
+  const topPct = subject?.deltaPct ?? null;
 
   if (level === "high" && flat) {
     reasons.push(
@@ -1780,7 +1795,7 @@ function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo
     );
     if (topPct != null && topPct >= 30) {
       reasons.push(
-        `The top winner is ${Math.round(topPct)}% better than the median — a clear observed lead within this dataset.`
+        `${subjectRole === "The leading ad" ? "The top winner" : subjectRole} is ${Math.round(topPct)}% better than the median — a clear observed lead within this dataset.`
       );
     }
     if (losers.length > 0 && belowBenchmarkSpend > 0) {
@@ -1814,14 +1829,14 @@ function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo
           : "No clear ad-name pattern — the judgement leans on numbers alone."
       );
     }
-    if (volumeBelowFloor && winners[0]?.conversions != null) {
+    if (volumeBelowFloor && subject?.conversions != null) {
       reasons.push(
-        `The leading ad has ${Math.round(winners[0].conversions)} recorded result${Math.round(winners[0].conversions) === 1 ? "" : "s"} — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-result noise floor, so confidence stays at medium while volume builds.`
+        `${subjectRole} has ${Math.round(subject.conversions)} recorded result${Math.round(subject.conversions) === 1 ? "" : "s"} — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-result noise floor, so confidence stays at medium while volume builds.`
       );
     }
     if (topPct != null && topPct < 30) {
       reasons.push(
-        `The top winner is ${Math.round(topPct)}% better than the median — an observed lead, though the gap is moderate.`
+        `${subjectRole === "The leading ad" ? "The top winner" : subjectRole} is ${Math.round(topPct)}% better than the median — an observed lead, though the gap is moderate.`
       );
     }
     clientWhy =
@@ -1848,6 +1863,18 @@ function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo
       : "Confidence is low because too few ads had enough spend to judge — treat the next steps as ideas to test rather than firm decisions.";
   }
 
+  /* Real-account follow-up: a Shift/Scale states the outcome volume
+     behind every ad it puts money into. */
+  const nouns = outcomeNounsFor(analysis);
+  if (nouns && receiverAds.length > 0 && receiverAds.every((a) => a.conversions != null)) {
+    const counts = receiverAds.map((a) => fmtCount(a.conversions as number));
+    const list = counts.length === 1 ? counts[0] : `${counts.slice(0, -1).join(", ")} and ${counts[counts.length - 1]}`;
+    reasons.push(
+      receiverAds.length === 1
+        ? `The ad receiving budget has ${list} ${receiverAds[0].conversions === 1 ? nouns.one : nouns.many}.`
+        : `The ${receiverAds.length} ads receiving budget have ${list} ${nouns.many}.`
+    );
+  }
   return { level, notes, reasons: reasons.slice(0, 4), clientWhy };
 }
 
@@ -2143,6 +2170,6 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
     avoid: buildAvoid(analysis, context, decision),
-    confidence: buildConfidence(analysis, decision),
+    confidence: buildConfidence(analysis, decision, criteria),
   };
 }

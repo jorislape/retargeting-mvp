@@ -98,9 +98,11 @@ export const SHORT_WINDOW_DAYS = 7;
  *  the export, and that count is under MIN_OUTCOMES_FOR_SUPPORTED.
  *  Shared by deriveEvidenceState (label cap), buildConfidence's cap
  *  in memo.ts, and the limits copy — one rule, no drift. */
-export function isOutcomeVolumeBelowFloor(analysis: AnalysisResult): boolean {
+export function isOutcomeVolumeBelowFloor(analysis: AnalysisResult, criteria?: DecisionCriteria): boolean {
   if (outcomeNounsFor(analysis) == null) return false;
-  const top = analysis.winners[0] ?? null;
+  /* Real-account follow-up: the ad the read stands on — the primary
+     receiver when the leader was passed over (evidenceLead). */
+  const top = evidenceLead(analysis, criteria);
   if (top == null || top.conversions == null) return false;
   return top.conversions < MIN_OUTCOMES_FOR_SUPPORTED;
 }
@@ -330,7 +332,8 @@ function stripTrailingPeriod(text: string): string {
  */
 export function deriveEvidenceState(
   analysis: AnalysisResult,
-  flatField: boolean
+  flatField: boolean,
+  criteria?: DecisionCriteria
 ): "insufficient" | "limited" | "supported" {
   const { median, adsJudged, winners, losers, missingColumns } = analysis;
 
@@ -348,7 +351,7 @@ export function deriveEvidenceState(
      results is not "strongly supported". Unverifiable counts never cap
      (missing is never treated as zero), and the action is untouched
      (evidenceState is a label, not a rule input). */
-  if (shapeSupported && !isOutcomeVolumeBelowFloor(analysis)) return "supported";
+  if (shapeSupported && !isOutcomeVolumeBelowFloor(analysis, criteria)) return "supported";
   return "limited";
 }
 
@@ -1167,7 +1170,7 @@ export function buildDecision(
   /* ---- Evidence-Explicit Decision V1: evidence strength, shape, and
      limits — a SEPARATE dimension from the action below. Computed once
      and spread into every return, so the action rules are untouched. ---- */
-  const evidenceState = deriveEvidenceState(analysis, flatField);
+  const evidenceState = deriveEvidenceState(analysis, flatField, criteria);
   const evidenceShape = deriveEvidenceShape(analysis, flatField);
   const baseLimits = buildLimits(analysis, flatField, testQuality);
 
@@ -1214,18 +1217,23 @@ export function buildDecision(
      user's own criterion (the floor is Debrief's minimal bar, never a
      practitioner judgment threshold). When the user DID set a bar,
      their criterion's own line above already carries the volume story. */
+  /* Real-account follow-up: these volume lines describe the ad the read
+     stands on — the primary receiver when the leader was passed over. */
+  const subject = evidenceLead(analysis, criteria);
+  const subjectOutcomes = subject?.conversions ?? null;
+  const subjectRole = subject != null && subject !== top ? "The primary receiving ad" : "The leading ad";
   if (
-    isOutcomeVolumeBelowFloor(analysis) &&
+    isOutcomeVolumeBelowFloor(analysis, criteria) &&
     minOutcome == null &&
     nouns != null &&
-    top != null &&
-    topOutcomes != null
+    subject != null &&
+    subjectOutcomes != null
   ) {
     criteriaBuyer.push(
-      `The leading ad has ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} behind its lead — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-${nouns.one} noise floor this read requires before labeling evidence strongly supported. That floor is deliberately minimal (many practitioners want 30–50 before acting); set your own minimum in the generator to enforce a stricter bar.`
+      `${subjectRole} has ${subjectOutcomes} ${subjectOutcomes === 1 ? nouns.one : nouns.many} behind its lead — under the ${MIN_OUTCOMES_FOR_SUPPORTED}-${nouns.one} noise floor this read requires before labeling evidence strongly supported. That floor is deliberately minimal (many practitioners want 30–50 before acting); set your own minimum in the generator to enforce a stricter bar.`
     );
     criteriaClient.push(
-      `The leading ad has ${topOutcomes} ${topOutcomes === 1 ? nouns.one : nouns.many} so far — too few results for a strong read, so the evidence is treated as limited while volume builds.`
+      `${subjectRole} has ${subjectOutcomes} ${subjectOutcomes === 1 ? nouns.one : nouns.many} so far — too few results for a strong read, so the evidence is treated as limited while volume builds.`
     );
   }
   /* Evidence Confidence V2 — a structurally strong read whose outcome
@@ -1234,8 +1242,8 @@ export function buildDecision(
   if (
     evidenceState === "supported" &&
     nouns != null &&
-    top != null &&
-    topOutcomes == null
+    subject != null &&
+    subjectOutcomes == null
   ) {
     criteriaBuyer.push(
       `Evidence here is based on relative separation — this export carries no ${nouns.one} counts, so the outcome volume behind the lead couldn't be checked.`
