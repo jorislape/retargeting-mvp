@@ -30,19 +30,29 @@ export function middleTruncate(name: string, max: number = NAME_DISPLAY_MAX): st
 export type NamePart = { text: string } | { name: string; short: string };
 
 /** Splits an engine sentence into plain text and the quoted ad names
- *  ("…") too long to show in full. Engine copy always quotes names with
- *  straight double quotes; shorter quoted text stays plain. Joining the
- *  parts back (text, or `"${name}"`) reproduces the input exactly. */
+ *  ("…") too long to show in full. Quotes are read strictly in PAIRS
+ *  (open, close, open, close…), so the text BETWEEN two names is never
+ *  mistaken for a name — the bug a regex scan had when a short name sat
+ *  before a long one. An unpaired trailing quote stays plain text.
+ *  Engine copy always quotes names with straight double quotes; shorter
+ *  quoted text stays plain. Joining the parts back (text, or
+ *  `"${name}"`) reproduces the input exactly. */
 export function splitLongNames(text: string, max: number = NAME_DISPLAY_MAX): NamePart[] {
+  const segments = text.split('"');
+  /* Even segments are plain text, odd ones quoted. With an odd number
+     of quotes the last segment has no closing quote: plain. */
+  const unpaired = segments.length % 2 === 0 ? segments.length - 1 : -1;
   const parts: NamePart[] = [];
-  const re = new RegExp(`"([^"]{${max + 1},})"`, "g");
-  let last = 0;
-  for (const m of text.matchAll(re)) {
-    const at = m.index ?? 0;
-    if (at > last) parts.push({ text: text.slice(last, at) });
-    parts.push({ name: m[1], short: middleTruncate(m[1], max) });
-    last = at + m[0].length;
-  }
-  if (last < text.length) parts.push({ text: text.slice(last) });
+  let plain = "";
+  segments.forEach((seg, i) => {
+    if (i % 2 === 0) plain += seg;
+    else if (i === unpaired) plain += `"${seg}`;
+    else if (seg.length > max) {
+      if (plain) parts.push({ text: plain });
+      plain = "";
+      parts.push({ name: seg, short: middleTruncate(seg, max) });
+    } else plain += `"${seg}"`;
+  });
+  if (plain) parts.push({ text: plain });
   return parts;
 }

@@ -10,6 +10,7 @@
  * article wraps anywhere (no `break-words`, which doesn't shrink
  * min-content); Copy/TXT keep full names. Browser overflow at
  * 375–1920px was checked manually (TESTING.md) — not runnable here.
+ * Quotes are read in pairs, so text between two names is never cut.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -39,6 +40,18 @@ assert.equal(
   "round-trips exactly"
 );
 assert.deepEqual(splitLongNames("No names here."), [{ text: "No names here." }]);
+
+/* Regression (real CSV, "What we know"): a SHORT name before a long one
+   once made the scan pair the short name's closing quote with the long
+   name's opening quote, truncating the sentence between them. Quotes
+   are read in pairs: only names are ever truncated. */
+const rationale = `"Short_ad" is 132% better than the median ROAS on 481.44 EUR with 31 purchases; "${LONG}" is 86% better than the median ROAS on 474.14 EUR with 27 purchases.`;
+const rp = splitLongNames(rationale);
+assert.deepEqual(rp.filter((p) => "name" in p).map((p) => ("name" in p ? p.name : "")), [LONG], "only the long name is a name");
+assert.ok(rp.some((p) => "text" in p && p.text.includes("is 132% better than the median ROAS on 481.44 EUR with 31 purchases; ")), "sentence intact");
+assert.equal(rp.map((p) => ("name" in p ? `"${p.name}"` : p.text)).join(""), rationale);
+const odd = `Unpaired "quote ${LONG}`;
+assert.deepEqual(splitLongNames(odd), [{ text: odd }], "an unpaired quote is plain text");
 
 /* ---- Report wiring (source scan) ---- */
 const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
