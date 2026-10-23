@@ -811,6 +811,50 @@ function DecisionCard({
 /* Real-account fix 6 — the printed counterpart of "+N more … Show all":
    rows past the on-screen cap stay collapsed on paper (a real account's
    lists ran the PDF to 25 pages); the full list lives online and in TXT. */
+/* Real-account fix 8 — "Patterns by naming": one compact table per
+   naming key (spend, outcomes, blended KPI per value). Buyer only, inside
+   Patterns; descriptive, never a cause. */
+function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }) {
+  const th = "py-1.5 pr-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400";
+  return (
+    <div className="mt-8">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-300">Patterns by naming</p>
+      <p className="mt-1.5 max-w-3xl text-xs leading-relaxed text-zinc-400">{np.intro}</p>
+      <div className="mt-3 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+        {np.keys.map((k) => (
+          <div key={k.key} className="print-avoid-break min-w-0 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className={th}>{k.key}</th>
+                  <th className={`${th} text-right`}>Spend</th>
+                  {np.outcomeLabel && <th className={`${th} text-right`}>{np.outcomeLabel}</th>}
+                  <th className={`${th} pr-0 text-right`}>{np.kpiLabel}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {k.rows.map((r) => (
+                  <tr key={r.value} className="border-b border-white/[0.06] last:border-0">
+                    <td className="py-1.5 pr-3 text-[13px] font-medium text-zinc-200 [overflow-wrap:anywhere]">
+                      {r.value} <span className="font-normal text-zinc-500">· {r.ads}</span>
+                    </td>
+                    <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-zinc-400">{r.spendLabel}</td>
+                    {np.outcomeLabel && (
+                      <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-zinc-400">{r.outcomesLabel}</td>
+                    )}
+                    <td className="py-1.5 text-right font-mono text-xs font-semibold tabular-nums text-zinc-100">{r.kpiValueLabel}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">{np.caveat}</p>
+    </div>
+  );
+}
+
 /* Trust Pass — "+N more: name1, name2 [Show all]" under a truncated
    list. Screen only (print-hidden); print shows PrintMore instead. */
 function MoreToggle({
@@ -2471,6 +2515,7 @@ export function Report({
                 </div>
               ))}
             </div>
+            {memo.namingPatterns && <NamingPatternsTable np={memo.namingPatterns} />}
           </section>
         )}
 

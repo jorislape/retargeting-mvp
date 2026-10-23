@@ -145,6 +145,12 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # line (per-stage counts + medians, "run once per stage"). Exists
                   # because the segment warning needs an ad set/campaign column that
                   # agency exports often lack. Never read by gate/median/ranking/action
+  namingPatterns.ts # Patterns by naming (Real-account fix 8) — decision-blind: when
+                  # ≥50% of judged ads carry "[KEY]VALUE" name tokens (else a consistent
+                  # ≥4-part "_" layout), analysis.namingPatterns lists, per key ([FOR],
+                  # [AN], [HK], [STG] first), spend / outcomes / blended KPI per value
+                  # over every ad with it, values with ≥2× the minimum spend only.
+                  # Buyer-only (Patterns section + buyer TXT); descriptive, never a cause
   memo.ts         # assembles the memo — templated, not an LLM call (see below).
                   # generateMemo always sets comparison: null — the route builds
                   # the comparison from the optional second file and attaches it

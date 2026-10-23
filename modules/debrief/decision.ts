@@ -804,7 +804,16 @@ export function buildLimits(
     }
   }
 
-  if (!analysis.hasCreativeNotes && !analysis.hasNameSignal) {
+  if (!analysis.hasCreativeNotes && !analysis.hasNameSignal && analysis.namingPatterns) {
+    /* Real-account fix 8: the names DO carry a convention — say what it
+       is worth (a description by token, never a cause). */
+    buyer.push(
+      "No creative notes, but the ad names follow a naming convention — Patterns by naming shows results per token value. Those are associations in this export; this read still can't say which creative attribute is behind any difference."
+    );
+    client.push(
+      "Without notes on the creative, this read is based on the numbers and the ad names — it can't say which part of an ad made the difference."
+    );
+  } else if (!analysis.hasCreativeNotes && !analysis.hasNameSignal) {
     buyer.push(
       "No creative notes or clear ad-name pattern — this is a metrics-only read, so it can't say which creative attribute is behind any difference."
     );

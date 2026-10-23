@@ -321,6 +321,43 @@ export interface DebriefContext extends DecisionInputContext {
   minLossSpendMultiple: number | null;
 }
 
+/** Real-account fix 8 — the memo's formatted "Patterns by naming". */
+export interface MemoNamingPatterns {
+  /** "28 of 30 judged ads use [KEY]VALUE name tokens …" */
+  intro: string;
+  /** Fixed caveat: per-value results are associations, not causes. */
+  caveat: string;
+  kpiLabel: string;
+  outcomeLabel: string | null;
+  keys: {
+    key: string;
+    rows: { value: string; ads: number; spendLabel: string; outcomesLabel: string | null; kpiValueLabel: string }[];
+  }[];
+}
+
+/** Real-account fix 8 — one value of a naming-convention key
+ *  (namingPatterns.ts). */
+export interface NamingPatternRow {
+  value: string;
+  ads: number;
+  spend: number;
+  /** Summed outcome count; null when any ad's count is unknown. */
+  outcomes: number | null;
+  /** Blended KPI over the value's ads (computeAccountKpi). */
+  kpiValue: number | null;
+}
+
+/** Real-account fix 8 — per-token results when ad names follow a
+ *  convention. Display-only: never read by the gate, median, ranking or
+ *  action. */
+export interface NamingPatterns {
+  basis: "tokens" | "segments";
+  /** Judged ads whose names follow the convention, of all judged. */
+  coverage: { matched: number; judged: number };
+  minSpend: number;
+  keys: { key: string; rows: NamingPatternRow[] }[];
+}
+
 /** One ad row after column resolution and metric derivation. */
 export interface ParsedAd {
   /** Display identity: the ad-name cell. Rows sharing the same
@@ -508,6 +545,9 @@ export interface AnalysisResult {
    *  the export rows behind the analyzed ads, and any breakdown columns
    *  (Day, Age, Placement, …) that caused the repetition. */
   mergedRows?: { rows: number; breakdowns: string[] };
+  /** Real-account fix 8 — present only when ≥50% of judged ads follow
+   *  a naming convention with at least one comparable key. */
+  namingPatterns?: NamingPatterns;
   /** Real-account fix 7 — the export's "Account name" value(s), for the
    *  report title. Absent when the column is missing or blank. */
   accountName?: string;
@@ -1234,6 +1274,9 @@ export interface Memo {
     winners: string[];
     losers: string[];
   };
+  /** Real-account fix 8 — "Patterns by naming" (buyer view + buyer TXT;
+   *  absent unless the ad names follow a convention). */
+  namingPatterns?: MemoNamingPatterns;
   /** Present only when the user pasted market/competitor context. */
   marketSignal: MemoMarketSignal | null;
   nextTests: MemoTest[];

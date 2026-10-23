@@ -544,6 +544,22 @@ export function memoToText(
     lines.push("What losers share:");
     memo.patterns.losers.forEach((p) => lines.push(`- ${p}`));
     lines.push("");
+    /* Real-account fix 8 — buyer only, like Patterns. */
+    const np = memo.namingPatterns;
+    if (np) {
+      lines.push("PATTERNS BY NAMING");
+      lines.push(np.intro);
+      for (const k of np.keys) {
+        lines.push(`${k.key}:`);
+        for (const r of k.rows) {
+          lines.push(
+            `- ${r.value} | ${r.ads} ad${r.ads === 1 ? "" : "s"} | ${r.spendLabel}${r.outcomesLabel != null ? ` | ${r.outcomesLabel} ${np.outcomeLabel?.toLowerCase()}` : ""} | ${r.kpiValueLabel} ${np.kpiLabel}`
+          );
+        }
+      }
+      lines.push(np.caveat);
+      lines.push("");
+    }
   }
 
   lines.push(view === "client" ? "WHAT WE'LL TEST NEXT" : "NEXT 3 TESTS");

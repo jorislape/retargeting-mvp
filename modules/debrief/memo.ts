@@ -30,6 +30,7 @@ import {
   Memo,
   MemoDecision,
   MemoMarketSignal,
+  MemoNamingPatterns,
   MemoSpendAllocation,
   MemoSpendAllocationSegment,
   MemoSpendAllocationSetAside,
@@ -442,6 +443,14 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
     loserNotes.push(tagNote(loserTag, losers, "underperformers"));
   }
 
+  /* Real-account fix 8: a naming convention replaces "metrics only". */
+  const namingNote = "Ad names follow a naming convention — see Patterns by naming for results per token value.";
+  if (winnerNotes.length === 0 && analysis.namingPatterns && !hasCreativeNotes && !hasNameSignal) {
+    winnerNotes.push(namingNote);
+  }
+  if (loserNotes.length === 0 && analysis.namingPatterns && !hasCreativeNotes && !hasNameSignal) {
+    loserNotes.push(namingNote);
+  }
   if (winnerNotes.length === 0) {
     winnerNotes.push(
       hasCreativeNotes || hasNameSignal
@@ -458,6 +467,36 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
   }
 
   return { winners: winnerNotes, losers: loserNotes };
+}
+
+/** Real-account fix 8 — formats analysis.namingPatterns for the report
+ *  and TXT. Absent key when there's no convention (byte-identical). */
+function buildNamingPatterns(analysis: AnalysisResult): { namingPatterns?: MemoNamingPatterns } {
+  const n = analysis.namingPatterns;
+  if (!n) return {};
+  const money = (v: number) => fmtMoney(v, analysis.currency);
+  const nouns = outcomeNounsFor(analysis);
+  const kpiLabel = kpiLabelFor(analysis);
+  return {
+    namingPatterns: {
+      intro: `${n.coverage.matched} of ${n.coverage.judged} judged ads use ${
+        n.basis === "tokens" ? "[KEY]VALUE name tokens" : "one \"_\"-separated name layout"
+      }. Per value: every ad carrying it (set-aside ads included), blended ${kpiLabel}; values with under ${money(n.minSpend)} of spend (2× the minimum spend) are left out.`,
+      caveat: "Descriptive only — a value's blended result is an association in this export, not proof the token caused it.",
+      kpiLabel,
+      outcomeLabel: nouns ? nouns.many.charAt(0).toUpperCase() + nouns.many.slice(1) : null,
+      keys: n.keys.map((k) => ({
+        key: n.basis === "tokens" ? `[${k.key}]` : k.key,
+        rows: k.rows.map((r) => ({
+          value: r.value,
+          ads: r.ads,
+          spendLabel: money(r.spend),
+          outcomesLabel: nouns && r.outcomes != null ? fmtCount(r.outcomes) : nouns ? "—" : null,
+          kpiValueLabel: r.kpiValue != null ? fmtKpiValue(r.kpiValue, analysis.kpi, analysis.currency) : "—",
+        })),
+      })),
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1749,7 +1788,9 @@ function buildConfidence(analysis: AnalysisResult, decision: MemoDecision): Memo
     if (!hasNameSignal) {
       // Context, not a cause of the level (evidenceState ignores names).
       reasons.push(
-        "No clear ad-name pattern — the judgement leans on numbers alone."
+        analysis.namingPatterns
+          ? "Ad names follow a naming convention — per-value results are in Patterns by naming (descriptive, not a cause); the judgement itself leans on numbers alone."
+          : "No clear ad-name pattern — the judgement leans on numbers alone."
       );
     }
     if (volumeBelowFloor && winners[0]?.conversions != null) {
@@ -2077,6 +2118,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       })(),
     },
     patterns: buildPatterns(analysis),
+    ...buildNamingPatterns(analysis),
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
     avoid: buildAvoid(analysis, context, decision),

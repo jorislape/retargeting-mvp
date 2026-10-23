@@ -2,6 +2,7 @@ import { ColumnMap, attributionFieldsFor, attributionSplitHeaders, clickBasisFor
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import { detectSegmentSpread } from "./segmentSpread";
 import { detectFunnelMix } from "./funnelStages";
+import { detectNamingPatterns } from "./namingPatterns";
 import { detectLowIntent } from "./intentFlags";
 import { computeAccountKpi } from "./accountKpi";
 import { fmtKpiValue } from "./format";
@@ -251,6 +252,8 @@ export function analyze(
 
   /* Real-account fix 4 — display-only, from the ranked ads. */
   const funnel = detectFunnelMix(ranked);
+  /* Real-account fix 8 — display-only, from the extracted ads. */
+  const naming = detectNamingPatterns(ads, judged, kpi, spendGate);
 
   /* Trust Pass: the FULL pools. The decision and the kill-list copy
      always counted every below-median ad ("…and 4 more"), but the lists
@@ -355,6 +358,7 @@ export function analyze(
       const acct = computeAccountKpi(ads, kpi);
       return acct ? { accountKpi: acct } : {};
     })(),
+    ...(naming ? { namingPatterns: naming } : {}),
     ...(funnel
       ? {
           funnelMix: {
