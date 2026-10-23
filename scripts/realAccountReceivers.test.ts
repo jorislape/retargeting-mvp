@@ -69,6 +69,30 @@ try {
   assert.match(r.buyerText, /currently sits on below-median ads — context, not the amount to move: trim the weakest and raise the receivers in steps\./);
   assert.match(r.clientText, /we trim the weakest and add budget to the leaders in steps, not all at once\./);
 
+  /* ---- T1, its brief and the Next controlled test build on the
+     PRIMARY receiver; the passed-over leader is only a watch note ---- */
+  {
+    const primary = to[0];
+    const t1 = r.memo.nextTests[0];
+    assert.ok(t1.test.includes(`"${primary}"`), "T1 builds on the primary receiver");
+    assert.ok(!t1.test.includes(leader.name) && !t1.hypothesis.includes(leader.name) && !t1.setup.includes(leader.name));
+    assert.ok(!JSON.stringify(t1.brief).includes(leader.name), "the brief never names the passed-over leader");
+    assert.ok(!t1.signals.some((x) => x.includes(leader.name)));
+    assert.match(t1.why, new RegExp(`Watch: "${leader.name.replace(/[[\]]/g, "\\$&")}" leads at [\\d.]+x ROAS but on 100\\.00 EUR and 8 purchases — under the receiver floor, so it isn't the base for this test\\.$`));
+    assert.match(t1.why, /^It's the strongest ad with the evidence to build on: /);
+    assert.ok(d.nextControlledTest?.preserve.includes(`"${primary}"`), "Next controlled test preserves the primary receiver");
+    assert.ok(!d.nextControlledTest?.preserve.includes(leader.name));
+    assert.equal(d.nextControlledTest?.change, "Only the opening 3 seconds / first frame — nothing else.", "UGC receiver ⇒ video wording");
+    assert.ok(!(t1.briefReadiness?.buyer ?? "").includes(leader.name), "readiness judges the primary receiver");
+    assert.ok(!(t1.evidenceDiagnostic?.buyer ?? "").includes(leader.name));
+  }
+  /* No passed-over leader ⇒ T1 stays on the leader, no watch note. */
+  {
+    const e = run(readFileSync(join(ROOT, "scripts/fixtures/ecom-13ads.csv"), "utf8"), "roas").memo;
+    assert.match(e.nextTests[0].test, /"Hero_UGC_A"/);
+    assert.ok(!e.nextTests[0].why.includes("Watch:"));
+  }
+
   /* ---- "Ready" never outruns the floor ---- */
   const t1 = r.memo.nextTests[0];
   assert.ok(t1.briefReadiness == null || t1.briefReadiness.state !== "ready");

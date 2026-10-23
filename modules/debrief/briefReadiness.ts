@@ -3,6 +3,7 @@
 // chain resolves under plain Node's type-stripping test runner
 // (scripts/briefReadiness.test.ts).
 import {
+  evidenceLead,
   MIN_OUTCOMES_FOR_SUPPORTED,
   passesReceiverFloor,
   RECEIVER_MIN_GATE_MULTIPLE,
@@ -100,7 +101,9 @@ export function deriveSignalVolumeReadiness(
   nounMany: string
 ): MemoBriefReadiness | null {
   if (outcomeNounsFor(analysis) == null) return null;
-  const top: RankedAd | null = analysis.winners[0] ?? null;
+  /* Real-account follow-up: the ad T1 builds on (the primary receiver
+     when the leader was passed over), so the badge judges that ad. */
+  const top: RankedAd | null = evidenceLead(analysis, criteria);
   if (top == null) return null;
 
   const userBar =

@@ -49,15 +49,23 @@ try {
     assert.ok(s.avoid.buyer.some((l) => l.startsWith("Do not move budget into static ads while they hold 3/3 loser slots")), "static never in the top half ⇒ warned");
   }
 
-  /* ---- Static/image openings ---- */
-  const t1 = r.memo.nextTests[0];
-  assert.ok(r.analysis.winners[0].nameTags.includes("static"), "fixture: a static ad leads");
-  assert.match(t1.setup, /Change only the headline \/ first visual between variants\./);
-  assert.equal(t1.brief.change, "Only the headline / first visual — nothing else.");
-  assert.ok(!/opening 3 seconds/.test(t1.setup + t1.brief.change));
+  /* ---- Static/image openings (format of the ad T1 builds on) ---- */
   {
-    const vid = run(ECOM, "roas").memo.nextTests[0];
-    assert.match(vid.setup, /opening 3 seconds \/ first frame/, "non-static ads keep the video wording");
+    const csv =
+      "Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" +
+      ["Static_Hero,400,30,2400", "UGC_B,400,22,1200", "UGC_C,400,20,1000", "Video_D,400,20,950", "Video_E,400,18,800", "UGC_F,400,15,600"].join("\n") + "\n";
+    const t1 = run(csv, "roas").memo.nextTests[0];
+    assert.match(t1.test, /"Static_Hero"/);
+    assert.match(t1.setup, /Change only the headline \/ first visual between variants\./);
+    assert.equal(t1.brief.change, "Only the headline / first visual — nothing else.");
+    assert.ok(!/opening 3 seconds/.test(t1.setup + t1.brief.change));
+  }
+  {
+    // The agency fixture's T1 builds on its primary receiver, a UGC ad
+    // (the static leader is passed over) — video wording there.
+    const t1 = r.memo.nextTests[0];
+    assert.ok(r.analysis.winners[0].nameTags.includes("static"), "fixture: a static ad leads the ranking…");
+    assert.match(t1.setup, /opening 3 seconds \/ first frame/, "…but T1's UGC receiver gets the video wording");
   }
 
   /* ---- T3 challenger grounded in the account ---- */

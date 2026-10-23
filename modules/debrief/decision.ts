@@ -266,6 +266,24 @@ export function budgetReceivers(analysis: AnalysisResult, criteria?: DecisionCri
     .slice(0, MAX_BUDGET_RECEIVERS);
 }
 
+/**
+ * The ad the memo builds on: the PRIMARY RECEIVER (highest-ranked ad
+ * that clears the receiver floor) when the committed call moves budget
+ * into receivers, else the top winner. When the raw leader is passed
+ * over by the floor, T1, its brief, the Next controlled test and brief
+ * readiness all anchor here — never on an ad too thin to receive budget.
+ */
+export function evidenceLead(analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd | null {
+  const primary = isScaleActionSupported(analysis, criteria) ? budgetReceivers(analysis, criteria)[0] : null;
+  return primary ?? analysis.winners[0] ?? null;
+}
+
+/** The raw leader when evidenceLead passed it over, else null. */
+export function passedOverLeader(analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd | null {
+  const top = analysis.winners[0] ?? null;
+  return top != null && evidenceLead(analysis, criteria) !== top ? top : null;
+}
+
 /** Quoted receiver names: "A", "A" and "B", or "A", "B" and "C". */
 function receiverNames(receivers: readonly RankedAd[]): string {
   return joinPlain(receivers.map((a) => `"${a.name}"`));

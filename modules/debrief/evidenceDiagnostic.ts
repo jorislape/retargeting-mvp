@@ -206,9 +206,12 @@ function outcomeTrigger(
  */
 export function deriveEvidenceDiagnostic(
   analysis: AnalysisResult,
-  money: MoneyFormatter
+  money: MoneyFormatter,
+  /** The ad T1 anchors (memo passes decision.ts's evidenceLead —
+   *  the primary receiver when the leader was passed over). */
+  subject: RankedAd | null = analysis.winners[0] ?? null
 ): MemoEvidenceDiagnostic | null {
-  const top: RankedAd | null = analysis.winners[0] ?? null;
+  const top: RankedAd | null = subject;
   if (top == null) return null;
 
   const trigger = outcomeTrigger(top, analysis.kpi);

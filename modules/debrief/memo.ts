@@ -2,6 +2,8 @@ import {
   analysisWindowDays,
   budgetReceivers,
   buildDecision,
+  evidenceLead,
+  passedOverLeader,
   isOutcomeVolumeBelowFloor,
   isScaleActionSupported,
   isProxyOutcomeConflict,
@@ -793,7 +795,11 @@ function buildNextTests(
      ad "the account's weakest judged ad", which only losers[0] is. */
   const outcome = analysis.proxyKpi?.outcome ?? null;
   const proxyConflict = isProxyOutcomeConflict(analysis);
-  const top = proxyConflict ? null : winners[0] ?? null;
+  /* Real-account follow-up: T1 builds on the PRIMARY RECEIVER when the
+     receiver floor passed the raw leader over — that ad appears only as
+     a watch note on T1. */
+  const top = proxyConflict ? null : evidenceLead(analysis, criteria);
+  const passedOver = proxyConflict ? null : passedOverLeader(analysis, criteria);
   const worstCandidate = losers[0] ?? null; // losers arrive sorted worst-first
   const worst =
     worstCandidate && outcome && outcome.aboveMedian.includes(worstCandidate.name) ? null : worstCandidate;
@@ -859,7 +865,7 @@ function buildNextTests(
      this ad is too thin to trust — what upstream signal, already in
      this export, is worth inspecting?" Buyer-only by design; see
      evidenceDiagnostic.ts for the full contract. */
-  const evidenceDiagnostic = deriveEvidenceDiagnostic(analysis, (v) => fmtMoney(v, currency));
+  const evidenceDiagnostic = deriveEvidenceDiagnostic(analysis, (v) => fmtMoney(v, currency), top);
 
   /* Market context (when pasted) may REFRAME a test — own performance
      data stays the primary signal, and every market-informed line says
@@ -873,9 +879,21 @@ function buildNextTests(
   /* Compact signal bullets — the receipts behind each recommendation.
      Built only from what the data actually shows: own numbers first,
      market notes always marked directional, guardrails last. */
+  const topConversions =
+    top && outcomeNouns && top.conversions != null
+      ? ` with ${fmtCount(top.conversions)} ${top.conversions === 1 ? outcomeNouns.one : outcomeNouns.many}`
+      : "";
   const topSignal = top
-    ? `"${top.name}" leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend.`
+    ? passedOver
+      ? `"${top.name}" runs at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend${topConversions} — the strongest ad that clears the receiver floor.`
+      : `"${top.name}" leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend.`
     : null;
+  /* The passed-over leader: a watch note on T1 only, never its base. */
+  const watchNote = passedOver
+    ? ` Watch: "${passedOver.name}" leads at ${fmtKpiValue(passedOver.kpiValue as number, kpi, currency)} ${kpiLabel} but on ${fmtMoney(passedOver.spend, currency)}${
+        outcomeNouns && passedOver.conversions != null ? ` and ${fmtCount(passedOver.conversions)} ${passedOver.conversions === 1 ? outcomeNouns.one : outcomeNouns.many}` : ""
+      } — under the receiver floor, so it isn't the base for this test.`
+    : "";
   const zeroMany = outcomeNouns?.many ?? "conversions";
   const worstSignal = worst
     ? worst.zeroConversions
@@ -1014,15 +1032,19 @@ function buildNextTests(
       test: founderLed
         ? `Brief 2 new ${format}variants of "${top.name}" — make one a founder-led version (market signal); vary only the opening on the other.`
         : `Brief 2 new ${format}variants of "${top.name}" — vary only the opening to test whether the angle has more headroom.`,
-      why: `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend — the strongest observed result in the current dataset. One way to test whether the angle has more headroom: vary only the opening. ${openingEvidence}${
+      why: `${
+        passedOver
+          ? `It's the strongest ad with the evidence to build on: ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend${topConversions}.`
+          : `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend — the strongest observed result in the current dataset.`
+      } One way to test whether the angle has more headroom: vary only the opening. ${openingEvidence}${
         founderLed
           ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of this leading angle. Adapt, don't copy."
           : ""
-      }`,
+      }${watchNote}`,
       setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the ${openingUnit(top.name)} between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
       signals,
-      hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" already leads this dataset at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend.`,
+      hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" ${passedOver ? "already runs at" : "already leads this dataset at"} ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend${passedOver ? `${topConversions}, the strongest result that clears the receiver floor` : ""}.`,
       briefReadiness: winnerReadiness ?? undefined,
       evidenceDiagnostic: evidenceDiagnostic ?? undefined,
       brief: {
