@@ -63,6 +63,16 @@ assert.match(report, /\{limitsList\}\s*<PrintMore count=\{limits\.length - print
 /* ---- Client PDF names its ads once ---- */
 assert.match(between("function ClientAdList(", "function AtMedianRows("), /ad\{rows\.length === 1 \? "" : "s"\} — see full list online \/ TXT/);
 assert.match(report, /\{sections\.executiveSummary && !client && <ExecutiveSummary/);
+/* Real-account review: the summary is page 1 — in the masthead, right
+   after the stat row — and its labels never break mid-word. */
+{
+  const statRow = report.indexOf('["Analyzed", String(memo.scope.adsAnalyzed)]');
+  const mount = report.indexOf("<ExecutiveSummary memo=");
+  assert.ok(statRow > 0 && mount > statRow && mount < report.indexOf("Minimum spend to judge (evidence gate):"), "directly under the stat row");
+  const exec = between("function ExecutiveSummary(", "/* Period Comparison V2");
+  assert.match(exec, /grid-cols-\[max-content_minmax\(0,1fr\)\]/);
+  assert.match(exec, /<dt className="print-kv-label whitespace-nowrap/);
+}
 assert.match(report, /<div className=\{client \? "print:hidden" : undefined\}>\s*<PerformanceRankingChart/);
 
 /* ---- Patterns by naming (on by default with tokens): capped in print ---- */

@@ -51,7 +51,11 @@ const ROOT = join(import.meta.dirname, "..");
   assert.ok(whatChangedIdx < movementIdx, "What Changed still precedes Movement Chart (unchanged relative order)");
   assert.ok(movementIdx < creativeEvidenceIdx, "Movement precedes Creative Evidence");
   assert.ok(creativeEvidenceIdx < expertTakeIdx, "Creative Evidence precedes Expert Commentary");
-  assert.ok(expertTakeIdx < executiveSummaryIdx, "Expert Commentary precedes the print-only Executive Summary");
+  // Real-account review: the print-only Executive Summary is page 1 of
+  // the buyer PDF — inside the masthead, directly under the stat row,
+  // so it precedes the card too (it renders nothing on screen).
+  assert.ok(executiveSummaryIdx < decisionCardIdx, "the print-only Executive Summary precedes the Decision card");
+  assert.ok(executiveSummaryIdx < src.indexOf("</header>"), "…inside the masthead");
   assert.ok(executiveSummaryIdx < verdictIdx, "Executive Summary precedes the numbered Verdict section");
 
   // Only one mount of each — moved, not duplicated.

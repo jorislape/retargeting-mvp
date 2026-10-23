@@ -183,14 +183,16 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
       <p className="print-section-label mb-1.5 text-[9px] font-bold uppercase tracking-[0.08em]">
         Executive summary
       </p>
-      <div className="space-y-1">
+      {/* Labels sit in their own nowrap column: "Top recommended test:"
+          never breaks mid-word, however long the value beside it. */}
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs leading-relaxed text-zinc-400">
         {lines.map((line) => (
-          <p key={line.label} className="flex gap-1.5 text-xs leading-relaxed text-zinc-400">
-            <span className="print-kv-label font-medium text-zinc-300">{line.label}: </span>
-            <span className="print-kv-value min-w-0 [overflow-wrap:anywhere]"><Names text={line.value} /></span>
-          </p>
+          <Fragment key={line.label}>
+            <dt className="print-kv-label whitespace-nowrap font-medium text-zinc-300">{line.label}:</dt>
+            <dd className="print-kv-value min-w-0 [overflow-wrap:anywhere]"><Names text={line.value} /></dd>
+          </Fragment>
         ))}
-      </div>
+      </dl>
     </div>
   );
 }
@@ -2188,6 +2190,10 @@ export function Report({
             ))}
           </div>
           )}
+          {/* Real-account review: page 1 of the buyer PDF, directly under
+              the stat row. The client PDF opens on its own "What this
+              means" box, which this print-only summary would repeat. */}
+          {sections.executiveSummary && !client && <ExecutiveSummary memo={memo} view={view} />}
           {/* Report Clarity Pass — the buyer register's FIRST mention of
               the evidence gate, always above the fold: defined once here
               in plain words; every later mention says "minimum spend". */}
@@ -2321,10 +2327,6 @@ export function Report({
             agencyName={customization.agencyName}
           />
         )}
-
-        {/* Real-account fix 6: the client PDF opens on its own "What this
-            means" box, which this print-only summary would repeat. */}
-        {sections.executiveSummary && !client && <ExecutiveSummary memo={memo} view={view} />}
 
         {/* ---- Verdict / Summary ---- */}
         {sections.verdict && (
