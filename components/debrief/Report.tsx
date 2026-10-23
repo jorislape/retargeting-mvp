@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import type {
   Memo,
   MemoBrief,
@@ -33,6 +33,7 @@ import { PERFORMANCE_MODE_DEFAULTS, PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRES
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
 import { MovementChart } from "./MovementChart";
+import { middleTruncate, splitLongNames } from "./longNames";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -56,6 +57,44 @@ const CONFIDENCE_COLOR: Record<Memo["confidence"]["level"], string> = {
 /** Filesystem-safe filename fragment — lowercase, ASCII, hyphenated,
  *  never empty. Applied only to the product name; the rest of the
  *  filename is a fixed, known-safe string. */
+/* Real-account fix 5 — an engine sentence with any quoted ad name over
+   60 characters middle-truncated (full name on hover); optional glossary
+   terms apply to the plain parts only. Copy/TXT never pass through here. */
+function Names({ text, terms }: { text: string; terms?: { phrase: string; tip: string }[] }) {
+  return (
+    <>
+      {splitLongNames(text).map((part, i) =>
+        "name" in part ? (
+          <span key={i} title={part.name}>
+            &quot;{part.short}&quot;
+          </span>
+        ) : (
+          <Fragment key={i}>{terms ? withTerms(part.text, terms) : part.text}</Fragment>
+        )
+      )}
+    </>
+  );
+}
+
+/* A bare ad name, middle-truncated with the full name on hover. */
+function AdName({ name }: { name: string }) {
+  const short = middleTruncate(name);
+  return short === name ? <>{name}</> : <span title={name}>{short}</span>;
+}
+
+/* A table/list ad name: full and wrapping anywhere on screen, middle-
+   truncated in print (Real-account fixes 5–6). */
+function FullAdName({ name }: { name: string }) {
+  const short = middleTruncate(name);
+  if (short === name) return <>{name}</>;
+  return (
+    <>
+      <span className="print:hidden">{name}</span>
+      <span className="hidden print:inline">{short}</span>
+    </>
+  );
+}
+
 function safeFilenamePart(text: string): string {
   const cleaned = text
     .toLowerCase()
@@ -121,7 +160,7 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
         {lines.map((line) => (
           <p key={line.label} className="flex gap-1.5 text-xs leading-relaxed text-zinc-400">
             <span className="print-kv-label font-medium text-zinc-300">{line.label}: </span>
-            <span className="print-kv-value min-w-0 break-words">{line.value}</span>
+            <span className="print-kv-value min-w-0 [overflow-wrap:anywhere]"><Names text={line.value} /></span>
           </p>
         ))}
       </div>
@@ -175,7 +214,9 @@ function WhatChangedSection({
                   : "border-red-400/40"
               }`}
             >
-              <span className="font-medium text-zinc-200">{row.name}</span>{" "}
+              <span className="font-medium text-zinc-200 [overflow-wrap:anywhere]">
+                <AdName name={row.name} />
+              </span>{" "}
               <span className="font-mono text-[12px] tabular-nums text-zinc-400">
                 {row.previousLabel} → {row.currentLabel}
               </span>{" "}
@@ -224,7 +265,7 @@ function WhatChangedSection({
       <ul className="mt-4 space-y-1.5">
         {account.map((line, i) => (
           <li key={i} className="text-[13px] leading-relaxed text-zinc-300">
-            {line}
+            <Names text={line} />
           </li>
         ))}
       </ul>
@@ -244,7 +285,7 @@ function WhatChangedSection({
           <ul className="mt-1.5 space-y-1.5">
             {persistence.map((line, i) => (
               <li key={i} className="text-[13px] leading-relaxed text-zinc-400">
-                {line}
+                <Names text={line} />
               </li>
             ))}
           </ul>
@@ -280,7 +321,7 @@ function WhatChangedSection({
           <ul className="mt-1.5 space-y-1">
             {limits.map((line, i) => (
               <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
-                {line}
+                <Names text={line} />
               </li>
             ))}
           </ul>
@@ -406,7 +447,7 @@ function BudgetMoveNames({
         <span className="font-medium text-zinc-300">{label}:</span>{" "}
         {ads.map((a, i) => (
           <span key={a.name + i} className={i >= SHOWN && !expanded ? "hidden print:inline" : ""}>
-            {i > 0 ? ", " : ""}&ldquo;{a.name}&rdquo; ({a.spendLabel})
+            {i > 0 ? ", " : ""}&ldquo;<AdName name={a.name} />&rdquo; ({a.spendLabel})
           </span>
         ))}
         {ads.length > SHOWN && (
@@ -505,7 +546,7 @@ function DecisionCard({
     <ul className="mt-2 space-y-1">
       {limits.map((line, i) => (
         <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
-          {line}
+          <Names text={line} />
         </li>
       ))}
     </ul>
@@ -535,7 +576,7 @@ function DecisionCard({
         Next move
       </p>
       <p className="mt-3 max-w-3xl text-[17px] font-semibold leading-snug text-zinc-50 sm:text-[19px]">
-        {client ? d.clientHeadline : d.headline}
+        <Names text={client ? d.clientHeadline : d.headline} />
       </p>
       {d.budgetMove && <BudgetMoveNames move={d.budgetMove} client={client} budgetVariantLabel={d.budgetVariant} />}
       {/* Trust Pass 4 — a budget move was withheld because this KPI is a
@@ -561,12 +602,17 @@ function DecisionCard({
         {client ? "What the data shows" : "What we know"}
       </p>
       <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-zinc-300">
-        {client
-          ? d.clientRationale
-          : withTerms(d.rationale, [
+        {client ? (
+          <Names text={d.clientRationale} />
+        ) : (
+          <Names
+            text={d.rationale}
+            terms={[
               { phrase: "judged spend", tip: TIP_JUDGED_SPEND },
               { phrase: "below-median", tip: TIP_BELOW_BENCHMARK },
-            ])}
+            ]}
+          />
+        )}
       </p>
       <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
         <span
@@ -640,7 +686,7 @@ function DecisionCard({
                 key={i}
                 className="border-l border-amber-300/40 pl-3 text-[13px] leading-relaxed text-zinc-400"
               >
-                {bullet}
+                <Names text={bullet} />
               </li>
             ))}
           </ul>
@@ -659,28 +705,28 @@ function DecisionCard({
                 to shrink below its content's natural width unless told
                 to). A long ad name in "Preserve" was enough to force
                 the row — and the whole page — wider than a 320px
-                viewport. min-w-0 break-words is the same fix already
+                viewport. min-w-0 [overflow-wrap:anywhere] is the same fix already
                 applied everywhere else long text sits in a flex row in
                 this file (TestRow, AdTable, WhatChangedSection). */}
             <div className="flex gap-2">
               <dt className="shrink-0 font-medium text-zinc-500">
                 {client ? "Keep the same" : "Preserve"}
               </dt>
-              <dd className="min-w-0 break-words">{cz(firstClause(d.nextControlledTest.preserve))}</dd>
+              <dd className="min-w-0 [overflow-wrap:anywhere]"><Names text={cz(firstClause(d.nextControlledTest.preserve))} /></dd>
             </div>
             <div className="flex gap-2">
               <dt className="shrink-0 font-medium text-zinc-500">Change</dt>
-              <dd className="min-w-0 break-words">{cz(d.nextControlledTest.change)}</dd>
+              <dd className="min-w-0 [overflow-wrap:anywhere]"><Names text={cz(d.nextControlledTest.change)} /></dd>
             </div>
             <div className="flex gap-2">
               <dt className="shrink-0 font-medium text-zinc-500">Watch</dt>
-              <dd className="min-w-0 break-words">{cz(d.nextControlledTest.watch)}</dd>
+              <dd className="min-w-0 [overflow-wrap:anywhere]"><Names text={cz(d.nextControlledTest.watch)} /></dd>
             </div>
           </dl>
         </div>
       )}
       <p className="mt-4 border-t border-white/[0.08] pt-3 text-xs leading-relaxed text-zinc-400">
-        {client ? d.reassess.client : d.reassess.buyer}
+        <Names text={client ? d.reassess.client : d.reassess.buyer} />
       </p>
       {limits.length > 0 &&
         (expandLimits ? (
@@ -695,7 +741,7 @@ function DecisionCard({
             <ul className="mt-2 space-y-1">
               {limits.map((line, i) => (
                 <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
-                  {line}
+                  <Names text={line} />
                 </li>
               ))}
             </ul>
@@ -748,7 +794,15 @@ function MoreToggle({
     <p className="print-hidden mt-2 text-xs leading-relaxed text-zinc-400">
       {expanded ? null : (
         <>
-          +{names.length} more: <span className="break-words text-zinc-300">{names.join(", ")}</span>{" "}
+          +{names.length} more:{" "}
+          <span className="text-zinc-300 [overflow-wrap:anywhere]">
+            {names.map((n, i) => (
+              <Fragment key={n + i}>
+                {i > 0 ? ", " : ""}
+                <AdName name={n} />
+              </Fragment>
+            ))}
+          </span>{" "}
         </>
       )}
       <button
@@ -828,11 +882,11 @@ function AdTable({
                 {String(i + 1).padStart(2, "0")}
               </td>
               <td className="max-w-72 py-3 pr-4 align-top">
-                {/* break-words: underscore-joined ad names have no
+                {/* [overflow-wrap:anywhere]: underscore-joined ad names have no
                     natural break points — they must wrap, not clip,
                     especially in print where the table can't scroll. */}
-                <p className="break-words text-[13px] font-semibold leading-snug text-zinc-100">
-                  {ad.name}
+                <p className="text-[13px] font-semibold leading-snug text-zinc-100 [overflow-wrap:anywhere]">
+                  <FullAdName name={ad.name} />
                 </p>
                 {ad.runsInLabel && (
                   <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">{ad.runsInLabel}</p>
@@ -941,8 +995,8 @@ function ClientAdList({
             } ${i >= topAdsShown && !expanded ? "hidden print:flex" : "flex"}`}
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold leading-snug text-zinc-100">
-                {ad.name}
+              <p className="text-[13px] font-semibold leading-snug text-zinc-100 [overflow-wrap:anywhere]">
+                <AdName name={ad.name} />
               </p>
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
                 {ad.spendLabel} spent
@@ -1007,8 +1061,8 @@ function AtMedianRows({
             className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-l-2 border-white/25 py-2.5 pl-4"
           >
             <div className="min-w-0 flex-1">
-              <p className="break-words text-[13px] font-semibold leading-snug text-zinc-100">
-                {ad.name}
+              <p className="text-[13px] font-semibold leading-snug text-zinc-100 [overflow-wrap:anywhere]">
+                <FullAdName name={ad.name} />
               </p>
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
                 {ad.spendLabel} spent
@@ -1119,7 +1173,7 @@ function ClientStatCards({ memo }: { memo: Memo }) {
             {card.label}
           </p>
           <p
-            className={`print-kv-value mt-1.5 break-words font-mono font-semibold tabular-nums ${
+            className={`print-kv-value mt-1.5 [overflow-wrap:anywhere] font-mono font-semibold tabular-nums ${
               card.tone ?? "text-zinc-50"
             } ${
               card.value.length > 12
@@ -1129,7 +1183,7 @@ function ClientStatCards({ memo }: { memo: Memo }) {
           >
             {card.value}
           </p>
-          <p className="mt-1.5 break-words text-[11px] leading-snug text-zinc-400">
+          <p className="mt-1.5 [overflow-wrap:anywhere] text-[11px] leading-snug text-zinc-400">
             {card.sub}
           </p>
         </div>
@@ -1197,9 +1251,9 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
               {group.names.map((name) => (
                 <li
                   key={name}
-                  className="break-words text-xs leading-snug text-zinc-300"
+                  className="text-xs leading-snug text-zinc-300 [overflow-wrap:anywhere]"
                 >
-                  {name}
+                  <AdName name={name} />
                 </li>
               ))}
               {/* Trust Pass: the count and the names come from the same
@@ -1239,8 +1293,8 @@ function ClientTestCards({ tests }: { tests: MemoTest[] }) {
               Next test
             </span>
           </div>
-          <p className="mt-3 break-words text-[13px] font-semibold leading-snug text-zinc-100">
-            {clientizeText(test.test)}
+          <p className="mt-3 [overflow-wrap:anywhere] text-[13px] font-semibold leading-snug text-zinc-100">
+            <Names text={clientizeText(test.test)} />
           </p>
           {/* Evidence Sufficiency V1 — same plain-language readiness
               read as the buyer badge, jargon-free by construction
@@ -1248,7 +1302,7 @@ function ClientTestCards({ tests }: { tests: MemoTest[] }) {
               Quiet, not a second headline; omitted entirely once the
               signal is fully established. */}
           {test.briefReadiness && test.briefReadiness.state !== "ready" && (
-            <p className="mt-2 break-words text-xs leading-relaxed text-zinc-400">
+            <p className="mt-2 [overflow-wrap:anywhere] text-xs leading-relaxed text-zinc-400">
               {test.briefReadiness.client}
             </p>
           )}
@@ -1308,13 +1362,13 @@ function TestRow({
       <div className="min-w-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <p
-            className={`min-w-0 break-words text-base font-semibold leading-snug tracking-tight transition ${
+            className={`min-w-0 [overflow-wrap:anywhere] text-base font-semibold leading-snug tracking-tight transition ${
               view === "buyer" && checked
                 ? "text-zinc-500 line-through decoration-zinc-600"
                 : "text-zinc-50"
             }`}
           >
-            {c(test.test)}
+            <Names text={c(test.test)} />
           </p>
           {view === "buyer" && (
             <button
@@ -1361,7 +1415,7 @@ function TestRow({
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Why{" "}
             </dt>
-            <dd className="print-kv-value inline break-words">{c(test.why)}</dd>
+            <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.why)} /></dd>
           </div>
         </dl>
         {/* Report Density & Sequencing Coherence V1 — Brief Readiness's
@@ -1385,8 +1439,8 @@ function TestRow({
                 <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                   Worth knowing{" "}
                 </dt>
-                <dd className="print-kv-value inline break-words">
-                  {c(test.briefReadiness.client)}
+                <dd className="print-kv-value inline [overflow-wrap:anywhere]">
+                  <Names text={c(test.briefReadiness.client)} />
                 </dd>
               </div>
             </dl>
@@ -1407,7 +1461,7 @@ function TestRow({
                     <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                       Readiness{" "}
                     </dt>
-                    <dd className="print-kv-value inline break-words">
+                    <dd className="print-kv-value inline [overflow-wrap:anywhere]">
                       {test.briefReadiness.state !== "ready"
                         ? test.briefReadiness.buyer
                         : (test.briefReadiness.disclosureNote ?? "")}
@@ -1419,7 +1473,7 @@ function TestRow({
                   <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                     Diagnostic{" "}
                   </dt>
-                  <dd className="print-kv-value inline break-words">
+                  <dd className="print-kv-value inline [overflow-wrap:anywhere]">
                     {test.evidenceDiagnostic.buyer}
                   </dd>
                 </div>
@@ -1432,13 +1486,13 @@ function TestRow({
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Hypothesis{" "}
             </dt>
-            <dd className="print-kv-value inline break-words">{c(test.hypothesis)}</dd>
+            <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.hypothesis)} /></dd>
           </div>
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "Success = " : "Win = "}
             </dt>
-            <dd className="print-kv-value inline break-words">{c(test.winningLooksLike)}</dd>
+            <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.winningLooksLike)} /></dd>
           </div>
         </dl>
         {/* Next Tests Setup/Signals Progressive Disclosure V1 — Setup
@@ -1466,7 +1520,7 @@ function TestRow({
               <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 {view === "client" ? "How " : "Setup "}
               </dt>
-              <dd className="print-kv-value inline break-words">{c(test.setup)}</dd>
+              <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.setup)} /></dd>
             </div>
           </dl>
           {/* The receipts: which signals produced this recommendation. */}
@@ -1485,7 +1539,7 @@ function TestRow({
                       aria-hidden="true"
                       className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
                     />
-                    <span className="min-w-0 break-words">{c(signal)}</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]"><Names text={c(signal)} /></span>
                   </li>
                 ))}
               </ul>
@@ -1517,7 +1571,7 @@ function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
             aria-hidden="true"
             className="mt-[8px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
           />
-          {item}
+          <Names text={item} />
         </li>
       ))}
     </ul>
@@ -1529,10 +1583,10 @@ function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
         Brief · T{index + 1}
       </p>
       <h3 className="mt-1.5 text-[15px] font-semibold tracking-tight text-zinc-50">
-        {brief.title}
+        <Names text={brief.title} />
       </h3>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-zinc-300">
-        {brief.objective}
+        <Names text={brief.objective} />
       </p>
 
       <div className="mt-5 space-y-5">
@@ -1543,7 +1597,7 @@ function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
         <div>
           {label("Concept")}
           <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
-            {brief.concept}
+            <Names text={brief.concept} />
           </p>
         </div>
         <div>
@@ -1557,7 +1611,7 @@ function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
                 <span className="shrink-0 font-mono text-[11px] font-semibold text-zinc-400">
                   {i + 1}.
                 </span>
-                {hook}
+                <Names text={hook} />
               </li>
             ))}
           </ol>
@@ -1570,20 +1624,20 @@ function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
           <div>
             {label("Keep constant")}
             <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
-              {brief.keepConstant}
+              <Names text={brief.keepConstant} />
             </p>
           </div>
           <div>
             {label("Change")}
             <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
-              {brief.change}
+              <Names text={brief.change} />
             </p>
           </div>
         </div>
         <div>
           {label("Success metric")}
           <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-300">
-            {brief.successMetric}
+            <Names text={brief.successMetric} />
           </p>
         </div>
         <div>
@@ -1593,7 +1647,7 @@ function BriefCard({ brief, index }: { brief: MemoBrief; index: number }) {
       </div>
 
       <p className="mt-5 border-t border-white/[0.06] pt-3 text-xs leading-relaxed text-zinc-400">
-        {brief.basisNote}
+        <Names text={brief.basisNote} />
       </p>
     </article>
   );
@@ -1872,7 +1926,10 @@ export function Report({
         </div>
       </div>
 
-      <article>
+      {/* Real-account fix 5: agency ad names are 120–200-char tokens with
+          no break points — every text node may break anywhere rather
+          than push the page wider than the viewport. */}
+      <article className="[overflow-wrap:anywhere]">
         {/* Print-only brand line — the on-screen sidebar wordmark is
             .print-hidden, so the printed document needs its own,
             otherwise the exported PDF carries no indication of what
@@ -1988,7 +2045,7 @@ export function Report({
                     and may wrap as a last resort — they must never spill
                     into the neighboring stat, on screen or in print. */}
                 <p
-                  className={`print-kv-value flex min-h-6 items-end break-words font-mono font-semibold tabular-nums text-zinc-50 ${
+                  className={`print-kv-value flex min-h-6 items-end [overflow-wrap:anywhere] font-mono font-semibold tabular-nums text-zinc-50 ${
                     value.length > 12
                       ? "text-[15px] leading-tight"
                       : value.length > 8
@@ -2050,7 +2107,7 @@ export function Report({
                 {unusedColumns.headers.map((h) => (
                   <li
                     key={h}
-                    className="max-w-full break-words rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[11px] text-zinc-300"
+                    className="max-w-full [overflow-wrap:anywhere] rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[11px] text-zinc-300"
                   >
                     {h}
                   </li>
@@ -2168,7 +2225,7 @@ export function Report({
                           : "text-[15px] font-medium"
                       }`}
                     >
-                      {line}
+                      <Names text={line} />
                     </p>
                   ))}
                 </div>
@@ -2189,7 +2246,7 @@ export function Report({
                       : "max-w-3xl text-[15px] leading-relaxed text-zinc-300"
                   }
                 >
-                  {line}
+                  <Names text={line} />
                 </p>
               ))}
             </div>
@@ -2310,7 +2367,7 @@ export function Report({
                   key={i}
                   className="border-l border-white/10 pl-3 text-[13px] leading-relaxed text-zinc-400"
                 >
-                  {bullet}
+                  <Names text={bullet} />
                 </li>
               ))}
             </ul>
@@ -2505,7 +2562,7 @@ export function Report({
                   key={i}
                   className="border-l border-amber-300/40 pl-3 text-[13px] leading-relaxed text-zinc-400"
                 >
-                  {bullet}
+                  <Names text={bullet} />
                 </li>
               ))}
             </ul>

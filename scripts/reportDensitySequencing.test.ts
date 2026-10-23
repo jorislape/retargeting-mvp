@@ -245,13 +245,15 @@ WorstAd,380.00,5,1.20`;
     const src = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
     // The three Next-controlled-test <dd> elements (Preserve/Change/
     // Watch) — the real, proven 320px overflow source (a bare flex
-    // child with no min-width:0) — now carry min-w-0 break-words.
+    // child with no min-width:0) — now carry min-w-0 plus
+    // overflow-wrap:anywhere (Real-account fix 5: break-word doesn't
+    // shrink min-content, so 160-char ad names still overflowed).
     // AdTable's min-w-[540px] table is deliberately untouched: browser
     // QA proved it's correctly contained by its own overflow-x-auto
     // and never causes genuine page-level scroll.
     const nextControlledIdx = src.indexOf("Next controlled test");
     const block = src.slice(nextControlledIdx, nextControlledIdx + 2000);
-    const ddMatches = block.match(/<dd className="min-w-0 break-words">\{cz/g) ?? [];
+    const ddMatches = block.match(/<dd className="min-w-0 \[overflow-wrap:anywhere\]"><Names text=\{cz/g) ?? [];
     assert.equal(ddMatches.length, 3, "all three Preserve/Change/Watch <dd> elements carry the overflow fix");
     assert.ok(
       src.includes('min-w-[540px]'),

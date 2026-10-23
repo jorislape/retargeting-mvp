@@ -318,3 +318,13 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
       absent on single-period runs; visible in Copy/TXT at the same spot.
 - [ ] **Decision bars applied** now lists the minimum-sample and
       flat-field-band defaults alongside the existing bars.
+
+## Real-account fixes (agency export)
+
+Run `scripts/fixtures/agency-naming-convention.csv` (ROAS).
+
+- [ ] **Long names**: at 375, 768, 1280 and 1920px, buyer and client,
+      nothing scrolls horizontally. The Next move headline, Pause/Receives
+      lists, test titles and client cards show names middle-truncated
+      (~60 chars, "start…end"), full name on hover. Tables show full names
+      wrapping. Copy/TXT keep full names.
