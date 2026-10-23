@@ -43,6 +43,14 @@ function median(values: number[]): number | null {
     : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+/** Total spend ÷ total conversions across every ad (Real-account fix
+ *  1's zero-purchase bar for ROAS). null when no ad recorded any. */
+export function accountCostPerOutcome(ads: readonly ParsedAd[]): number | null {
+  const outcomes = ads.reduce((sum, a) => sum + (a.conversions ?? 0), 0);
+  if (!(outcomes > 0)) return null;
+  return ads.reduce((sum, a) => sum + a.spend, 0) / outcomes;
+}
+
 function computeSpendGate(
   ads: ParsedAd[],
   targetCpa: number | null,
@@ -176,21 +184,33 @@ export function analyze(
     }
     return a.conversions < floorMin ? { ...a, gate: "below_outcome_floor" } : a;
   });
-  /* Zero-conversion CPA ads never enter the median (Tester Feedback
-     Fix 2) — it's computed from the ads that have a value. */
+  /* Zero-conversion ads never enter the median (Tester Feedback Fix 2;
+     Real-account fix 1 extends it to 0x ROAS ads) — it's computed from
+     the ads that recorded an outcome. */
   const benchmark = median(
     firstPass
-      .filter((a) => a.gate === "judged" && a.kpiValue != null)
+      .filter((a) => a.gate === "judged" && a.kpiValue != null && !a.zeroConversions)
       .map((a) => a.kpiValue as number)
   );
   /* Follow-up guard: past the spend gate, a zero-conversion ad is judged
      only at ≥ ZERO_CONVERSION_SPEND_MULTIPLE × max(median CPA, target
      CPA); below that it's set aside. No median and no target → there is
      nothing to measure "0" against, so it's set aside too. */
-  const zeroBarBase = Math.max(benchmark ?? 0, targetCpa != null && targetCpa > 0 ? targetCpa : 0);
+  /* Real-account fix 1: for ROAS, "0 purchases" is measured against
+     what one purchase costs this account — total spend ÷ total
+     purchases over EVERY analyzed ad (the median here is a ROAS, not a
+     cost). No purchases anywhere → nothing to measure against. */
+  const zeroUnitCost = kpi === "roas" ? accountCostPerOutcome(ads) : benchmark;
+  const zeroBarBase = Math.max(zeroUnitCost ?? 0, targetCpa != null && targetCpa > 0 ? targetCpa : 0);
   const zeroBar = zeroBarBase > 0 ? ZERO_CONVERSION_SPEND_MULTIPLE * zeroBarBase : null;
+  /* Real-account fix 1: for ROAS every zero-purchase ad under the bar
+     reads "no purchases yet, low spend" — including those under the
+     spend gate, which would otherwise be lumped in with "too little
+     spend" ads that DID record purchases. */
   const gated: GatedAd[] = firstPass.map((a) =>
-    a.gate === "judged" && a.zeroConversions && !(zeroBar != null && a.spend >= zeroBar)
+    (a.gate === "judged" || (kpi === "roas" && a.gate === "below_spend_gate")) &&
+    a.zeroConversions &&
+    !(zeroBar != null && a.spend >= zeroBar)
       ? { ...a, gate: "zero_outcome_thin" }
       : a
   );
@@ -291,6 +311,7 @@ export function analyze(
           zeroOutcomeThin: {
             ads: zeroThin.map((z) => ({ name: z.name, spend: z.spend })),
             needs: zeroBar,
+            ...(kpi === "roas" ? { unitCost: zeroUnitCost } : {}),
           },
         }
       : {}),
@@ -365,7 +386,7 @@ function buildProxyKpi(
     // A zero-purchase ad has no CPA but is unambiguously the worst result.
     return { name: r.name, value: o?.kpiValue ?? null, zero: o?.zeroConversions === true };
   });
-  const known = values.filter((v) => v.value != null).map((v) => v.value as number);
+  const known = values.filter((v) => v.value != null && !v.zero).map((v) => v.value as number);
   const med = median(known);
   if (med == null) return { outcomeKpis };
   const higher = HIGHER_IS_BETTER[pref.kpi];
@@ -409,11 +430,15 @@ function computeKpiGaps(
     kpi === "roas" || kpi === "cpa"
       ? noValueAds.filter((a) => a.conversions === 0).length
       : 0;
-  const belowGateWithValue = gated.filter(
-    (a) =>
-      (a.gate === "below_spend_gate" && (a.kpiValue != null || a.zeroConversions)) ||
-      a.gate === "zero_outcome_thin"
-  ).length;
+  /* ROAS zero-purchase ads under their bar get their own part
+     (zeroLowSpend) — "too little spend" is left to ads with purchases. */
+  const zeroLowSpend = kpi === "roas" ? gated.filter((a) => a.gate === "zero_outcome_thin").length : 0;
+  const belowGateWithValue =
+    gated.filter(
+      (a) =>
+        (a.gate === "below_spend_gate" && (a.kpiValue != null || a.zeroConversions)) ||
+        a.gate === "zero_outcome_thin"
+    ).length - zeroLowSpend;
   const missing = noValueAds.length - zeroOutcome;
   const belowOutcomeFloor = gated.filter((a) => a.gate === "below_outcome_floor").length;
   let suggestedKpi: KpiKey | null = null;
@@ -428,6 +453,7 @@ function computeKpiGaps(
     noValue: noValueAds.length,
     zeroOutcome,
     belowGateWithValue,
+    ...(zeroLowSpend > 0 ? { zeroLowSpend } : {}),
     ...(belowOutcomeFloor > 0 ? { belowOutcomeFloor } : {}),
     suggestedKpi,
     ...(suggestedCpaBasis ? { suggestedCpaBasis } : {}),

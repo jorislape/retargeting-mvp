@@ -9,6 +9,7 @@ import {
   SCALE_TEST_MIN_DELTA_PCT,
   SHORT_WINDOW_DAYS,
   spendGateSource,
+  zeroThinCopy,
 } from "./decision";
 import {
   fmtCount,
@@ -66,7 +67,13 @@ function spendSetAside(analysis: AnalysisResult): number {
   /* Ads under the user's outcome minimum are named separately too
      (KpiGaps already counts them in their own bucket). */
   const floor = analysis.kpiGaps ? 0 : analysis.outcomeFloor?.setAside.length ?? 0;
-  return (analysis.kpiGaps ? analysis.kpiGaps.belowGateWithValue : analysis.adsSetAside) - thin - floor;
+  return (
+    (analysis.kpiGaps
+      ? analysis.kpiGaps.belowGateWithValue + (analysis.kpiGaps.zeroLowSpend ?? 0)
+      : analysis.adsSetAside) -
+    thin -
+    floor
+  );
 }
 
 /** Tester Feedback follow-up: one buyer line per zero-conversion CPA ad
@@ -75,6 +82,8 @@ function zeroThinLines(analysis: AnalysisResult): string[] {
   const z = analysis.zeroOutcomeThin;
   if (!z) return [];
   const money = (v: number) => fmtMoney(v, analysis.currency);
+  const summary = zeroThinCopy(z, analysis, money);
+  if (summary) return [summary.buyer];
   const many = outcomeNounsFor(analysis)?.many ?? "conversions";
   const need =
     z.needs != null
@@ -159,8 +168,10 @@ function buildRow(
     const many = outcomeNounsFor(analysis)?.many ?? "conversions";
     return {
       name: ad.name,
-      valueLabel: `0 ${many}`,
-      vsMedianLabel: `no ${kpiLabelFor(analysis)} — ranked last`,
+      /* Real-account fix 1: a zero-purchase ROAS ad IS 0x. */
+      valueLabel: analysis.kpi === "roas" ? fmtKpiValue(0, "roas", analysis.currency) : `0 ${many}`,
+      vsMedianLabel:
+        analysis.kpi === "roas" ? `0 ${many} — ranked last` : `no ${kpiLabelFor(analysis)} — ranked last`,
       deltaPct: null,
       spendLabel: fmtMoney(ad.spend, analysis.currency),
       reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
@@ -1895,7 +1906,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       ...(analysis.kpiGaps
         ? {
             setAsideBreakdown: {
-              spend: analysis.kpiGaps.belowGateWithValue,
+              spend: analysis.kpiGaps.belowGateWithValue + (analysis.kpiGaps.zeroLowSpend ?? 0),
               noValue: analysis.kpiGaps.noValue,
             },
           }

@@ -183,7 +183,7 @@ export function buildComparison(
     const map = new Map<string, RankedAd>();
     for (const ad of period.analysis.rankedAds) {
       /* A judged zero-conversion CPA ad has no value to diff. */
-      if (ad.kpiValue == null) continue;
+      if (ad.kpiValue == null || ad.zeroConversions) continue;
       const k = usable(ad);
       if (k != null) map.set(k, ad);
     }

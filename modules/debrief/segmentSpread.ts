@@ -66,7 +66,7 @@ export function detectSegmentSpread(
   if (!dimension) return null;
   const groups = new Map<string, number[]>();
   for (const ad of ranked) {
-    if (ad.kpiValue == null) continue;
+    if (ad.kpiValue == null || ad.zeroConversions) continue;
     const raw = dimension === "ad set" ? ad.adSetName : ad.campaignName;
     const key = raw?.trim().replace(/\s+/g, " ").toLowerCase();
     if (!key) continue;

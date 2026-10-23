@@ -445,8 +445,13 @@ export interface KpiGaps {
   belowGateWithValue: number;
   /** First-Run Robustness 2 — ads set aside by the user's outcome
    *  minimum (present only when > 0). Partition: adsJudged + noValue +
-   *  belowGateWithValue + (belowOutcomeFloor ?? 0) === adsAnalyzed. */
+   *  belowGateWithValue + (belowOutcomeFloor ?? 0) + (zeroLowSpend ?? 0)
+   *  === adsAnalyzed. */
   belowOutcomeFloor?: number;
+  /** ROAS only (Real-account fix 1): ads with 0 purchases set aside
+   *  under the zero-purchase spend bar — "no purchases yet, low spend"
+   *  (NOT counted in belowGateWithValue for ROAS). */
+  zeroLowSpend?: number;
   /** The KPI this export reads best with (kpiUsability's preferredUsableKpi
    *  — same choice the generator's auto-switch makes), offered only when
    *  most ads simply lack the selected KPI's column data. */
@@ -572,7 +577,13 @@ export interface AnalysisResult {
    *  the zero-conversion spend bar (gate "zero_outcome_thin"). `needs`
    *  is that bar in money, or null when there was nothing to measure it
    *  against (no median CPA and no target). Absent when none. */
-  zeroOutcomeThin?: { ads: { name: string; spend: number }[]; needs: number | null };
+  zeroOutcomeThin?: {
+    ads: { name: string; spend: number }[];
+    needs: number | null;
+    /** ROAS only (Real-account fix 1): the account's cost per purchase
+     *  (total spend ÷ total purchases) the bar is a multiple of. */
+    unitCost?: number | null;
+  };
   /** First-Run Robustness 2 — present ONLY when the user set
    *  minJudgeOutcomes and the KPI has an outcome count. setAside: ads
    *  set aside under it (gate "below_outcome_floor"), with their count;

@@ -150,14 +150,18 @@ try {
     assert.match(t.memo.losers.setAsideNote, /1 had no CPA value/);
   }
 
-  /* ---- Non-CPA KPIs are untouched: ROAS with a 0-purchase row ---- */
+  /* ---- ROAS (Real-account fix 1): a 0-purchase row is a 0x result,
+     judged as the worst past 2× the account's cost per purchase ---- */
   {
     const roas =
       "Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" +
       "R1,400,10,900\nR2,380,8,700\nR3,360,6,500\nR4,340,5,300\nR5,320,4,200\nR6,300,0,\n";
     const t = run(roas, "roas");
-    assert.ok(t.ads.every((x) => x.zeroConversions === undefined), "flag is CPA-only");
-    assert.equal(t.analysis.kpiGaps?.zeroOutcome, 1, "ROAS zero-outcome wording path unchanged");
+    const r6 = t.ads.find((x) => x.name === "R6");
+    assert.equal(r6?.zeroConversions, true, "ROAS zero-purchase row flagged");
+    assert.equal(r6?.kpiValue, 0, "its ROAS is 0x");
+    assert.equal(t.analysis.kpiGaps, undefined, "no longer a missing value");
+    assert.equal(t.analysis.losers[0].name, "R6", "judged as the worst (300 ≥ 2 × 2,100/33)");
   }
 
   /* ---- Tester fixture: its below-gate zero (Ad_A) stays set aside ---- */

@@ -133,6 +133,28 @@ function cpaZeroConversions(row: Record<string, string>, columns: ColumnMap): bo
   return count === 0;
 }
 
+/** Real-account fix 1: true when a ROAS row has no ROAS value because
+ *  it recorded NO purchases — an explicit 0 purchases or 0 purchase
+ *  value, or (Meta writes blank, not 0, for "no actions") a blank
+ *  purchases/value cell in a column that holds numbers on other rows.
+ *  A row with purchases > 0 but no value stays a genuinely missing
+ *  value, and a column that is blank on EVERY row proves nothing
+ *  (missing ≠ zero) — those stay "no ROAS value". */
+function roasZeroPurchases(
+  row: Record<string, string>,
+  columns: ColumnMap,
+  click: ClickBasis | null,
+  populated: { count: boolean; value: boolean }
+): boolean {
+  const countHeader = click ? click.count : columns.purchases;
+  const valueHeader = click ? click.value : columns.purchaseValue;
+  const count = countHeader ? parseNumericCell(row[countHeader]) : null;
+  const value = valueHeader ? parseNumericCell(row[valueHeader]) : null;
+  if (count === 0 || value === 0) return true;
+  if (count != null || value != null) return false;
+  return populated.count || populated.value;
+}
+
 /** Evidence Inputs V1: the raw conversion count behind a purchase-based
  *  KPI — purchases for roas/cpa/purchases, leads for leads — when a count
  *  column is present. Returns null for ctr/cpc (their reliability axis is
@@ -222,6 +244,20 @@ export function extractAds(
   /* Attribution & Intent 2: click-only basis for ROAS/CPA/CPL when the
      export has it (7-day preferred); null ⇒ blended, as before. */
   const click = clickBasisFor(kpi, columns);
+  const hasNumber = (header: string | null | undefined) =>
+    header != null && rows.some((r) => parseNumericCell(r[header]) != null);
+  /* A zero is only inferred when the export carries ROAS data at all
+     (a ROAS or purchase-value column with numbers): with neither, no
+     ad has a ROAS and a 0-purchase row is no different (missing ≠ 0). */
+  const roasData =
+    kpi === "roas" &&
+    (hasNumber(click ? click.value : columns.purchaseValue) || (!click && hasNumber(columns.purchaseRoas)));
+  const roasPopulated = roasData
+    ? {
+        count: hasNumber(click ? click.count : columns.purchases),
+        value: hasNumber(click ? click.value : columns.purchaseValue),
+      }
+    : null;
   const ads = rows
     .map((row, index) => {
       const spend = columns.spend ? (parseNumericCell(row[columns.spend]) ?? 0) : 0;
@@ -233,7 +269,19 @@ export function extractAds(
          an empty cell stays null. */
       const rawId = columns.adId ? row[columns.adId] : undefined;
       const id = rawId && rawId.trim() !== "" ? rawId.trim() : null;
-      const kpiValue = kpiValueForRow(row, columns, kpi, spend, click);
+      const rawKpiValue = kpiValueForRow(row, columns, kpi, spend, click);
+      /* Real-account fix 1: a ROAS row with spend and no purchases is a
+         0x result, not a missing value — it takes the same zero-outcome
+         path as a zero-conversion CPA ad (judged as the worst past its
+         own spend bar, set aside and named under it). */
+      const roasZero =
+        roasPopulated != null &&
+        rawKpiValue == null &&
+        spend > 0 &&
+        roasZeroPurchases(row, columns, click, roasPopulated);
+      /* …and its ROAS IS 0x (unlike a zero-conversion CPA, which has no
+         value) — kept out of the median by its zeroConversions flag. */
+      const kpiValue = roasZero ? 0 : rawKpiValue;
       return {
         name,
         id,
@@ -241,13 +289,14 @@ export function extractAds(
         kpiValue,
         /* Tester Feedback Fix 2 — key present only when true, so other
            ads (and every non-CPA run) are key-for-key unchanged. */
-        ...(kpi === "cpa" &&
-        kpiValue == null &&
-        (click ? parseNumericCell(row[click.count as string]) === 0 : cpaZeroConversions(row, columns))
+        ...((kpi === "cpa" &&
+          kpiValue == null &&
+          (click ? parseNumericCell(row[click.count as string]) === 0 : cpaZeroConversions(row, columns))) ||
+        roasZero
           ? { zeroConversions: true as const }
           : {}),
         nameTags: extractNameTags(name),
-        conversions: conversionsForRow(row, columns, kpi, click),
+        conversions: roasZero ? 0 : conversionsForRow(row, columns, kpi, click),
         ...viewThroughForRow(row, columns, kpi),
         ...upstreamFieldsForRow(row, columns),
         /* Spreadsheet row number (header = row 1) — used only for the

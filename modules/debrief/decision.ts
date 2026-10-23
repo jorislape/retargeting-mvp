@@ -385,6 +385,13 @@ function gapParts(gaps: KpiGaps, kpiLabel: string, kpiClient: string, outcomeMan
       client: "didn't have enough spend to include yet",
     });
   }
+  if (gaps.zeroLowSpend && outcomeMany) {
+    parts.push({
+      n: gaps.zeroLowSpend,
+      buyer: `had no ${outcomeMany} yet on low spend`,
+      client: `haven't made a sale yet on little spend`,
+    });
+  }
   if (gaps.belowOutcomeFloor && outcomeMany) {
     parts.push({
       n: gaps.belowOutcomeFloor,
@@ -400,6 +407,43 @@ function gapParts(gaps: KpiGaps, kpiLabel: string, kpiClient: string, outcomeMan
     );
   return { buyer: render("buyer"), client: render("client") };
 }
+
+/** Most zero-outcome ads named in full before the rest are counted. */
+export const ZERO_THIN_NAMED = 3;
+
+/** Real-account fix 1 — ROAS zero-purchase ads set aside under the
+ *  account-cost bar ("no purchases yet, low spend"), or any zero-outcome
+ *  list too long to name one line per ad: ONE line per register naming
+ *  the first ZERO_THIN_NAMED and counting the rest. null ⇒ the original
+ *  per-ad CPA lines (a short CPA list stays byte-identical). */
+export function zeroThinCopy(
+  thin: NonNullable<AnalysisResult["zeroOutcomeThin"]>,
+  analysis: AnalysisResult,
+  money: MoneyFormatter
+): { buyer: string; client: string } | null {
+  const roas = analysis.kpi === "roas";
+  if (!roas && thin.ads.length <= ZERO_THIN_NAMED) return null;
+  const nouns = outcomeNounsFor(analysis) ?? { one: "conversion", many: "conversions" };
+  const n = thin.ads.length;
+  const named = thin.ads.slice(0, ZERO_THIN_NAMED).map((z) => `"${z.name}" (${money(z.spend)})`);
+  const list = n > ZERO_THIN_NAMED ? `${named.join(", ")} and ${n - ZERO_THIN_NAMED} more` : joinAnd(named);
+  const fromUnitCost =
+    thin.needs != null && thin.unitCost != null && Math.abs(thin.needs - 2 * thin.unitCost) < 1e-9;
+  const bar =
+    thin.needs == null
+      ? `no ad in this export has a ${nouns.one} yet to measure them against`
+      : fromUnitCost
+        ? `each needs ≥ ${money(thin.needs)} — ${ZERO_CONVERSION_MULTIPLE_LABEL} the account's ${money(thin.unitCost as number)} cost per ${nouns.one} — before 0 ${nouns.many} counts as a result`
+        : `each needs ≥ ${money(thin.needs)} before 0 ${nouns.many} counts as a result`;
+  return {
+    buyer: `${n} ad${n === 1 ? "" : "s"} with 0 ${nouns.many} set aside — no ${nouns.many} yet, low spend: ${list}; ${bar}.`,
+    client: `${n} ad${n === 1 ? " hasn't" : "s haven't"} made a ${nouns.one} yet but also ${n === 1 ? "hasn't" : "haven't"} spent enough to call — ${list}.`,
+  };
+}
+
+/** Mirrors analysis.ts's ZERO_CONVERSION_SPEND_MULTIPLE (2×) for copy —
+ *  decision.ts can't import analysis.ts under the plain-Node runner. */
+const ZERO_CONVERSION_MULTIPLE_LABEL = "2×";
 
 /** Hold copy when ads cleared the spend gate but have no KPI value — so
  *  the hold names that cause instead of blaming the gate. Wording only;
@@ -636,7 +680,8 @@ export function buildLimits(
       kpiClientLabelFor(analysis),
       outcomeNounsFor(analysis)?.many ?? null
     );
-    const one = analysis.kpiGaps.noValue + analysis.kpiGaps.belowGateWithValue === 1;
+    const one =
+      analysis.kpiGaps.noValue + analysis.kpiGaps.belowGateWithValue + (analysis.kpiGaps.zeroLowSpend ?? 0) === 1;
     buyer.push(`${parts.buyer} — set aside, so no conclusion is drawn about ${one ? "it" : "them"} either way.`);
     client.push(`${parts.client}, so ${one ? "it's" : "they're"} not part of this read.`);
   } else if (
@@ -1102,7 +1147,12 @@ export function buildDecision(
     const nouns = outcomeNounsFor(analysis);
     const many = nouns?.many ?? "conversions";
     const one = nouns?.one ?? "conversion";
-    for (const z of thin.ads) {
+    const lines = zeroThinCopy(thin, analysis, money);
+    if (lines) {
+      gateSourceBuyer.push(lines.buyer);
+      gateSourceClient.push(lines.client);
+    }
+    for (const z of lines ? [] : thin.ads) {
       gateSourceBuyer.push(
         `"${z.name}" spent ${money(z.spend)} with 0 ${many} — not enough spend yet to call it (${
           thin.needs != null
