@@ -2193,6 +2193,11 @@ export function Report({
               New debrief
             </button>
           )}
+          {/* Real-account review: the browser's own header/footer (URL,
+              date, page title) otherwise prints on every page. */}
+          <p className="basis-full text-[11px] leading-relaxed text-zinc-500">
+            Tip: turn off &lsquo;Headers and footers&rsquo; in the print dialog.
+          </p>
         </div>
       </div>
 

@@ -116,4 +116,13 @@ assert.match(naming, /namingRowPrinted\(ki, ri\) \? "" : "print:hidden"/);
 assert.match(naming, /<PrintMore count=\{k\.rows\.length - PRINT_NAMING_ROWS\} \/>/);
 assert.match(report, /sm:grid-cols-2 \$\{memo\.namingPatterns \? "print:hidden" : ""\}/, "share lists screen-only beside the table");
 
+/* ---- Real-account review: no dev badge on paper; a tip for browser chrome ---- */
+assert.match(css, /@media print \{[\s\S]*?nextjs-portal \{\s*display: none !important;\s*\}/, "Next.js dev indicator hidden in print");
+{
+  const toolbar = between("{/* ---- Toolbar: view tabs + actions. Never prints. ---- */}", "<article");
+  assert.match(toolbar, /Print \/ Save PDF/);
+  assert.match(toolbar, /Tip: turn off &lsquo;Headers and footers&rsquo; in the print dialog\./);
+  assert.ok(toolbar.indexOf("Tip: turn off") > toolbar.indexOf("Print / Save PDF"), "beside the print action, in the print-hidden toolbar");
+}
+
 console.log("real-account print: all assertions passed");

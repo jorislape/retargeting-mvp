@@ -217,6 +217,11 @@ body {
   .print-hidden {
     display: none !important;
   }
+  /* Next.js's dev-mode indicator (the "N" badge) is a <nextjs-portal>
+     custom element outside the app tree — never part of a PDF. */
+  nextjs-portal {
+    display: none !important;
+  }
   .print-only {
     display: block !important;
   }
