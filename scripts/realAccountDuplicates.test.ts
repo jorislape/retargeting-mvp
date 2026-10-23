@@ -7,7 +7,8 @@
  * merged (spend / outcomes / value / impressions summed, the KPI
  * recomputed from the sums — never an average of ratios); unknown parts
  * stay unknown; "- Copy" variants stay separate; no "(row N)" label
- * survives anywhere; "runs in N ad sets" / "combined from N rows" is
+ * survives anywhere; "runs in N ad sets" only with an ad set column,
+ * else "appears N times in this export", is
  * shown; breakdown exports are detected and named in the file card.
  */
 import assert from "node:assert/strict";
@@ -22,7 +23,7 @@ const sku = (s: string) => (n: string) => n.includes(`[SKU]${s}_`);
 const { run, requireCompiled, buildSampleMemo, cleanup } = loadEngine();
 try {
   const { mergedRowsNote } = requireCompiled("modules/debrief/extract.js") as {
-    mergedRowsNote: (m: { names: number; rows: number; breakdowns: string[] }) => string | null;
+    mergedRowsNote: (m: { names: number; rows: number; breakdowns: string[]; adSetColumn?: boolean }) => string | null;
   };
   const r = run(AGENCY, "roas");
 
@@ -42,16 +43,17 @@ try {
   assert.equal(merged240.spend, 450);
   assert.equal(merged240.conversions, 30);
 
-  /* ---- No row labels; "runs in N ad sets"; disclosure ---- */
+  /* ---- No row labels; no ad set column ⇒ "appears N times"; disclosure ---- */
   assert.ok(!JSON.stringify(r.memo).includes("(row "), "no (row N) in the memo");
   assert.ok(!r.buyerText.includes("(row ") && !r.clientText.includes("(row "));
   const row = [...r.memo.winners, ...r.memo.losers.rows].find((x) => sku("00240")(x.name) && !/Copy$/.test(x.name));
-  assert.equal(row?.runsInLabel, "runs in 2 ad sets");
-  assert.match(r.buyerText, /\(runs in 2 ad sets\) \|/);
+  assert.equal(row?.runsInLabel, "appears 2 times in this export");
+  assert.match(r.buyerText, /\(appears 2 times in this export\) \|/);
+  assert.ok(!JSON.stringify(r.memo).includes("ad sets"), "no ad set claim without an ad set column");
   assert.equal(r.analysis.duplicateAdNames.length, 2);
   assert.ok(
     r.memo.decision.limits.buyer.some((l) =>
-      /^2 ad names appeared on several rows \(the same creative ran in several ad sets\) and were combined into one creative each — spend, purchases and value summed, ROAS recomputed from the totals/.test(l)
+      /^2 ad names appeared on several rows \(the same name appears more than once in this export\) and were combined into one creative each — spend, purchases and value summed, ROAS recomputed from the totals/.test(l)
     )
   );
 
@@ -75,16 +77,16 @@ try {
     assert.equal(y.conversions, 15);
   }
 
-  /* ---- Breakdown export: detected, named, "combined from N rows" ---- */
+  /* ---- Breakdown export: detected and named ---- */
   {
     const csv =
       "Ad name,Day,Amount spent (EUR),Purchases,Purchases conversion value\n" +
       ["A,2025-04-01,100,5,400", "A,2025-04-02,120,6,480", "A,2025-04-03,90,4,300", "B,2025-04-01,150,5,300", "B,2025-04-02,140,4,280"].join("\n") + "\n";
     const b = run(csv, "roas");
     assert.deepEqual(b.columns.breakdowns, ["Day"]);
-    assert.deepEqual(b.analysis.mergedRows, { rows: 5, breakdowns: ["Day"] });
+    assert.deepEqual(b.analysis.mergedRows, { rows: 5, breakdowns: ["Day"], adSetColumn: false });
     const a = b.memo.winners.find((x) => x.name === "A") ?? b.memo.losers.rows.find((x) => x.name === "A");
-    assert.equal(a?.runsInLabel, "combined from 3 rows", "a breakdown repeats ads; it doesn't prove ad sets");
+    assert.equal(a?.runsInLabel, "appears 3 times in this export", "a breakdown repeats ads; it doesn't prove ad sets");
     assert.ok(b.memo.decision.limits.buyer.some((l) => l.includes("(the export is broken down by Day)")));
     assert.match(mergedRowsNote({ names: 2, rows: 5, breakdowns: ["Day"] })!, /^Broken down by Day: 5 rows share 2 ad names — combined into one creative per ad name/);
   }
@@ -96,6 +98,8 @@ try {
     const s = run(csv, "roas");
     const a = s.ads.find((x) => x.name === "A")!;
     assert.equal(a.adSetCount, 2);
+    const aRow = [...s.memo.winners, ...s.memo.losers.rows, ...(s.memo.atMedian?.rows ?? [])].find((x) => x.name === "A");
+    assert.equal(aRow?.runsInLabel, "runs in 2 ad sets", "the ad set column proves the ad sets");
     assert.equal(a.adSetName, null, "mixed ad sets ⇒ no single ad set");
     assert.equal(s.ads.find((x) => x.name === "B")!.adSetName, "Set 1", "single rows untouched");
   }
@@ -108,7 +112,11 @@ try {
   assert.ok(!JSON.stringify(buildSampleMemo()).includes("runsInLabel"), "sample untouched");
   assert.match(
     mergedRowsNote({ names: 29, rows: 66, breakdowns: [] })!,
-    /^66 rows share 29 ad names \(the same creative in several ad sets\) — each name is combined into one creative/
+    /^66 rows share 29 ad names — each name is combined into one creative/
+  );
+  assert.match(
+    mergedRowsNote({ names: 2, rows: 5, breakdowns: [], adSetColumn: true })!,
+    /^5 rows share 2 ad names \(the same creative in several ad sets\)/
   );
 
   console.log("real-account duplicates: all assertions passed");

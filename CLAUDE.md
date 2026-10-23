@@ -64,7 +64,8 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # normalized name on several rows — ad sets or Day/Age/Placement
                   # breakdowns — is ONE creative: spend/outcomes/value/impressions
                   # summed, KPI recomputed from the sums, unknown parts stay unknown;
-                  # "- Copy" variants stay separate; rowsMerged → "runs in N ad sets";
+                  # "- Copy" variants stay separate; rowsMerged → "runs in N ad sets" only
+                  # with an ad set column, else "appears N times in this export";
                   # a limits line and the file card disclose it),
                   # applyFormatOverrides (Creative Format Confirmation V1: user-confirmed
                   # formats replace the ad-name tag GUESS and set formatConfirmed — they

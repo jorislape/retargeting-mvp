@@ -1960,7 +1960,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       assert.equal(alphaRows.length, 1, "one creative, not two rows");
       assert.equal(alphaRows[0].name, "Alpha");
       assert.equal(alphaRows[0].valueLabel, "2.75x", "ROAS recomputed: (1,500 + 150) ÷ 600");
-      assert.equal(alphaRows[0].runsInLabel, "runs in 2 ad sets");
+      assert.equal(alphaRows[0].runsInLabel, "appears 2 times in this export", "no ad set column ⇒ no ad set claim");
       assert.ok(!JSON.stringify(mDup).includes("(row "), "no row-numbered labels anywhere");
       assert.ok(
         mDup.decision.limits.buyer.some(

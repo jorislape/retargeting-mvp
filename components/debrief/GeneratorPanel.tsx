@@ -560,7 +560,7 @@ export function GeneratorPanel() {
     groupKeyByName: Record<string, string>;
     /** Real-account fix 3 — file-card disclosure: names on several rows
      *  (merged into one creative each) and any breakdown columns. */
-    merged: { names: number; rows: number; breakdowns: string[] };
+    merged: { names: number; rows: number; breakdowns: string[]; adSetColumn: boolean };
   } | null>(null);
   /* First-Run Robustness: the shared file check (fileCheck.ts), run on
      drop — the SAME checks and copy the API runs. Keyed to the File so a
@@ -653,6 +653,7 @@ export function GeneratorPanel() {
           names: mergedEntries.length,
           rows: mergedEntries.reduce((n, e) => n + e.ids.length, 0),
           breakdowns: columns.breakdowns,
+          adSetColumn: columns.adSetName != null,
         };
         /* Display-only extras (the API recomputes everything): spend
            column total and the file's reporting range. */

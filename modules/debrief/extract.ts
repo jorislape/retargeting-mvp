@@ -354,13 +354,18 @@ export function normalizeRowName(name: string): string {
  *  rows (null when nothing merges). Breakdown exports say which
  *  breakdown repeated the ads; ad-level exports say the same creative
  *  ran in several ad sets. */
-export function mergedRowsNote(merged: { names: number; rows: number; breakdowns: readonly string[] }): string | null {
+export function mergedRowsNote(merged: {
+  names: number;
+  rows: number;
+  breakdowns: readonly string[];
+  adSetColumn?: boolean;
+}): string | null {
   if (merged.names === 0) return null;
   const n = merged.names;
   const what = `${merged.rows} rows share ${n} ad name${n === 1 ? "" : "s"}`;
   return merged.breakdowns.length > 0
     ? `Broken down by ${merged.breakdowns.join(", ")}: ${what} — combined into one creative per ad name (spend, purchases and value summed).`
-    : `${what} (the same creative in several ad sets) — each name is combined into one creative (spend, purchases and value summed). Names that differ, like "- Copy", stay separate.`;
+    : `${what}${merged.adSetColumn ? " (the same creative in several ad sets)" : ""} — each name is combined into one creative (spend, purchases and value summed). Names that differ, like "- Copy", stay separate.`;
 }
 
 /** Sum of a field over rows — null when ANY row lacks it (an unknown

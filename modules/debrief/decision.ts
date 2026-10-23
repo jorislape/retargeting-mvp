@@ -843,7 +843,9 @@ export function buildLimits(
     const why =
       breakdowns.length > 0
         ? `the export is broken down by ${breakdowns.join(", ")}`
-        : "the same creative ran in several ad sets";
+        : analysis.mergedRows?.adSetColumn
+          ? "the same creative ran in several ad sets"
+          : "the same name appears more than once in this export";
     buyer.push(
       `${names.length} ad name${names.length === 1 ? "" : "s"} appeared on several rows (${why}) and ${names.length === 1 ? "was" : "were"} combined into one creative each — spend, ${outcomeNounsFor(analysis)?.many ?? "results"} and value summed, ${kpiLabelFor(analysis)} recomputed from the totals: ${list}. Near-identical names ("- Copy") are kept separate.`
     );

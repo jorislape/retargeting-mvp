@@ -544,7 +544,7 @@ export interface AnalysisResult {
   /** Real-account fix 3 — present only when same-name rows were merged:
    *  the export rows behind the analyzed ads, and any breakdown columns
    *  (Day, Age, Placement, …) that caused the repetition. */
-  mergedRows?: { rows: number; breakdowns: string[] };
+  mergedRows?: { rows: number; breakdowns: string[]; adSetColumn: boolean };
   /** Real-account fix 8 — present only when ≥50% of judged ads follow
    *  a naming convention with at least one comparable key. */
   namingPatterns?: NamingPatterns;
