@@ -37,7 +37,7 @@ try {
   assert.equal(m.decision.budgetVariant, "shift");
   assert.deepEqual(m.decision.budgetMove?.from.map((x) => x.name).sort(), [...BELOW].sort());
   assert.deepEqual(m.decision.budgetMove?.to.map((x) => x.name), ["Hero_UGC_A", "Review_B", "Demo_C"]);
-  assert.match(m.decision.headline, /and 4 more into "Hero_UGC_A", "Review_B" and "Demo_C"\.$/);
+  assert.equal(m.decision.headline, "Shift budget in steps from 6 below-median ads into 3 ads with 24+ purchases each.", "count form; names in the lists");
 
   // Every below-median ad appears in buyer TXT, client TXT, and at the
   // client's 3-row display cap too (the rest after "+N more:").

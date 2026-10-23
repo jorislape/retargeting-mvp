@@ -191,7 +191,9 @@ function assertContract(d: MemoDecision, label: string) {
   assert.equal(at25.action, "budget", "25% share exactly clears the cut bar");
   assert.ok(at25.headline.startsWith("Trim "), "cut-only variant");
   assert.equal(at25.budgetVariant, "cut", "cut-only sets budgetVariant cut");
-  assert.ok(at25.headline.includes("and 2 more"), "loser names honest about the remainder");
+  // >2 trimmed ads ⇒ count form; the names live in budgetMove.from.
+  assert.ok(at25.headline.startsWith("Trim 4 below-median ads;"), "count form honest about the full total");
+  assert.deepEqual(at25.budgetMove?.from.map((x) => x.name), ["L1", "L2"]);
   assert.ok(at25.rationale.includes(`${CUT_MIN_SPEND_SHARE_PCT}`) || at25.rationale.includes("25"), "rationale carries the share");
   assertContract(at24, "cut@24");
   assertContract(at25, "cut@25");
@@ -1314,8 +1316,8 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // The pin documented in sampleCsv.ts's invariants header.
     assert.equal(memo.decision.action, "budget", "sample decision is a budget move");
     assert.ok(
-      memo.decision.headline.startsWith("Shift budget in steps from") &&
-        memo.decision.headline.includes('"UGC_MorningRoutine_V1"'),
+      memo.decision.headline === "Shift budget in steps from 5 below-median ads into 3 ads with 24+ purchases each." &&
+        memo.decision.budgetMove?.to[0].name === "UGC_MorningRoutine_V1",
       "sample decision shifts into the documented leader"
     );
     assert.ok(memo.decision.rationale.includes("100%"), "documented +100% vs median ROAS");

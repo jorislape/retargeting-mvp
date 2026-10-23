@@ -1507,6 +1507,18 @@ export function buildDecision(
           }`
       )
       .join("; ");
+    /* Real-account follow-up: >2 trimmed ads or >1 receiver ⇒ the
+       headline counts; the names stay in the Pause / Receives lines. */
+    const countForm = analysis.belowBenchmarkCount > 2 || receivers.length > 1;
+    const minReceiverOutcomes =
+      nouns != null && receivers.length > 0 && receivers.every((r) => r.conversions != null)
+        ? Math.min(...receivers.map((r) => r.conversions as number))
+        : null;
+    const receiversCounted =
+      receivers.length > 1
+        ? `${receivers.length} ads${minReceiverOutcomes != null ? ` with ${minReceiverOutcomes}+ ${nouns!.many} each` : ""}`
+        : receiverNames(receivers);
+    const losersCounted = `${analysis.belowBenchmarkCount} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"}`;
     const passedOver = topBelowFloor && top != null && lead != null && top !== lead
       ? ` "${top.name}" leads but sits under the receiver floor, so it isn't scaled.`
       : "";
@@ -1527,7 +1539,9 @@ export function buildDecision(
         action: "budget",
         budgetVariant: "shift",
         budgetMove: { from: fromAds, to: toAds, belowSpendLabel },
-        headline: `Shift budget in steps from ${loserNames(analysis)} into ${receiverNames(receivers)}.`,
+        headline: countForm
+          ? `Shift budget in steps from ${losersCounted} into ${receiversCounted}.`
+          : `Shift budget in steps from ${loserNames(analysis)} into ${receiverNames(receivers)}.`,
         clientHeadline: many
           ? `Trim the weakest ads and step up budget on the ${receivers.length} clear leaders.`
           : `Trim the weakest ads and step up budget on "${lead!.name}", the clear leader.`,
@@ -1551,7 +1565,7 @@ export function buildDecision(
         budgetVariant: "scale",
         budgetMove: { from: [], to: toAds },
         headline: many
-          ? `Scale ${receiverNames(receivers)} in steps — each over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`
+          ? `Scale ${receiversCounted} in steps — each over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`
           : `Scale "${lead!.name}" in steps — ${pct(lead!.deltaPct!)}% better than the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         clientHeadline: `Increase spend on ${receiverNames(receivers)} in steps — ${many ? "they're" : "it's"} clearly outperforming.`,
         rationale: `${receiverFacts} — past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.${passedOver} ${belowShare >= CUT_MIN_SPEND_SHARE_PCT ? `No cut: ${pct(belowShare)}% of judged spend sits below the median, but the weakest ad isn't ${SCALE_TEST_MIN_DELTA_PCT}% behind it.` : `No loser group is large enough to cut (${pct(belowShare)}% of judged spend, under the ${CUT_MIN_SPEND_SHARE_PCT}% bar).`}`,
@@ -1580,7 +1594,10 @@ export function buildDecision(
       action: "budget",
       budgetVariant: "cut",
       budgetMove: { from: fromAds, to: [], belowSpendLabel },
-      headline: `Trim ${loserNames(analysis)}; hold everything else steady.`,
+      headline:
+        analysis.belowBenchmarkCount > 2
+          ? `Trim ${analysis.belowBenchmarkCount} below-median ads; hold everything else steady.`
+          : `Trim ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
       rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${
         receiverBlocked && top != null

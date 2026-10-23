@@ -28,11 +28,12 @@ import type { DebriefContext } from "./types";
  *   - Decision-First V1 (pinned, asserted by scripts/decision.test.ts):
  *     with SAMPLE_CONTEXT (ROAS) the Next-move decision is a BUDGET
  *     shift — "UGC_MorningRoutine_V1" is +100% vs the median ROAS
- *     (past the 30% scale bar) AND the 5 below-benchmark ads hold 35%
+ *     (past the 30% scale bar) AND the 5 below-median ads hold 35%
  *     of judged spend, $1,150.65 (past the 25% cut bar), so both B1
- *     branches fire and the card reads "Shift budget from … into
- *     'UGC_MorningRoutine_V1'". Editing rows in a way that changes
- *     this action/leader breaks that test on purpose.
+ *     branches fire and the card reads "Shift budget in steps from 5
+ *     below-median ads into 3 ads with 24+ purchases each" — the
+ *     leader first among the 3 receivers. Editing rows in a way that
+ *     changes this action/leader breaks that test on purpose.
  *   - Evidence-Explicit Decision V1 (pinned): the same run is
  *     evidenceState "supported" / evidenceShape "separation" — 11
  *     judged ads (≥ the 10-ad bar), no missing required columns, a

@@ -129,7 +129,8 @@ try {
     const td = t.memo.decision;
     assert.equal(td.action, "budget");
     assert.equal(td.budgetVariant, "cut");
-    assert.match(td.headline, /^Trim "F", "E" and 1 more; hold everything else steady\.$/);
+    assert.match(td.headline, /^Trim 3 below-median ads; hold everything else steady\.$/);
+    assert.equal(td.budgetMove?.from.length, 3, "the trimmed ads are named in the Pause list");
     assert.deepEqual(td.budgetMove?.to, []);
     assert.match(td.rationale, /No ad qualifies to receive budget — "Thin" leads by \d+% but has 6 purchases, under the receiver floor \(≥10 purchases and ≥ [\d.,]+ EUR spent \(the minimum spend\)\) — so the move is trimming the leak, not scaling\./);
     for (const s of clientStrings(t.memo))
