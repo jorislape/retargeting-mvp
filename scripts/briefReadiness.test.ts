@@ -383,7 +383,7 @@ console.log("briefReadiness Stage 1: all pure-logic proofs passed");
 
     // The sample's worst loser (Static_StockPhoto_Generic_V1, $198.20
     // spend) with no target CPA set: proxy multiple against the
-    // ~$120.91 spend gate is ~1.64x — under Debrief's 2x default ->
+    // ~$126.11 spend gate is ~1.57x — under Debrief's 2x default ->
     // insufficient (capped there anyway since there's no true target).
     assert.ok(memo.nextTests[1].briefReadiness, "T2 carries a brief-readiness read on the sample");
     assert.equal(memo.nextTests[1].briefReadiness.state, "insufficient");

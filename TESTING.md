@@ -8,7 +8,7 @@ browser's localStorage and is cleared with "Clear watchlist" (see the
 watchlist cases below).
 
 The sample dataset lives in `modules/debrief/sampleCsv.ts` (14 ads,
-June 2026). Engine facts to check against: spend gate ≈ **$120.91**
+June 2026). Engine facts to check against: spend gate ≈ **$126.11**
 (no target CPA), **11 judged / 3 set aside**, medians — ROAS 2.31×,
 CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 5 winners and 5 losers around its median.
@@ -170,7 +170,7 @@ CPA $24.03, CTR 1.68%, CPC $0.57, Purchases 12, Leads 22. Every KPI has
 - [ ] **Client view density**: top 3 performers each way as summary
       cards (not tables) with a "N more … full detail in the Buyer
       view" note; confidence reads "This result is based on 14 ads and
-      $3,385.50 in ad spend…". Buyer view keeps full tables and notes.
+      $3,530.95 in ad spend…". Buyer view keeps full tables and notes.
 - [ ] **Client visual blocks**: masthead shows 4–5 executive cards
       (spend / typical result / best performer / judged fairly / next
       tests) instead of the stat row; Summary renders the "What this

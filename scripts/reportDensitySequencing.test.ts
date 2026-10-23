@@ -128,7 +128,7 @@ WorstAd,380.00,5,1.20`;
     const sampleMemo = buildSampleMemo();
     assert.equal(sampleMemo.decision.action, "budget");
     assert.equal(sampleMemo.decision.budgetVariant, "shift");
-    assert.equal(sampleMemo.decision.evidenceState, "limited"); // weakest receiver 24 < 30
+    assert.equal(sampleMemo.decision.evidenceState, "supported"); // weakest receiver 31 ≥ 30
     assert.equal(sampleMemo.nextTests[0].briefReadiness.state, "directional");
     assert.equal(sampleMemo.nextTests[0].evidenceDiagnostic, undefined);
     // Same pins already established by briefReadiness.test.ts and

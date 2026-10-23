@@ -289,7 +289,7 @@ WorstAd,380.00,10,2.90`;
     // regression). Dataset-level decision/evidenceState are untouched.
     assert.equal(sampleMemo.nextTests[0].briefReadiness.state, "directional");
     assert.match(sampleMemo.nextTests[0].hypothesis, /we want to test whether/);
-    assert.equal(sampleMemo.decision.evidenceState, "limited", "dataset-level evidenceState (limited since the receiver-volume bar: weakest receiver 24 < 30)");
+    assert.equal(sampleMemo.decision.evidenceState, "supported", "dataset-level evidenceState (weakest receiver 31 ≥ the 30 receiver-volume bar)");
     assert.equal(sampleMemo.decision.action, "budget");
     assert.equal(sampleMemo.decision.budgetVariant, "shift");
     // T3 never exists on the sample's own scale-eligible path here since

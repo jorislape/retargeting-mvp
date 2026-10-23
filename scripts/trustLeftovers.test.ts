@@ -50,8 +50,8 @@ try {
     assert.ok(!/benchmark/i.test(m.decision.rationale), `What we know: ${m.decision.rationale}`);
     if (m.spendAllocation) assert.ok(!/benchmark/i.test(m.spendAllocation.headline.buyer), m.spendAllocation.headline.buyer);
   }
-  assert.match(sample.decision.rationale, /5 below-median ads hold 35% of judged spend/);
-  assert.equal(sample.spendAllocation?.headline.buyer, "35% of judged spend sits behind below-median ads.");
+  assert.match(sample.decision.rationale, /5 below-median ads hold 34% of judged spend/);
+  assert.equal(sample.spendAllocation?.headline.buyer, "34% of judged spend sits behind below-median ads.");
   const chart = readFileSync(join(ROOT, "components/debrief/SpendAllocationChart.tsx"), "utf8");
   assert.match(chart, /below: \{ buyer: "Below median"/);
   assert.match(chart, /above: \{ buyer: "Above median"/);

@@ -1330,23 +1330,23 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // The pin documented in sampleCsv.ts's invariants header.
     assert.equal(memo.decision.action, "budget", "sample decision is a budget move");
     assert.ok(
-      memo.decision.headline === "Shift budget in steps from 5 below-median ads into 3 ads with 24+ purchases each." &&
+      memo.decision.headline === "Shift budget in steps from 5 below-median ads into 3 ads with 31+ purchases each." &&
         memo.decision.budgetMove?.to[0].name === "UGC_MorningRoutine_V1",
       "sample decision shifts into the documented leader"
     );
     assert.ok(memo.decision.rationale.includes("100%"), "documented +100% vs median ROAS");
-    assert.ok(memo.decision.rationale.includes("35%"), "documented 35% below-benchmark spend share");
-    assert.ok(memo.decision.reassess.buyer.includes("$120.91"), "documented spend gate in the reassess trigger");
+    assert.ok(memo.decision.rationale.includes("34%"), "documented 34% below-benchmark spend share");
+    assert.ok(memo.decision.reassess.buyer.includes("$126.11"), "documented spend gate in the reassess trigger");
     assertContract(memo.decision, "sample");
 
     // Evidence-Explicit Decision V1 — pinned evidence read on the sample:
     // materially separated, controlled test and limits both surfaced.
-    // Confidence follow-up: its weakest receiver has 24 purchases, under
-    // 3× the 10-purchase floor, so the label is LIMITED (confidence
-    // medium) while the action stays the documented budget shift.
-    assert.equal(memo.decision.evidenceState, "limited", "sample: weakest receiver (24) under the 30 bar");
-    assert.equal(memo.confidence.level, "medium");
-    assert.ok(memo.confidence.reasons.includes("The weakest ad receiving budget has 24 purchases. High confidence needs at least 30 on every ad receiving budget."));
+    // Its weakest receiver has 31 purchases — past 3× the 10-purchase
+    // floor — so it reads SUPPORTED / high (the sample shows that path).
+    assert.equal(memo.decision.evidenceState, "supported", "sample: weakest receiver (31) clears the 30 bar");
+    assert.equal(memo.confidence.level, "high");
+    assert.ok(!memo.confidence.reasons.some((r: string) => r.startsWith("The weakest ad receiving budget")), "no volume cap reason");
+    assert.ok(memo.confidence.reasons.includes("The 3 ads receiving budget have 34, 31 and 32 purchases."));
     assert.equal(memo.decision.evidenceShape, "separation", "sample field is materially separated");
     assert.ok(memo.decision.nextControlledTest, "sample surfaces a controlled next test");
     assert.ok(
@@ -1393,11 +1393,11 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // Evidence-Explicit Decision V1 polish: plain-language evidence
     // sentence, no raw evidenceShape enum, relabeled limits header.
     assert.ok(
-      buyerText.includes("Evidence: Directional — the available data supports a next step"),
-      "buyer text carries the plain-language evidence sentence for the pinned limited sample (weakest receiver under 30)"
+      buyerText.includes("Evidence: Strong support from this dataset"),
+      "buyer text carries the plain-language evidence sentence for the pinned supported/separation sample"
     );
     assert.ok(
-      clientText.includes("How sure we are: Moderate — the results point in this direction"),
+      clientText.includes("How sure we are: Strong — the available results show a clear enough difference"),
       "client text carries the plain-language client evidence sentence"
     );
     for (const text of [buyerText, clientText]) {
@@ -1466,7 +1466,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
 
     // Sample numeric/decision pins are unaffected by conversion visibility.
     assert.equal(memo.decision.action, "budget", "conversion visibility didn't change the sample action");
-    assert.equal(memo.decision.evidenceState, "limited", "conversion visibility didn't change evidenceState (limited: weakest receiver 24 < 30)");
+    assert.equal(memo.decision.evidenceState, "supported", "conversion visibility didn't change evidenceState");
 
     /* Synthetic engine runs to prove the honesty rules that the sample
        (which HAS counts, ROAS) can't exercise. Uses the same compiled
@@ -2023,8 +2023,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       );
       assertCoherent(mModest, "modest-lead");
       // Positive control: a supported shift (every receiver ≥30
-      // purchases — the sample's weakest receiver has 24, so it now
-      // reads limited) keeps the decisive wording.
+      // purchases) keeps the decisive wording — the sample too.
       const strongShiftCsv =
         "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
         [["T1", 40, 5.0], ["T2", 36, 4.6], ["T3", 32, 4.2], ["M1", 20, 2.0], ["M2", 20, 2.05], ["M3", 20, 2.1],
@@ -2037,6 +2036,10 @@ console.log("decision (stage 1 — rules): all assertions passed");
       assert.ok(
         evidenceLine(mStrong.decision, mStrong.scope.adsJudged, "buyer").includes("clearly pulled ahead"),
         "a supported shift keeps the decisive buyer evidence wording"
+      );
+      assert.ok(
+        evidenceLine(memo.decision, memo.scope.adsJudged, "buyer").includes("clearly pulled ahead"),
+        "the supported shift sample keeps the decisive buyer evidence wording"
       );
 
       /* QA C3 — positive ROAS with a verifiable outcome count of ZERO

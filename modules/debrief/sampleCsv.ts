@@ -10,7 +10,7 @@ import type { DebriefContext } from "./types";
  * Shaped like a real Ads Manager export (column names resolve through
  * columns.ts like any upload) and tuned against the rules engine —
  * keep these invariants if you edit rows:
- *   - 14 ads; mean spend ≈ $242 → spend gate ≈ $121 (no target CPA):
+ *   - 14 ads; mean spend ≈ $252 → spend gate ≈ $126 (no target CPA):
  *     11 ads judged, 3 set aside. The set-asides include a great ROAS
  *     on tiny spend (UGC_TikTokRemix_V1 — the "don't crown it yet"
  *     honesty case) and a dud with zero purchases (empty ROAS/CPP
@@ -28,19 +28,23 @@ import type { DebriefContext } from "./types";
  *   - Decision-First V1 (pinned, asserted by scripts/decision.test.ts):
  *     with SAMPLE_CONTEXT (ROAS) the Next-move decision is a BUDGET
  *     shift — "UGC_MorningRoutine_V1" is +100% vs the median ROAS
- *     (past the 30% scale bar) AND the 5 below-median ads hold 35%
+ *     (past the 30% scale bar) AND the 5 below-median ads hold 34%
  *     of judged spend, $1,150.65 (past the 25% cut bar), so both B1
  *     branches fire and the card reads "Shift budget in steps from 5
- *     below-median ads into 3 ads with 24+ purchases each" — the
+ *     below-median ads into 3 ads with 31+ purchases each" — the
  *     leader first among the 3 receivers. Editing rows in a way that
  *     changes this action/leader breaks that test on purpose.
  *   - Evidence-Explicit Decision V1 (pinned): the same run is
  *     evidenceShape "separation" — 11 judged ads (≥ the 10-ad bar), no
  *     missing required columns, a non-flat field, and 5 winners / 5
- *     losers (both ≥ 3) — but evidenceState "limited" / confidence
- *     medium: its weakest receiver has 24 purchases, under 3× the
- *     10-purchase floor (30) the confidence follow-up requires on every
- *     receiver. The action is unaffected (still the budget shift).
+ *     losers (both ≥ 3) — and evidenceState "supported" / confidence
+ *     high: its 3 receivers have 34, 31 and 32 purchases, every one at
+ *     or past 3× the 10-purchase floor (30) the confidence rule requires
+ *     on every receiver. Keep every receiver ≥ 30 purchases so /sample
+ *     and the homepage show this path (Testimonial_CustomerReview_V3 and
+ *     UGC_UnboxingReaction_V2 were scaled up row-wide — spend,
+ *     impressions, clicks, purchases, leads — so every ratio, incl. ROAS,
+ *     is unchanged).
  */
 
 export const SAMPLE_CSV_FILENAME =
@@ -48,8 +52,8 @@ export const SAMPLE_CSV_FILENAME =
 
 export const SAMPLE_CSV_TEXT = `Ad name,Campaign name,Ad set name,Amount spent (USD),Impressions,Link clicks,CTR (link click-through rate),CPC (cost per link click) (USD),Purchases,Leads,Cost per purchase (USD),Cost per lead (USD),Purchase ROAS (return on ad spend),Reporting starts,Reporting ends
 UGC_MorningRoutine_V1,Q2 Scaling — Purchase,Prospecting — Broad,428.60,61200,1450,2.37,0.30,34,61,12.61,7.03,4.62,2026-06-01,2026-06-30
-Testimonial_CustomerReview_V3,Q2 Scaling — Purchase,Retargeting — 30d engagers,391.25,48900,1108,2.27,0.35,29,52,13.49,7.52,4.18,2026-06-01,2026-06-30
-UGC_UnboxingReaction_V2,Creative Testing — June,Prospecting — Broad,355.40,45100,964,2.14,0.37,24,44,14.81,8.08,3.71,2026-06-01,2026-06-30
+Testimonial_CustomerReview_V3,Q2 Scaling — Purchase,Retargeting — 30d engagers,418.23,52272,1184,2.27,0.35,31,56,13.49,7.47,4.18,2026-06-01,2026-06-30
+UGC_UnboxingReaction_V2,Creative Testing — June,Prospecting — Broad,473.87,60133,1285,2.14,0.37,32,59,14.81,8.03,3.71,2026-06-01,2026-06-30
 BeforeAfter_Static_8Weeks,Q2 Scaling — Purchase,Prospecting — Interests,340.10,39800,812,2.04,0.42,21,38,16.20,8.95,3.40,2026-06-01,2026-06-30
 FounderStory_Video_V2,Creative Testing — June,Prospecting — Broad,302.80,33500,590,1.76,0.51,14,27,21.63,11.21,2.55,2026-06-01,2026-06-30
 Lifestyle_BrandVideo_V2,Q2 Scaling — Purchase,Prospecting — Interests,288.40,30100,505,1.68,0.57,12,22,24.03,13.11,2.31,2026-06-01,2026-06-30

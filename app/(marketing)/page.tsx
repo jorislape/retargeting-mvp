@@ -94,7 +94,7 @@ function MiniBuyerMemo() {
         <span className="h-1 w-6 rounded-full bg-accent" aria-hidden="true" />
       </div>
       <p className="mt-2 text-[11px] font-medium leading-snug text-zinc-200">
-        “UGC_MorningRoutine_V1” leads at 4.62× ROAS — move budget toward it.
+        3 ads earn the budget move, led by “UGC_MorningRoutine_V1” at 4.62× ROAS.
       </p>
       <div className="mt-2.5 space-y-1.5 font-mono text-[9px] tabular-nums">
         {[

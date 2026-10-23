@@ -94,19 +94,19 @@ function assertClose(actual: number, expected: number, message: string, toleranc
 
     /* ---- Sample-dataset reconciliation pin ----
        Hand-computed from sampleCsv.ts's 14-row CSV: judgedSpend
-       $3,257.20 (14 - 3 set-aside), median ROAS 2.31 held exactly by
+       $3,402.65 (14 - 3 set-aside), median ROAS 2.31 held exactly by
        Lifestyle_BrandVideo_V2 ($288.40) — the odd-count median IS a
        judged ad's own value, so it sits at delta 0 (neither winner nor
        loser under the existing strict >/< pools). Above = the 5 ads
-       beating 2.31 ($1,818.15); below = the 5 documented below-
-       benchmark ads ($1,150.65, already pinned elsewhere as 35% of
-       judged spend). Set-aside = totalSpend $3,385.50 - judgedSpend. */
+       beating 2.31 ($1,963.60); below = the 5 documented below-
+       benchmark ads ($1,150.65, already pinned elsewhere as 34% of
+       judged spend). Set-aside = totalSpend $3,530.95 - judgedSpend. */
     const memo = buildSampleMemo();
     const sa = memo.spendAllocation;
     assert.ok(sa != null, "sample carries a non-null spendAllocation");
 
-    assertClose(sa.judgedSpend, 3257.2, "sample judgedSpend");
-    assertClose(sa.totalSpend, 3385.5, "sample totalSpend");
+    assertClose(sa.judgedSpend, 3402.65, "sample judgedSpend");
+    assertClose(sa.totalSpend, 3530.95, "sample totalSpend");
 
     const below = sa.segments.find((s: { id: string }) => s.id === "below");
     const at = sa.segments.find((s: { id: string }) => s.id === "at");
@@ -114,13 +114,13 @@ function assertClose(actual: number, expected: number, message: string, toleranc
     assert.ok(below && at && above, "sample carries all three segments (below/at/above)");
     assertClose(below.spend, 1150.65, "sample belowBenchmarkSpend");
     assert.equal(below.count, 5);
-    assert.equal(below.shareLabel, "35%");
+    assert.equal(below.shareLabel, "34%");
     assertClose(at.spend, 288.4, "sample atBenchmarkSpend — Lifestyle_BrandVideo_V2");
     assert.equal(at.count, 1, "exactly one ad sits at the median (odd judged count guarantees this)");
-    assert.equal(at.shareLabel, "9%");
-    assertClose(above.spend, 1818.15, "sample aboveBenchmarkSpend");
+    assert.equal(at.shareLabel, "8%");
+    assertClose(above.spend, 1963.6, "sample aboveBenchmarkSpend");
     assert.equal(above.count, 5);
-    assert.equal(above.shareLabel, "56%");
+    assert.equal(above.shareLabel, "58%");
 
     // 1. above + at + below reconciles to judgedSpend.
     assertClose(below.spend + at.spend + above.spend, sa.judgedSpend, "above+at+below === judgedSpend");
@@ -130,10 +130,10 @@ function assertClose(actual: number, expected: number, message: string, toleranc
     assertClose(sa.setAside.spend, 128.3, "sample setAsideSpend");
     assert.equal(sa.setAside.count, 3);
     assert.equal(sa.setAside.shareOfTotalLabel, "4%");
-    // 3. shares derive from judgedSpend, not totalSpend (35% of $3,257.20,
-    //    not of $3,385.50 — the two must never be readable as one base).
+    // 3. shares derive from judgedSpend, not totalSpend (34% of $3,402.65,
+    //    not of $3,530.95 — the two must never be readable as one base).
     assert.ok(
-      Math.abs(below.spend / sa.judgedSpend - 0.35325) < 0.001,
+      Math.abs(below.spend / sa.judgedSpend - 0.33816) < 0.001,
       "below share is computed against judgedSpend"
     );
 
@@ -144,12 +144,12 @@ function assertClose(actual: number, expected: number, message: string, toleranc
     assert.ok(!sa.segments.some((s: { id: string }) => s.id !== "below" && s.id !== "at" && s.id !== "above"));
 
     // Copy Hierarchy Polish: ONE short clause — the below-benchmark
-    // share only. No above (56%) figure, no dollar amount, no ad count
+    // share only. No above (58%) figure, no dollar amount, no ad count
     // — those live in the segment labels below, not repeated here.
-    assert.equal(sa.headline.buyer, "35% of judged spend sits behind below-median ads.");
-    assert.equal(sa.headline.client, "35% of this period's working budget went to ads below the middle ad.");
-    assert.ok(!sa.headline.buyer.includes("56%"), "buyer headline never restates the above-side share");
-    assert.ok(!sa.headline.client.includes("56%"), "client headline never restates the above-side share");
+    assert.equal(sa.headline.buyer, "34% of judged spend sits behind below-median ads.");
+    assert.equal(sa.headline.client, "34% of this period's working budget went to ads below the middle ad.");
+    assert.ok(!sa.headline.buyer.includes("58%"), "buyer headline never restates the above-side share");
+    assert.ok(!sa.headline.client.includes("58%"), "client headline never restates the above-side share");
     assert.ok(!/\$/.test(sa.headline.buyer), "buyer headline carries no dollar amount");
     assert.ok(!/\d+\s+ads?\b/.test(sa.headline.buyer), "buyer headline carries no ad count");
     assert.ok(!sa.headline.client.includes("benchmark"), "client headline stays jargon-free");
@@ -174,11 +174,11 @@ function assertClose(actual: number, expected: number, message: string, toleranc
     const buyerTxt: string = memoToText(memo, "buyer", 5);
     const clientTxt: string = memoToText(memo, "client", 3);
     assert.ok(
-      /Spend allocation: 56% above median, 9% at median, 35% below median; \$128\.30 set aside\./.test(buyerTxt),
+      /Spend allocation: 58% above median, 8% at median, 34% below median; \$128\.30 set aside\./.test(buyerTxt),
       "TXT export carries the additive spend-allocation line, buyer register"
     );
     assert.ok(
-      clientTxt.includes("Spend allocation: 56% above the middle ad, 9% at the middle ad, 35% below the middle ad"),
+      clientTxt.includes("Spend allocation: 58% above the middle ad, 8% at the middle ad, 34% below the middle ad"),
       "TXT export client register swaps median -> the middle ad via clientizeText"
     );
 

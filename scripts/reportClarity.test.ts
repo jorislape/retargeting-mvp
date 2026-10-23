@@ -127,11 +127,11 @@ try {
   const sample = buildSampleMemo();
   assert.equal(sample.decision.action, "budget");
   assert.equal(sample.decision.budgetVariant, "shift");
-  assert.equal(sample.decision.evidenceState, "limited"); // weakest receiver 24 < 30
-  assert.equal(sample.scope.spendGateLabel, "$120.91");
+  assert.equal(sample.decision.evidenceState, "supported"); // weakest receiver 31 ≥ 30
+  assert.equal(sample.scope.spendGateLabel, "$126.11");
   assert.match(sample.decision.rationale, /is 100% better than the median ROAS on \$428\.60/);
   assert.ok(
-    sample.decision.appliedCriteria.some((c: { label: string }) => c.label.startsWith("Minimum spend to judge: $120.91 per ad")),
+    sample.decision.appliedCriteria.some((c: { label: string }) => c.label.startsWith("Minimum spend to judge: $126.11 per ad")),
     "decision bars use the plain label"
   );
 
