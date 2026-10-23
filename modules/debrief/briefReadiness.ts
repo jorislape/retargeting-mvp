@@ -158,7 +158,7 @@ export function deriveSignalVolumeReadiness(
   if (!passesReceiverFloor(top, analysis, criteria)) {
     return {
       state: "directional",
-      buyer: `Directional — "${top.name}" has ${n} ${nounMany} but ${top.spend < RECEIVER_MIN_GATE_MULTIPLE * analysis.spendGate ? `under ${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend` : "too few for your scaling minimum"} — the same floor an ad needs before it receives budget, so it isn't treated as an established pattern yet.`,
+      buyer: `Directional — "${top.name}" has ${n} ${nounMany} but ${top.spend < RECEIVER_MIN_GATE_MULTIPLE * analysis.spendGate ? RECEIVER_MIN_GATE_MULTIPLE === 1 ? "under the minimum spend" : `under ${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend` : "too few for your scaling minimum"} — the same floor an ad needs before it receives budget, so it isn't treated as an established pattern yet.`,
       client: `"${top.name}" is ahead with plenty of results, but on too little spend yet to call it a proven pattern.`,
       criterion,
     };

@@ -66,9 +66,7 @@ try {
   }
   const ecomShift = run(ECOM, "roas").memo;
   assert.ok(ecomShift.nextTests.some((t) => /The shift above is this debrief's one budget move/.test(t.why)), "challenger names the shift");
-  /* A 100 minimum spend keeps the leader (300 spend, 27 purchases) over
-     the receiver floor (Real-account fix 2: ≥ 2× the minimum spend). */
-  const scaleOnly = run(ECOM, "roas", { minJudgeOutcomes: 10, spendGateOverride: 100 }).memo;
+  const scaleOnly = run(ECOM, "roas", { minJudgeOutcomes: 10 }).memo;
   assert.equal(scaleOnly.decision.budgetVariant, "scale");
   assert.ok(scaleOnly.nextTests.some((t) => SCALE_TEST.test(t.test)), "scale-only call keeps its scale test");
   // The scale-only rationale no longer says "43% … under the 25% bar".

@@ -134,16 +134,16 @@ function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
 }
 {
   // Real-account fix 2: "Ready" respects the budget receiver floor — an
-  // ad with plenty of outcomes but under 2× the minimum spend is capped
-  // at directional, with the reason named.
+  // ad with plenty of outcomes but under the minimum spend (1× since
+  // the follow-up) is capped at directional, with the reason named.
   const r = deriveSignalVolumeReadiness(
-    fixture({ winners: [ad("W", 199, 40, 60)] }),
+    fixture({ winners: [ad("W", 99, 40, 60)] }),
     undefined,
     "purchase",
     "purchases"
   );
   assert.equal(r?.state, "directional");
-  assert.ok(r!.buyer.includes("under 2× the minimum spend"));
+  assert.ok(r!.buyer.includes("under the minimum spend"));
 }
 {
   // 4. Missing conversions NEVER become zero: null count -> directional

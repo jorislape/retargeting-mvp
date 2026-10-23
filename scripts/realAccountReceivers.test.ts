@@ -3,8 +3,8 @@
  *
  * A real agency export shifted "7,889 EUR from 43 ads" into ONE ad with
  * 68 EUR / 8 purchases. Proves: an ad receives budget only with ≥10
- * outcomes (or the user's own scaling minimum) AND spend ≥ 2× the
- * minimum spend; a leader that fails is passed over for the best ad that
+ * outcomes (or the user's own scaling minimum) AND spend ≥ the minimum
+ * spend (1× — follow-up; 2× was too strict for evenly-spent accounts); a leader that fails is passed over for the best ad that
  * passes (up to 3 receivers); none passing ⇒ a test with a one-line
  * reason; the below-median total is descriptive only; the "Ready" brief
  * badge respects the same floor.
@@ -31,8 +31,8 @@ try {
   const d = r.memo.decision;
   const leader = a.winners[0];
   assert.ok(leader.name.includes(THIN_LEADER), "fixture: the thin ad leads the ranking");
-  assert.equal(leader.conversions, 8);
-  assert.ok(leader.spend < RECEIVER_MIN_GATE_MULTIPLE * a.spendGate, "…on under 2× the minimum spend");
+  assert.equal(leader.conversions, 8, "…on 8 purchases, under the 10-purchase floor");
+  assert.equal(RECEIVER_MIN_GATE_MULTIPLE, 1);
 
   /* ---- It is passed over; the best ads that clear the floor receive ---- */
   assert.equal(d.action, "budget");
@@ -44,7 +44,7 @@ try {
   for (const n of to) {
     const ad = ranked.get(n)!;
     assert.ok((ad.conversions ?? 0) >= MIN_OUTCOMES_FOR_SUPPORTED, `${n}: ≥10 purchases`);
-    assert.ok(ad.spend >= RECEIVER_MIN_GATE_MULTIPLE * a.spendGate, `${n}: ≥ 2× the minimum spend`);
+    assert.ok(ad.spend >= RECEIVER_MIN_GATE_MULTIPLE * a.spendGate, `${n}: ≥ the minimum spend`);
     assert.ok((ad.deltaPct ?? 0) >= SCALE_TEST_MIN_DELTA_PCT, `${n}: past the scale bar`);
   }
   // Best first: receivers are the top passing ads in ranking order.
@@ -57,7 +57,7 @@ try {
   assert.deepEqual(to, passing.slice(0, MAX_BUDGET_RECEIVERS).map((w) => w.name));
   assert.match(d.headline, /^Shift budget in steps from /);
   assert.ok(
-    d.limits.buyer.some((l) => l.includes(`leads by ${Math.round(leader.deltaPct!)}% but has 8 purchases on 100.00 EUR of spend — under the receiver floor`)),
+    d.limits.buyer.some((l) => l.includes(`leads by ${Math.round(leader.deltaPct!)}% but has 8 purchases — under the receiver floor`)),
     "the passed-over leader is explained"
   );
   assert.ok(
@@ -91,7 +91,7 @@ try {
     const td = t.memo.decision;
     assert.equal(td.action, "test", "no receiver ⇒ no budget move");
     assert.match(td.headline, /No ad has enough evidence to receive budget yet\.$/);
-    assert.match(td.rationale, /^No budget move: "Thin" leads by \d+% but has 6 purchases on 200\.00 EUR of spend, and no ad past the 30% bar clears the receiver floor \(≥10 purchases and ≥ [\d.,]+ EUR spent \(2× the minimum spend\)\)\./);
+    assert.match(td.rationale, /^No budget move: "Thin" leads by \d+% but has 6 purchases, and no ad past the 30% bar clears the receiver floor \(≥10 purchases and ≥ [\d.,]+ EUR spent \(the minimum spend\)\)\./);
     assert.equal(td.rationale.split(". ").length <= 2, true, "one line of reason + the closing sentence");
     for (const s of clientStrings(t.memo))
       for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);

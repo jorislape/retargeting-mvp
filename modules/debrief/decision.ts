@@ -209,10 +209,16 @@ export function isScaleActionSupported(
 /* ------------------------------------------------------------------ */
 
 /** An ad that receives budget must have spent at least this multiple of
- *  the minimum spend to judge — clearing the gate once is enough to be
- *  ranked, not enough to be trusted with more money. (A real export
- *  shifted 7,889 EUR from 43 ads into one ad with 68 EUR / 8 purchases.) */
-export const RECEIVER_MIN_GATE_MULTIPLE = 2;
+ *  the minimum spend to judge. 1× — every judged ad clears it, so the
+ *  floor that binds in practice is the outcome count (a real export
+ *  shifted 7,889 EUR from 43 ads into one ad with 68 EUR / 8 purchases);
+ *  2× proved too strict for evenly-spent accounts, where it equals the
+ *  average spend per ad. Kept explicit so the bar stays visible. */
+export const RECEIVER_MIN_GATE_MULTIPLE = 1;
+
+/** "the minimum spend" / "2× the minimum spend" — copy for the bar. */
+const RECEIVER_SPEND_WORDS =
+  RECEIVER_MIN_GATE_MULTIPLE === 1 ? "the minimum spend" : `${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend`;
 
 /** At most this many ads share a shift/scale. */
 export const MAX_BUDGET_RECEIVERS = 3;
@@ -1120,7 +1126,7 @@ export function buildDecision(
     if (ad.spend < RECEIVER_MIN_GATE_MULTIPLE * analysis.spendGate) gaps.push(`${money(ad.spend)} of spend`);
     return gaps.join(" on ");
   };
-  const floorPhrase = `${nouns != null ? `≥${receiverMin} ${nouns.many}${minOutcome != null ? " (your minimum)" : ""} and ` : ""}≥ ${receiverSpendLabel} spent (${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend)`;
+  const floorPhrase = `${nouns != null ? `≥${receiverMin} ${nouns.many}${minOutcome != null ? " (your minimum)" : ""} and ` : ""}≥ ${receiverSpendLabel} spent (${RECEIVER_SPEND_WORDS})`;
 
   /* ---- flat-field fact (hoisted above the rule branches so every
      return path can label the evidence; B1 and H2 are mutually
@@ -1326,7 +1332,7 @@ export function buildDecision(
       source: "debrief_default",
     },
     {
-      label: `Receiver floor: ${nouns != null && minOutcome == null ? `≥${receiverMin} ${nouns.many} and ` : ""}≥ ${receiverSpendLabel} spent (${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend) before an ad receives budget; up to ${MAX_BUDGET_RECEIVERS} receivers — Debrief default`,
+      label: `Receiver floor: ${nouns != null && minOutcome == null ? `≥${receiverMin} ${nouns.many} and ` : ""}≥ ${receiverSpendLabel} spent (${RECEIVER_SPEND_WORDS}) before an ad receives budget; up to ${MAX_BUDGET_RECEIVERS} receivers — Debrief default`,
       source: "debrief_default",
     },
     {

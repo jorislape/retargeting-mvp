@@ -31,13 +31,13 @@ try {
   assert.equal(m.winners.length, 6);
 
   // The decision moves budget from all six, into the receiver — named.
-  // Real-account fix 2: Hero_UGC_A leads but spent 300 < 2× the 171
-  // minimum spend, so Demo_C (374 spend, 24 purchases, +44%) receives.
+  // Real-account fix 2: up to 3 receivers past the 30% bar with ≥10
+  // purchases — the leader (300 spend, 27 purchases) among them.
   assert.equal(m.decision.action, "budget");
   assert.equal(m.decision.budgetVariant, "shift");
   assert.deepEqual(m.decision.budgetMove?.from.map((x) => x.name).sort(), [...BELOW].sort());
-  assert.deepEqual(m.decision.budgetMove?.to.map((x) => x.name), ["Demo_C"]);
-  assert.match(m.decision.headline, /and 4 more into "Demo_C"/);
+  assert.deepEqual(m.decision.budgetMove?.to.map((x) => x.name), ["Hero_UGC_A", "Review_B", "Demo_C"]);
+  assert.match(m.decision.headline, /and 4 more into "Hero_UGC_A", "Review_B" and "Demo_C"\.$/);
 
   // Every below-median ad appears in buyer TXT, client TXT, and at the
   // client's 3-row display cap too (the rest after "+N more:").
