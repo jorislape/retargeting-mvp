@@ -481,7 +481,7 @@ function buildNamingPatterns(analysis: AnalysisResult): { namingPatterns?: MemoN
     namingPatterns: {
       intro: `${n.coverage.matched} of ${n.coverage.total} ${n.basis === "tokens" ? "ads" : "judged ads"} use ${
         n.basis === "tokens" ? "[KEY]VALUE name tokens" : "one \"_\"-separated name layout"
-      }. Per value: every ad carrying it (set-aside ads included), blended ${kpiLabel}; values with under ${money(n.minSpend)} of spend (2× the minimum spend) are left out.`,
+      }. Per value: every ad carrying it (set-aside ads included), blended ${kpiLabel}; values with under ${money(n.minSpend)} of spend (2× the minimum spend) or on a single ad are left out.`,
       coverageLine: `Covers ${Math.round(n.coverage.judgedSpendShare * 100)}% of judged spend.`,
       caveat: "Descriptive only — a value's blended result is an association in this export, not proof the token caused it.",
       kpiLabel,

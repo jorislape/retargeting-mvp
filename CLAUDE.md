@@ -153,7 +153,8 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # Patterns section then defaults ON (performanceModeDefaultsFor in
                   # reportPresets.ts) — analysis.namingPatterns lists, per key ([FOR],
                   # [AN], [HK], [STG] first), spend / outcomes / blended KPI per value
-                  # over every ad with it, values with ≥2× the minimum spend only.
+                  # over every ad with it, values with ≥2× the minimum spend and ≥2 ads only
+                  # (numeric values normalized: 01 == 1).
                   # Buyer-only (Patterns section + buyer TXT); descriptive, never a cause
   memo.ts         # assembles the memo — templated, not an LLM call (see below).
                   # generateMemo always sets comparison: null — the route builds

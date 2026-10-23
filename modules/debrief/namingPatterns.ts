@@ -42,11 +42,21 @@ function clean(value: string): string {
     .replace(/^[\s_\-.]+|[\s_\-.]+$/g, "");
 }
 
+/** One spelling per numeric value: "01", "1" and "001" are the same
+ *  hook/variant number, shown unpadded. Non-numeric values untouched. */
+function canonical(value: string): string {
+  return /^\d+$/.test(value) ? String(Number(value)) : value;
+}
+
+/** A value carried by fewer ads than this is one ad's result, not a
+ *  pattern — left out of the table. */
+export const NAMING_MIN_ADS_PER_VALUE = 2;
+
 /** `[KEY]VALUE` tokens in a name (empty values dropped). */
 export function parseNameTokens(name: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const m of name.matchAll(TOKEN)) {
-    const value = clean(m[2]);
+    const value = canonical(clean(m[2]));
     if (value !== "" && !(m[1] in out)) out[m[1]] = value;
   }
   return out;
@@ -122,7 +132,9 @@ export function detectNamingPatterns(
       const p = parts(ad);
       labels.set(
         ad.name,
-        p.length === layout ? Object.fromEntries(p.map((v, i) => [`Part ${i + 1}`, v]).filter(([, v]) => v !== "")) : {}
+        p.length === layout
+          ? Object.fromEntries(p.map((v, i) => [`Part ${i + 1}`, canonical(v)]).filter(([, v]) => v !== ""))
+          : {}
       );
     }
   }
@@ -148,7 +160,7 @@ export function detectNamingPatterns(
           kpiValue: computeAccountKpi(group, kpi)?.value ?? null,
         };
       })
-      .filter((r) => r.spend >= minSpend)
+      .filter((r) => r.spend >= minSpend && r.ads >= NAMING_MIN_ADS_PER_VALUE)
       .sort((a, b) =>
         a.kpiValue == null ? 1 : b.kpiValue == null ? -1 : better ? b.kpiValue - a.kpiValue : a.kpiValue - b.kpiValue
       );

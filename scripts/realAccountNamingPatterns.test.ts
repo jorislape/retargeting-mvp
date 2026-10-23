@@ -9,7 +9,7 @@
  * Buyer view's Patterns section on by default; [FOR]/[AN]/[HK]/
  * [STG] come first; each row is spend / purchases / blended ROAS over
  * every ad with the value, and only values with ≥2× the minimum spend
- * are listed; "_" segments are a fallback only for a consistent ≥4-part
+ * and ≥2 ads are listed (numeric values normalized: 01 == 1); "_" segments are a fallback only for a consistent ≥4-part
  * layout; the decision is byte-identical with or without the feature;
  * the client view never gets it; "No clear ad-name pattern" is replaced
  * when tokens exist.
@@ -29,6 +29,8 @@ assert.deepEqual(parseNameTokens("[VAR]ORG_[FOR]UGC_[AN]QUAL_[STG]TOFU_[ED]STUDI
 });
 assert.deepEqual(parseNameTokens("[STG]_[FOR]IMG – Copy"), { FOR: "IMG" }, "empty value dropped, en-dash Copy stripped");
 assert.deepEqual(parseNameTokens("UGC_MorningRoutine_V1"), {});
+assert.deepEqual(parseNameTokens("[HK]01_[CR]1_[AN]QUAL"), { HK: "1", CR: "1", AN: "QUAL" }, "01 == 1, shown unpadded");
+assert.deepEqual(parseNameTokens("[HK]007"), { HK: "7" });
 
 const { run, buildSampleMemo, memoToText, cleanup } = loadEngine();
 try {
@@ -55,7 +57,12 @@ try {
   assert.ok(Math.abs((ugc.kpiValue as number) - blended) < 1e-9, "blended = Σvalue ÷ Σspend");
   for (const k of n!.keys) {
     assert.ok(k.rows.length >= 2, `${k.key}: at least two comparable values`);
-    for (const row of k.rows) assert.ok(row.spend >= 2 * r.analysis.spendGate, `${k.key}=${row.value}: ≥2× minimum spend`);
+    for (const row of k.rows) {
+      assert.ok(row.spend >= 2 * r.analysis.spendGate, `${k.key}=${row.value}: ≥2× minimum spend`);
+      assert.ok(row.ads >= 2, `${k.key}=${row.value}: on at least 2 ads`);
+      assert.ok(!/^0\d/.test(row.value), `${k.key}=${row.value}: numeric values unpadded`);
+    }
+    assert.equal(new Set(k.rows.map((x) => x.value)).size, k.rows.length, `${k.key}: one row per value`);
     const vals = k.rows.map((x) => x.kpiValue ?? -Infinity);
     assert.deepEqual(vals, [...vals].sort((a, b) => b - a), `${k.key}: best ROAS first`);
   }
@@ -104,14 +111,26 @@ try {
   /* ---- Under 50% of ads but ≥30% of judged spend ⇒ shown ---- */
   {
     const rows = [
-      "[FOR]UGC_[AN]QUAL,900,45,4000", "[FOR]IMG_[AN]EASE,900,40,2700",
-      "Plain_B,300,15,900", "Plain_C,300,15,800", "Plain_D,300,15,700", "Plain_E,300,15,650",
+      "[FOR]UGC_[AN]QUAL,600,30,2700", "[FOR]UGC_[AN]EASE,600,28,2400",
+      "[FOR]IMG_[AN]QUAL,600,25,1900", "[FOR]IMG_[AN]EASE,600,22,1600",
+      "Plain_B,300,15,900", "Plain_C,300,15,800", "Plain_D,300,15,700", "Plain_E,300,15,650", "Plain_F,300,14,600",
     ];
     const t = run("Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" + rows.join("\n") + "\n", "roas");
     const tn = t.analysis.namingPatterns;
-    assert.ok(tn, "2/6 ads tokened but 60% of judged spend");
-    assert.equal(tn!.coverage.matched, 2);
-    assert.equal(t.memo.namingPatterns!.coverageLine, "Covers 60% of judged spend.");
+    assert.ok(tn, "4/9 ads tokened but 62% of judged spend");
+    assert.equal(tn!.coverage.matched, 4);
+    assert.equal(t.memo.namingPatterns!.coverageLine, "Covers 62% of judged spend.");
+  }
+  /* ---- A value on a single ad is hidden; a key left with <2 values goes ---- */
+  {
+    const rows = [
+      "[FOR]UGC_[HK]01,600,30,2700", "[FOR]UGC_[HK]1,600,28,2400", "[FOR]IMG_[HK]02,600,25,1900",
+      "[FOR]IMG_[HK]2,600,22,1600", "[FOR]VID_[HK]03,600,20,1200",
+    ];
+    const t = run("Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" + rows.join("\n") + "\n", "roas");
+    const keys = Object.fromEntries(t.analysis.namingPatterns!.keys.map((k) => [k.key, k.rows.map((x) => `${x.value}:${x.ads}`)]));
+    assert.deepEqual(keys.FOR, ["UGC:2", "IMG:2"], "VID (1 ad) hidden");
+    assert.deepEqual(keys.HK, ["1:2", "2:2"], "01 + 1 and 02 + 2 merged; 03 (1 ad) hidden");
   }
   /* ---- "_" fallback: only a consistent ≥4-part layout ---- */
   {
