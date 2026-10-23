@@ -35,25 +35,6 @@ export function normalizeAdName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
-/** Names that appear on MORE THAN ONE row of the loaded file. A name
- *  reused across rows is not structurally guaranteed to be one
- *  creative, so manual image attachment is disabled for it (the
- *  Verify stage explains why) and its spotlight renders the neutral
- *  placeholder instead of a possibly-wrong image. */
-export function findAmbiguousAdNames(rowNames: readonly string[]): Set<string> {
-  const counts = new Map<string, number>();
-  for (const raw of rowNames) {
-    const key = normalizeAdName(raw);
-    if (key === "") continue;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const ambiguous = new Set<string>();
-  for (const [key, count] of counts) {
-    if (count > 1) ambiguous.add(key);
-  }
-  return ambiguous;
-}
-
 /* ------------------------------------------------------------------ */
 /* Spotlight selection                                                 */
 /* ------------------------------------------------------------------ */

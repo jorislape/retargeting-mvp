@@ -157,6 +157,20 @@ function buildLeadingConversion(
   };
 }
 
+/** Real-account fix 3: where a merged creative ran. Ad sets are named
+ *  only when the export proves them (an ad set column, or an ad-level
+ *  export with no breakdown, where each row is one ad); a breakdown
+ *  export just says how many rows were combined. */
+function runsInFor(ad: RankedAd, analysis: AnalysisResult): { runsInLabel?: string } {
+  const n = ad.rowsMerged ?? 1;
+  if (n <= 1) return {};
+  if (ad.adSetCount != null) {
+    return { runsInLabel: `runs in ${ad.adSetCount} ad set${ad.adSetCount === 1 ? "" : "s"}` };
+  }
+  if ((analysis.mergedRows?.breakdowns.length ?? 0) > 0) return { runsInLabel: `combined from ${n} rows` };
+  return { runsInLabel: `runs in ${n} ad sets` };
+}
+
 function buildRow(
   ad: RankedAd,
   analysis: AnalysisResult,
@@ -175,6 +189,7 @@ function buildRow(
         analysis.kpi === "roas" ? `0 ${many} — ranked last` : `no ${kpiLabelFor(analysis)} — ranked last`,
       deltaPct: null,
       spendLabel: fmtMoney(ad.spend, analysis.currency),
+      ...runsInFor(ad, analysis),
       reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
       ...frequencyFieldsFor(ad),
       ...vsTargetFor(ad, analysis, context),
@@ -188,6 +203,7 @@ function buildRow(
     vsMedianLabel: fmtDeltaVsMedian(ad.deltaFromMedian, ad.deltaPct),
     deltaPct: ad.deltaPct,
     spendLabel: fmtMoney(ad.spend, analysis.currency),
+    ...runsInFor(ad, analysis),
     reason: describeAdReason(ad, analysis.hasCreativeNotes, context.creativeNotes),
     conversionLabel: conversionLabelFor(ad, analysis),
     ...fewOutcomesNoteFor(ad, analysis),

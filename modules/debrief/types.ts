@@ -152,19 +152,14 @@ export type CreativeFormatOverrides = Record<string, string>;
 /* it — Debrief encodes no taxonomy of hooks/angles/concepts/formats. */
 /* ------------------------------------------------------------------ */
 
-/** Execution identity → the group labels the user assigned it (an ad
+/** Creative identity → the group labels the user assigned it (an ad
  *  may carry more than one). Sent as an optional JSON field with the
  *  debrief request, exactly like CreativeFormatOverrides — lives only
- *  for that request, never stored. Deliberately NOT keyed like format
- *  overrides (raw ad name via sourceName ?? name): a group is
- *  execution-level user context, and two executions can legitimately
- *  share a raw name (same creative reused, or unrelated ads exported
- *  with the same label) while belonging to different groups. Keyed
- *  instead by Meta's Ad ID when the export has one, else the
- *  already-unique-per-row `name` the Duplicate Identity fix produces
- *  (see creativeGroups.ts's executionKey and extract.ts's
- *  disambiguateDuplicateNames) — so duplicate-named rows can carry
- *  independent assignments. */
+ *  for that request, never stored. Keyed by Meta's Ad ID when every
+ *  merged row shares one, else the ad name — unique per report since
+ *  same-name rows are merged into one creative (Real-account fix 3;
+ *  see creativeGroups.ts's executionKey and extract.ts's
+ *  aggregateDuplicateRows). */
 export type CreativeGroupAssignments = Record<string, string[]>;
 
 /** Structured, user-actionable error returned by /api/debrief. Every
@@ -325,19 +320,18 @@ export interface DebriefContext extends DecisionInputContext {
 
 /** One ad row after column resolution and metric derivation. */
 export interface ParsedAd {
-  /** Display identity. Normally the raw ad-name cell; when the SAME
-   *  normalized name appears on multiple rows (Duplicate Identity fix),
-   *  each row's name is disambiguated deterministically as
-   *  "Name (row N)" — N being the spreadsheet row number — so no two
-   *  ads in one report ever share a label. Rows stay separate ads;
-   *  nothing is aggregated, and the export is never assumed to prove
-   *  same-name rows are the same creative. */
+  /** Display identity: the ad-name cell. Rows sharing the same
+   *  normalized name are ONE creative (Real-account fix 3) — merged by
+   *  extract.ts's aggregateDuplicateRows, so names are unique per report
+   *  and are the key for cross-period, format-override and creative-
+   *  group matching. */
   name: string;
-  /** The raw ad-name cell when `name` was disambiguated (set ONLY for
-   *  duplicate-named rows). Cross-period matching (compare.ts) and
-   *  creative-format-override matching key on this, so row-position
-   *  labels can never fabricate a cross-period or override match. */
-  sourceName?: string;
+  /** Real-account fix 3: how many export rows were merged into this ad
+   *  (present only when > 1). */
+  rowsMerged?: number;
+  /** Distinct ad sets among the merged rows — present only when the
+   *  export has an ad set column filled on every merged row. */
+  adSetCount?: number;
   /** Meta's Ad ID, when the export included an "Ad ID" column — the
    *  reliable cross-period identifier for Period Comparison V2 (it
    *  survives renames; names don't). null when the column is absent or
@@ -503,11 +497,14 @@ export interface AnalysisResult {
   hasNameSignal: boolean;
   hasCreativeNotes: boolean;
   missingColumns: string[];
-  /** Duplicate Identity fix: the distinct RAW ad names that appear on
-   *  more than one row of the export (empty on clean files). Rows are
-   *  kept as separate ads with row-numbered labels; this list drives
-   *  the honesty disclosure in the decision's limits. */
+  /** Real-account fix 3: the ad names that appeared on more than one
+   *  row and were merged into one creative each (empty on clean files).
+   *  Drives the disclosure in the decision's limits. */
   duplicateAdNames: string[];
+  /** Real-account fix 3 — present only when same-name rows were merged:
+   *  the export rows behind the analyzed ads, and any breakdown columns
+   *  (Day, Age, Placement, …) that caused the repetition. */
+  mergedRows?: { rows: number; breakdowns: string[] };
   /** KPI Source Column Disclosure — present ONLY when a conversion
    *  column behind the selected KPI was a partial or "Results" match
    *  (standard exact exports omit the key entirely, so the sample and
@@ -649,6 +646,10 @@ export interface MemoWinnerLoserRow {
    * Positive is better and negative is worse for every KPI. */
   deltaPct: number | null;
   spendLabel: string;
+  /** Real-account fix 3 — present only for a creative merged from
+   *  several rows: "runs in 3 ad sets" (or "combined from 30 rows" when
+   *  a breakdown, not ad sets, caused the repetition). */
+  runsInLabel?: string;
   reason: string;
   /** Evidence Inputs V1: neutral conversion count for this ad
    *  ("34 purchases" / "12 leads"), present only for purchase-based
@@ -756,9 +757,8 @@ export interface MemoSpendAllocation {
 /* ------------------------------------------------------------------ */
 
 export interface MemoCreativeGroupMember {
-  /** Display name (post duplicate-name disambiguation, e.g. an
-   *  ad that shares its raw name with another row already carries a
-   *  "(row N)" suffix here — see extract.ts's Duplicate Identity fix). */
+  /** Display name — unique per report (same-name rows are merged
+   *  into one creative; see extract.ts's aggregateDuplicateRows). */
   name: string;
   category: "below" | "at" | "above";
 }

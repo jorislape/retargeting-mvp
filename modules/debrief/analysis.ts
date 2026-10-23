@@ -286,12 +286,17 @@ export function analyze(
     hasNameSignal: hasNameSignal(winnerPool, loserPool),
     hasCreativeNotes: context.creativeNotes.trim().length > 0,
     missingColumns,
-    /* Duplicate Identity fix: distinct raw names that extract.ts found
-       on multiple rows (their ads carry sourceName). Drives the limits
-       disclosure; never affects gating, ranking, or the decision. */
-    duplicateAdNames: [
-      ...new Set(ads.filter((a) => a.sourceName != null).map((a) => a.sourceName as string)),
-    ],
+    /* Real-account fix 3: names whose rows extract.ts merged into one
+       creative (rowsMerged > 1). Drives the limits disclosure only. */
+    duplicateAdNames: ads.filter((a) => (a.rowsMerged ?? 1) > 1).map((a) => a.name),
+    ...(ads.some((a) => (a.rowsMerged ?? 1) > 1)
+      ? {
+          mergedRows: {
+            rows: ads.reduce((n, a) => n + (a.rowsMerged ?? 1), 0),
+            breakdowns: columns.breakdowns,
+          },
+        }
+      : {}),
     /* KPI Source Column Disclosure: only attached when non-empty, so a
        standard export's AnalysisResult is unchanged key-for-key. */
     ...(kpiSources.length > 0 ? { kpiColumnSources: kpiSources } : {}),

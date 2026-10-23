@@ -314,33 +314,26 @@ function allStrings(cmp: MemoComparison): string[] {
   assert.equal(missingId.appeared.total, 0, "an id-less row never reads as 'new'");
 }
 
-/* ===================== row-label identity never fabricates a match (QA B1) ===================== */
+/* ===================== repeated names never fabricate a match (QA B1) ===================== */
 
 {
-  // Duplicate-named rows arrive with row-disambiguated display names
-  // and the raw name in sourceName. Matching MUST key on the raw name
-  // (row positions aren't stable across exports) — so both rows stay
-  // ambiguous and excluded, exactly like before the display change.
+  // extract.ts merges same-name rows into one creative (Real-account
+  // fix 3), so a real export never repeats a name here. A hand-built
+  // period that does must still keep both copies ambiguous and excluded.
   const cur = period([
-    { name: "Alpha (row 2)", kpiValue: 3 },
-    { name: "Alpha (row 5)", kpiValue: 1 },
+    { name: "Alpha", kpiValue: 3 },
+    { name: "Alpha", kpiValue: 1 },
     { name: "Solo", kpiValue: 2 },
   ]);
-  cur.ads[0].sourceName = "Alpha";
-  cur.ads[1].sourceName = "Alpha";
-  for (const a of cur.analysis.rankedAds) if (a.name.startsWith("Alpha")) a.sourceName = "Alpha";
   const prev = period([
-    { name: "Alpha (row 3)", kpiValue: 2 },
-    { name: "Alpha (row 7)", kpiValue: 2 },
+    { name: "Alpha", kpiValue: 2 },
+    { name: "Alpha", kpiValue: 2 },
     { name: "Solo", kpiValue: 2 },
   ]);
-  prev.ads[0].sourceName = "Alpha";
-  prev.ads[1].sourceName = "Alpha";
-  for (const a of prev.analysis.rankedAds) if (a.name.startsWith("Alpha")) a.sourceName = "Alpha";
   const cmp = buildComparison(cur, prev, fmt);
-  assert.equal(cmp.matchedJudgedBoth, 1, "only Solo matches — row labels never pair up");
-  assert.equal(cmp.unmatched.ambiguousOrMissingKey, 2, "both duplicate rows counted ambiguous");
-  assert.equal(cmp.appeared.total, 0, "row-labeled duplicates never read as new ads");
+  assert.equal(cmp.matchedJudgedBoth, 1, "only Solo matches — repeated names never pair up");
+  assert.equal(cmp.unmatched.ambiguousOrMissingKey, 2, "both repeated rows counted ambiguous");
+  assert.equal(cmp.appeared.total, 0, "repeated names never read as new ads");
 }
 
 /* ===================== judged-both-periods-only deltas ===================== */

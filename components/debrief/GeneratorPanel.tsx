@@ -5,7 +5,8 @@ import type { CompetitorSource, CreativeGroupAssignments, DebriefApiError, Expor
 import {
   assessMarketNotes,
   CREATIVE_FORMAT_OPTIONS,
-  disambiguateDuplicateNames,
+  mergedRowsNote,
+  normalizeRowName,
   EMPTY_COMPETITOR_SOURCE,
   extractNameTags,
   fmtMoney,
@@ -37,7 +38,7 @@ import {
   SIGNAL_PRESETS,
   structureMarketNotes,
 } from "@/modules/debrief";
-import { findAmbiguousAdNames, normalizeAdName } from "./creativeEvidence";
+import { normalizeAdName } from "./creativeEvidence";
 import { SAMPLE_CREATIVE_ASSETS } from "./sampleCreatives";
 import {
   appendPageSignalsToNotes,
@@ -126,33 +127,22 @@ const PROCESSING_STEPS = [
    table. Compact: a "+ Image" affordance, then thumbnail + replace/
    remove. Validation + the object-URL lifecycle live in
    DebriefProvider.setCreativeAsset (shared image rules, browser-only);
-   this cell owns just the hidden input and the inline error. Ads whose
-   name appears on multiple rows get an explanation instead of a
-   control — one image can't be tied to one row for them. */
+   this cell owns just the hidden input and the inline error. Same-name
+   rows are one creative (Real-account fix 3), so every name takes one
+   image. */
 function AdImageCell({
   adName,
-  ambiguous,
   assetUrl,
   assetName,
   onSelect,
 }: {
   adName: string;
-  ambiguous: boolean;
   assetUrl: string | null;
   assetName: string | null;
   onSelect: (file: File | null) => { ok: boolean; error?: string };
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-
-  if (ambiguous) {
-    return (
-      <p className="text-[11px] leading-relaxed text-zinc-500">
-        Name appears on multiple rows — one image can&rsquo;t be tied to
-        one row, so attach is unavailable.
-      </p>
-    );
-  }
 
   return (
     <div>
@@ -563,18 +553,14 @@ export function GeneratorPanel() {
      *  identity fix — creativeFormatOverrides stays keyed the same way
      *  it always has (raw name; see applyFormatOverrides). */
     ads: { name: string; tags: string[] }[];
-    /** Creative Evidence V1: normalized names that appear on MORE THAN
-     *  ONE row — one image can't be tied to one row for these, so the
-     *  attach control is disabled with an explanation. */
-    ambiguousNames: string[];
-    /** Creative Grouping V1 (identity fix): every underlying execution
-     *  for a given raw ad name, keyed the SAME way the server will
-     *  independently (but deterministically) resolve it — Meta's Ad ID
-     *  when present, else the disambiguated "(row N)" name
-     *  extract.ts's Duplicate Identity fix already produces (see
-     *  disambiguateDuplicateNames). Non-ambiguous names have exactly
-     *  one entry, whose disambiguatedName equals the raw name. */
-    executionsByName: Record<string, { executionKey: string; disambiguatedName: string }[]>;
+    /** Creative-group key per ad name, resolved the SAME way the server
+     *  does (creativeGroups.ts): the Ad ID when every same-name row
+     *  shares one, else the name — same-name rows are one creative
+     *  (Real-account fix 3, extract.ts's aggregateDuplicateRows). */
+    groupKeyByName: Record<string, string>;
+    /** Real-account fix 3 — file-card disclosure: names on several rows
+     *  (merged into one creative each) and any breakdown columns. */
+    merged: { names: number; rows: number; breakdowns: string[] };
   } | null>(null);
   /* First-Run Robustness: the shared file check (fileCheck.ts), run on
      drop — the SAME checks and copy the API runs. Keyed to the File so a
@@ -632,48 +618,42 @@ export function GeneratorPanel() {
         const nameIdx = columns.adName ? headers.indexOf(columns.adName) : -1;
         const seen = new Set<string>();
         const ads: { name: string; tags: string[] }[] = [];
-        const allRowNames: string[] = [];
         if (nameIdx >= 0) {
           for (const row of matrix.slice(1)) {
             const name = (row[nameIdx] ?? "").trim();
             if (name === "") continue;
-            allRowNames.push(name);
             if (seen.has(name)) continue;
             seen.add(name);
             ads.push({ name, tags: extractNameTags(name) });
           }
         }
-        const ambiguousNames = [...findAmbiguousAdNames(allRowNames)];
-        /* Creative Grouping V1 (identity fix): recompute the exact
-           per-row execution identity extract.ts's Duplicate Identity
-           fix will independently (but deterministically) produce
-           server-side — Ad ID when the column resolved, else the
-           disambiguated "(row N)" name — so the Verify table can offer
-           one grouping control per underlying execution instead of one
-           per raw name. Entirely separate from the `ads`/`seen` loop
-           above; creativeFormatOverrides' keying is untouched. */
-        const executionsByName: Record<
-          string,
-          { executionKey: string; disambiguatedName: string }[]
-        > = {};
+        /* Real-account fix 3: same-name rows are one creative — one
+           group key per name (shared Ad ID, else the name), and the
+           counts behind the file card's "combined" line. */
+        const groupKeyByName: Record<string, string> = {};
+        const rowsByName = new Map<string, { name: string; ids: (string | null)[] }>();
         if (nameIdx >= 0) {
           const adIdIdx = columns.adId ? headers.indexOf(columns.adId) : -1;
-          const rawRows: { name: string; fileRow: number; id: string | null }[] = [];
-          matrix.slice(1).forEach((row, i) => {
+          for (const row of matrix.slice(1)) {
             const name = (row[nameIdx] ?? "").trim();
-            if (name === "") return;
+            if (name === "") continue;
             const rawId = adIdIdx >= 0 ? (row[adIdIdx] ?? "").trim() : "";
-            rawRows.push({ name, fileRow: i + 2, id: rawId !== "" ? rawId : null });
-          });
-          for (const item of disambiguateDuplicateNames(rawRows)) {
-            const rawName = item.sourceName ?? item.name;
-            const key = item.id ?? item.name;
-            (executionsByName[rawName] ??= []).push({
-              executionKey: key,
-              disambiguatedName: item.name,
-            });
+            const key = normalizeRowName(name);
+            const entry = rowsByName.get(key) ?? { name, ids: [] };
+            entry.ids.push(rawId !== "" ? rawId : null);
+            rowsByName.set(key, entry);
+          }
+          for (const { name, ids } of rowsByName.values()) {
+            const shared = ids[0] != null && ids.every((id) => id === ids[0]) ? ids[0] : null;
+            groupKeyByName[name] = shared ?? name;
           }
         }
+        const mergedEntries = [...rowsByName.values()].filter((e) => e.ids.length > 1);
+        const merged = {
+          names: mergedEntries.length,
+          rows: mergedEntries.reduce((n, e) => n + e.ids.length, 0),
+          breakdowns: columns.breakdowns,
+        };
         /* Display-only extras (the API recomputes everything): spend
            column total and the file's reporting range. */
         const spendIdx = columns.spend ? headers.indexOf(columns.spend) : -1;
@@ -713,8 +693,8 @@ export function GeneratorPanel() {
           currency: columns.currency,
           dateRange,
           ads,
-          ambiguousNames,
-          executionsByName,
+          groupKeyByName,
+          merged,
         });
         /* First-Run Fixes: the KPI follows the data — but only until the
            user picks one themselves; a manual choice is never overridden. */
@@ -762,8 +742,6 @@ export function GeneratorPanel() {
   const previewSparse = preview
     ? sparseKpiWarning(preview.usability[fields.kpi], KPI_LABELS[fields.kpi])
     : null;
-  /* Creative Evidence V1: names on multiple rows can't take one image. */
-  const previewAmbiguous = new Set(preview?.ambiguousNames ?? []);
   /* Creative Grouping V1: every distinct label used on any ad this
    *  session, first-seen display casing/spacing — feeds each row's
    *  "click to reuse" pills. Cheap to recompute per render at realistic
@@ -1483,6 +1461,11 @@ export function GeneratorPanel() {
                 {previewKpiSource && (
                   <p className="mt-1 text-xs leading-relaxed text-zinc-400">
                     {previewKpiSource}
+                  </p>
+                )}
+                {mergedRowsNote(preview.merged) && (
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                    {mergedRowsNote(preview.merged)}
                   </p>
                 )}
                 {/* First-Run Fixes: the KPI followed the data — say so,
@@ -3171,57 +3154,30 @@ export function GeneratorPanel() {
                             </select>
                           </td>
                           <td className="py-2 pr-4 align-middle">
-                            {/* Creative Grouping V1 (identity fix): keyed
-                                by each row's execution identity (Ad ID
-                                when the export has one, else the
-                                disambiguated "(row N)" name) — the same
-                                key creativeGroups.ts resolves server-side
-                                — never by the raw display name, which
-                                collapses distinct executions that merely
-                                share a name. A name with more than one
-                                underlying execution (a duplicate) renders
-                                one independently-labeled control per
-                                execution instead of one shared control. */}
-                            <div className="flex flex-col gap-2">
-                              {(
-                                preview.executionsByName[ad.name] ?? [
-                                  { executionKey: ad.name, disambiguatedName: ad.name },
-                                ]
-                              ).map((exec) => {
-                                const ambiguous =
-                                  (preview.executionsByName[ad.name]?.length ?? 0) > 1;
-                                return (
-                                  <div key={exec.executionKey}>
-                                    {ambiguous && (
-                                      <p className="mb-1 truncate text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-                                        {exec.disambiguatedName}
-                                      </p>
-                                    )}
-                                    <CreativeGroupsCell
-                                      adName={exec.disambiguatedName}
-                                      assigned={creativeGroups[exec.executionKey] ?? []}
-                                      allLabels={allGroupLabels}
-                                      onChange={(next) => {
-                                        const nextGroups: CreativeGroupAssignments = {
-                                          ...creativeGroups,
-                                        };
-                                        if (next.length === 0) {
-                                          delete nextGroups[exec.executionKey];
-                                        } else {
-                                          nextGroups[exec.executionKey] = next;
-                                        }
-                                        setCreativeGroups(nextGroups);
-                                      }}
-                                    />
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            {/* Creative Grouping V1: keyed by the creative's
+                                identity — the Ad ID its rows share, else the
+                                name (same-name rows are one creative) — the
+                                same key creativeGroups.ts resolves server-side. */}
+                            {(() => {
+                              const key = preview.groupKeyByName[ad.name] ?? ad.name;
+                              return (
+                                <CreativeGroupsCell
+                                  adName={ad.name}
+                                  assigned={creativeGroups[key] ?? []}
+                                  allLabels={allGroupLabels}
+                                  onChange={(next) => {
+                                    const nextGroups: CreativeGroupAssignments = { ...creativeGroups };
+                                    if (next.length === 0) delete nextGroups[key];
+                                    else nextGroups[key] = next;
+                                    setCreativeGroups(nextGroups);
+                                  }}
+                                />
+                              );
+                            })()}
                           </td>
                           <td className="py-2 pl-1 align-middle">
                             <AdImageCell
                               adName={ad.name}
-                              ambiguous={previewAmbiguous.has(normalizeAdName(ad.name))}
                               assetUrl={creativeAssets[normalizeAdName(ad.name)]?.url ?? null}
                               assetName={creativeAssets[normalizeAdName(ad.name)]?.name ?? null}
                               onSelect={(f) => setCreativeAsset(normalizeAdName(ad.name), f)}

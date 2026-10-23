@@ -19,7 +19,7 @@ npm test             # every script test in one run (list below)
 The full check is `npm run build && npx tsc --noEmit && npx eslint . && npm test`. There is no other test runner; behavioral verification is manual against the dev server — `TESTING.md` is the checklist, and the sample dataset's expected numbers (spend gate ≈ $120.91, 11 judged / 3 set aside, per-KPI medians) are documented in `modules/debrief/sampleCsv.ts` for asserting against. Every `scripts/*.test.ts` is a plain-Node script (no Jest/Vitest) — run one directly with `node scripts/<name>.test.ts`, or via its `npm run test:<name>` alias in `package.json`:
 
 - `test:csv`, `test:watchlist`, `test:signals`, `test:signal-summary` — the debrief/competitor engine proofs (RFC 4180 escaping, watchlist sanitize/diff/format/append, signal-builder tables, signal-summary interpretation).
-- `test:creative-evidence` — Creative Evidence V1 proofs: deterministic spotlight selection (top/worst/biggest-mover, tie-to-improvement), whitespace-safe identity + duplicate-name ambiguity detection, dedupe-with-merged-roles, causal-vocabulary and client-jargon blocklists over every generated string, and the two structural isolation scans (the selection module never references assets — an image can't influence spotlight choice; `modules/debrief/` never references creative-asset machinery — images can't influence any engine result; the provider never appends assets to the API request).
+- `test:creative-evidence` — Creative Evidence V1 proofs: deterministic spotlight selection (top/worst/biggest-mover, tie-to-improvement), whitespace-safe identity, dedupe-with-merged-roles, causal-vocabulary and client-jargon blocklists over every generated string, and the two structural isolation scans (the selection module never references assets — an image can't influence spotlight choice; `modules/debrief/` never references creative-asset machinery — images can't influence any engine result; the provider never appends assets to the API request).
 - `test:report-visuals` — Performance Ranking V2 proofs: raw polarity-corrected memo deltas drive direction and shared scaling, supplied visible-row order/scope is preserved, null/zero values invent no geometry, and the chart math has no KPI-specific or action-inference surface.
 - `test:compare` — Period Comparison V2 proofs: match-basis selection (Ad ID over exact name, provenance always disclosed), duplicate/missing-key exclusion (counted, never guessed, never leaked into appeared/disappeared), judged-both-periods-only deltas, KPI-polarity-aware improvement, composition caveat, period sanity warnings, a causal-vocabulary blocklist over every generated string, and a source scan pinning `compare.ts` to importing nothing but `types.ts` (the mirror-image scan — `decision.ts` never referencing the comparison — lives in `test:decision`).
 - `test:competitor-debrief` — Competitor Debrief V1 engine proofs: insufficient-evidence handling, category detection, no forbidden performance/spend claims outside the fixed caveat, and a source-scan asserting the engine imports no network/fetch code.
@@ -60,10 +60,12 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # generic "spend" alias never resolves into ROAS-shaped headers —
                   # a spend-less CSV must error, not silently misuse the ROAS column
   extract.ts      # raw rows -> ParsedAd[], KPI value derivation, ad-name tag extraction,
-                  # duplicate-identity handling (same normalized name on multiple rows ⇒
-                  # rows stay SEPARATE ads, display names get a deterministic "(row N)"
-                  # suffix, raw name kept in sourceName for cross-period/override
-                  # matching — labels are never match keys; a limits line discloses it),
+                  # duplicate rows (Real-account fix 3, aggregateDuplicateRows: the same
+                  # normalized name on several rows — ad sets or Day/Age/Placement
+                  # breakdowns — is ONE creative: spend/outcomes/value/impressions
+                  # summed, KPI recomputed from the sums, unknown parts stay unknown;
+                  # "- Copy" variants stay separate; rowsMerged → "runs in N ad sets";
+                  # a limits line and the file card disclose it),
                   # applyFormatOverrides (Creative Format Confirmation V1: user-confirmed
                   # formats replace the ad-name tag GUESS and set formatConfirmed — they
                   # feed pattern/test/brief wording only, never spend/KPI/gate/ranking;
@@ -429,8 +431,8 @@ components/debrief/
                        # over the client-side preview; first 25 ads + show-all; sent as
                        # creativeFormatOverrides JSON, cleared whenever the file changes)
                        # plus Creative Evidence V1's optional per-ad image attach
-                       # (browser-only, never uploaded; disabled for names appearing on
-                       # multiple rows — one image can't be tied to one row),
+                       # (browser-only, never uploaded; same-name rows are one
+                       # merged creative, so each name takes one image),
                        # structured-error display with one-click KPI switch
   MetaConnect.tsx      # connect button / connected controls; checks /api/meta/config first
   Report.tsx           # the memo document; Buyer/Client view toggle is display-only.
@@ -458,8 +460,7 @@ components/debrief/
   memoToText.ts        # view-aware plain-text serialization for the Copy button; takes
                        # briefIndices so briefs are included only while shown
   creativeEvidence.ts  # Creative Evidence V1 — PURE spotlight selection + ad-identity
-                       # helpers (normalizeAdName mirrors compare.ts's key rule;
-                       # findAmbiguousAdNames flags names on multiple rows). Selection
+                       # helpers (normalizeAdName mirrors compare.ts's key rule). Selection
                        # reads ONLY memo evidence (top winner / worst loser / biggest
                        # comparison mover, deduped into one card with merged role
                        # labels) — it cannot see creative assets, so an attached image

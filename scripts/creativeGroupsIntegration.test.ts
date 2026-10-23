@@ -113,12 +113,11 @@ ThinSpendAd,5.00,1,9.00`;
 
     console.log("creativeGroupsIntegration: real-engine end-to-end + decision byte-identity + Copy/TXT confirmed");
 
-    /* ===== Identity-fix regression: real CSV, duplicate raw names, Ad ID present ===== */
-    // Two rows share the raw name "UGC_V1" but carry distinct Ad IDs —
-    // exactly the milestone's own example (same raw name, different
-    // executions/results). Also proves the CSV path resolves an Ad ID
-    // through the real columns.ts/extractAds pipeline, not a hand-built
-    // fixture.
+    /* ===== Real-account fix 3: same-name rows are ONE creative ===== */
+    // Two rows share the name "UGC_V1" with distinct Ad IDs — the same
+    // creative running in two ad sets. extractAds merges them; the Ad
+    // IDs disagree, so the merged creative's identity is its name, and
+    // that is the key creative groups and format overrides use.
     const dupCsvText = `Ad name,Ad ID,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend)
 UGC_V1,ad_1,400.00,10,4.00
 UGC_V1,ad_2,350.00,6,1.00
@@ -129,47 +128,29 @@ ThinSpendAd,ad_5,5.00,1,9.00`;
     const dupColumns = resolveColumns(dupTable.headers);
     const dupAds = extractAds(dupTable.rows, dupColumns, "roas");
 
-    const ugc1 = dupAds.find((a: { sourceName?: string; name: string }) => a.sourceName === "UGC_V1" && a.name.endsWith("(row 2)"));
-    const ugc2 = dupAds.find((a: { sourceName?: string; name: string }) => a.sourceName === "UGC_V1" && a.name.endsWith("(row 3)"));
-    assert.ok(ugc1 && ugc2, "extract.ts's Duplicate Identity fix disambiguates both UGC_V1 rows");
-    assert.equal(ugc1.id, "ad_1", "Ad ID survives disambiguation for the first duplicate row");
-    assert.equal(ugc2.id, "ad_2", "Ad ID survives disambiguation for the second duplicate row");
+    const ugc = dupAds.filter((a: { name: string }) => a.name === "UGC_V1");
+    assert.equal(ugc.length, 1, "the two UGC_V1 rows are one creative");
+    assert.equal(ugc[0].rowsMerged, 2);
+    assert.equal(ugc[0].id, null, "disagreeing Ad IDs never pick one — identity falls back to the name");
+    assert.equal(ugc[0].spend, 750);
+    assert.ok(Math.abs(ugc[0].kpiValue - 1950 / 750) < 1e-9, "ROAS recomputed from summed value ÷ summed spend");
+    assert.equal(ugc[0].conversions, 16);
 
     const dupAnalysis = analyze(dupAds, dupTable.rows, dupColumns, ctx);
-    const dupDeclared = {
-      // Keyed by Ad ID (the real, resolved identity) — different groups
-      // for the two same-named executions, plus a second execution in
-      // each group so both clear the repetition floor.
-      ad_1: ["Morning routine"],
+    const dupGroups = summarizeCreativeGroups(dupAnalysis.rankedAds, {
+      UGC_V1: ["Morning routine"],
       ad_3: ["Morning routine"],
-      ad_2: ["Testimonial"],
-      ad_4: ["Testimonial"],
-    };
-    const dupGroups = summarizeCreativeGroups(dupAnalysis.rankedAds, dupDeclared);
-    assert.equal(dupGroups.groups.length, 2, "two same-named executions correctly land in two different, independently-tallied groups via their real Ad IDs");
+    });
     const dupMorning = dupGroups.groups.find((g: { label: string }) => g.label === "Morning routine");
-    const dupTestimonial = dupGroups.groups.find((g: { label: string }) => g.label === "Testimonial");
-    assert.ok(dupMorning.members.some((m: { name: string }) => m.name === ugc1.name));
-    assert.ok(!dupMorning.members.some((m: { name: string }) => m.name === ugc2.name), "the sibling same-named execution never leaks in via the real pipeline");
-    assert.ok(dupTestimonial.members.some((m: { name: string }) => m.name === ugc2.name));
+    assert.ok(dupMorning.members.some((m: { name: string }) => m.name === "UGC_V1"), "the merged creative is grouped by its name");
 
-    console.log("creativeGroupsIntegration: real CSV with duplicate raw names + Ad IDs — independent group attachment confirmed end to end");
-
-    /* ===== creativeFormatOverrides regression: duplicate-name behavior UNCHANGED ===== */
-    // applyFormatOverrides is explicitly out of scope for this fix — it
-    // must keep matching on sourceName ?? name (the raw, shared name),
-    // so one override still applies to every row sharing that name.
     const overridden = applyFormatOverrides(dupAds, { UGC_V1: "video" });
-    const ov1 = overridden.find((a: { name: string }) => a.name === ugc1.name);
-    const ov2 = overridden.find((a: { name: string }) => a.name === ugc2.name);
-    assert.deepEqual(ov1.nameTags, ["video"], "one raw-name-keyed override still applies to the first duplicate row");
-    assert.deepEqual(ov2.nameTags, ["video"], "...and to the second duplicate row too — unchanged, sourceName-shared behavior");
-    assert.equal(ov1.formatConfirmed, true);
-    assert.equal(ov2.formatConfirmed, true);
-    const soloOverridden = overridden.find((a: { name: string }) => a.name === "Solo");
-    assert.equal(soloOverridden.formatConfirmed, undefined, "an unrelated ad is untouched");
+    const ov = overridden.find((a: { name: string }) => a.name === "UGC_V1");
+    assert.deepEqual(ov.nameTags, ["video"], "one name-keyed override applies to the merged creative");
+    assert.equal(ov.formatConfirmed, true);
+    assert.equal(overridden.find((a: { name: string }) => a.name === "Solo").formatConfirmed, undefined, "an unrelated ad is untouched");
 
-    console.log("creativeGroupsIntegration: creativeFormatOverrides duplicate-name behavior confirmed unchanged (still keyed by sourceName ?? name)");
+    console.log("creativeGroupsIntegration: same-name rows merge into one creative; groups and overrides key on its name");
   } finally {
     rmSync(dist, { recursive: true, force: true });
   }

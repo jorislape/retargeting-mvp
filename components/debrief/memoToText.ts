@@ -468,7 +468,7 @@ export function memoToText(
     const target = r.vsTarget
       ? ` | ${r.vsTarget === "beats" ? (buyer ? "✓ beats target" : "✓ beats your target") : buyer ? "✗ misses target" : "✗ below your target"}`
       : "";
-    return `- ${r.name} | ${r.valueLabel} (${c(r.vsMedianLabel)})${target} | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""}${freq} | ${r.reason}${notes}`;
+    return `- ${r.name}${r.runsInLabel ? ` (${r.runsInLabel})` : ""} | ${r.valueLabel} (${c(r.vsMedianLabel)})${target} | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""}${freq} | ${r.reason}${notes}`;
   };
   /* Trust Pass: TXT/Copy lists EVERY row. The first topAdsShown match
      the on-screen table; a "+N more:" line marks where the screen

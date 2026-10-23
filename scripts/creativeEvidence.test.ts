@@ -18,7 +18,6 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import {
   CREATIVE_EVIDENCE_CAVEAT,
-  findAmbiguousAdNames,
   normalizeAdName,
   selectSpotlights,
   SPOTLIGHT_ROLE_LABELS,
@@ -48,10 +47,6 @@ function source(overrides: Partial<SpotlightSource> = {}): SpotlightSource {
   assert.equal(normalizeAdName("plain"), "plain");
   // Case-sensitive on purpose — never fuzzy.
   assert.notEqual(normalizeAdName("Ad A"), normalizeAdName("ad a"));
-
-  const ambiguous = findAmbiguousAdNames(["A", "B", " A ", "C", "C", "C", ""]);
-  assert.deepEqual([...ambiguous].sort(), ["A", "C"], "whitespace-variant duplicates detected; blanks ignored");
-  assert.equal(findAmbiguousAdNames(["A", "B"]).size, 0);
 }
 
 /* ===================== spotlight selection ===================== */

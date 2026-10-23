@@ -1941,9 +1941,9 @@ console.log("decision (stage 1 — rules): all assertions passed");
         "test-action TXT export drops the kill-list framing"
       );
 
-      /* QA B1 — duplicate ad name at BOTH extremes: rows stay separate,
-         labels are row-disambiguated, and no sentence can name one
-         label as both source and target of the shift. */
+      /* Real-account fix 3 (replaces QA B1's row labels): same-name
+         rows are ONE creative — merged, KPI recomputed from the sums,
+         no "(row N)" label anywhere, disclosed in both registers. */
       const dupNameCsv =
         "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
         "Alpha,300,30,5.0,2026-06-01,2026-06-30\n" +
@@ -1953,43 +1953,25 @@ console.log("decision (stage 1 — rules): all assertions passed");
         "M3,200,20,1.95,2026-06-01,2026-06-30\n" +
         "M4,200,20,1.9,2026-06-01,2026-06-30\n";
       const mDup = runEngine(dupNameCsv, "roas");
-      assert.equal(mDup.decision.action, "budget", "dup dataset still lands on a budget move");
-      assert.ok(
-        mDup.decision.headline.includes('into "Alpha (row 2)"'),
-        "shift target carries the row-disambiguated label"
-      );
-      assert.ok(
-        mDup.decision.headline.includes('"Alpha (row 3)"'),
-        "shift source names the loser row's label"
-      );
-      assert.ok(
-        !/from ("[^"]+").*into \1/.test(mDup.decision.headline),
-        "headline never shifts a label into itself"
-      );
-      assert.ok(
-        mDup.tldr[0].includes("Alpha (row 2)") && mDup.tldr[1].includes("Alpha (row 3)"),
-        "TLDR uses the disambiguated labels on both sides"
-      );
-      assert.ok(
-        mDup.nextTests[0].test.includes("Alpha (row 2)"),
-        "next tests reference the disambiguated winner"
-      );
+      const alphaRows = [...mDup.winners, ...mDup.losers.rows, ...(mDup.atMedian?.rows ?? [])].filter((r: { name: string }) => r.name.startsWith("Alpha"));
+      assert.equal(alphaRows.length, 1, "one creative, not two rows");
+      assert.equal(alphaRows[0].name, "Alpha");
+      assert.equal(alphaRows[0].valueLabel, "2.75x", "ROAS recomputed: (1,500 + 150) ÷ 600");
+      assert.equal(alphaRows[0].runsInLabel, "runs in 2 ad sets");
+      assert.ok(!JSON.stringify(mDup).includes("(row "), "no row-numbered labels anywhere");
       assert.ok(
         mDup.decision.limits.buyer.some(
-          (l: string) => l.includes('"Alpha"') && l.includes("multiple rows")
+          (l: string) => l.includes('"Alpha"') && l.includes("combined into one creative each")
         ) &&
-          mDup.decision.limits.client.some(
-            (l: string) => l.includes('"Alpha"') && l.includes("row number")
-          ),
-        "duplicate-name disclosure present in both registers"
+          mDup.decision.limits.client.some((l: string) => l.includes("shown as one creative each")),
+        "merge disclosure present in both registers"
       );
       assertCoherent(mDup, "duplicate-name");
-      // Clean files carry no duplicate machinery: no disclosure, no
-      // row-suffixed labels (byte-identity for the common case).
+      // Clean files carry no merge machinery: no disclosure, no label.
       assert.ok(
-        !memo.decision.limits.buyer.some((l: string) => l.includes("multiple rows —")) &&
-          memo.winners.every((w: { name: string }) => !/\(row \d+\)$/.test(w.name)),
-        "no duplicate handling on the clean sample"
+        !memo.decision.limits.buyer.some((l: string) => l.includes("combined into one creative")) &&
+          memo.winners.every((w: { runsInLabel?: string }) => w.runsInLabel == null),
+        "no merge handling on the clean sample"
       );
 
       /* QA C1 — supported evidence with a modest (+21%) leader on a

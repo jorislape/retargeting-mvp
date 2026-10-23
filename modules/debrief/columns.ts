@@ -312,6 +312,22 @@ export interface ColumnMap {
   /** Attribution & Intent 1 — attribution-split columns by field (click
    *  7-day / 1-day, view-through). Empty object when none. */
   attributionSplits: Partial<Record<AttributionField, AttributionSplit>>;
+  /** Real-account fix 3 — Ads Manager breakdown columns (Day, Age,
+   *  Placement, …): each ad then appears once per slice, and the rows
+   *  are merged per ad. Empty when the export has none. */
+  breakdowns: string[];
+}
+
+/** Ads Manager breakdown headers (normalized, exact match only — "Age"
+ *  must never match "Average …"). */
+const BREAKDOWN_HEADERS = new Set([
+  "day", "week", "month", "date", "hour of day", "time of day",
+  "age", "gender", "placement", "platform", "position", "device platform", "impression device",
+  "country", "region", "dma region", "dma", "business locations",
+]);
+
+export function breakdownColumns(headers: readonly string[]): string[] {
+  return headers.filter((h) => BREAKDOWN_HEADERS.has(h.trim().toLowerCase().replace(/\s+/g, " ")));
 }
 
 export function resolveColumns(allHeaders: string[]): ColumnMap {
@@ -355,6 +371,7 @@ export function resolveColumns(allHeaders: string[]): ColumnMap {
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
     sources: resolveSources(headers),
     attributionSplits: resolveAttributionSplits(allHeaders),
+    breakdowns: breakdownColumns(allHeaders),
   };
 }
 

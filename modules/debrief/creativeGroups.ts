@@ -28,21 +28,13 @@ export function normalizeGroupLabel(label: string): string {
   return label.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-/** Execution-identity resolution (Creative Grouping V1, corrected):
- *  Meta's Ad ID when the export included one — the most reliable,
- *  rename-proof key — otherwise `ad.name`, which by this point is
- *  ALREADY a stable, unique-per-row identity: extract.ts's Duplicate
- *  Identity fix (disambiguateDuplicateNames) appends a deterministic
- *  "(row N)" suffix to every row sharing a raw name BEFORE this module
- *  ever sees it, so two executions named "UGC_V1" are never the same
- *  key here. This is deliberately NOT sourceName (the shared RAW name)
- *  — that was the bug: keying by sourceName collapsed distinct
- *  executions that merely happen to share a display name back into one
- *  shared assignment, exactly like creativeFormatOverrides does (a
- *  fine tradeoff for a format guess, not for user-declared per-
- *  execution group membership). A defensive `.trim()` fallback covers
- *  a padded id/name from a hand-built request; both sides of this
- *  match are otherwise already-computed, already-trimmed values. */
+/** Creative-identity resolution: Meta's Ad ID when the export carries
+ *  one (shared by every merged row) — the most reliable, rename-proof
+ *  key — otherwise `ad.name`, unique per report because extract.ts
+ *  merges same-name rows into one creative (Real-account fix 3,
+ *  aggregateDuplicateRows) before this module ever sees them. A
+ *  defensive `.trim()` fallback covers a padded id/name from a
+ *  hand-built request. */
 function executionKey(ad: RankedAd): string {
   return ad.id ?? ad.name;
 }

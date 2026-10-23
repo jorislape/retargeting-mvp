@@ -330,55 +330,175 @@ export function extractAds(
   const leadBased =
     kpi === "cpa" && valued.length > 0 && valued.every((a) => a.cpaRowBasis === "lead");
 
-  return disambiguateDuplicateNames(ads).map(({ fileRow, ...withMeta }) => {
+  const perRow = ads.map(({ fileRow, ...withMeta }) => {
     const ad: Partial<typeof withMeta> = { ...withMeta };
     const leadCount = withMeta.leadCount;
     delete ad.cpaRowBasis;
     delete ad.leadCount;
     const parsed = ad as ParsedAd;
-    return leadBased ? { ...parsed, conversions: leadCount, cpaBasis: "lead" as const } : parsed;
+    return {
+      fileRow,
+      ad: leadBased ? { ...parsed, conversions: leadCount, cpaBasis: "lead" as const } : parsed,
+    };
   });
+  return aggregateDuplicateRows(perRow, kpi);
 }
 
-/** Trim + collapse internal whitespace — the identity-comparison key
- *  only (never a display value; see disambiguateDuplicateNames). */
+/** Trim + collapse internal whitespace — the identity key for
+ *  aggregation (aggregateDuplicateRows) and cross-period matching. */
 export function normalizeRowName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
-/** Duplicate Identity fix: the same normalized name on multiple rows
- *  is NOT proof of one creative (the same name routinely appears
- *  across ad sets with very different results). Rows stay separate
- *  ads; each duplicate's display name gains a deterministic,
- *  client-readable "(row N)" suffix so no report sentence can ever
- *  name the same label as both winner and loser. The raw name is
- *  preserved in sourceName for cross-period and override matching —
- *  row positions are NOT stable across exports, so labels must never
- *  become match keys. Files without duplicates are byte-identical to
- *  before this fix.
- *
- *  Factored out of extractAds (Creative Grouping V1) so the Generator's
- *  client-side preview can compute the IDENTICAL per-row disambiguated
- *  identity the server will independently (but deterministically)
- *  recompute — the two must never drift, since Creative Group
- *  assignments are keyed to this exact identity (see
- *  modules/debrief/creativeGroups.ts). */
-export function disambiguateDuplicateNames<T extends { name: string; fileRow: number }>(
-  items: readonly T[]
-): (T & { sourceName?: string })[] {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    const key = normalizeRowName(item.name);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+/** Real-account fix 3 — the generator file card's line about merged
+ *  rows (null when nothing merges). Breakdown exports say which
+ *  breakdown repeated the ads; ad-level exports say the same creative
+ *  ran in several ad sets. */
+export function mergedRowsNote(merged: { names: number; rows: number; breakdowns: readonly string[] }): string | null {
+  if (merged.names === 0) return null;
+  const n = merged.names;
+  const what = `${merged.rows} rows share ${n} ad name${n === 1 ? "" : "s"}`;
+  return merged.breakdowns.length > 0
+    ? `Broken down by ${merged.breakdowns.join(", ")}: ${what} — combined into one creative per ad name (spend, purchases and value summed).`
+    : `${what} (the same creative in several ad sets) — each name is combined into one creative (spend, purchases and value summed). Names that differ, like "- Copy", stay separate.`;
+}
+
+/** Sum of a field over rows — null when ANY row lacks it (an unknown
+ *  part makes the total unknown; never counted as 0). */
+function sumOrNull(values: readonly (number | null | undefined)[]): number | null {
+  let total = 0;
+  for (const v of values) {
+    if (v == null) return null;
+    total += v;
   }
-  return items.map((item) => {
-    if ((counts.get(normalizeRowName(item.name)) ?? 0) <= 1) return item;
-    return {
-      ...item,
-      name: `${item.name.trim()} (row ${item.fileRow})`,
-      sourceName: item.name,
-    };
-  });
+  return total;
+}
+
+/** The one value every row shares, else null (rows disagree / blank). */
+function sharedOrNull(values: readonly (string | null | undefined)[]): string | null {
+  const first = values[0] ?? null;
+  return first != null && values.every((v) => v === first) ? first : null;
+}
+
+/**
+ * Real-account fix 3 — same-name rows are ONE creative. An agency export
+ * runs the same ad (same name) in several ad sets, and breakdown exports
+ * (day / age / placement) repeat every ad once per slice; ranking each
+ * row separately split one creative's evidence into thin "(row N)"
+ * fragments. Rows whose normalized names match exactly are merged:
+ * spend, outcomes, value, impressions, clicks and reach-free counts are
+ * summed and the KPI is RECOMPUTED from the sums (Σvalue ÷ Σspend for
+ * ROAS, Σspend ÷ Σoutcomes for CPA, Σclicks ÷ Σimpressions for CTR, …) —
+ * never an average of row ratios. A part unknown on any row makes that
+ * aggregate unknown (missing ≠ zero). Frequency is dropped for merged
+ * rows (reach doesn't add across ad sets). Near-names ("- Copy") are NOT
+ * merged — exact matches only. A name on one row passes through
+ * untouched, so files without duplicates are byte-identical.
+ *
+ * Also the identity contract for the Generator's client-side preview:
+ * one ParsedAd per normalized name, `name` = the first row's trimmed
+ * name — creative groups, format confirmations and creative images all
+ * key on it.
+ */
+export function aggregateDuplicateRows(
+  rows: readonly { fileRow: number; ad: ParsedAd }[],
+  kpi: KpiKey
+): ParsedAd[] {
+  const groups = new Map<string, ParsedAd[]>();
+  for (const { ad } of rows) {
+    const key = normalizeRowName(ad.name);
+    const group = groups.get(key);
+    if (group) group.push(ad);
+    else groups.set(key, [ad]);
+  }
+  return [...groups.values()].map((group) => (group.length === 1 ? group[0] : mergeAds(group, kpi)));
+}
+
+function mergeAds(group: readonly ParsedAd[], kpi: KpiKey): ParsedAd {
+  const first = group[0];
+  const spend = group.reduce((s, a) => s + a.spend, 0);
+  const sum = (f: (a: ParsedAd) => number | null | undefined) => sumOrNull(group.map(f));
+  const impressions = sum((a) => a.impressions);
+  /* Per-row click counts — the column, else back out of CTR/CPC. */
+  const clicks = sum(
+    (a) =>
+      a.linkClicks ??
+      (kpi === "ctr" && a.kpiValue != null && a.impressions != null
+        ? (a.kpiValue * a.impressions) / 100
+        : kpi === "cpc" && a.kpiValue != null && a.kpiValue > 0
+          ? a.spend / a.kpiValue
+          : null)
+  );
+  /* Per-row outcome counts — the count column, else spend ÷ CPA. */
+  const outcomes = sum(
+    (a) =>
+      a.conversions ??
+      (a.zeroConversions ? 0 : kpi === "cpa" && a.kpiValue != null && a.kpiValue > 0 ? a.spend / a.kpiValue : null)
+  );
+  const allZero = group.every((a) => a.zeroConversions === true);
+  let kpiValue: number | null;
+  let zeroConversions = false;
+  switch (kpi) {
+    case "roas": {
+      const value = sum((a) => (a.kpiValue == null ? null : a.kpiValue * a.spend));
+      zeroConversions = allZero;
+      kpiValue = value == null || spend <= 0 ? null : value / spend;
+      break;
+    }
+    case "cpa":
+      if (outcomes == null) kpiValue = null;
+      else if (outcomes > 0) kpiValue = spend / outcomes;
+      else {
+        kpiValue = null;
+        zeroConversions = group.some((a) => a.zeroConversions === true);
+      }
+      break;
+    case "ctr":
+      kpiValue = clicks != null && impressions != null && impressions > 0 ? (clicks / impressions) * 100 : null;
+      break;
+    case "cpc":
+      kpiValue = clicks != null && clicks > 0 ? spend / clicks : null;
+      break;
+    case "purchases":
+    case "leads":
+      kpiValue = sum((a) => a.kpiValue);
+      break;
+  }
+  const vt = group.every((a) => a.viewThrough != null)
+    ? {
+        viewThrough: {
+          click: group.reduce((s, a) => s + a.viewThrough!.click, 0),
+          view: group.reduce((s, a) => s + a.viewThrough!.view, 0),
+        },
+      }
+    : {};
+  const adSets = group.map((a) => a.adSetName?.trim() || null);
+  const distinctAdSets = adSets.every((n) => n != null) ? new Set(adSets).size : null;
+  return {
+    name: first.name.trim(),
+    id: sharedOrNull(group.map((a) => a.id ?? null)),
+    spend,
+    kpiValue,
+    ...(zeroConversions ? { zeroConversions: true as const } : {}),
+    ...(first.cpaBasis ? { cpaBasis: first.cpaBasis } : {}),
+    nameTags: first.nameTags,
+    conversions: kpi === "ctr" || kpi === "cpc" ? null : allZero ? 0 : sum((a) => a.conversions),
+    ...vt,
+    impressions,
+    linkClicks: sum((a) => a.linkClicks),
+    addToCart: sum((a) => a.addToCart),
+    contentViews: sum((a) => a.contentViews),
+    cpm: impressions != null && impressions > 0 ? (spend / impressions) * 1000 : null,
+    frequency: null,
+    reach: null,
+    adSetName: sharedOrNull(adSets),
+    videoPlays3s: sum((a) => a.videoPlays3s),
+    thruPlays: sum((a) => a.thruPlays),
+    outboundClicks: sum((a) => a.outboundClicks),
+    campaignName: sharedOrNull(group.map((a) => a.campaignName?.trim() || null)),
+    rowsMerged: group.length,
+    ...(distinctAdSets != null ? { adSetCount: distinctAdSets } : {}),
+  };
 }
 
 /**
@@ -398,11 +518,7 @@ export function applyFormatOverrides(
   return ads.map((ad) => {
     // The generator's confirmation list shows trimmed names; extraction
     // keeps the raw cell — accept either so a padded cell still matches.
-    // Duplicate-named rows carry their raw name in sourceName (the
-    // display name has a "(row N)" suffix the user never typed); the
-    // one override then applies to every row sharing the name, exactly
-    // as before the Duplicate Identity fix.
-    const raw = ad.sourceName ?? ad.name;
+    const raw = ad.name;
     const format = overrides[raw] ?? overrides[raw.trim()];
     if (!format || !(format in CREATIVE_FORMAT_LABELS)) return ad;
     return { ...ad, nameTags: [format], formatConfirmed: true };

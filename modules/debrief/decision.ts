@@ -801,17 +801,22 @@ export function buildLimits(
     );
     client.push("The file didn't include ad names, so ads are shown generically.");
   }
-  /* Duplicate Identity fix: same-name rows are separate ads, labeled by
-     row number — disclosed plainly, since the export doesn't establish
-     whether they are the same creative. */
+  /* Real-account fix 3: same-name rows were merged into one creative
+     each — disclosed with how, so a reader can reconstruct the numbers. */
   if (analysis.duplicateAdNames.length > 0) {
-    const quoted = analysis.duplicateAdNames.map((n) => `"${n}"`).join(", ");
-    const plural = analysis.duplicateAdNames.length > 1;
+    const names = analysis.duplicateAdNames;
+    const shown = names.slice(0, 2).map((n) => `"${n}"`);
+    const list = names.length > 2 ? `${shown.join(", ")} and ${names.length - 2} more` : shown.join(" and ");
+    const breakdowns = analysis.mergedRows?.breakdowns ?? [];
+    const why =
+      breakdowns.length > 0
+        ? `the export is broken down by ${breakdowns.join(", ")}`
+        : "the same creative ran in several ad sets";
     buyer.push(
-      `${plural ? "Ad names" : "The ad name"} ${quoted} appear${plural ? "" : "s"} on multiple rows — each row is treated as a separate ad and labeled by its row number. The export doesn't establish whether same-name rows are the same creative.`
+      `${names.length} ad name${names.length === 1 ? "" : "s"} appeared on several rows (${why}) and ${names.length === 1 ? "was" : "were"} combined into one creative each — spend, ${outcomeNounsFor(analysis)?.many ?? "results"} and value summed, ${kpiLabelFor(analysis)} recomputed from the totals: ${list}. Near-identical names ("- Copy") are kept separate.`
     );
     client.push(
-      `Some ads in the file share the same name (${quoted}). Each row is shown separately with its row number, since the file doesn't say whether they're actually the same ad.`
+      `${names.length} ad${names.length === 1 ? "" : "s"} ran on several rows of the file and ${names.length === 1 ? "is" : "are"} shown as one creative each, with ${names.length === 1 ? "its" : "their"} results added together.`
     );
   }
   if (analysis.missingColumns.includes("Reporting date range")) {

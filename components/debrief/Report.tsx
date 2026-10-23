@@ -834,6 +834,9 @@ function AdTable({
                 <p className="break-words text-[13px] font-semibold leading-snug text-zinc-100">
                   {ad.name}
                 </p>
+                {ad.runsInLabel && (
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">{ad.runsInLabel}</p>
+                )}
                 {density === "standard" && (
                   <>
                     <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">

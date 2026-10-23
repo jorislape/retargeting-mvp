@@ -1,7 +1,7 @@
 export { parseCsv, toTable, parseNumericCell } from "./csv";
 export { resolveColumns, requiredColumnsFor, kpiReadFields, kpiSourcePreview, unusedColumns, UNUSED_COLUMNS_CAP, EXPORT_AT_AD_LEVEL, type ColumnMap, type ColumnSource } from "./columns";
 export { kpiUsability, chooseAutoKpi, preferredUsableKpi, sparseKpiWarning, KPI_ORDER, type KpiUsability } from "./kpiUsability";
-export { applyFormatOverrides, disambiguateDuplicateNames, extractAds, extractNameTags, normalizeRowName } from "./extract";
+export { aggregateDuplicateRows, applyFormatOverrides, extractAds, extractNameTags, mergedRowsNote, normalizeRowName } from "./extract";
 export { analyze, DEFAULT_SPEND_FLOOR } from "./analysis";
 export {
   buildDecision,

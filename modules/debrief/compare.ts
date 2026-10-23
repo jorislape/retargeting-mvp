@@ -69,13 +69,11 @@ export interface ComparisonFormatters {
 /* Matching                                                            */
 /* ------------------------------------------------------------------ */
 
-/* Duplicate Identity fix: key on the RAW ad-name cell (sourceName when
-   extract.ts disambiguated a duplicate-named row's display name with a
-   "(row N)" suffix). Row positions are not stable across exports, so
-   display labels must never become match keys — and duplicated raw
-   names still land in the ambiguous bucket below, exactly as before. */
-const nameKey = (ad: ParsedAd): string =>
-  (ad.sourceName ?? ad.name).trim().replace(/\s+/g, " ");
+/* Key on the ad-name cell. Same-name rows are already merged into one
+   creative by extract.ts (Real-account fix 3), so a name is unique per
+   period; a hand-built input with a repeated name still lands in the
+   ambiguous bucket below. */
+const nameKey = (ad: ParsedAd): string => ad.name.trim().replace(/\s+/g, " ");
 const idKey = (ad: ParsedAd): string | null =>
   ad.id != null && ad.id.trim() !== "" ? ad.id.trim() : null;
 
