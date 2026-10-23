@@ -5,7 +5,9 @@
  * kill-list copy counted the full pools, so a 6th below-median ad was
  * mentioned ("…and 4 more", in the spend total) and shown nowhere. Now
  * the memo carries the full pools; the report caps only the display
- * ("+N more … Show all", every row in print), TXT/Copy lists every row,
+ * ("+N more … Show all"; in print, Real-account fix 6: "+N more — see
+ * full list online / TXT" — every collapsed row still counted), TXT/Copy
+ * lists every row,
  * and the budget decision carries the full from/to list.
  */
 import assert from "node:assert/strict";
@@ -48,12 +50,14 @@ try {
   // TL;DR "others" = every other below-median ad.
   assert.ok(m.tldr.some((l) => l.includes("and 5 other below-benchmark ads")));
 
-  /* Report: no row is sliced away; collapsed rows still print; counts
+  /* Report: no row is sliced away; collapsed rows are counted in print
+     (Real-account fix 6 — a real account's PDF ran to 25 pages); counts
      and names come from the same full list. */
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
   assert.ok(!/rows\.slice\(0, topAdsShown\)/.test(report), "tables no longer drop rows");
-  assert.match(report, /i >= topAdsShown && !expanded \? "hidden print:table-row"/);
-  assert.match(report, /i >= topAdsShown && !expanded \? "hidden print:flex"/);
+  assert.match(report, /i >= topAdsShown && !expanded \? "hidden" : ""/);
+  assert.match(report, /<PrintMore count=\{expanded \? 0 : rows\.length - topAdsShown\} \/>/);
+  assert.match(report, /\+\$\{count\} more — see full list online \/ TXT/);
   assert.match(report, /<MoreToggle\s+names=\{rows\.slice\(topAdsShown\)\.map\(\(a\) => a\.name\)\}/);
   assert.match(report, /\{d\.budgetMove && <BudgetMoveNames move=\{d\.budgetMove\} client=\{client\}/);
   assert.match(report, /count: memo\.losers\.rows\.length,/);

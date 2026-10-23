@@ -33,7 +33,7 @@ import { PERFORMANCE_MODE_DEFAULTS, PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRES
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
 import { MovementChart } from "./MovementChart";
-import { middleTruncate, splitLongNames } from "./longNames";
+import { middleTruncate, NAME_PRINT_MAX, splitLongNames } from "./longNames";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -66,7 +66,8 @@ function Names({ text, terms }: { text: string; terms?: { phrase: string; tip: s
       {splitLongNames(text).map((part, i) =>
         "name" in part ? (
           <span key={i} title={part.name}>
-            &quot;{part.short}&quot;
+            &quot;<span className="print:hidden">{part.short}</span>
+            <span className="hidden print:inline">{middleTruncate(part.name, NAME_PRINT_MAX)}</span>&quot;
           </span>
         ) : (
           <Fragment key={i}>{terms ? withTerms(part.text, terms) : part.text}</Fragment>
@@ -79,19 +80,39 @@ function Names({ text, terms }: { text: string; terms?: { phrase: string; tip: s
 /* A bare ad name, middle-truncated with the full name on hover. */
 function AdName({ name }: { name: string }) {
   const short = middleTruncate(name);
-  return short === name ? <>{name}</> : <span title={name}>{short}</span>;
+  if (short === name && name.length <= NAME_PRINT_MAX) return <>{name}</>;
+  return (
+    <span title={name}>
+      <span className="print:hidden">{short}</span>
+      <span className="hidden print:inline">{middleTruncate(name, NAME_PRINT_MAX)}</span>
+    </span>
+  );
 }
 
 /* A table/list ad name: full and wrapping anywhere on screen, middle-
    truncated in print (Real-account fixes 5–6). */
 function FullAdName({ name }: { name: string }) {
-  const short = middleTruncate(name);
+  const short = middleTruncate(name, NAME_PRINT_MAX);
   if (short === name) return <>{name}</>;
   return (
     <>
       <span className="print:hidden">{name}</span>
       <span className="hidden print:inline">{short}</span>
     </>
+  );
+}
+
+/** Evidence limits printed before "+N more — see full list online / TXT"
+ *  (client: the permanent caveat plus one). */
+const PRINT_LIMITS_SHOWN = { buyer: 4, client: 2 } as const;
+
+function PrintMore({ count, inline = false }: { count: number; inline?: boolean }) {
+  if (count <= 0) return null;
+  const text = `+${count} more — see full list online / TXT`;
+  return inline ? (
+    <span className="print-only-inline"> {text}</span>
+  ) : (
+    <p className="print-only mt-2 text-xs leading-relaxed text-zinc-400">{text}</p>
   );
 }
 
@@ -446,10 +467,11 @@ function BudgetMoveNames({
       <p className="text-xs leading-relaxed text-zinc-400">
         <span className="font-medium text-zinc-300">{label}:</span>{" "}
         {ads.map((a, i) => (
-          <span key={a.name + i} className={i >= SHOWN && !expanded ? "hidden print:inline" : ""}>
+          <span key={a.name + i} className={i >= SHOWN && !expanded ? "hidden" : ""}>
             {i > 0 ? ", " : ""}&ldquo;<AdName name={a.name} />&rdquo; ({a.spendLabel})
           </span>
         ))}
+        {ads.length > SHOWN && !expanded && <PrintMore inline count={ads.length - SHOWN} />}
         {ads.length > SHOWN && (
           <span className="print-hidden">
             {" "}
@@ -542,10 +564,14 @@ function DecisionCard({
       ))}
     </ul>
   );
+  const printLimits = PRINT_LIMITS_SHOWN[client ? "client" : "buyer"];
   const limitsList = (
     <ul className="mt-2 space-y-1">
       {limits.map((line, i) => (
-        <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
+        <li
+          key={i}
+          className={`text-[12px] leading-relaxed text-zinc-500 ${i >= printLimits ? "print:hidden" : ""}`}
+        >
           <Names text={line} />
         </li>
       ))}
@@ -693,7 +719,7 @@ function DecisionCard({
         </div>
       )}
       {d.nextControlledTest && (
-        <div className="print-avoid-break mt-4">
+        <div className={`print-avoid-break mt-4 ${client ? "print:hidden" : ""}`}>
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             Next controlled test
           </p>
@@ -740,11 +766,15 @@ function DecisionCard({
             </p>
             <ul className="mt-2 space-y-1">
               {limits.map((line, i) => (
-                <li key={i} className="text-[12px] leading-relaxed text-zinc-500">
+                <li
+                  key={i}
+                  className={`text-[12px] leading-relaxed text-zinc-500 ${i >= printLimits ? "print:hidden" : ""}`}
+                >
                   <Names text={line} />
                 </li>
               ))}
             </ul>
+            <PrintMore count={limits.length - printLimits} />
           </div>
         ) : (
           <>
@@ -770,6 +800,7 @@ function DecisionCard({
                 {client ? "What we still can't conclude" : "Evidence limits"}
               </p>
               {limitsList}
+              <PrintMore count={limits.length - printLimits} />
             </div>
           </>
         ))}
@@ -777,9 +808,11 @@ function DecisionCard({
   );
 }
 
+/* Real-account fix 6 — the printed counterpart of "+N more … Show all":
+   rows past the on-screen cap stay collapsed on paper (a real account's
+   lists ran the PDF to 25 pages); the full list lives online and in TXT. */
 /* Trust Pass — "+N more: name1, name2 [Show all]" under a truncated
-   list. Screen only (print-hidden): in print/PDF every row renders, so
-   no ad the report counts is ever invisible on paper either. */
+   list. Screen only (print-hidden); print shows PrintMore instead. */
 function MoreToggle({
   names,
   expanded,
@@ -871,7 +904,7 @@ function AdTable({
             <tr
               key={ad.name + i}
               className={`border-b border-white/[0.06] transition-colors last:border-0 hover:bg-white/[0.02] ${
-                i >= topAdsShown && !expanded ? "hidden print:table-row" : ""
+                i >= topAdsShown && !expanded ? "hidden" : ""
               }`}
             >
               <td
@@ -893,7 +926,9 @@ function AdTable({
                 )}
                 {density === "standard" && (
                   <>
-                    <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
+                    {/* Real-account fix 6: per-row notes are screen/TXT
+                        only — print keeps each row to name + numbers. */}
+                    <p className="print-hidden mt-0.5 text-xs leading-relaxed text-zinc-400">
                       {ad.reason}
                     </p>
                     {ad.conversionLabel && (
@@ -902,7 +937,7 @@ function AdTable({
                       </p>
                     )}
                     {view !== "client" && ad.fewOutcomesNote && (
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
+                      <p className="print-hidden mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
                         {ad.fewOutcomesNote}
                       </p>
                     )}
@@ -911,7 +946,7 @@ function AdTable({
                 {/* Tester Feedback Fix 6 — buyer only, every density:
                     delivery context, never part of the ranking. */}
                 {view !== "client" && ad.frequencyLabel && (
-                  <p className="mt-0.5 font-mono text-[11px] leading-relaxed text-zinc-500 tabular-nums">
+                  <p className="print-hidden mt-0.5 font-mono text-[11px] leading-relaxed text-zinc-500 tabular-nums">
                     {ad.frequencyLabel}
                   </p>
                 )}
@@ -961,6 +996,7 @@ function AdTable({
         expanded={expanded}
         onToggle={() => setExpanded((v) => !v)}
       />
+      <PrintMore count={expanded ? 0 : rows.length - topAdsShown} />
     </div>
   );
 }
@@ -984,7 +1020,13 @@ function ClientAdList({
   const [expanded, setExpanded] = useState(false);
   return (
     <div>
-      <div className="divide-y divide-white/[0.06]">
+      {/* Real-account fix 6: the client PDF names its ads once, in the
+          Summary's worked / needs-improvement split; these per-section
+          lists stay on screen and in TXT. */}
+      <p className="print-only text-xs leading-relaxed text-zinc-400">
+        {rows.length} ad{rows.length === 1 ? "" : "s"} — see full list online / TXT
+      </p>
+      <div className="divide-y divide-white/[0.06] print:hidden">
         {rows.map((ad, i) => (
           <div
             key={ad.name + i}
@@ -992,7 +1034,7 @@ function ClientAdList({
               tone === "win"
                 ? "print-win border-emerald-400/70"
                 : "print-loss border-red-400/60"
-            } ${i >= topAdsShown && !expanded ? "hidden print:flex" : "flex"}`}
+            } ${i >= topAdsShown && !expanded ? "hidden" : "flex"}`}
           >
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-semibold leading-snug text-zinc-100 [overflow-wrap:anywhere]">
@@ -1279,7 +1321,7 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
    the Copy output; the recommendation logic is untouched. */
 function ClientTestCards({ tests }: { tests: MemoTest[] }) {
   return (
-    <div className="mt-5 grid gap-3 sm:grid-cols-3">
+    <div className="mt-5 grid gap-3 sm:grid-cols-3 print:grid-cols-1">
       {tests.slice(0, 3).map((test, i) => (
         <article
           key={i}
@@ -1301,23 +1343,25 @@ function ClientTestCards({ tests }: { tests: MemoTest[] }) {
               (MemoBriefReadiness.client never uses buyer vocabulary).
               Quiet, not a second headline; omitted entirely once the
               signal is fully established. */}
+          {/* Real-account fix 6: print keeps each card to its title and
+              "Success looks like" — readiness and why are screen/TXT. */}
           {test.briefReadiness && test.briefReadiness.state !== "ready" && (
-            <p className="mt-2 [overflow-wrap:anywhere] text-xs leading-relaxed text-zinc-400">
-              {test.briefReadiness.client}
+            <p className="print-hidden mt-2 [overflow-wrap:anywhere] text-xs leading-relaxed text-zinc-400">
+              <Names text={test.briefReadiness.client} />
             </p>
           )}
-          <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          <p className="print-hidden mt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             Why it&apos;s worth testing
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-            {clientizeText(test.why)}
+          <p className="print-hidden mt-1 text-xs leading-relaxed text-zinc-400">
+            <Names text={clientizeText(test.why)} />
           </p>
           <p className="mt-2.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-400 print-win">
             <CheckIcon className="h-3 w-3" />
             Success looks like
           </p>
           <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-            {clientizeText(test.winningLooksLike)}
+            <Names text={clientizeText(test.winningLooksLike)} />
           </p>
         </article>
       ))}
@@ -1410,7 +1454,10 @@ function TestRow({
             )}
           </p>
         )}
-        <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
+        {/* Real-account fix 6: print keeps each test to its title,
+            Hypothesis and Win — Why, Evidence, Setup and Signals are
+            screen/TXT only (the PDF was 25 pages on a real account). */}
+        <dl className="print-hidden mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Why{" "}
@@ -1434,7 +1481,7 @@ function TestRow({
             by construction). */}
         {view === "client" ? (
           test.briefReadiness && test.briefReadiness.state !== "ready" && (
-            <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
+            <dl className="print-hidden mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
               <div>
                 <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                   Worth knowing{" "}
@@ -1450,7 +1497,7 @@ function TestRow({
             (test.briefReadiness.state !== "ready" || test.briefReadiness.disclosureNote)) ||
           test.evidenceDiagnostic
         ) && (
-          <div className="print-accent-border mt-2.5 border-l border-white/10 pl-3">
+          <div className="print-hidden print-accent-border mt-2.5 border-l border-white/10 pl-3">
             <p className="print-kv-label text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
               Evidence
             </p>
@@ -1462,9 +1509,13 @@ function TestRow({
                       Readiness{" "}
                     </dt>
                     <dd className="print-kv-value inline [overflow-wrap:anywhere]">
-                      {test.briefReadiness.state !== "ready"
-                        ? test.briefReadiness.buyer
-                        : (test.briefReadiness.disclosureNote ?? "")}
+                      <Names
+                        text={
+                          test.briefReadiness.state !== "ready"
+                            ? test.briefReadiness.buyer
+                            : (test.briefReadiness.disclosureNote ?? "")
+                        }
+                      />
                     </dd>
                   </div>
                 )}
@@ -1474,7 +1525,7 @@ function TestRow({
                     Diagnostic{" "}
                   </dt>
                   <dd className="print-kv-value inline [overflow-wrap:anywhere]">
-                    {test.evidenceDiagnostic.buyer}
+                    <Names text={test.evidenceDiagnostic.buyer} />
                   </dd>
                 </div>
               )}
@@ -1514,7 +1565,7 @@ function TestRow({
         >
           {setupExpanded ? "Hide setup details" : "Show setup details"}
         </button>
-        <div id={setupDetailsId} className={`print-force-block ${setupExpanded ? "block" : "hidden"}`}>
+        <div id={setupDetailsId} className={`print-hidden ${setupExpanded ? "block" : "hidden"}`}>
           <dl className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-zinc-400">
             <div>
               <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
@@ -2196,7 +2247,9 @@ export function Report({
           />
         )}
 
-        {sections.executiveSummary && <ExecutiveSummary memo={memo} view={view} />}
+        {/* Real-account fix 6: the client PDF opens on its own "What this
+            means" box, which this print-only summary would repeat. */}
+        {sections.executiveSummary && !client && <ExecutiveSummary memo={memo} view={view} />}
 
         {/* ---- Verdict / Summary ---- */}
         {sections.verdict && (
@@ -2256,7 +2309,10 @@ export function Report({
 
         {/* Main analytical proof layer: the exact visible judged rows below,
             placed after the committed decision/evidence and before detail. */}
+        {/* Real-account fix 6: the client PDF names its ads once (the
+            Summary split); the chart stays on screen. */}
         {customization.showRankingChart && (
+          <div className={client ? "print:hidden" : undefined}>
           <PerformanceRankingChart
             winners={sections.winners ? memo.winners.slice(0, customization.topAdsShown) : []}
             losers={sections.underperformers ? memo.losers.rows.slice(0, customization.topAdsShown) : []}
@@ -2265,6 +2321,7 @@ export function Report({
             view={view}
             density={customization.density}
           />
+          </div>
         )}
 
         {/* Spend Allocation V1 — complements Performance Ranking (which
@@ -2316,7 +2373,10 @@ export function Report({
             section renumbers): the median ad is neither. Shown whenever
             either neighbouring section is. Print follows the DOM. ---- */}
         {memo.atMedian && (sections.winners || sections.underperformers) && (
-          <section className="animate-rise mt-12" aria-label={client ? "The middle ad" : "At the median"}>
+          <section
+            className={`animate-rise mt-12 ${client ? "print:hidden" : ""}`}
+            aria-label={client ? "The middle ad" : "At the median"}
+          >
             <AtMedianRows atMedian={memo.atMedian} client={client} density={customization.density} />
           </section>
         )}
@@ -2439,8 +2499,9 @@ export function Report({
           />
           {client ? (
             <>
+              {/* Print-hidden: client cards don't print the readiness line. */}
               {memo.nextTests.some((t) => t.briefReadiness) && (
-                <p className="mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
+                <p className="print-hidden mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
                   <span className="font-medium text-zinc-300">Ready for a creative brief?</span>{" "}
                   {CLIENT_BRIEF_LEGEND}
                 </p>

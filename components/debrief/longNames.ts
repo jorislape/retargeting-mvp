@@ -14,6 +14,10 @@
 /** Names longer than this are middle-truncated in running text. */
 export const NAME_DISPLAY_MAX = 60;
 
+/** Tighter cap for print/PDF (Real-account fix 6): a page is narrower
+ *  than a screen and every extra line costs paper. */
+export const NAME_PRINT_MAX = 40;
+
 /** "start…end", exactly `max` characters (60% head, 40% tail). Names
  *  at or under `max` come back unchanged. */
 export function middleTruncate(name: string, max: number = NAME_DISPLAY_MAX): string {

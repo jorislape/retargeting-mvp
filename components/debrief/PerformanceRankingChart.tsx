@@ -1,4 +1,5 @@
 import type { MemoWinnerLoserRow } from "@/modules/debrief";
+import { middleTruncate, NAME_DISPLAY_MAX, NAME_PRINT_MAX } from "./longNames";
 import type { Density } from "@/components/report/reportCustomization";
 import { clientizeText, type ReportView } from "./memoToText";
 import {
@@ -88,8 +89,14 @@ export function PerformanceRankingChart({
           return (
             <li key={`${chartRow.row.name}-${index}`} className="print-avoid-break min-w-0">
               <p className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-0.5 text-[12px] leading-snug">
-                <span className="min-w-0 break-words font-medium text-zinc-200">
-                  {chartRow.row.name}
+                {/* Real-account fix 5: long agency names middle-truncated,
+                    full name on hover. */}
+                <span
+                  className="min-w-0 font-medium text-zinc-200 [overflow-wrap:anywhere]"
+                  title={chartRow.row.name.length > NAME_DISPLAY_MAX ? chartRow.row.name : undefined}
+                >
+                  <span className="print:hidden">{middleTruncate(chartRow.row.name)}</span>
+                  <span className="hidden print:inline">{middleTruncate(chartRow.row.name, NAME_PRINT_MAX)}</span>
                 </span>
                 <span className="flex shrink-0 items-baseline gap-x-2">
                   <span className="font-mono font-semibold tabular-nums text-zinc-100">

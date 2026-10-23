@@ -67,7 +67,9 @@ const wrapperAndAfter = testRowSrc.slice(wrapperIdx);
 /* ===== 3. Screen-hidden by default ===== */
 {
   assert.match(testRowSrc, /const \[setupExpanded, setSetupExpanded\] = useState\(false\)/, "setupExpanded initializes to false (collapsed)");
-  const wrapperDivMatch = wrapperAndAfter.match(/<div id=\{setupDetailsId\} className=\{`print-force-block \$\{setupExpanded \? "block" : "hidden"\}`\}>/);
+  /* Real-account fix 6: Setup/Signals are screen/TXT only — the PDF
+     keeps each test to its title, Hypothesis and Win. */
+  const wrapperDivMatch = wrapperAndAfter.match(/<div id=\{setupDetailsId\} className=\{`print-hidden \$\{setupExpanded \? "block" : "hidden"\}`\}>/);
   assert.ok(wrapperDivMatch, "wrapper className renders 'hidden' when setupExpanded is false, 'block' when true — same state driving both");
   console.log("nextTestsProgressiveDisclosure: 3. collapsed by default, driven by the same setupExpanded state");
 }

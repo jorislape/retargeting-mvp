@@ -193,6 +193,12 @@ body {
   display: none;
 }
 
+/* Inline variant (Real-account fix 6: "+N more — see full list online
+   / TXT" at the end of an inline name list). */
+.print-only-inline {
+  display: none;
+}
+
 /* Keeps one logical unit (a stat block, a test card, a summary
    callout) from splitting across a page boundary — the difference
    between a designed document and a webpage dumped to paper. Applied
@@ -213,6 +219,9 @@ body {
   }
   .print-only {
     display: block !important;
+  }
+  .print-only-inline {
+    display: inline !important;
   }
   /* Next Tests Setup/Signals Progressive Disclosure V1 — the inverse
      problem from .print-hidden/.print-only above: content that stays
