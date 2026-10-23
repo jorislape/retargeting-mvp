@@ -31,8 +31,11 @@ assert.ok(!/online/i.test(report.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").repla
 assert.equal((report.match(/<PrintMore count=\{expanded \? 0 : rows\.length - Math\.min\(topAdsShown, PRINT_TABLE_ROWS\)\} \/>/g) ?? []).length, 1, "ad table");
 assert.match(report, /const PRINT_TABLE_ROWS = 3;/, "tables print their top 3 rows");
 assert.match(report, /i >= PRINT_TABLE_ROWS && !expanded \? "print:hidden" : ""/);
-assert.match(report, /const PRINT_CRITERIA_SHOWN = 5;/, "decision bars: first 5 + every user criterion");
-assert.match(report, /criterionPrinted\(criterion, i\) \? "" : "print:hidden"/);
+/* Real-account review: decision bars print only when they changed the
+   call (decision.ts marks them `decisive`) or the user set them. */
+assert.match(report, /const criterionPrinted = \(c: Memo\["decision"\]\["appliedCriteria"\]\[number\]\) =>\s*c\.decisive === true \|\| c\.source === "user";/);
+assert.match(report, /criterionPrinted\(criterion\) \? "" : "print:hidden"/);
+assert.ok(!report.includes("PRINT_CRITERIA_SHOWN"), "no positional cap on bars");
 assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline count=\{ads\.length - SHOWN\} inAppendix=\{!client\} \/>\}/, "Pause / Receives lists");
 
 /* ---- The appendix: what print collapses, listed on the last page(s) ---- */
@@ -49,14 +52,16 @@ assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline co
   for (const col of [/r\.spendLabel/, /r\.conversionLabel\?\.replace/, /r\.valueLabel/]) assert.match(app, col);
   // Exactly the rest of what the body collapses — the same predicates.
   assert.match(app, /const moreLimits = .*\.slice\(PRINT_LIMITS_SHOWN\[client \? "client" : "buyer"\]\)/);
-  assert.match(app, /d\.appliedCriteria\.filter\(\(c, i\) => !criterionPrinted\(c, i\)\)/);
+  assert.match(app, /d\.appliedCriteria\.filter\(\(c\) => !criterionPrinted\(c\)\)/);
   assert.match(app, /k\.rows\.filter\(\(_, ri\) => !namingRowPrinted\(ki, ri\)\)/);
   assert.match(report, /className=\{`border-b border-white\/\[0\.06\] last:border-0 \$\{namingRowPrinted\(ki, ri\) \? "" : "print:hidden"\}`\}/);
   // Buyer only lists every ad; the client PDF stays top-performers-only.
   assert.match(report, /<PrintAppendix\s+memo=\{memo\}\s+view=\{view\}\s+showAds=\{!client && \(sections\.winners \|\| sections\.underperformers\)\}\s+showNaming=\{sections\.patterns && !client\}/);
   assert.ok(report.indexOf("<PrintAppendix") > report.indexOf("</footer>"), "after the sign-off");
-  assert.match(app, /className=\{`print-only \$\{rows\.length > 0 \? "print-appendix" : "mt-3"\}`\}/);
-  assert.match(css, /\.print-appendix \{\s*break-before: page;\s*\}/, "the ads appendix starts its own page");
+  /* Flows on after the sign-off: a forced page break cost a real
+     account a whole extra page. */
+  assert.match(app, /className=\{`print-only \$\{rows\.length > 0 \? "mt-6 border-t border-white\/\[0\.08\] pt-1" : "mt-3"\}`\}/);
+  assert.ok(!/break-before: page/.test(css), "no forced page break");
 }
 assert.match(css, /\.print-only-inline \{\s*display: none;\s*\}/);
 assert.match(css, /\.print-only-inline \{\s*display: inline !important;\s*\}/);
@@ -84,7 +89,7 @@ const adTable = between("function AdTable(", "function ClientAdList(");
 assert.match(adTable, /<p className="print-hidden mt-0\.5 text-xs leading-relaxed text-zinc-400">\s*\{ad\.reason\}/);
 
 /* ---- Limits: capped in print (4 buyer, 2 client) ---- */
-assert.match(report, /const PRINT_LIMITS_SHOWN = \{ buyer: 4, client: 2 \} as const;/);
+assert.match(report, /const PRINT_LIMITS_SHOWN = \{ buyer: 2, client: 2 \} as const;/, "first 2 limits on paper");
 assert.match(report, /\{limitsList\}\s*<PrintMore count=\{limits\.length - printLimits\} \/>/);
 
 /* ---- Client PDF names its ads once ---- */
@@ -102,13 +107,13 @@ assert.match(report, /\{sections\.executiveSummary && !client && <ExecutiveSumma
 }
 assert.match(report, /<div className=\{client \? "print:hidden" : undefined\}>\s*<PerformanceRankingChart/);
 
-/* ---- Patterns by naming (on by default with tokens): capped in print ---- */
-assert.match(report, /const PRINT_NAMING_KEYS = 2;\s*const PRINT_NAMING_ROWS = 3;/);
+/* ---- Patterns by naming (on by default with tokens): every key, top 4 values ---- */
+assert.match(report, /const PRINT_NAMING_ROWS = 4;\s*const namingRowPrinted = \(_ki: number, ri: number\) => ri < PRINT_NAMING_ROWS;/);
 const naming = between("function NamingPatternsTable(", "/* Trust Pass");
-assert.match(naming, /ki >= PRINT_NAMING_KEYS \? "print:hidden" : ""/);
+assert.ok(!report.includes("PRINT_NAMING_KEYS"), "no key is hidden in print");
+assert.match(naming, /<div key=\{k\.key\} className="print-avoid-break min-w-0 overflow-x-auto">/);
 assert.match(naming, /namingRowPrinted\(ki, ri\) \? "" : "print:hidden"/);
 assert.match(naming, /<PrintMore count=\{k\.rows\.length - PRINT_NAMING_ROWS\} \/>/);
-assert.match(naming, /<PrintMore count=\{np\.keys\.length - PRINT_NAMING_KEYS\} \/>/);
 assert.match(report, /sm:grid-cols-2 \$\{memo\.namingPatterns \? "print:hidden" : ""\}/, "share lists screen-only beside the table");
 
 console.log("real-account print: all assertions passed");

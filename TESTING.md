@@ -331,9 +331,11 @@ Run `scripts/fixtures/agency-naming-convention.csv` (ROAS).
 - [ ] **PDF length**: Print / Save PDF (A4). Buyer ≤ 7 pages, client ≤ 4
       (Chromium: 7 / 4 on the fixture and on a real 341-ad account, which
       started at 25 / 15). Collapsed lists print "+N more — full list in the
-      appendix" (ad tables print their top 3 rows). The buyer appendix starts
-      on its own page: every judged ad once (name ≤50 chars, role, spend,
-      outcomes, KPI), then any collapsed limits / decision bars / naming
+      appendix" (ad tables print their top 3 rows). Buyer print shows every
+      naming key (top 4 values each), only the decision bars that changed
+      the call plus your own, and the first 2 evidence limits. The buyer
+      appendix follows the sign-off: every judged ad once (name ≤50 chars,
+      role, spend, outcomes, KPI), then the collapsed limits / bars / naming
       values; the client appendix carries only collapsed limits. Names are middle-truncated (~40 chars); each test
       prints only its title, Hypothesis and Win (client: title + Success);
       the client PDF names ads once, in the Summary split. Repeat in

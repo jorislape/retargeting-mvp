@@ -105,19 +105,18 @@ function FullAdName({ name }: { name: string }) {
 /** Ad-table rows printed before "+N more" (unless expanded on screen). */
 const PRINT_TABLE_ROWS = 3;
 
-/** Decision bars printed before "+N more" (user criteria always print). */
-const PRINT_CRITERIA_SHOWN = 5;
-
 /** Evidence limits printed before "+N more — full list in the appendix"
- *  (client: the permanent caveat plus one). */
-const PRINT_LIMITS_SHOWN = { buyer: 4, client: 2 } as const;
+ *  (buyer: the first two; client: the permanent caveat plus one). */
+const PRINT_LIMITS_SHOWN = { buyer: 2, client: 2 } as const;
 
 /* Real-account review: a PDF has no "online" version — whatever print
    collapses is listed in the print-only appendix on the last page(s).
    These predicates are the ONE definition of what the body prints, so
    the appendix lists exactly the rest. */
-const criterionPrinted = (c: Memo["decision"]["appliedCriteria"][number], i: number) =>
-  i < PRINT_CRITERIA_SHOWN || c.source === "user";
+/** Decision bars on paper: the ones that changed the call, and every
+ *  bar the user set. */
+const criterionPrinted = (c: Memo["decision"]["appliedCriteria"][number]) =>
+  c.decisive === true || c.source === "user";
 
 /** `inAppendix` false: the client PDF never lists every ad, so its
  *  collapsed name lists just count what's left. */
@@ -565,10 +564,10 @@ function DecisionCard({
       {d.appliedCriteria.map((criterion, i) => (
         <li
           key={i}
-          /* Fix 6: print keeps the first PRINT_CRITERIA_SHOWN bars and
-             every user criterion; the rest are in the appendix. */
+          /* Real-account review: print keeps the bars that changed the
+             call and every user criterion; the rest are in the appendix. */
           className={`flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500 ${
-            criterionPrinted(criterion, i) ? "" : "print:hidden"
+            criterionPrinted(criterion) ? "" : "print:hidden"
           }`}
         >
           <span
@@ -720,7 +719,7 @@ function DecisionCard({
             </p>
             {appliedCriteriaList}
             <PrintMore
-              count={d.appliedCriteria.filter((c, i) => !criterionPrinted(c, i)).length}
+              count={d.appliedCriteria.filter((c) => !criterionPrinted(c)).length}
             />
           </div>
         </>
@@ -838,10 +837,10 @@ function DecisionCard({
 /* Real-account fix 8 — "Patterns by naming": one compact table per
    naming key (spend, outcomes, blended KPI per value). Buyer only, inside
    Patterns; descriptive, never a cause. */
-/** Naming keys / values per key printed before "+N more" (fix 6). */
-const PRINT_NAMING_KEYS = 2;
-const PRINT_NAMING_ROWS = 3;
-const namingRowPrinted = (ki: number, ri: number) => ki < PRINT_NAMING_KEYS && ri < PRINT_NAMING_ROWS;
+/** Real-account review: print shows every naming key — the table is
+ *  the agency's own vocabulary — with its top values by the KPI. */
+const PRINT_NAMING_ROWS = 4;
+const namingRowPrinted = (_ki: number, ri: number) => ri < PRINT_NAMING_ROWS;
 
 function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }) {
   const th = "py-1.5 pr-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400";
@@ -851,13 +850,10 @@ function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }
       <p className="mt-1.5 max-w-3xl text-xs leading-relaxed text-zinc-400">{np.intro}</p>
       <p className="mt-1 text-xs font-medium text-zinc-300">{np.coverageLine}</p>
       <div className="mt-3 grid gap-x-8 gap-y-5 sm:grid-cols-2">
-        {/* Real-account fix 6 applies here too: print keeps the first
-            PRINT_NAMING_KEYS keys and PRINT_NAMING_ROWS values each. */}
+        {/* Print keeps every key and its top PRINT_NAMING_ROWS values;
+            the rest are in the appendix. */}
         {np.keys.map((k, ki) => (
-          <div
-            key={k.key}
-            className={`print-avoid-break min-w-0 overflow-x-auto ${ki >= PRINT_NAMING_KEYS ? "print:hidden" : ""}`}
-          >
+          <div key={k.key} className="print-avoid-break min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left">
@@ -889,7 +885,6 @@ function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }
           </div>
         ))}
       </div>
-      <PrintMore count={np.keys.length - PRINT_NAMING_KEYS} />
       <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">{np.caveat}</p>
     </div>
   );
@@ -1090,7 +1085,8 @@ const APPENDIX_NAME_MAX = 50;
 
 /* Real-account review — the print-only appendix. Buyer: one compact
    table of every judged ad (name, spend, outcomes, KPI) grouped by the
-   role the report gives it, on its own page. Then whatever else print
+   role the report gives it, right after the sign-off (a forced page
+   break cost a whole page on a real account). Then whatever else print
    collapsed above (evidence limits, decision bars, naming values). The
    client PDF never lists every ad (top performers only), so its
    appendix carries only the collapsed limits. Restates memo fields. */
@@ -1128,7 +1124,7 @@ function PrintAppendix({
     : null;
   const kpiHeader = client ? memo.scope.kpiLabelClient ?? memo.scope.kpiLabel : memo.scope.kpiLabel;
   const moreLimits = (client ? d.limits.client : d.limits.buyer).slice(PRINT_LIMITS_SHOWN[client ? "client" : "buyer"]);
-  const bars = client ? [] : d.appliedCriteria.filter((c, i) => !criterionPrinted(c, i));
+  const bars = client ? [] : d.appliedCriteria.filter((c) => !criterionPrinted(c));
   const naming =
     showNaming && memo.namingPatterns
       ? memo.namingPatterns.keys.flatMap((k, ki) =>
@@ -1138,10 +1134,10 @@ function PrintAppendix({
   if (rows.length === 0 && moreLimits.length === 0 && bars.length === 0 && naming.length === 0) return null;
 
   const th = "py-0.5 pr-2 text-left text-[8px] font-semibold uppercase tracking-[0.06em] text-zinc-400";
-  const td = "py-px pr-2 align-top font-mono text-[8px] leading-tight tabular-nums text-zinc-400";
-  const head = "print-section-label mt-3 mb-1 text-[9px] font-bold uppercase tracking-[0.08em]";
+  const td = "py-0 pr-2 align-top font-mono text-[8px] leading-[10px] tabular-nums text-zinc-400";
+  const head = "print-section-label print-heading mt-3 mb-1 text-[9px] font-bold uppercase tracking-[0.08em]";
   return (
-    <section aria-label="Appendix" className={`print-only ${rows.length > 0 ? "print-appendix" : "mt-3"}`}>
+    <section aria-label="Appendix" className={`print-only ${rows.length > 0 ? "mt-6 border-t border-white/[0.08] pt-1" : "mt-3"}`}>
       <p className={head}>Appendix{rows.length > 0 ? ` — all ${rows.length} judged ads` : ""}</p>
       {rows.length > 0 && (
         <table className="w-full">

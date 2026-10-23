@@ -223,10 +223,6 @@ body {
   .print-only-inline {
     display: inline !important;
   }
-  /* The appendix (Report.tsx PrintAppendix) starts on its own page. */
-  .print-appendix {
-    break-before: page;
-  }
   /* Next Tests Setup/Signals Progressive Disclosure V1 — the inverse
      problem from .print-hidden/.print-only above: content that stays
      in the DOM at all times and is hidden on SCREEN only via a plain

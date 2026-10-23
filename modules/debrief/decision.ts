@@ -1080,7 +1080,59 @@ function withMaterialActionVerificationGuardrail(limits: {
   };
 }
 
-export function buildDecision(
+/* Real-account review — which of Debrief's default bars CHANGED the
+   call (the print card shows only these plus the user's own bars; the
+   rest go to the appendix). Read from the committed decision, never a
+   second eligibility rule:
+     insufficient-data hold → minimum spend + minimum sample;
+     flat hold              → flat-field band;
+     budget move            → budget-move bar (receivers) / cut bar
+                              (trim side) / receiver floor when it
+                              passed over an ad that cleared the bar;
+     test                   → the bar that withheld the budget move
+                              (receiver floor, else budget-move bar) and
+                              the cut bar when ads sit below the median. */
+type BarKey = "gate" | "sample" | "move" | "floor" | "cut" | "flat";
+const BAR_KEYS = new WeakMap<AppliedCriterion, BarKey>();
+const bar = (key: BarKey, c: AppliedCriterion): AppliedCriterion => {
+  BAR_KEYS.set(c, key);
+  return c;
+};
+
+function decisiveBars(d: MemoDecision, analysis: AnalysisResult, criteria?: DecisionCriteria): Set<BarKey> {
+  const floorExcluded = analysis.winners.some(
+    (w) => w.deltaPct != null && w.deltaPct >= SCALE_TEST_MIN_DELTA_PCT && !passesReceiverFloor(w, analysis, criteria)
+  );
+  if (d.action === "hold") {
+    if (d.holdReason === "insufficient_data") return new Set(["gate", "sample"]);
+    if (d.holdReason === "flat_performance") return new Set(["flat"]);
+    return new Set();
+  }
+  if (d.action === "budget") {
+    const keys = new Set<BarKey>();
+    if ((d.budgetMove?.to.length ?? 0) > 0) keys.add("move");
+    if ((d.budgetMove?.from.length ?? 0) > 0) keys.add("cut");
+    if (floorExcluded && !isProxyWithOutcome(analysis)) keys.add("floor");
+    return keys;
+  }
+  const keys = new Set<BarKey>([floorExcluded ? "floor" : "move"]);
+  if (analysis.belowBenchmarkCount > 0) keys.add("cut");
+  return keys;
+}
+
+export function buildDecision(...args: Parameters<typeof decide>): MemoDecision {
+  const d = decide(...args);
+  const keys = decisiveBars(d, args[0], args[5]);
+  return {
+    ...d,
+    appliedCriteria: d.appliedCriteria.map((c) => {
+      const key = BAR_KEYS.get(c);
+      return key != null && keys.has(key) ? { ...c, decisive: true as const } : c;
+    }),
+  };
+}
+
+function decide(
   analysis: AnalysisResult,
   firstTestTitle: string | null,
   money: MoneyFormatter,
@@ -1398,14 +1450,14 @@ export function buildDecision(
      call, each with provenance. Always built — Debrief's defaults are
      labeled as Debrief's rules, never presented as universal truth. ---- */
   const appliedCriteria: AppliedCriterion[] = [
-    {
+    bar("gate", {
       label: userGate
         ? `Minimum spend to judge: ${gateLabel} per ad — your criterion`
         : analysis.spendGateBasis === "target_cpa"
           ? `Minimum spend to judge: ${gateLabel} per ad (3× your target CPA) — Debrief default rule`
           : `Minimum spend to judge: ${gateLabel} per ad — Debrief default: ${spendGateSource(analysis, money).buyer}`,
       source: userGate ? "user" : "debrief_default",
-    },
+    }),
     ...(analysis.outcomeFloor
       ? [
           {
@@ -1414,26 +1466,26 @@ export function buildDecision(
           },
         ]
       : []),
-    {
+    bar("sample", {
       label: `Minimum sample: ≥${DECISION_MIN_JUDGED} judged ads before any call — Debrief default`,
       source: "debrief_default",
-    },
-    {
+    }),
+    bar("move", {
       label: `Budget-move bar: an ad receiving budget is ≥${SCALE_TEST_MIN_DELTA_PCT}% better than the median — Debrief default`,
       source: "debrief_default",
-    },
-    {
+    }),
+    bar("floor", {
       label: `Receiver floor: ${nouns != null && minOutcome == null ? `≥${receiverMin} ${nouns.many} and ` : ""}≥ ${receiverSpendLabel} spent (${RECEIVER_SPEND_WORDS}) before an ad receives budget; up to ${MAX_BUDGET_RECEIVERS} receivers — Debrief default`,
       source: "debrief_default",
-    },
-    {
+    }),
+    bar("cut", {
       label: `Cut bar: worst ad ≥${SCALE_TEST_MIN_DELTA_PCT}% behind and ≥${CUT_MIN_SPEND_SHARE_PCT}% of judged spend below the median — Debrief default`,
       source: "debrief_default",
-    },
-    {
+    }),
+    bar("flat", {
       label: `Flat-field band: every judged ad within ±${FLAT_FIELD_DELTA_PCT}% of the median reads as noise, not signal — Debrief default`,
       source: "debrief_default",
-    },
+    }),
     ...(minOutcome != null && nouns != null
       ? [
           {

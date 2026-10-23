@@ -23,7 +23,7 @@ import {
 const AGENCY = readFileSync(join(ROOT, "scripts/fixtures/agency-naming-convention.csv"), "utf8");
 const THIN_LEADER = "[SKU]00229_";
 
-const { run, cleanup } = loadEngine();
+const { run, buildSampleMemo, cleanup } = loadEngine();
 try {
   /* ---- The fixture reproduces the real failure: a thin leader ---- */
   const r = run(AGENCY, "roas");
@@ -167,6 +167,27 @@ try {
     assert.ok(
       u.memo.decision.appliedCriteria.some((c) => c.label.startsWith("Scaling minimum: ≥35 purchases") && c.source === "user")
     );
+  }
+
+  /* ---- Real-account review: which default bars changed the call ----
+     The print card shows only these (plus the user's own bars). */
+  {
+    const H = "Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n";
+    const decisive = (m: { decision: { appliedCriteria: { label: string; decisive?: true; source: string }[] } }) =>
+      m.decision.appliedCriteria.filter((c) => c.decisive).map((c) => c.label.split(":")[0]);
+    assert.deepEqual(decisive(r.memo), ["Budget-move bar", "Receiver floor", "Cut bar"], "shift that passed over the leader");
+    assert.deepEqual(decisive(buildSampleMemo()), ["Budget-move bar", "Cut bar"], "plain shift");
+    const few = run(H + ["A,400,20,1600", "B,400,20,800", "C,30,1,40"].join("\n") + "\n", "roas").memo;
+    assert.equal(few.decision.holdReason, "insufficient_data");
+    assert.deepEqual(decisive(few), ["Minimum spend to judge", "Minimum sample"]);
+    const flat = run(H + ["A,400,20,820", "B,400,20,800", "C,400,20,800", "D,400,20,790", "E,400,20,780", "F,400,20,800"].join("\n") + "\n", "roas").memo;
+    assert.equal(flat.decision.holdReason, "flat_performance");
+    assert.deepEqual(decisive(flat), ["Flat-field band"]);
+    const neither = run(H + ["Thin,200,6,2000", "A,400,20,800", "B,400,20,800", "C,400,20,780", "D,400,20,760", "E,400,18,700", "F,400,18,690"].join("\n") + "\n", "roas").memo;
+    assert.equal(neither.decision.action, "test");
+    assert.deepEqual(decisive(neither), ["Receiver floor", "Cut bar"], "the floor withheld the move; the cut bar withheld the trim");
+    const u = run(AGENCY, "roas", { minOutcomeCount: 35 }).memo;
+    assert.ok(u.decision.appliedCriteria.every((c) => c.source !== "user" || c.decisive === undefined), "user bars print anyway — never flagged");
   }
 
   console.log("real-account receivers: all assertions passed");

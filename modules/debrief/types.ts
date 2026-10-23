@@ -262,6 +262,10 @@ export interface DecisionCriteria {
 export interface AppliedCriterion {
   label: string;
   source: "debrief_default" | "user";
+  /** Real-account review — set (true) only on a Debrief default bar
+   *  that changed the committed call (decision.ts decisiveBars). The
+   *  print card shows these plus every user bar; display only. */
+  decisive?: true;
 }
 
 /** Context the user fills in alongside the CSV — never stored. */
