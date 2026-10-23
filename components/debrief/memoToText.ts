@@ -554,6 +554,7 @@ export function memoToText(
     if (np) {
       lines.push("PATTERNS BY NAMING");
       lines.push(np.intro);
+      lines.push(np.coverageLine);
       for (const k of np.keys) {
         lines.push(`${k.key}:`);
         for (const r of k.rows) {

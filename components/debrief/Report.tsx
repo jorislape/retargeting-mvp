@@ -29,7 +29,7 @@ import { PERFORMANCE_SECTIONS, PERFORMANCE_SECTION_IDS } from "@/components/repo
 import { accentCssVars, getAccentById } from "@/components/report/reportCustomization";
 import { useReportCustomization } from "@/components/report/useReportCustomization";
 import { ReportCustomizationPanel } from "@/components/report/ReportCustomizationPanel";
-import { PERFORMANCE_MODE_DEFAULTS, PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS } from "./reportPresets";
+import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS, performanceModeDefaultsFor } from "./reportPresets";
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
 import { MovementChart } from "./MovementChart";
@@ -814,15 +814,25 @@ function DecisionCard({
 /* Real-account fix 8 — "Patterns by naming": one compact table per
    naming key (spend, outcomes, blended KPI per value). Buyer only, inside
    Patterns; descriptive, never a cause. */
+/** Naming keys / values per key printed before "+N more" (fix 6). */
+const PRINT_NAMING_KEYS = 2;
+const PRINT_NAMING_ROWS = 3;
+
 function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }) {
   const th = "py-1.5 pr-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400";
   return (
     <div className="mt-8">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-300">Patterns by naming</p>
       <p className="mt-1.5 max-w-3xl text-xs leading-relaxed text-zinc-400">{np.intro}</p>
+      <p className="mt-1 text-xs font-medium text-zinc-300">{np.coverageLine}</p>
       <div className="mt-3 grid gap-x-8 gap-y-5 sm:grid-cols-2">
-        {np.keys.map((k) => (
-          <div key={k.key} className="print-avoid-break min-w-0 overflow-x-auto">
+        {/* Real-account fix 6 applies here too: print keeps the first
+            PRINT_NAMING_KEYS keys and PRINT_NAMING_ROWS values each. */}
+        {np.keys.map((k, ki) => (
+          <div
+            key={k.key}
+            className={`print-avoid-break min-w-0 overflow-x-auto ${ki >= PRINT_NAMING_KEYS ? "print:hidden" : ""}`}
+          >
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left">
@@ -833,8 +843,11 @@ function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }
                 </tr>
               </thead>
               <tbody>
-                {k.rows.map((r) => (
-                  <tr key={r.value} className="border-b border-white/[0.06] last:border-0">
+                {k.rows.map((r, ri) => (
+                  <tr
+                    key={r.value}
+                    className={`border-b border-white/[0.06] last:border-0 ${ri >= PRINT_NAMING_ROWS ? "print:hidden" : ""}`}
+                  >
                     <td className="py-1.5 pr-3 text-[13px] font-medium text-zinc-200 [overflow-wrap:anywhere]">
                       {r.value} <span className="font-normal text-zinc-500">· {r.ads}</span>
                     </td>
@@ -847,9 +860,11 @@ function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }
                 ))}
               </tbody>
             </table>
+            <PrintMore count={k.rows.length - PRINT_NAMING_ROWS} />
           </div>
         ))}
       </div>
+      <PrintMore count={np.keys.length - PRINT_NAMING_KEYS} />
       <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">{np.caveat}</p>
     </div>
   );
@@ -1790,10 +1805,13 @@ export function Report({
      customization.mode rather than tracked separately — one source of
      truth, translated at this single boundary so nothing downstream
      needs to know customization exists. */
+  /* Real-account fix 8: naming tokens turn Buyer's Patterns on by
+     default. Read once at mount, like every other default. */
+  const [modeDefaults] = useState(() => performanceModeDefaultsFor(memo.namingPatterns != null));
   const customizationActions = useReportCustomization(
     PERFORMANCE_SECTION_IDS,
     PERFORMANCE_PRESETS,
-    PERFORMANCE_MODE_DEFAULTS
+    modeDefaults
   );
   const { customization } = customizationActions;
   const [panelOpen, setPanelOpen] = useState(false);
@@ -2489,7 +2507,9 @@ export function Report({
             style={stagger(staggerFor(sectionNumbers.patterns))}
           >
             <SectionHead n={sectionNumbers.patterns!} title="Patterns" />
-            <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            {/* With naming patterns these lists mostly point at the table
+                below — screen only then, to keep the PDF short (fix 6). */}
+            <div className={`mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 ${memo.namingPatterns ? "print:hidden" : ""}`}>
               {(
                 [
                   ["What winners share", memo.patterns.winners, "text-emerald-400", "print-win"],

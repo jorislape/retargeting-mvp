@@ -137,6 +137,21 @@ export const PERFORMANCE_MODE_DEFAULTS: ModeDefaults<PerformanceSectionId> = {
   client: PERFORMANCE_PRESETS.client,
 };
 
+/** Real-account fix 8 follow-up: when the memo carries "Patterns by
+ *  naming", the Buyer register opens with Patterns ON — the per-token
+ *  table is the most useful pattern read an agency account has. Same
+ *  object otherwise (no naming patterns ⇒ PERFORMANCE_MODE_DEFAULTS
+ *  itself, so every existing report is unchanged). Client never shows
+ *  Patterns. */
+export function performanceModeDefaultsFor(hasNamingPatterns: boolean): ModeDefaults<PerformanceSectionId> {
+  if (!hasNamingPatterns) return PERFORMANCE_MODE_DEFAULTS;
+  const internal = PERFORMANCE_MODE_DEFAULTS.internal!;
+  return {
+    ...PERFORMANCE_MODE_DEFAULTS,
+    internal: { ...internal, sections: { ...internal.sections, patterns: true } },
+  };
+}
+
 export const PRESET_LABELS: Record<Exclude<PresetId, "custom">, string> = {
   buyer: "Buyer analysis",
   client: "Client summary",

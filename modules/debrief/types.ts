@@ -323,8 +323,10 @@ export interface DebriefContext extends DecisionInputContext {
 
 /** Real-account fix 8 — the memo's formatted "Patterns by naming". */
 export interface MemoNamingPatterns {
-  /** "28 of 30 judged ads use [KEY]VALUE name tokens …" */
+  /** "28 of 30 ads use [KEY]VALUE name tokens …" */
   intro: string;
+  /** "Covers 64% of judged spend." */
+  coverageLine: string;
   /** Fixed caveat: per-value results are associations, not causes. */
   caveat: string;
   kpiLabel: string;
@@ -352,8 +354,10 @@ export interface NamingPatternRow {
  *  action. */
 export interface NamingPatterns {
   basis: "tokens" | "segments";
-  /** Judged ads whose names follow the convention, of all judged. */
-  coverage: { matched: number; judged: number };
+  /** Ads following the convention, of `total` (all analyzed ads for
+   *  tokens; judged ads for the "_" layout), and the share of judged
+   *  spend on them (0–1). */
+  coverage: { matched: number; total: number; judgedSpendShare: number };
   minSpend: number;
   keys: { key: string; rows: NamingPatternRow[] }[];
 }

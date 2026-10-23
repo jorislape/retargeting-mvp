@@ -15,9 +15,13 @@
 import { computeAccountKpi } from "./accountKpi.ts";
 import { HIGHER_IS_BETTER, type KpiKey, type NamingPatternRow, type NamingPatterns, type ParsedAd } from "./types.ts";
 
-/** Share of judged ads that must carry tokens (or share a segment
- *  layout) before names are read as a convention. */
+/** Share of ALL analyzed ads that must carry tokens (judged ads, for
+ *  the "_" layout fallback) before names are read as a convention. */
 export const NAMING_MIN_SHARE = 0.5;
+/** …or the share of JUDGED SPEND on tokened ads: an account whose newer
+ *  low-spend ads are tokened but whose big spenders aren't still has its
+ *  money described (a real export: 75% of ads tokened, 42% of judged). */
+export const NAMING_MIN_JUDGED_SPEND_SHARE = 0.3;
 /** A value is listed only with at least this multiple of the minimum
  *  spend behind it — less is too thin to compare. */
 export const NAMING_MIN_GATE_MULTIPLE = 2;
@@ -74,9 +78,11 @@ function keysFor(
 }
 
 /**
- * null unless ≥ NAMING_MIN_SHARE of the judged ads follow a naming
- * convention: `[KEY]VALUE` tokens, else (only if consistent) one shared
- * "_" layout of ≥ MIN_SEGMENTS parts. Rows aggregate EVERY analyzed ad
+ * null unless the names follow a convention: `[KEY]VALUE` tokens on ≥
+ * NAMING_MIN_SHARE of all ads OR on ads holding ≥
+ * NAMING_MIN_JUDGED_SPEND_SHARE of judged spend; else (only if
+ * consistent) one "_" layout of ≥ MIN_SEGMENTS parts shared by ≥
+ * NAMING_MIN_SHARE of the judged ads. Rows aggregate EVERY analyzed ad
  * carrying the value (set-aside ads too — spend-weighted, so thin ads
  * barely move it) and are listed only with ≥ NAMING_MIN_GATE_MULTIPLE ×
  * the minimum spend; a key needs ≥2 such values to say anything.
@@ -93,9 +99,15 @@ export function detectNamingPatterns(
   const labels = new Map<string, Record<string, string>>();
   let basis: NamingPatterns["basis"] = "tokens";
   for (const ad of ads) labels.set(ad.name, parseNameTokens(ad.name));
-  let matched = judged.filter((a) => Object.keys(labels.get(a.name)!).length > 0).length;
+  const tokened = (a: ParsedAd) => Object.keys(labels.get(a.name) ?? {}).length > 0;
+  const judgedSpend = judged.reduce((s, a) => s + a.spend, 0);
+  const spendShare = (match: (a: ParsedAd) => boolean) =>
+    judgedSpend > 0 ? judged.filter(match).reduce((s, a) => s + a.spend, 0) / judgedSpend : 0;
+  let matched = ads.filter(tokened).length;
+  let total = ads.length;
+  let judgedSpendShare = spendShare(tokened);
 
-  if (matched < NAMING_MIN_SHARE * judged.length) {
+  if (matched < NAMING_MIN_SHARE * total && judgedSpendShare < NAMING_MIN_JUDGED_SPEND_SHARE) {
     // Fallback: a consistent "_" layout, read positionally.
     const parts = (a: ParsedAd) => clean(a.name).split("_").map((p) => p.trim());
     const counts = new Map<number, number>();
@@ -104,6 +116,8 @@ export function detectNamingPatterns(
     if (layout < MIN_SEGMENTS || n < NAMING_MIN_SHARE * judged.length) return null;
     basis = "segments";
     matched = n;
+    total = judged.length;
+    judgedSpendShare = spendShare((a) => parts(a).length === layout);
     for (const ad of ads) {
       const p = parts(ad);
       labels.set(
@@ -142,5 +156,5 @@ export function detectNamingPatterns(
     if (keys.length >= MAX_KEYS) break;
   }
   if (keys.length === 0) return null;
-  return { basis, coverage: { matched, judged: judged.length }, minSpend, keys };
+  return { basis, coverage: { matched, total, judgedSpendShare }, minSpend, keys };
 }

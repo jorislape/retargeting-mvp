@@ -4,7 +4,9 @@
  * A real agency export encoded format/angle/hook/stage in "[KEY]VALUE"
  * name tokens, yet Patterns said "No clear ad-name pattern". Proves:
  * tokens are parsed ("- Copy" stripped, empty values dropped); the table
- * appears only when ≥50% of judged ads carry tokens; [FOR]/[AN]/[HK]/
+ * appears when ≥50% of ALL ads OR ads holding ≥30% of judged spend carry
+ * tokens, with a "Covers X% of judged spend" line, and then turns the
+ * Buyer view's Patterns section on by default; [FOR]/[AN]/[HK]/
  * [STG] come first; each row is spend / purchases / blended ROAS over
  * every ad with the value, and only values with ≥2× the minimum spend
  * are listed; "_" segments are a fallback only for a consistent ≥4-part
@@ -34,7 +36,10 @@ try {
   const n = r.analysis.namingPatterns;
   assert.ok(n, "fixture: ≥50% of judged ads carry tokens");
   assert.equal(n!.basis, "tokens");
-  assert.ok(n!.coverage.matched / n!.coverage.judged >= 0.5);
+  assert.equal(n!.coverage.total, r.analysis.adsAnalyzed, "token share is over all ads");
+  const judgedSpend = r.analysis.rankedAds.reduce((s, a) => s + a.spend, 0);
+  const tokSpend = r.analysis.rankedAds.filter((a) => Object.keys(parseNameTokens(a.name)).length > 0).reduce((s, a) => s + a.spend, 0);
+  assert.ok(Math.abs(n!.coverage.judgedSpendShare - tokSpend / judgedSpend) < 1e-9);
   assert.deepEqual(n!.keys.slice(0, 4).map((k) => k.key), ["FOR", "AN", "HK", "STG"], "preferred keys first");
   assert.ok(!n!.keys.some((k) => ["SKU", "DTE", "PLT", "AUD"].includes(k.key)), "ID-like and single-value keys skipped");
 
@@ -57,7 +62,9 @@ try {
 
   /* ---- Memo, TXT, copy replacements ---- */
   const np = r.memo.namingPatterns!;
-  assert.match(np.intro, /^\d+ of \d+ judged ads use \[KEY\]VALUE name tokens\./);
+  assert.match(np.intro, /^\d+ of \d+ ads use \[KEY\]VALUE name tokens\./);
+  assert.equal(np.coverageLine, `Covers ${Math.round((tokSpend / judgedSpend) * 100)}% of judged spend.`);
+  assert.ok(r.buyerText.includes(`\n${np.coverageLine}\n`), "coverage line in TXT");
   assert.equal(np.keys[0].key, "[FOR]");
   assert.match(r.buyerText, /\nPATTERNS BY NAMING\n/);
   assert.match(r.buyerText, /\n\[FOR\]:\n- \w+ \| \d+ ads \| [\d.,]+ EUR \| \d+ purchases \| [\d.]+x ROAS\n/);
@@ -88,11 +95,23 @@ try {
   assert.equal(u.memo.decision.action, r.memo.decision.action);
   assert.equal(u.analysis.median, r.analysis.median);
 
-  /* ---- Below 50% of judged ads tokened ⇒ nothing ---- */
+  /* ---- Under 50% of ads AND under 30% of judged spend ⇒ nothing ---- */
   {
     const rows = ["[FOR]UGC_[AN]A,400,20,1200", "Plain_B,400,20,1000", "Plain_C,400,20,900", "Plain_D,400,20,800", "Plain_E,400,20,700"];
     const t = run("Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" + rows.join("\n") + "\n", "roas");
-    assert.equal(t.analysis.namingPatterns, undefined);
+    assert.equal(t.analysis.namingPatterns, undefined, "1/5 ads, 20% of judged spend");
+  }
+  /* ---- Under 50% of ads but ≥30% of judged spend ⇒ shown ---- */
+  {
+    const rows = [
+      "[FOR]UGC_[AN]QUAL,900,45,4000", "[FOR]IMG_[AN]EASE,900,40,2700",
+      "Plain_B,300,15,900", "Plain_C,300,15,800", "Plain_D,300,15,700", "Plain_E,300,15,650",
+    ];
+    const t = run("Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" + rows.join("\n") + "\n", "roas");
+    const tn = t.analysis.namingPatterns;
+    assert.ok(tn, "2/6 ads tokened but 60% of judged spend");
+    assert.equal(tn!.coverage.matched, 2);
+    assert.equal(t.memo.namingPatterns!.coverageLine, "Covers 60% of judged spend.");
   }
   /* ---- "_" fallback: only a consistent ≥4-part layout ---- */
   {
@@ -102,6 +121,14 @@ try {
     assert.deepEqual(t.analysis.namingPatterns?.keys.map((k) => k.key), ["Part 1", "Part 2", "Part 3"], "single-value Part 4 skipped");
   }
   assert.equal(run(ECOM, "roas").analysis.namingPatterns, undefined, "3-part names are prose, not a layout");
+  /* ---- Buyer Patterns default: on with naming patterns, unchanged otherwise ---- */
+  const presetsSrc = readFileSync(join(ROOT, "components/debrief/reportPresets.ts"), "utf8");
+  assert.match(presetsSrc, /if \(!hasNamingPatterns\) return PERFORMANCE_MODE_DEFAULTS;/, "no tokens ⇒ the exact existing defaults");
+  assert.match(presetsSrc, /internal: \{ \.\.\.internal, sections: \{ \.\.\.internal\.sections, patterns: true \} \}/);
+  assert.match(report, /useState\(\(\) => performanceModeDefaultsFor\(memo\.namingPatterns != null\)\)/);
+  assert.match(report, /useReportCustomization\(\s*PERFORMANCE_SECTION_IDS,\s*PERFORMANCE_PRESETS,\s*modeDefaults\s*\)/);
+  assert.match(report, /\{np\.coverageLine\}/);
+
   const sample = buildSampleMemo();
   assert.equal(sample.namingPatterns, undefined, "sample untouched");
   assert.ok(!memoToText(sample, "buyer", 5, []).includes("PATTERNS BY NAMING"));

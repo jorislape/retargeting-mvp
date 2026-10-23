@@ -61,4 +61,13 @@ assert.match(between("function ClientAdList(", "function AtMedianRows("), /ad\{r
 assert.match(report, /\{sections\.executiveSummary && !client && <ExecutiveSummary/);
 assert.match(report, /<div className=\{client \? "print:hidden" : undefined\}>\s*<PerformanceRankingChart/);
 
+/* ---- Patterns by naming (on by default with tokens): capped in print ---- */
+assert.match(report, /const PRINT_NAMING_KEYS = 2;\s*const PRINT_NAMING_ROWS = 3;/);
+const naming = between("function NamingPatternsTable(", "/* Trust Pass");
+assert.match(naming, /ki >= PRINT_NAMING_KEYS \? "print:hidden" : ""/);
+assert.match(naming, /ri >= PRINT_NAMING_ROWS \? "print:hidden" : ""/);
+assert.match(naming, /<PrintMore count=\{k\.rows\.length - PRINT_NAMING_ROWS\} \/>/);
+assert.match(naming, /<PrintMore count=\{np\.keys\.length - PRINT_NAMING_KEYS\} \/>/);
+assert.match(report, /sm:grid-cols-2 \$\{memo\.namingPatterns \? "print:hidden" : ""\}/, "share lists screen-only beside the table");
+
 console.log("real-account print: all assertions passed");
