@@ -478,13 +478,14 @@ function BudgetMoveNames({
   const [expanded, setExpanded] = useState(false);
   const SHOWN = 2;
   const variant = budgetVariantLabel;
-  const line = (label: string, ads: { name: string; spendLabel: string }[]) =>
+  const line = (label: string, ads: { name: string; spendLabel: string; note?: { buyer: string; client: string } }[]) =>
     ads.length === 0 ? null : (
       <p className="text-xs leading-relaxed text-zinc-400">
         <span className="font-medium text-zinc-300">{label}:</span>{" "}
         {ads.map((a, i) => (
           <span key={a.name + i} className={i >= SHOWN && !expanded ? "hidden" : ""}>
-            {i > 0 ? ", " : ""}&ldquo;<AdName name={a.name} />&rdquo; ({a.spendLabel})
+            {i > 0 ? ", " : ""}&ldquo;<AdName name={a.name} />&rdquo; ({a.spendLabel}
+            {a.note ? <span className="text-amber-300/80"> — {client ? a.note.client : a.note.buyer}</span> : null})
           </span>
         ))}
         {ads.length > SHOWN && !expanded && <PrintMore inline count={ads.length - SHOWN} inAppendix={!client} />}
@@ -625,6 +626,13 @@ function DecisionCard({
         <Names text={client ? d.clientHeadline : d.headline} />
       </p>
       {d.budgetMove && <BudgetMoveNames move={d.budgetMove} client={client} budgetVariantLabel={d.budgetVariant} />}
+      {/* Real-account review: a top trim candidate may still be
+          profitable — ask for the breakeven that makes the list profit-based. */}
+      {d.trimTargetHint && (
+        <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
+          {client ? d.trimTargetHint.client : d.trimTargetHint.buyer}
+        </p>
+      )}
       {/* Trust Pass 4 — a budget move was withheld because this KPI is a
           proxy/count and the export can judge results: one click re-runs
           the same file on the outcome KPI (same style as the existing
@@ -1043,6 +1051,12 @@ function AdTable({
                     {view === "client" ? ad.lowIntentNote.client : ad.lowIntentNote.buyer}
                   </p>
                 )}
+                {/* Real-account review: below median ≠ unprofitable. */}
+                {ad.trimNote && (
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
+                    {view === "client" ? ad.trimNote.client : ad.trimNote.buyer}
+                  </p>
+                )}
               </td>
               <td className="py-3 pr-4 text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
                 {ad.valueLabel}
@@ -1270,6 +1284,9 @@ function ClientAdList({
               )}
               {ad.lowIntentNote && (
                 <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">{ad.lowIntentNote.client}</p>
+              )}
+              {ad.trimNote && (
+                <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">{ad.trimNote.client}</p>
               )}
             </div>
             <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">

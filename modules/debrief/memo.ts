@@ -272,6 +272,65 @@ function vsTargetFor(ad: RankedAd, analysis: AnalysisResult, context: DebriefCon
   return { vsTarget: beatsTarget(ad, analysis, target) ? "beats" : "misses" };
 }
 
+/** Real-account review — a below-median ROAS at or above
+ *  min(PROFITABLE_ROAS_FLOOR, PROFITABLE_MEDIAN_SHARE × median) may still
+ *  be profitable: without a target its trim row says so. Rules of thumb
+ *  for a caution note, never a ranking or decision input. */
+export const PROFITABLE_ROAS_FLOOR = 1.5;
+export const PROFITABLE_MEDIAN_SHARE = 0.5;
+
+function trimNoteFor(
+  ad: RankedAd,
+  analysis: AnalysisResult,
+  context: DebriefContext
+): { trimNote?: NonNullable<MemoWinnerLoserRow["trimNote"]> } {
+  const target = targetFor(analysis, context);
+  if (target != null) {
+    if (!beatsTarget(ad, analysis, target)) return {};
+    const label = analysis.kpi === "roas" ? "above target" : "beats your target CPA";
+    return {
+      trimNote: {
+        buyer: `${label.charAt(0).toUpperCase()}${label.slice(1)} — reduce, don't pause.`,
+        client: "Still beats your target — we'll reduce its budget rather than pause it.",
+        short: { buyer: `${label} — reduce, don't pause`, client: "beats your target — reducing, not pausing" },
+      },
+    };
+  }
+  if (analysis.kpi !== "roas" || analysis.median == null || ad.kpiValue == null || ad.zeroConversions) return {};
+  if (ad.kpiValue < Math.min(PROFITABLE_ROAS_FLOOR, PROFITABLE_MEDIAN_SHARE * analysis.median)) return {};
+  return {
+    trimNote: {
+      buyer: "Below median, not necessarily unprofitable — check against your breakeven ROAS before cutting.",
+      client: "Below the middle ad, but not necessarily losing money — worth checking against your break-even point before pausing.",
+      short: { buyer: "below median, not necessarily unprofitable", client: "below average, not necessarily losing money" },
+    },
+  };
+}
+
+/** Copies each Pause / trim ad's trimNote (short form) onto the card's
+ *  list and, with no target set, adds the target hint when one of the
+ *  first three may still be profitable. The decision itself is untouched
+ *  — same action, same ads, same order. */
+function withTrimNotes(d: MemoDecision, analysis: AnalysisResult, context: DebriefContext): MemoDecision {
+  if (!d.budgetMove || d.budgetMove.from.length === 0) return d;
+  const byName = new Map(analysis.losers.map((a) => [a.name, a]));
+  const from = d.budgetMove.from.map((f) => {
+    const ad = byName.get(f.name);
+    const note = ad ? trimNoteFor(ad, analysis, context).trimNote : undefined;
+    return note ? { ...f, note: note.short } : f;
+  });
+  const hint =
+    targetFor(analysis, context) == null && from.slice(0, 3).some((f) => f.note)
+      ? {
+          trimTargetHint: {
+            buyer: "Set a target ROAS (your breakeven) for a profit-based trim list.",
+            client: "Telling us your break-even return would let us separate ads that lose money from ones that are just below average.",
+          },
+        }
+      : {};
+  return { ...d, budgetMove: { ...d.budgetMove, from }, ...hint };
+}
+
 /** Tester Feedback Fix 6: frequency at or above this gets a buyer-only
  *  "possible fatigue" note. A practitioner rule of thumb, NOT a
  *  measured threshold — one export can't show a fatigue trend, which
@@ -2110,7 +2169,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
   // Built BEFORE the verdict lines (TLDR Coherence fix): buildTldr and
   // buildClientSummary read the committed decision so their imperatives
   // can never contradict the Next-move card.
-  const decision = buildDecision(
+  const decision = withTrimNotes(buildDecision(
       analysis,
       nextTests[0]?.test ?? null,
       (v) => fmtMoney(v, currency),
@@ -2130,7 +2189,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       // the framing context above, this MAY withhold a scale/shift
       // move — see DecisionCriteria in types.ts.
       criteria
-  );
+  ), analysis, context);
 
   return {
     decision,
@@ -2232,7 +2291,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     leadingConversion: buildLeadingConversion(analysis),
     losers: {
       /* Real-account review: listed by money at stake, not by KPI. */
-      rows: trimOrder(analysis).map((ad) => buildRow(ad, analysis, context)),
+      rows: trimOrder(analysis).map((ad) => ({ ...buildRow(ad, analysis, context), ...trimNoteFor(ad, analysis, context) })),
       /* Losers Coherence fix (same contract as buildTldr): the cut
          imperative is voiced ONLY when the committed decision actually
          contains a cut (budgetVariant "cut" or "shift"). Scale-only,

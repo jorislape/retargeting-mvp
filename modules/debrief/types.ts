@@ -753,6 +753,13 @@ export interface MemoWinnerLoserRow {
    *  FREQUENCY_FATIGUE_NOTE_AT — "Frequency 5.1 — possible fatigue;
    *  check the trend in Ads Manager." Never changes action/evidence. */
   fatigueNote?: string;
+  /** Real-account review — below-median rows only: "below median" isn't
+   *  "unprofitable". No target: present when the ROAS is ≥
+   *  min(PROFITABLE_ROAS_FLOOR, PROFITABLE_MEDIAN_SHARE × median); with a
+   *  target: present when the ad beats it ("reduce, don't pause").
+   *  `short` is the Pause / trim list form. Display only — never the
+   *  ranking or the action. */
+  trimNote?: { buyer: string; client: string; short: { buyer: string; client: string } };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1178,13 +1185,18 @@ export interface MemoDecision {
    *  TXT and PDF show. Names restate already-ranked facts — nothing new
    *  is decided here. */
   budgetMove?: {
-    from: { name: string; spendLabel: string }[];
+    /** note: the row's trimNote short form (memo.ts), when it has one. */
+    from: { name: string; spendLabel: string; note?: { buyer: string; client: string } }[];
     to: { name: string; spendLabel: string }[];
     /** Trust Pass 3d — analysis.belowBenchmarkSpend, formatted: "about
      *  $X currently on below-median ads". Shift/cut only (a scale-only
      *  move takes from no one). */
     belowSpendLabel?: string;
   };
+  /** Real-account review — present only when no target is set and a
+   *  top-3 Pause / trim ad may still be profitable (trimNote). One line
+   *  on the card; copy only. */
+  trimTargetHint?: { buyer: string; client: string };
   headline: string;
   /** Jargon-free counterpart — no "kill/gate/benchmark/median/judged". */
   clientHeadline: string;

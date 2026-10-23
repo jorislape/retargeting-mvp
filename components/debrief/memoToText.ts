@@ -309,14 +309,17 @@ export function memoToText(
   lines.push(view === "client" ? d.clientHeadline : d.headline);
   /* Trust Pass: every ad the budget move names, in full. */
   if (d.budgetMove) {
-    const list = (ads: { name: string; spendLabel: string }[]) =>
-      ads.map((a) => `"${a.name}" (${a.spendLabel})`).join(", ");
+    const list = (ads: { name: string; spendLabel: string; note?: { buyer: string; client: string } }[]) =>
+      ads
+        .map((a) => `"${a.name}" (${a.spendLabel}${a.note ? ` — ${view === "client" ? a.note.client : a.note.buyer}` : ""})`)
+        .join(", ");
     if (d.budgetMove.from.length > 0)
       lines.push(`${view === "client" ? "Pausing or reducing" : "Pause or trim"}: ${list(d.budgetMove.from)}`);
     if (d.budgetMove.to.length > 0)
       lines.push(
         `${view === "client" ? "Getting more budget" : d.budgetVariant === "scale" ? "Gets more budget" : "Receives the budget"}: ${list(d.budgetMove.to)}`
       );
+    if (d.trimTargetHint) lines.push(view === "client" ? d.trimTargetHint.client : d.trimTargetHint.buyer);
     if (d.budgetMove.belowSpendLabel)
       lines.push(
         view === "client"
@@ -470,8 +473,8 @@ export function memoToText(
     const buyer = view !== "client";
     const freq = buyer && r.frequencyLabel ? ` | ${r.frequencyLabel}` : "";
     const notes = buyer
-      ? [r.fewOutcomesNote, r.fatigueNote, r.viewThroughNote?.buyer, r.lowIntentNote?.buyer].filter(Boolean).map((n) => ` ${n}`).join("")
-      : [r.viewThroughNote?.client, r.lowIntentNote?.client].filter(Boolean).map((n) => ` ${n}`).join("");
+      ? [r.fewOutcomesNote, r.fatigueNote, r.viewThroughNote?.buyer, r.lowIntentNote?.buyer, r.trimNote?.buyer].filter(Boolean).map((n) => ` ${n}`).join("")
+      : [r.viewThroughNote?.client, r.lowIntentNote?.client, r.trimNote?.client].filter(Boolean).map((n) => ` ${n}`).join("");
     const target = r.vsTarget
       ? ` | ${r.vsTarget === "beats" ? (buyer ? "✓ beats target" : "✓ beats your target") : buyer ? "✗ misses target" : "✗ below your target"}`
       : "";
