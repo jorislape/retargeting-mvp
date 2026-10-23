@@ -292,14 +292,63 @@ export function passesReceiverFloor(
  * brief-readiness badge.
  */
 export function budgetReceivers(analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd[] {
-  return analysis.winners
-    .filter(
-      (a) =>
-        a.deltaPct != null &&
-        a.deltaPct >= SCALE_TEST_MIN_DELTA_PCT &&
-        passesReceiverFloor(a, analysis, criteria)
-    )
-    .slice(0, MAX_BUDGET_RECEIVERS);
+  return byEvidence(qualifyingReceivers(analysis, criteria), analysis, criteria).slice(0, MAX_BUDGET_RECEIVERS);
+}
+
+/** Every winner past the scale bar (raw KPI) AND the receiver floor, KPI order. */
+function qualifyingReceivers(analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd[] {
+  return analysis.winners.filter(
+    (a) => a.deltaPct != null && a.deltaPct >= SCALE_TEST_MIN_DELTA_PCT && passesReceiverFloor(a, analysis, criteria)
+  );
+}
+
+/** Real-account review: k in the evidence adjustment, as a multiple of
+ *  the purchase floor (10 by default ⇒ k = 20). */
+export const EVIDENCE_ADJUST_FLOOR_MULTIPLE = 2;
+
+/**
+ * Evidence-adjusted ROAS: the ad's ROAS shrunk toward the median by its
+ * purchase volume — (purchases × ROAS + k × median) ÷ (purchases + k),
+ * k = EVIDENCE_ADJUST_FLOOR_MULTIPLE × the purchase floor. A 4.83x on
+ * 110 purchases outranks a 7.02x on 18. ROAS only, and only with a
+ * verifiable count; null otherwise. Orders receivers and the above-median
+ * table — never eligibility (the 30% bar stays on raw ROAS).
+ */
+export function evidenceAdjustedKpi(
+  ad: Pick<RankedAd, "conversions" | "kpiValue">,
+  analysis: AnalysisResult,
+  criteria?: DecisionCriteria
+): number | null {
+  if (analysis.kpi !== "roas" || analysis.median == null || ad.conversions == null || ad.kpiValue == null) return null;
+  const k = EVIDENCE_ADJUST_FLOOR_MULTIPLE * receiverOutcomeMin(criteria);
+  return (ad.conversions * ad.kpiValue + k * analysis.median) / (ad.conversions + k);
+}
+
+/** Ads ordered by evidence-adjusted ROAS (best first; ties keep KPI
+ *  order) — unchanged order unless EVERY ad has an adjusted value. */
+export function byEvidence(ads: readonly RankedAd[], analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd[] {
+  const adj = ads.map((a) => evidenceAdjustedKpi(a, analysis, criteria));
+  if (adj.some((v) => v == null)) return [...ads];
+  return ads
+    .map((ad, i) => ({ ad, i, v: adj[i] as number }))
+    .sort((a, b) => b.v - a.v || a.i - b.i)
+    .map((x) => x.ad);
+}
+
+/** True when the evidence adjustment changed who receives budget, or
+ *  in what order, versus raw KPI order. */
+export function evidenceReordersReceivers(analysis: AnalysisResult, criteria?: DecisionCriteria): boolean {
+  const raw = qualifyingReceivers(analysis, criteria).slice(0, MAX_BUDGET_RECEIVERS);
+  const adj = budgetReceivers(analysis, criteria);
+  return raw.some((a, i) => adj[i] !== a);
+}
+
+/** Why the raw leader isn't the ad the memo builds on: under the
+ *  receiver floor, or outranked once purchase volume is weighed. */
+export function passedOverReason(analysis: AnalysisResult, criteria?: DecisionCriteria): "floor" | "evidence" | null {
+  const top = passedOverLeader(analysis, criteria);
+  if (top == null) return null;
+  return passesReceiverFloor(top, analysis, criteria) ? "evidence" : "floor";
 }
 
 /**
@@ -1306,6 +1355,17 @@ function decide(
     );
     criteriaClient.push(
       `The minimum of ${minOutcome} ${nouns.many} you set couldn't be checked — this export doesn't include ${nouns.one} counts — so it wasn't applied.`
+    );
+  }
+  /* Real-account review: say how receivers were ranked whenever the
+     evidence adjustment changed who receives budget, or in what order. */
+  if (scaleEligible && !proxyHeld && evidenceReordersReceivers(analysis, criteria) && analysis.median != null) {
+    const k = EVIDENCE_ADJUST_FLOOR_MULTIPLE * receiverMin;
+    criteriaBuyer.push(
+      `Receivers are ranked by evidence-adjusted ROAS — ads with few purchases are pulled toward the median: (purchases × ROAS + ${k} × median) ÷ (purchases + ${k}). Each still clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar on raw ROAS.`
+    );
+    criteriaClient.push(
+      "Ads with more sales behind them count for more when choosing where budget goes — a high return on a handful of sales is pulled toward the typical result."
     );
   }
   if (rawScaleEligible && !proxyHeld && topBelowFloor && lead != null && top != null) {

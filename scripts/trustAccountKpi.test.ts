@@ -84,8 +84,8 @@ try {
   assert.deepEqual(tgt.memo.scope.targetSummary, { targetLabel: "≥ 3.00x", beat: 5, judged: 13 });
   assert.match(tgt.buyerText, /Target ROAS ≥ 3\.00x: 5 of 13 judged ads beat your target\./);
   assert.match(tgt.clientText, /Your target \(ROAS ≥ 3\.00x\): 5 of 13 ads with enough spend to compare beat it\./);
-  assert.match(tgt.buyerText, /- Hero_UGC_A \| 5\.00x \(100% better than median\) \| ✓ beats target/);
-  assert.match(tgt.buyerText, /- Unbox_F \| 2\.71x \([^)]*\) \| ✗ misses target/);
+  assert.match(tgt.buyerText, /- Hero_UGC_A \| 5\.00x · adj\. 3\.94x \(100% better than median\) \| ✓ beats target/);
+  assert.match(tgt.buyerText, /- Unbox_F \| 2\.71x(?: · adj\. [\d.]+x)? \([^)]*\) \| ✗ misses target/);
   assert.match(tgt.buyerText, /\nWINNERS\n/, "with a target, the sections are winners/losers");
   assert.ok([...tgt.memo.winners, ...tgt.memo.losers.rows].every((r) => r.vsTarget != null));
   assert.deepEqual(tgt.memo.decision, ecom.memo.decision, "target ROAS changes nothing in the decision");

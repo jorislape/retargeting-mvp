@@ -18,6 +18,10 @@ import {
   SHORT_WINDOW_DAYS,
   spendGateSource,
   trimOrder,
+  byEvidence,
+  evidenceAdjustedKpi,
+  passedOverReason,
+  passesReceiverFloor,
   zeroThinCopy,
 } from "./decision";
 import {
@@ -305,6 +309,13 @@ function trimNoteFor(
       short: { buyer: "below median, not necessarily unprofitable", client: "below average, not necessarily losing money" },
     },
   };
+}
+
+/** The buyer view's "adj." value: ROAS shrunk toward the median by
+ *  purchase volume (decision.ts evidenceAdjustedKpi). ROAS only. */
+function adjFor(ad: RankedAd, analysis: AnalysisResult, criteria: DecisionCriteria): { adjValueLabel?: string } {
+  const v = evidenceAdjustedKpi(ad, analysis, criteria);
+  return v == null ? {} : { adjValueLabel: fmtKpiValue(v, analysis.kpi, analysis.currency) };
 }
 
 /** Copies each Pause / trim ad's trimNote (short form) onto the card's
@@ -930,6 +941,16 @@ function buildNextTests(
      a watch note on T1. */
   const top = proxyConflict ? null : evidenceLead(analysis, criteria);
   const passedOver = proxyConflict ? null : passedOverLeader(analysis, criteria);
+  /* Real-account review: the leader is passed over either for failing
+     the receiver floor or for ranking lower once purchases are weighed. */
+  const rawFirstReceiver = analysis.winners.find(
+    (w) => w.deltaPct != null && w.deltaPct >= SCALE_TEST_MIN_DELTA_PCT && passesReceiverFloor(w, analysis, criteria)
+  );
+  /* True also when the leader failed the floor but the evidence
+     adjustment (not raw ROAS) then picked the base among the rest. */
+  const overByEvidence =
+    passedOver != null && (passedOverReason(analysis, criteria) === "evidence" || (rawFirstReceiver != null && rawFirstReceiver !== top));
+  const leadBasis = overByEvidence ? "the strongest evidence-adjusted result" : "the strongest result that clears the receiver floor";
   const worstCandidate = losers[0] ?? null; // losers arrive sorted worst-first
   const worst =
     worstCandidate && outcome && outcome.aboveMedian.includes(worstCandidate.name) ? null : worstCandidate;
@@ -1015,14 +1036,14 @@ function buildNextTests(
       : "";
   const topSignal = top
     ? passedOver
-      ? `"${top.name}" runs at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend${topConversions} — the strongest ad that clears the receiver floor.`
+      ? `"${top.name}" runs at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend${topConversions} — ${overByEvidence ? "the strongest evidence-adjusted result" : "the strongest ad that clears the receiver floor"}.`
       : `"${top.name}" leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend.`
     : null;
   /* The passed-over leader: a watch note on T1 only, never its base. */
   const watchNote = passedOver
     ? ` Watch: "${passedOver.name}" leads at ${fmtKpiValue(passedOver.kpiValue as number, kpi, currency)} ${kpiLabel} but on ${fmtMoney(passedOver.spend, currency)}${
         outcomeNouns && passedOver.conversions != null ? ` and ${fmtCount(passedOver.conversions)} ${passedOver.conversions === 1 ? outcomeNouns.one : outcomeNouns.many}` : ""
-      } — under the receiver floor, so it isn't the base for this test.`
+      } — ${passedOverReason(analysis, criteria) === "evidence" ? "fewer purchases pull it below the receivers once results are evidence-adjusted" : "under the receiver floor"}, so it isn't the base for this test.`
     : "";
   const zeroMany = outcomeNouns?.many ?? "conversions";
   const worstSignal = worst
@@ -1174,7 +1195,7 @@ function buildNextTests(
       setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the ${openingUnit(top.name)} between variants.`,
       winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
       signals,
-      hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" ${passedOver ? "already runs at" : "already leads this dataset at"} ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend${passedOver ? `${topConversions}, the strongest result that clears the receiver floor` : ""}.`,
+      hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" ${passedOver ? "already runs at" : "already leads this dataset at"} ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend${passedOver ? `${topConversions}, ${leadBasis}` : ""}.`,
       briefReadiness: winnerReadiness ?? undefined,
       evidenceDiagnostic: evidenceDiagnostic ?? undefined,
       brief: {
@@ -2286,7 +2307,12 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     },
     tldr: buildTldr(analysis, decision),
     clientSummary: buildClientSummary(analysis, decision),
-    winners: analysis.winners.map((ad) => buildRow(ad, analysis, context)),
+    /* Real-account review: ranked by evidence-adjusted ROAS (raw ROAS
+       stays the row's value; "adj." beside it in the buyer view). */
+    winners: byEvidence(analysis.winners, analysis, criteria).map((ad) => ({
+      ...buildRow(ad, analysis, context),
+      ...adjFor(ad, analysis, criteria),
+    })),
     ...buildAtMedian(analysis, context),
     leadingConversion: buildLeadingConversion(analysis),
     losers: {

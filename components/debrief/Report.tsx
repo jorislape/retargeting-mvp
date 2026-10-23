@@ -453,6 +453,8 @@ const TIP_JUDGED = "Ads that had enough spend to judge fairly.";
 const TIP_MEDIAN = "The account's midpoint result.";
 const TIP_JUDGED_SPEND = "The budget that's had a fair chance to perform.";
 const TIP_BELOW_BENCHMARK = "Performing below the middle ad (the median).";
+const TIP_ADJ =
+  "Evidence-adjusted ROAS — ads with few purchases are pulled toward the median: (purchases × ROAS + k × median) ÷ (purchases + k), k = 2× the purchase floor (20 by default). This table and the budget receivers are ranked by it; the 30% bar still reads raw ROAS.";
 const TIP_BRIEF_READINESS =
   "Whether this winner has enough results behind it to build the next creative brief on.";
 const TIP_DECISION_BARS =
@@ -959,6 +961,9 @@ function AdTable({
   const [expanded, setExpanded] = useState(false);
   /* Trust Pass 2: the extra column exists only when a target is set. */
   const hasTarget = rows.some((r) => r.vsTarget != null);
+  /* Real-account review: the evidence-adjusted ROAS the above-median
+     table (and the receivers) are ranked by. Buyer view only. */
+  const hasAdj = view !== "client" && rows.some((r) => r.adjValueLabel != null);
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[540px] text-sm">
@@ -973,6 +978,11 @@ function AdTable({
             <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Value
             </th>
+            {hasAdj && (
+              <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                <Term tip={TIP_ADJ}>adj.</Term>
+              </th>
+            )}
             <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "vs middle ad" : "vs median"}
             </th>
@@ -1061,6 +1071,11 @@ function AdTable({
               <td className="py-3 pr-4 text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
                 {ad.valueLabel}
               </td>
+              {hasAdj && (
+                <td className="py-3 pr-4 text-right align-top font-mono text-xs tabular-nums text-zinc-400">
+                  {ad.adjValueLabel ?? "—"}
+                </td>
+              )}
               <td
                 className={`py-3 pr-4 text-right align-top font-mono text-xs font-semibold tabular-nums ${
                   tone === "win" ? "print-win text-emerald-400" : "print-loss text-red-400"
