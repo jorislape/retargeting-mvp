@@ -23,7 +23,7 @@ const sku = (s: string) => (n: string) => n.includes(`[SKU]${s}_`);
 const { run, requireCompiled, buildSampleMemo, cleanup } = loadEngine();
 try {
   const { mergedRowsNote } = requireCompiled("modules/debrief/extract.js") as {
-    mergedRowsNote: (m: { names: number; rows: number; breakdowns: string[]; adSetColumn?: boolean }) => string | null;
+    mergedRowsNote: (m: { names: number; spendRows: number; creatives: number; breakdowns: string[]; adSetColumn?: boolean }) => string | null;
   };
   const r = run(AGENCY, "roas");
 
@@ -88,7 +88,10 @@ try {
     const a = b.memo.winners.find((x) => x.name === "A") ?? b.memo.losers.rows.find((x) => x.name === "A");
     assert.equal(a?.runsInLabel, "appears 3 times in this export", "a breakdown repeats ads; it doesn't prove ad sets");
     assert.ok(b.memo.decision.limits.buyer.some((l) => l.includes("(the export is broken down by Day)")));
-    assert.match(mergedRowsNote({ names: 2, rows: 5, breakdowns: ["Day"] })!, /^Broken down by Day: 5 rows share 2 ad names — combined into one creative per ad name/);
+    assert.equal(
+      mergedRowsNote({ names: 2, spendRows: 5, creatives: 2, breakdowns: ["Day"] }),
+      "Broken down by Day: 3 rows merged into 2 creatives — one per ad name (spend, purchases and value summed)."
+    );
   }
   /* ---- An ad set column counts real ad sets ---- */
   {
@@ -108,16 +111,30 @@ try {
   const clean = run(ECOM, "roas");
   assert.ok(clean.ads.every((a) => a.rowsMerged === undefined && a.adSetCount === undefined));
   assert.equal(clean.analysis.mergedRows, undefined);
-  assert.equal(mergedRowsNote({ names: 0, rows: 0, breakdowns: [] }), null);
+  assert.equal(mergedRowsNote({ names: 0, spendRows: 13, creatives: 13, breakdowns: [] }), null);
   assert.ok(!JSON.stringify(buildSampleMemo()).includes("runsInLabel"), "sample untouched");
+  /* The real account's shape: 341 rows with spend, 303 creatives. The
+     card counts rows WITH SPEND only (zero-spend rows never reach the
+     report), so its numbers match the report's. */
   assert.match(
-    mergedRowsNote({ names: 29, rows: 66, breakdowns: [] })!,
-    /^66 rows share 29 ad names — each name is combined into one creative/
+    mergedRowsNote({ names: 29, spendRows: 341, creatives: 303, breakdowns: [] })!,
+    /^38 rows merged into 303 creatives — 29 ad names appear on more than one row with spend; spend, purchases and value are summed\./
   );
   assert.match(
-    mergedRowsNote({ names: 2, rows: 5, breakdowns: [], adSetColumn: true })!,
-    /^5 rows share 2 ad names \(the same creative in several ad sets\)/
+    mergedRowsNote({ names: 2, spendRows: 5, creatives: 3, breakdowns: [], adSetColumn: true })!,
+    /^2 rows merged into 3 creatives — 2 ad names appear on more than one row with spend \(the same creative in several ad sets\)/
   );
+  /* The fixture, counted the way the generator counts it. */
+  {
+    const { parseCsv, toTable } = requireCompiled("modules/debrief/csv.js") as {
+      parseCsv: (t: string) => string[][];
+      toTable: (m: string[][]) => { rows: Record<string, string>[] };
+    };
+    const spendRows = toTable(parseCsv(AGENCY)).rows.filter((x) => Number(x["Amount spent (EUR)"]) > 0);
+    assert.equal(spendRows.length - r.analysis.adsAnalyzed, spendRows.length - new Set(spendRows.map((x) => x["Ad name"].trim())).size, "card ↔ report agree");
+  }
+  const panel = readFileSync(join(ROOT, "components/debrief/GeneratorPanel.tsx"), "utf8");
+  assert.match(panel, /if \(spendCol < 0 \|\| \(parseNumericCell\(row\[spendCol\] \?\? ""\) \?\? 0\) > 0\) entry\.spendIds\.push\(id\);/, "card counts spend rows only");
 
   console.log("real-account duplicates: all assertions passed");
 } finally {

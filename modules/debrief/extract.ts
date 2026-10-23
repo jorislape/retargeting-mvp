@@ -351,21 +351,28 @@ export function normalizeRowName(name: string): string {
 }
 
 /** Real-account fix 3 — the generator file card's line about merged
- *  rows (null when nothing merges). Breakdown exports say which
- *  breakdown repeated the ads; ad-level exports say the same creative
- *  ran in several ad sets. */
+ *  rows (null when nothing merges). Counts only rows WITH SPEND, exactly
+ *  what the report analyzes: "38 rows merged into 303 creatives". Ad
+ *  sets are named only when the export has an ad set column. */
 export function mergedRowsNote(merged: {
+  /** Ad names on more than one spend row. */
   names: number;
-  rows: number;
+  /** Rows with spend > 0. */
+  spendRows: number;
+  /** Distinct names among those rows — the report's creatives. */
+  creatives: number;
   breakdowns: readonly string[];
   adSetColumn?: boolean;
 }): string | null {
-  if (merged.names === 0) return null;
+  const folded = merged.spendRows - merged.creatives;
+  if (merged.names === 0 || folded <= 0) return null;
+  const head = `${folded} row${folded === 1 ? "" : "s"} merged into ${merged.creatives} creative${merged.creatives === 1 ? "" : "s"}`;
   const n = merged.names;
-  const what = `${merged.rows} rows share ${n} ad name${n === 1 ? "" : "s"}`;
   return merged.breakdowns.length > 0
-    ? `Broken down by ${merged.breakdowns.join(", ")}: ${what} — combined into one creative per ad name (spend, purchases and value summed).`
-    : `${what}${merged.adSetColumn ? " (the same creative in several ad sets)" : ""} — each name is combined into one creative (spend, purchases and value summed). Names that differ, like "- Copy", stay separate.`;
+    ? `Broken down by ${merged.breakdowns.join(", ")}: ${head} — one per ad name (spend, purchases and value summed).`
+    : `${head} — ${n} ad name${n === 1 ? " appears" : "s appear"} on more than one row with spend${
+        merged.adSetColumn ? " (the same creative in several ad sets)" : ""
+      }; spend, purchases and value are summed. Names that differ, like "- Copy", stay separate.`;
 }
 
 /** Sum of a field over rows — null when ANY row lacks it (an unknown

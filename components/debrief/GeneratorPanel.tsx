@@ -560,7 +560,7 @@ export function GeneratorPanel() {
     groupKeyByName: Record<string, string>;
     /** Real-account fix 3 — file-card disclosure: names on several rows
      *  (merged into one creative each) and any breakdown columns. */
-    merged: { names: number; rows: number; breakdowns: string[]; adSetColumn: boolean };
+    merged: { names: number; spendRows: number; creatives: number; breakdowns: string[]; adSetColumn: boolean };
   } | null>(null);
   /* First-Run Robustness: the shared file check (fileCheck.ts), run on
      drop — the SAME checks and copy the API runs. Keyed to the File so a
@@ -630,28 +630,36 @@ export function GeneratorPanel() {
         /* Real-account fix 3: same-name rows are one creative — one
            group key per name (shared Ad ID, else the name), and the
            counts behind the file card's "combined" line. */
+        /* Only rows WITH SPEND count, as on the server (extract.ts drops
+           zero-spend rows before merging) — so the card's numbers match
+           the report's. With no spend column every row counts. */
         const groupKeyByName: Record<string, string> = {};
-        const rowsByName = new Map<string, { name: string; ids: (string | null)[] }>();
+        const rowsByName = new Map<string, { name: string; ids: (string | null)[]; spendIds: (string | null)[] }>();
         if (nameIdx >= 0) {
           const adIdIdx = columns.adId ? headers.indexOf(columns.adId) : -1;
+          const spendCol = columns.spend ? headers.indexOf(columns.spend) : -1;
           for (const row of matrix.slice(1)) {
             const name = (row[nameIdx] ?? "").trim();
             if (name === "") continue;
             const rawId = adIdIdx >= 0 ? (row[adIdIdx] ?? "").trim() : "";
+            const id = rawId !== "" ? rawId : null;
             const key = normalizeRowName(name);
-            const entry = rowsByName.get(key) ?? { name, ids: [] };
-            entry.ids.push(rawId !== "" ? rawId : null);
+            const entry = rowsByName.get(key) ?? { name, ids: [], spendIds: [] };
+            entry.ids.push(id);
+            if (spendCol < 0 || (parseNumericCell(row[spendCol] ?? "") ?? 0) > 0) entry.spendIds.push(id);
             rowsByName.set(key, entry);
           }
-          for (const { name, ids } of rowsByName.values()) {
-            const shared = ids[0] != null && ids.every((id) => id === ids[0]) ? ids[0] : null;
+          for (const { name, ids, spendIds } of rowsByName.values()) {
+            const own = spendIds.length > 0 ? spendIds : ids;
+            const shared = own[0] != null && own.every((id) => id === own[0]) ? own[0] : null;
             groupKeyByName[name] = shared ?? name;
           }
         }
-        const mergedEntries = [...rowsByName.values()].filter((e) => e.ids.length > 1);
+        const delivered = [...rowsByName.values()].filter((e) => e.spendIds.length > 0);
         const merged = {
-          names: mergedEntries.length,
-          rows: mergedEntries.reduce((n, e) => n + e.ids.length, 0),
+          names: delivered.filter((e) => e.spendIds.length > 1).length,
+          spendRows: delivered.reduce((n, e) => n + e.spendIds.length, 0),
+          creatives: delivered.length,
           breakdowns: columns.breakdowns,
           adSetColumn: columns.adSetName != null,
         };
