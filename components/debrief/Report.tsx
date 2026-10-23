@@ -1114,6 +1114,14 @@ function AdTable({
   );
 }
 
+/** The appendix's outcome count: the row's own count, and 0 for a
+ *  judged zero-outcome ad (its row carries the 0 in its labels, not a
+ *  conversionLabel) — never "—" where the tables show a 0. */
+function appendixOutcomes(r: MemoWinnerLoserRow): string {
+  if (r.conversionLabel) return r.conversionLabel.replace(/\s.*$/, "");
+  return /^0 (purchases|leads)\b/.test(r.vsMedianLabel) || /^0 (purchases|leads)$/.test(r.valueLabel) ? "0" : "—";
+}
+
 /** Appendix ad names: middle-truncated harder than the body. */
 const APPENDIX_NAME_MAX = 50;
 
@@ -1191,7 +1199,7 @@ function PrintAppendix({
                 <td className={`${td} font-sans text-zinc-300`} title={r.name}>{middleTruncate(r.name, APPENDIX_NAME_MAX)}</td>
                 <td className={`${td} font-sans whitespace-nowrap`}>{group}</td>
                 <td className={`${td} text-right whitespace-nowrap`}>{r.spendLabel}</td>
-                {outcomeHeader && <td className={`${td} text-right`}>{r.conversionLabel?.replace(/\s.*$/, "") ?? "—"}</td>}
+                {outcomeHeader && <td className={`${td} text-right`}>{appendixOutcomes(r)}</td>}
                 <td className={`${td} pr-0 text-right whitespace-nowrap`}>{r.valueLabel}</td>
               </tr>
             ))}

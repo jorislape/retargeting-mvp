@@ -49,7 +49,9 @@ assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline co
   assert.match(app, /memo\.losers\.rows\.map\(\(r\) => \(\{ r, group: from\.has\(r\.name\) \? label\.trim : r\.holdNote \? label\.hold : label\.below \}\)\)/);
   assert.match(app, /trim: client \? "Reduce \/ pause" : "Pause \/ trim"/);
   // Columns: name, role, spend, outcomes, KPI.
-  for (const col of [/r\.spendLabel/, /r\.conversionLabel\?\.replace/, /r\.valueLabel/]) assert.match(app, col);
+  for (const col of [/r\.spendLabel/, /appendixOutcomes\(r\)/, /r\.valueLabel/]) assert.match(app, col);
+  // A judged zero-purchase ad reads 0 (as in the tables), never "—".
+  assert.match(report, /if \(r\.conversionLabel\) return r\.conversionLabel\.replace\(\/\\s\.\*\$\/, ""\);\s*return \/\^0 \(purchases\|leads\)\\b\/\.test\(r\.vsMedianLabel\) \|\| \/\^0 \(purchases\|leads\)\$\/\.test\(r\.valueLabel\) \? "0" : "—";/);
   // Exactly the rest of what the body collapses — the same predicates.
   assert.match(app, /const moreLimits = .*\.slice\(PRINT_LIMITS_SHOWN\[client \? "client" : "buyer"\]\)/);
   assert.match(app, /d\.appliedCriteria\.filter\(\(c\) => !criterionPrinted\(c\)\)/);
