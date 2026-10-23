@@ -1138,7 +1138,7 @@ function PrintAppendix({
   const head = "print-section-label print-heading mt-3 mb-1 text-[9px] font-bold uppercase tracking-[0.08em]";
   return (
     <section aria-label="Appendix" className={`print-only ${rows.length > 0 ? "mt-6 border-t border-white/[0.08] pt-1" : "mt-3"}`}>
-      <p className={head}>Appendix{rows.length > 0 ? ` — all ${rows.length} judged ads` : ""}</p>
+      {rows.length > 0 && <p className={head}>Appendix — all {rows.length} judged ads</p>}
       {rows.length > 0 && (
         <table className="w-full">
           <thead>
@@ -1165,7 +1165,10 @@ function PrintAppendix({
       )}
       {moreLimits.length > 0 && (
         <>
-          <p className={head}>{client ? "What we still can't conclude (continued)" : "Evidence limits (continued)"}</p>
+          <p className={head}>
+            {rows.length > 0 ? "" : "Appendix — "}
+            {client ? "what we still can't conclude (continued)" : "Evidence limits (continued)"}
+          </p>
           <ul className="space-y-0.5">
             {moreLimits.map((line, i) => (
               <li key={i} className="text-[8px] leading-snug text-zinc-500"><Names text={line} /></li>

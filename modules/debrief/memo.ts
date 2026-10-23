@@ -670,7 +670,14 @@ const FORMAT_CHALLENGERS: Record<string, string> = {
 /** Real-account fix 7 — the creative formats a challenger is drawn from,
  *  in tie-break order, and how a challenger built in each is phrased. */
 const CHALLENGER_FORMATS = ["ugc", "video", "static", "carousel"] as const;
-const CHALLENGER_PHRASE: Record<(typeof CHALLENGER_FORMATS)[number], string> = {
+type ChallengerFormat = (typeof CHALLENGER_FORMATS)[number];
+/** Static and motion are the two families a challenger switches between. */
+const FORMAT_FAMILY: Record<string, "static" | "motion"> = { static: "static", ugc: "motion", video: "motion" };
+const OPPOSITE_FORMATS: Record<"static" | "motion", readonly ChallengerFormat[]> = {
+  static: ["ugc", "video"],
+  motion: ["static"],
+};
+const CHALLENGER_PHRASE: Record<ChallengerFormat, string> = {
   ugc: "a creator-shot UGC version of the control's message",
   video: "a video version of the control's message",
   static: "a static-image version of the control's message",
@@ -688,6 +695,12 @@ const CHALLENGER_PHRASE: Record<(typeof CHALLENGER_FORMATS)[number], string> = {
  *  3. the control tag's structural challenger (FORMAT_CHALLENGERS), or
  *     a plain "different creative format".
  * `basis` (1 and 2 only) says which, in one clause, for the why/signals.
+ *
+ * Real-account review: never the control's own format FAMILY — a static
+ * control gets a UGC or video challenger, a UGC/video control a static
+ * one (a real export's static control was challenged with "a
+ * static-image version"). With a known family, step 3 is the first
+ * opposite format.
  */
 function chooseChallenger(
   winners: readonly RankedAd[],
@@ -696,7 +709,11 @@ function chooseChallenger(
   fallback: string
 ): { text: string; format: string | null; basis: string | null } {
   const count = (ads: readonly RankedAd[], f: string) => ads.filter((a) => a.nameTags.includes(f)).length;
-  const inWinners = CHALLENGER_FORMATS.filter((f) => f !== controlTag && count(winners, f) > 0).sort(
+  const family = controlTag != null ? FORMAT_FAMILY[controlTag] : undefined;
+  const allowed: readonly ChallengerFormat[] = family
+    ? OPPOSITE_FORMATS[family]
+    : CHALLENGER_FORMATS.filter((f) => f !== controlTag);
+  const inWinners = allowed.filter((f) => count(winners, f) > 0).sort(
     (a, b) => count(winners, b) - count(winners, a)
   );
   if (inWinners.length > 0) {
@@ -708,7 +725,7 @@ function chooseChallenger(
     };
   }
   const tagged = judged.some((a) => a.nameTags.some((t) => (CHALLENGER_FORMATS as readonly string[]).includes(t)));
-  const missing = tagged ? CHALLENGER_FORMATS.filter((f) => f !== controlTag && count(judged, f) === 0) : [];
+  const missing = tagged ? allowed.filter((f) => count(judged, f) === 0) : [];
   if (missing.length > 0) {
     const f = missing[0];
     return {
@@ -717,7 +734,18 @@ function chooseChallenger(
       basis: `the account has no ${formatLabel(f)} ads among the judged ones yet`,
     };
   }
+  if (family) {
+    const f = allowed[0];
+    return { text: CHALLENGER_PHRASE[f], format: f, basis: `the control is ${formatLabel(controlTag!)}, so the challenger is a different format` };
+  }
   return { text: (controlTag && FORMAT_CHALLENGERS[controlTag]) ?? fallback, format: null, basis: null };
+}
+
+/** The control's format, for the challenger: the format tag of the ad
+ *  the memo builds on, else the winners' dominant tag. */
+function controlFormatOf(lead: RankedAd | null, winnerTag: string | null): { tag: string | null; fromLead: boolean } {
+  const own = lead?.nameTags.find((t) => (CHALLENGER_FORMATS as readonly string[]).includes(t)) ?? null;
+  return own != null ? { tag: own, fromLead: true } : { tag: winnerTag, fromLead: false };
 }
 
 /** Shot / asset direction per creative format — structural direction
@@ -1331,7 +1359,7 @@ function buildNextTests(
       });
     }
   } else if (!skipRebuild) {
-    const pick = chooseChallenger(winners, analysis.rankedAds, winnerTag?.tag ?? null, "a new creative format");
+    const pick = chooseChallenger(winners, analysis.rankedAds, controlFormatOf(top, winnerTag?.tag ?? null).tag, "a new creative format");
     const challenger = pick.text;
     const signals = sig(
       "No judged ad is failing clearly this period.",
@@ -1479,13 +1507,15 @@ function buildNextTests(
       },
     });
   } else {
-    const pick = chooseChallenger(
-      winners,
-      analysis.rankedAds,
-      winnerTag?.tag ?? null,
-      "a deliberately different creative format"
-    );
+    const control = controlFormatOf(top, winnerTag?.tag ?? null);
+    const pick = chooseChallenger(winners, analysis.rankedAds, control.tag, "a deliberately different creative format");
     const challenger = pick.text;
+    /* The control is the ad T1 builds on whenever its format is known —
+       so T3 never challenges a static control with another static. */
+    const controlLabel =
+      control.fromLead && top != null
+        ? `"${top.name}" (${formatLabel(control.tag!)}) as the control`
+        : `your ${winnerTag ? `${winnerTag.tag} ads` : "current best ad"} as the control`;
     const signals = sig(
       tagSignal ?? "No format is clearly winning yet.",
       topSignal,
@@ -1493,7 +1523,7 @@ function buildNextTests(
       gateSignal
     );
     tests.push({
-      test: `Test ${challenger} against your ${winnerTag ? `${winnerTag.tag} ads` : "current best ad"} as the control.`,
+      test: `Test ${challenger} against ${controlLabel}.`,
       why: shiftCommitted
         ? `The shift above is this debrief's one budget move — it already moves budget into ${receiverList}. Alongside it, a structured challenger against it as the control builds the next comparison; launch it once the shift has ~${gateLabel} of fresh spend.`
         : leadPastBar

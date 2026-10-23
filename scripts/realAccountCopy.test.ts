@@ -7,7 +7,8 @@
  *  - static/image ads: "headline / first visual", not "opening 3 seconds"
  *    ([FOR]IMG / [FOR]VID tokens are read as static / video);
  *  - the T3 challenger is a format present in the winners or clearly
- *    missing — never a stock "founder/expert explainer video";
+ *    missing — never a stock "founder/expert explainer video", and never
+ *    the control's own family (static ↔ UGC / video);
  *  - report title: product, else the export's account name, else the
  *    file name — "Your account" only when none exists;
  *  - the scale-discipline avoid line names the actual receivers.
@@ -71,11 +72,15 @@ try {
   /* ---- T3 challenger grounded in the account ---- */
   for (const m of [r.memo, run(ECOM, "roas").memo, sample])
     assert.ok(!JSON.stringify(m.nextTests).includes("founder/expert explainer video"));
+  /* Real-account review: the control is the ad T1 builds on (here a
+     UGC receiver), and the challenger never shares its format family —
+     static vs UGC / video. */
   const t3 = r.memo.nextTests[2];
-  assert.match(t3.test, /^Test a video version of the control's message against your ugc ads as the control\.$/);
-  assert.ok(t3.signals.some((x) => /^Challenger: Video already places among your winners \(\d+\/\d+\)\.$/.test(x)));
+  const t1Base = r.memo.decision.budgetMove!.to[0].name;
+  assert.equal(t3.test, `Test a static-image version of the control's message against "${t1Base}" (UGC) as the control.`);
+  assert.ok(t3.signals.some((x) => /^Challenger: Static already places among your winners \(\d+\/\d+\)\.$/.test(x)));
   {
-    // Every winner is UGC and nothing judged is static ⇒ the missing format.
+    // Every winner is UGC/video and nothing judged is static ⇒ the missing format.
     const csv =
       "Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n" +
       ["UGC_A,400,22,1000", "UGC_B,400,21,960", "Video_C,400,20,800", "Video_D,400,20,800", "Video_E,400,19,760", "Carousel_F,400,18,720"].join("\n") + "\n";
@@ -84,6 +89,24 @@ try {
     assert.ok(challenger, "a grounded challenger is proposed");
     assert.match(challenger!.test, /static-image version/);
     assert.ok(challenger!.signals.includes("Challenger: the account has no Static ads among the judged ones yet."));
+  }
+  /* ---- Never the control's format family ---- */
+  {
+    const H = "Ad name,Amount spent (EUR),Purchases,Purchases conversion value\n";
+    const cases: [string, string[], RegExp][] = [
+      // Static control; static ads also crowd the winners ⇒ still UGC/video.
+      ["static control", ["Static_A,400,30,2400", "Static_B,400,22,1300", "Static_C,400,21,1250", "Video_D,400,20,1000", "Static_E,400,18,800", "Static_F,400,15,500", "Static_G,400,14,450"], /^Test a (video|creator-shot UGC) version of the control's message against "Static_A" \(Static\) as the control\.$/],
+      // Video control with UGC winners ⇒ static, not UGC.
+      ["video control", ["Video_A,400,30,2400", "UGC_B,400,22,1300", "UGC_C,400,21,1250", "Static_D,400,20,1000", "UGC_E,400,18,800", "UGC_F,400,15,500", "UGC_G,400,14,450"], /^Test a static-image version of the control's message against "Video_A" \(Video\) as the control\.$/],
+      // UGC control, no static ad anywhere ⇒ static by default.
+      ["ugc control", ["UGC_A,400,30,2400", "UGC_B,400,22,1300", "Video_C,400,21,1250", "UGC_D,400,20,1000", "Video_E,400,18,800", "UGC_F,400,15,500", "UGC_G,400,14,450"], /^Test a static-image version of the control's message against "UGC_A" \(UGC\) as the control\.$/],
+    ];
+    for (const [label, rows, want] of cases) {
+      const tests = run(H + rows.join("\n") + "\n", "roas").memo.nextTests;
+      const challenger = tests.find((t) => t.test.includes("version of the control's message"));
+      assert.ok(challenger, `${label}: a challenger`);
+      assert.match(challenger!.test, want, label);
+    }
   }
 
   /* ---- Report title ---- */
