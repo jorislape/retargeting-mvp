@@ -1842,9 +1842,11 @@ export function Report({
     Judged: memo.scope.spendGateSource && memo.scope.spendGateLabel
       ? `${TIP_JUDGED.replace(/\.$/, "")} — at least ${memo.scope.spendGateLabel}, ${memo.scope.spendGateSource.short}.`
       : TIP_JUDGED,
-    "Set aside": memo.scope.setAsideBreakdown
-      ? `Ads with no ${viewKpiLabel} figure, or not enough spend to judge fairly — set aside rather than counted against.`
-      : "Ads that did not have enough spend to judge fairly — set aside rather than counted against.",
+    "Set aside": `${
+      memo.scope.setAsideBreakdown
+        ? `Ads with no ${viewKpiLabel} figure, or not enough spend to judge fairly`
+        : "Ads that did not have enough spend to judge fairly"
+    }${memo.scope.zeroOutcomeAside ? `, or no ${memo.scope.zeroOutcomeAside.many} yet on low spend` : ""} — set aside rather than counted against.`,
     [`Median ${viewKpiLabel}`]: TIP_MEDIAN,
     ...(memo.scope.accountKpiBasis
       ? {

@@ -69,6 +69,12 @@ try {
   assert.match(zeroLine!, /and \d+ more; each needs ≥ [\d.,]+ EUR — 2× the account's [\d.,]+ EUR cost per purchase/);
   assert.ok(!r.memo.decision.limits.buyer.some((l) => /had no purchases, so ROAS couldn't be computed/.test(l)));
 
+  /* ---- The "Set aside" tooltip names them too ---- */
+  assert.deepEqual(r.memo.scope.zeroOutcomeAside, { count: thin!.ads.length, many: "purchases" });
+  const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
+  assert.match(report, /memo\.scope\.zeroOutcomeAside \? `, or no \$\{memo\.scope\.zeroOutcomeAside\.many\} yet on low spend` : ""/);
+  assert.equal(run(readFileSync(join(ROOT, "scripts/fixtures/ecom-13ads.csv"), "utf8"), "roas").memo.scope.zeroOutcomeAside, undefined, "absent without such ads");
+
   /* ---- "no ROAS value" only for genuinely missing data ---- */
   assert.equal(a.kpiGaps?.noValue, 1, "only the purchases-but-no-value row");
   assert.equal(r.ads.find((x) => bySku("00299")(x.name))?.kpiValue, null);

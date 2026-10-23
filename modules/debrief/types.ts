@@ -680,6 +680,9 @@ export interface MemoScope {
   /** First-Run Robustness 2 — present only when the user's outcome
    *  minimum set ads aside: how many, the noun, and the bar. */
   outcomeFloorAside?: { count: number; many: string; min: number };
+  /** Real-account follow-up — set-aside ads with no outcomes yet on low
+   *  spend (zeroOutcomeThin): the noun for the "Set aside" tooltip. */
+  zeroOutcomeAside?: { count: number; many: string };
   /** CPA Leads Label: client-register label ("cost per lead"), present
    *  only when it differs from kpiLabel. Report/text pick per view. */
   kpiLabelClient?: string;

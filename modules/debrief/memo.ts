@@ -2104,6 +2104,14 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
             },
           }
         : {}),
+      ...(analysis.zeroOutcomeThin && analysis.zeroOutcomeThin.ads.length > 0
+        ? {
+            zeroOutcomeAside: {
+              count: analysis.zeroOutcomeThin.ads.length,
+              many: outcomeNounsFor(analysis)?.many ?? "conversions",
+            },
+          }
+        : {}),
       ...(analysis.outcomeFloor && analysis.outcomeFloor.setAside.length > 0
         ? {
             outcomeFloorAside: {

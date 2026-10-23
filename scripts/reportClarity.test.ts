@@ -170,7 +170,7 @@ try {
   for (const [what, re] of [
     // Tester Feedback Fix 4 extends the Judged tip with the gate source (TIP_JUDGED stays the base/fallback).
     ["Judged", /Judged: memo\.scope\.spendGateSource[\s\S]{0,200}TIP_JUDGED/],
-    ["Set aside", /"Set aside": memo\.scope\.setAsideBreakdown/],
+    ["Set aside", /"Set aside": `\$\{\s*memo\.scope\.setAsideBreakdown/],
     ["Median <KPI>", /\[`Median \$\{viewKpiLabel\}`\]: TIP_MEDIAN/],
     ["judged spend", /phrase: "judged spend", tip: TIP_JUDGED_SPEND/],
     ["below-median", /phrase: "below-median", tip: TIP_BELOW_BENCHMARK/],
