@@ -44,7 +44,9 @@ try {
   for (const [label, txt] of [["buyer", t.buyerText], ["client", t.clientText], ["client top-3", memoToText(m, "client", 3, [])], ["buyer top-3", memoToText(m, "buyer", 3, [])]] as const) {
     for (const name of [...BELOW, ...ABOVE]) assert.ok(txt.includes(name), `${label} TXT names ${name}`);
   }
-  assert.match(memoToText(m, "buyer", 5, []), /\n\+1 more:\n- Clickbait_M|\n\+1 more:\n- Static_H/, "the 6th row follows a +1 more marker");
+  // Real-account review: losers are listed by money at stake, so the
+  // 6th row is the one with the least at stake.
+  assert.ok(memoToText(m, "buyer", 5, []).includes(`\n+1 more:\n- ${m.losers.rows[5].name}`), "the 6th row follows a +1 more marker");
   assert.match(t.buyerText, /Pause or trim: "Clickbait_M" \(\$384\.00\), .*"Static_H" \(\$379\.00\)/);
   assert.match(t.clientText, /Pausing or reducing: /); // labels made concrete in Trust Pass 3d
   // TL;DR "others" = every other below-median ad.

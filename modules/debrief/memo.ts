@@ -17,6 +17,7 @@ import {
   SCALE_TEST_MIN_DELTA_PCT,
   SHORT_WINDOW_DAYS,
   spendGateSource,
+  trimOrder,
   zeroThinCopy,
 } from "./decision";
 import {
@@ -331,6 +332,9 @@ function buildAtMedian(
   };
 }
 
+/** Appended to the losers instruction: why the list isn't in KPI order. */
+export const TRIM_ORDER_NOTE = "Listed by money at stake — spend × gap to the median.";
+
 /** The decision's receivers as ranked ads, in the card's order. */
 function moveReceivers(analysis: AnalysisResult, decision: MemoDecision): RankedAd[] {
   return (decision.budgetMove?.to ?? [])
@@ -388,7 +392,9 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
 
   if (losers.length > 0) {
     /* Trust Pass: losers is the full pool, so "others" are every other
-       below-median ad — all listed in the Losers section below. */
+       below-median ad — all listed in the Losers section below. The one
+       named is the most money at stake (the list's own first row). */
+    const firstTrim = trimOrder(analysis)[0];
     const extra = belowBenchmarkCount - 1;
     const alsoBelow = extra > 0
       ? cutSide
@@ -397,8 +403,8 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
       : "";
     lines.push(
       cutSide
-        ? `Trim or pause "${losers[0].name}"${alsoBelow} — combined ${fmtMoney(belowBenchmarkSpend, currency)} spent below the median.`
-        : `"${losers[0].name}"${alsoBelow} sit${extra > 0 ? "" : "s"} below the median — combined ${fmtMoney(belowBenchmarkSpend, currency)}, though no cut clears this memo's bars yet (see Next move).`
+        ? `Trim or pause "${firstTrim.name}"${alsoBelow} — combined ${fmtMoney(belowBenchmarkSpend, currency)} spent below the median.`
+        : `"${firstTrim.name}"${alsoBelow} sit${extra > 0 ? "" : "s"} below the median — combined ${fmtMoney(belowBenchmarkSpend, currency)}, though no cut clears this memo's bars yet (see Next move).`
     );
   } else {
     lines.push(`No ad is clearly underperforming enough to kill outright.`);
@@ -2182,7 +2188,8 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     ...buildAtMedian(analysis, context),
     leadingConversion: buildLeadingConversion(analysis),
     losers: {
-      rows: analysis.losers.map((ad) => buildRow(ad, analysis, context)),
+      /* Real-account review: listed by money at stake, not by KPI. */
+      rows: trimOrder(analysis).map((ad) => buildRow(ad, analysis, context)),
       /* Losers Coherence fix (same contract as buildTldr): the cut
          imperative is voiced ONLY when the committed decision actually
          contains a cut (budgetVariant "cut" or "shift"). Scale-only,
@@ -2192,8 +2199,8 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       killInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `${decision.budgetVariant === "cut" ? "Trim the weakest ads below; the freed budget stays with the current ads" : "Trim the weakest ads below and raise the receivers in steps"}. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} sits on ${fmtCount(analysis.belowBenchmarkCount)} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} — context, not the amount to move.`
-            : `The ads below ran under the median — combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} across ${fmtCount(analysis.belowBenchmarkCount)} ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total. No cut clears this memo's bars yet (see Next move).`
+            ? `${decision.budgetVariant === "cut" ? "Trim the weakest ads below; the freed budget stays with the current ads" : "Trim the weakest ads below and raise the receivers in steps"}. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} sits on ${fmtCount(analysis.belowBenchmarkCount)} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} — context, not the amount to move.${analysis.losers.length > 1 ? ` ${TRIM_ORDER_NOTE}` : ""}`
+            : `The ads below ran under the median — combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} across ${fmtCount(analysis.belowBenchmarkCount)} ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total. No cut clears this memo's bars yet (see Next move).${analysis.losers.length > 1 ? ` ${TRIM_ORDER_NOTE}` : ""}`
           : "No ad fell clearly below the median this period.",
       clientInstruction:
         analysis.losers.length > 0

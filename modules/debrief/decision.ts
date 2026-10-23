@@ -334,11 +334,32 @@ function pct(value: number): number {
   return Math.round(value);
 }
 
+/** Real-account review — what a below-median ad costs relative to the
+ *  median: spend × its gap to the median (|deltaPct|). An ad with no
+ *  outcome at all (zero purchases: ROAS 0x, or a CPA ad with no value)
+ *  stakes its whole spend. */
+export function moneyAtStake(ad: RankedAd): number {
+  if (ad.zeroConversions || ad.deltaPct == null) return ad.spend;
+  return (ad.spend * Math.min(100, Math.abs(Math.min(ad.deltaPct, 0)))) / 100;
+}
+
+/**
+ * Trim candidates in the order a buyer should act on them: most money
+ * at stake first (ties keep the KPI order). DISPLAY order only — the
+ * cut bar still reads analysis.losers[0], the worst ad by the KPI.
+ */
+export function trimOrder(analysis: AnalysisResult): RankedAd[] {
+  return analysis.losers
+    .map((ad, i) => ({ ad, i, stake: moneyAtStake(ad) }))
+    .sort((a, b) => b.stake - a.stake || a.i - b.i)
+    .map((x) => x.ad);
+}
+
 /** Up to two quoted loser names, honest about any remainder — the
  *  remainder counts ALL below-median ads (belowBenchmarkCount), not
  *  just the display slice, matching the kill-list spend rule. */
 function loserNames(analysis: AnalysisResult): string {
-  const shown = analysis.losers.slice(0, 2).map((a) => `"${a.name}"`);
+  const shown = trimOrder(analysis).slice(0, 2).map((a) => `"${a.name}"`);
   const more = analysis.belowBenchmarkCount - shown.length;
   if (more > 0) return `${shown.join(", ")} and ${more} more`;
   return shown.join(" and ");
@@ -1584,7 +1605,7 @@ function decide(
       };
     }
     /* Trust Pass: the full from/to lists behind the headline's names. */
-    const fromAds = analysis.losers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
+    const fromAds = trimOrder(analysis).map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     const toAds = receivers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     /* Trust Pass 3d: the already-computed below-median spend, so the move
        is concrete — no new percentage or amount is invented. */
