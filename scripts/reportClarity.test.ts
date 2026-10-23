@@ -127,7 +127,7 @@ try {
   const sample = buildSampleMemo();
   assert.equal(sample.decision.action, "budget");
   assert.equal(sample.decision.budgetVariant, "shift");
-  assert.equal(sample.decision.evidenceState, "supported");
+  assert.equal(sample.decision.evidenceState, "limited"); // weakest receiver 24 < 30
   assert.equal(sample.scope.spendGateLabel, "$120.91");
   assert.match(sample.decision.rationale, /is 100% better than the median ROAS on \$428\.60/);
   assert.ok(

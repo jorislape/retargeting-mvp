@@ -1101,7 +1101,21 @@ console.log("decision (stage 1 — rules): all assertions passed");
   );
 
   assert.equal(deriveEvidenceState(supportedShape(9), false), "limited", "supported shape caps at limited under the floor");
-  assert.equal(deriveEvidenceState(supportedShape(10), false), "supported", "at the floor stays supported");
+  /* Confidence follow-up: W is also the receiver of a scale move, so
+     "supported" additionally needs every receiver at ≥3× the 10-purchase
+     floor (30) — 10..29 clears the noise floor but caps at limited. */
+  assert.equal(deriveEvidenceState(supportedShape(10), false), "limited", "at the floor: past noise, under the 30 receiver bar");
+  assert.equal(deriveEvidenceState(supportedShape(29), false), "limited", "29: one short of 3× the floor");
+  assert.equal(deriveEvidenceState(supportedShape(30), false), "supported", "30: every receiver at 3× the floor");
+  {
+    const capped = buildDecision(supportedShape(24), "Fallback test.", money);
+    assert.equal(capped.action, "budget", "the move stands — the bar caps only the label");
+    assert.ok(capped.limits.buyer.some((l) => l.startsWith("The weakest ad receiving budget has 24 purchases — under the 30 (3× the 10-purchase floor)")));
+    assert.ok(capped.limits.client.some((l) => l.includes("(the fewest is 24)")));
+    // The user's own scaling minimum is the floor the 3× is taken of.
+    assert.equal(deriveEvidenceState(supportedShape(40), false, { minOutcomeCount: 13 }), "supported", "40 ≥ 3 × 13");
+    assert.equal(deriveEvidenceState(supportedShape(40), false, { minOutcomeCount: 14 }), "limited", "40 < 3 × 14");
+  }
   assert.equal(deriveEvidenceState(supportedShape(undefined), false), "supported", "unverifiable count never caps");
 
   /* The floor is Debrief's evidence LABEL bar; the user's
@@ -1326,9 +1340,13 @@ console.log("decision (stage 1 — rules): all assertions passed");
     assertContract(memo.decision, "sample");
 
     // Evidence-Explicit Decision V1 — pinned evidence read on the sample:
-    // supported by the dataset, materially separated, controlled test and
-    // limits both surfaced. Action stays the documented budget shift.
-    assert.equal(memo.decision.evidenceState, "supported", "sample is supported by the dataset");
+    // materially separated, controlled test and limits both surfaced.
+    // Confidence follow-up: its weakest receiver has 24 purchases, under
+    // 3× the 10-purchase floor, so the label is LIMITED (confidence
+    // medium) while the action stays the documented budget shift.
+    assert.equal(memo.decision.evidenceState, "limited", "sample: weakest receiver (24) under the 30 bar");
+    assert.equal(memo.confidence.level, "medium");
+    assert.ok(memo.confidence.reasons.includes("The weakest ad receiving budget has 24 purchases. High confidence needs at least 30 on every ad receiving budget."));
     assert.equal(memo.decision.evidenceShape, "separation", "sample field is materially separated");
     assert.ok(memo.decision.nextControlledTest, "sample surfaces a controlled next test");
     assert.ok(
@@ -1375,11 +1393,11 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // Evidence-Explicit Decision V1 polish: plain-language evidence
     // sentence, no raw evidenceShape enum, relabeled limits header.
     assert.ok(
-      buyerText.includes("Evidence: Strong support from this dataset"),
-      "buyer text carries the plain-language evidence sentence for the pinned supported/separation sample"
+      buyerText.includes("Evidence: Directional — the available data supports a next step"),
+      "buyer text carries the plain-language evidence sentence for the pinned limited sample (weakest receiver under 30)"
     );
     assert.ok(
-      clientText.includes("How sure we are: Strong — the available results show a clear enough difference"),
+      clientText.includes("How sure we are: Moderate — the results point in this direction"),
       "client text carries the plain-language client evidence sentence"
     );
     for (const text of [buyerText, clientText]) {
@@ -1448,7 +1466,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
 
     // Sample numeric/decision pins are unaffected by conversion visibility.
     assert.equal(memo.decision.action, "budget", "conversion visibility didn't change the sample action");
-    assert.equal(memo.decision.evidenceState, "supported", "conversion visibility didn't change evidenceState");
+    assert.equal(memo.decision.evidenceState, "limited", "conversion visibility didn't change evidenceState (limited: weakest receiver 24 < 30)");
 
     /* Synthetic engine runs to prove the honesty rules that the sample
        (which HAS counts, ROAS) can't exercise. Uses the same compiled
@@ -2004,10 +2022,21 @@ console.log("decision (stage 1 — rules): all assertions passed");
         "client evidence line preserves the same meaning without jargon"
       );
       assertCoherent(mModest, "modest-lead");
-      // Positive control: the pinned shift sample keeps the decisive wording.
+      // Positive control: a supported shift (every receiver ≥30
+      // purchases — the sample's weakest receiver has 24, so it now
+      // reads limited) keeps the decisive wording.
+      const strongShiftCsv =
+        "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends\n" +
+        [["T1", 40, 5.0], ["T2", 36, 4.6], ["T3", 32, 4.2], ["M1", 20, 2.0], ["M2", 20, 2.05], ["M3", 20, 2.1],
+         ["M4", 20, 2.15], ["M5", 20, 2.2], ["M6", 20, 2.25], ["L1", 8, 0.8], ["L2", 8, 0.8], ["L3", 8, 0.8]]
+          .map(([n, p, r]) => `${n},400,${p},${r},2026-06-01,2026-06-30`).join("\n") + "\n";
+      const mStrong = runEngine(strongShiftCsv, "roas");
+      assert.equal(mStrong.decision.budgetVariant, "shift");
+      assert.equal(mStrong.decision.evidenceState, "supported", "every receiver ≥30 ⇒ supported");
+      assert.equal(mStrong.confidence.level, "high");
       assert.ok(
-        evidenceLine(memo.decision, memo.scope.adsJudged, "buyer").includes("clearly pulled ahead"),
-        "shift sample keeps the decisive buyer evidence wording"
+        evidenceLine(mStrong.decision, mStrong.scope.adsJudged, "buyer").includes("clearly pulled ahead"),
+        "a supported shift keeps the decisive buyer evidence wording"
       );
 
       /* QA C3 — positive ROAS with a verifiable outcome count of ZERO

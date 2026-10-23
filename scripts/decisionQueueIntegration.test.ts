@@ -65,7 +65,9 @@ try {
      under the 25% cut-spend-share bar too). */
   const csvA = [
     "Ad name,Amount spent (USD),Purchases,Purchase ROAS (return on ad spend),Reporting starts,Reporting ends",
-    "TopAd,100.00,20,4.00,2026-01-01,2026-01-14",
+    // 30 purchases: the scale's receiver at 3× the 10-purchase floor,
+    // so the read can be "supported" (confidence follow-up).
+    "TopAd,100.00,30,4.00,2026-01-01,2026-01-14",
     ...Array.from({ length: 5 }, (_, i) => `AboveAd${i + 1},100.00,12,2.30,2026-01-01,2026-01-14`),
     "MedianAd,100.00,10,2.00,2026-01-01,2026-01-14",
     ...Array.from({ length: 6 }, (_, i) => `BelowAd${i + 1},100.00,8,1.70,2026-01-01,2026-01-14`),
@@ -185,7 +187,7 @@ try {
   /* ===================== Meta virtual-CSV path (testable without credentials) ===================== */
   const metaCsv = insightsToCsv(
     [
-      { adName: "TopAd", spend: "100.00", impressions: "10000", linkClicks: "500", ctr: "5", cpc: "0.2", purchases: "20", purchaseValue: "400", purchaseRoas: "4.00", costPerPurchase: "5", leads: "", costPerLead: "", dateStart: "2026-01-01", dateStop: "2026-01-07", addToCart: "", contentViews: "", cpm: "" },
+      { adName: "TopAd", spend: "100.00", impressions: "10000", linkClicks: "500", ctr: "5", cpc: "0.2", purchases: "30", purchaseValue: "400", purchaseRoas: "4.00", costPerPurchase: "3.33", leads: "", costPerLead: "", dateStart: "2026-01-01", dateStop: "2026-01-07", addToCart: "", contentViews: "", cpm: "" },
       ...Array.from({ length: 5 }, (_, i) => ({ adName: `AboveAd${i + 1}`, spend: "100.00", impressions: "8000", linkClicks: "400", ctr: "5", cpc: "0.25", purchases: "12", purchaseValue: "230", purchaseRoas: "2.30", costPerPurchase: "8.3", leads: "", costPerLead: "", dateStart: "2026-01-01", dateStop: "2026-01-07", addToCart: "", contentViews: "", cpm: "" })),
       { adName: "MedianAd", spend: "100.00", impressions: "8000", linkClicks: "400", ctr: "5", cpc: "0.25", purchases: "10", purchaseValue: "200", purchaseRoas: "2.00", costPerPurchase: "10", leads: "", costPerLead: "", dateStart: "2026-01-01", dateStop: "2026-01-07", addToCart: "", contentViews: "", cpm: "" },
       ...Array.from({ length: 6 }, (_, i) => ({ adName: `BelowAd${i + 1}`, spend: "100.00", impressions: "8000", linkClicks: "400", ctr: "5", cpc: "0.25", purchases: "8", purchaseValue: "170", purchaseRoas: "1.70", costPerPurchase: "12.5", leads: "", costPerLead: "", dateStart: "2026-01-01", dateStop: "2026-01-07", addToCart: "", contentViews: "", cpm: "" })),

@@ -180,7 +180,7 @@ function fixture(overrides: Partial<AnalysisResult>): AnalysisResult {
     const sampleMemo = buildSampleMemo();
     assert.equal(sampleMemo.decision.action, "budget");
     assert.equal(sampleMemo.decision.budgetVariant, "shift");
-    assert.equal(sampleMemo.decision.evidenceState, "supported");
+    assert.equal(sampleMemo.decision.evidenceState, "limited"); // weakest receiver 24 < 30
     assert.equal(sampleMemo.nextTests[0].briefReadiness.state, "directional");
     assert.equal(sampleMemo.nextTests[0].evidenceDiagnostic, undefined);
 

@@ -35,12 +35,12 @@ import type { DebriefContext } from "./types";
  *     leader first among the 3 receivers. Editing rows in a way that
  *     changes this action/leader breaks that test on purpose.
  *   - Evidence-Explicit Decision V1 (pinned): the same run is
- *     evidenceState "supported" / evidenceShape "separation" — 11
- *     judged ads (≥ the 10-ad bar), no missing required columns, a
- *     non-flat field, and 5 winners / 5 losers (both ≥ 3). Evidence is
- *     derived independently of the action; this is a supported budget
- *     move, but a supported test or supported flat hold are equally
- *     possible shapes on other data.
+ *     evidenceShape "separation" — 11 judged ads (≥ the 10-ad bar), no
+ *     missing required columns, a non-flat field, and 5 winners / 5
+ *     losers (both ≥ 3) — but evidenceState "limited" / confidence
+ *     medium: its weakest receiver has 24 purchases, under 3× the
+ *     10-purchase floor (30) the confidence follow-up requires on every
+ *     receiver. The action is unaffected (still the budget shift).
  */
 
 export const SAMPLE_CSV_FILENAME =

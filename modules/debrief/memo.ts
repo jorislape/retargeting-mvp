@@ -3,6 +3,11 @@ import {
   budgetReceivers,
   buildDecision,
   evidenceLead,
+  HIGH_CONFIDENCE_OUTCOME_MULTIPLE,
+  isReceiverVolumeBelowHighBar,
+  receiverOutcomeMin,
+  volumeSubject,
+  weakestReceiver,
   passedOverLeader,
   isOutcomeVolumeBelowFloor,
   isScaleActionSupported,
@@ -1714,8 +1719,17 @@ function buildConfidence(
   /* Real-account follow-up: the volume story is about the ad the read
      stands on — the primary receiver when the leader was passed over —
      and a Shift/Scale cites every receiver's own count. */
-  const subject = evidenceLead(analysis, criteria);
-  const subjectRole = subject != null && subject !== winners[0] ? "The primary receiving ad" : "The leading ad";
+  const subject = volumeSubject(analysis, criteria);
+  const weakest = weakestReceiver(analysis, criteria);
+  const subjectRole =
+    weakest != null
+      ? "The weakest ad receiving budget"
+      : subject != null && subject !== winners[0]
+        ? "The primary receiving ad"
+        : "The leading ad";
+  /* Confidence follow-up: "high" only when every receiver has ≥3× the
+     purchase floor; otherwise medium, and this says why. */
+  const belowHighBar = isReceiverVolumeBelowHighBar(analysis, criteria);
   const receiverAds =
     decision.action === "budget"
       ? (decision.budgetMove?.to ?? [])
@@ -1778,7 +1792,9 @@ function buildConfidence(
      client view. */
   const reasons: string[] = [];
   let clientWhy: string;
-  const topPct = subject?.deltaPct ?? null;
+  const leadAd = evidenceLead(analysis, criteria);
+  const leadRole = leadAd != null && leadAd !== winners[0] ? "The primary receiving ad" : "The top winner";
+  const topPct = leadAd?.deltaPct ?? null;
 
   if (level === "high" && flat) {
     reasons.push(
@@ -1795,7 +1811,7 @@ function buildConfidence(
     );
     if (topPct != null && topPct >= 30) {
       reasons.push(
-        `${subjectRole === "The leading ad" ? "The top winner" : subjectRole} is ${Math.round(topPct)}% better than the median — a clear observed lead within this dataset.`
+        `${leadRole} is ${Math.round(topPct)}% better than the median — a clear observed lead within this dataset.`
       );
     }
     if (losers.length > 0 && belowBenchmarkSpend > 0) {
@@ -1836,11 +1852,20 @@ function buildConfidence(
     }
     if (topPct != null && topPct < 30) {
       reasons.push(
-        `${subjectRole === "The leading ad" ? "The top winner" : subjectRole} is ${Math.round(topPct)}% better than the median — an observed lead, though the gap is moderate.`
+        `${leadRole} is ${Math.round(topPct)}% better than the median — an observed lead, though the gap is moderate.`
+      );
+    }
+    if (belowHighBar && weakest?.conversions != null && !volumeBelowFloor) {
+      const n = Math.round(weakest.conversions);
+      const nouns = outcomeNounsFor(analysis);
+      reasons.push(
+        `The weakest ad receiving budget has ${fmtCount(n)} ${n === 1 ? nouns?.one ?? "result" : nouns?.many ?? "results"}. High confidence needs at least ${HIGH_CONFIDENCE_OUTCOME_MULTIPLE * receiverOutcomeMin(criteria)} on every ad receiving budget.`
       );
     }
     clientWhy =
-      "Confidence is medium because the results point one way, but the sample is small enough that the next round of spend could still shift it.";
+      belowHighBar && weakest?.conversions != null && !volumeBelowFloor
+        ? "Confidence is medium because the ads getting more budget have a moderate number of sales behind them so far — more results would firm the call up."
+        : "Confidence is medium because the results point one way, but the sample is small enough that the next round of spend could still shift it.";
   } else {
     if (median == null) {
       reasons.push(

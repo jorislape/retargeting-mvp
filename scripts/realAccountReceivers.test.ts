@@ -98,6 +98,18 @@ try {
       assert.ok(!/8 recorded results?/.test(line), line);
     }
     assert.ok(!d.limits.buyer.some((l) => l.includes("noise floor this read requires")), "the receivers clear the noise floor");
+    /* Confidence follow-up: the WEAKEST receiver sets the label — "high"
+       needs every receiver at ≥30 (3× the 10-purchase floor). */
+    const weakestCount = Math.min(...(counts as number[]));
+    if (weakestCount < 30) {
+      assert.equal(d.evidenceState, "limited");
+      assert.equal(r.memo.confidence.level, "medium");
+      assert.ok(conf.reasons.includes(`The weakest ad receiving budget has ${weakestCount} purchases. High confidence needs at least 30 on every ad receiving budget.`));
+      assert.ok(d.limits.buyer.some((l) => l.startsWith(`The weakest ad receiving budget has ${weakestCount} purchases — under the 30`)));
+    } else {
+      assert.notEqual(r.memo.confidence.level, "medium");
+    }
+    assert.equal(d.action, "budget", "the bar caps the label, never the move");
   }
 
   /* No passed-over leader ⇒ T1 stays on the leader, no watch note. */

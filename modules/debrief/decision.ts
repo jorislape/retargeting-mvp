@@ -100,11 +100,45 @@ export const SHORT_WINDOW_DAYS = 7;
  *  in memo.ts, and the limits copy — one rule, no drift. */
 export function isOutcomeVolumeBelowFloor(analysis: AnalysisResult, criteria?: DecisionCriteria): boolean {
   if (outcomeNounsFor(analysis) == null) return false;
-  /* Real-account follow-up: the ad the read stands on — the primary
-     receiver when the leader was passed over (evidenceLead). */
-  const top = evidenceLead(analysis, criteria);
+  /* Real-account follow-up: the WEAKEST receiver when the call moves
+     budget into receivers (a read is only as strong as the thinnest ad
+     taking money), else the ad the read stands on (evidenceLead). */
+  const top = volumeSubject(analysis, criteria);
   if (top == null || top.conversions == null) return false;
   return top.conversions < MIN_OUTCOMES_FOR_SUPPORTED;
+}
+
+/** "High" confidence needs every receiver at this multiple of the
+ *  purchase floor (receiverOutcomeMin: 10 by default ⇒ 30). */
+export const HIGH_CONFIDENCE_OUTCOME_MULTIPLE = 3;
+
+/** The receiver with the fewest VERIFIABLE outcomes when the committed
+ *  call moves budget into receivers; null otherwise (or when no
+ *  receiver's count is in the export — missing is never zero). */
+export function weakestReceiver(analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd | null {
+  if (!isScaleActionSupported(analysis, criteria)) return null;
+  const counted = budgetReceivers(analysis, criteria).filter((r) => r.conversions != null);
+  if (counted.length === 0) return null;
+  return counted.reduce((min, r) => ((r.conversions as number) < (min.conversions as number) ? r : min));
+}
+
+/** The ad whose outcome volume qualifies the evidence: the weakest
+ *  receiver of a budget move, else evidenceLead. */
+export function volumeSubject(analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd | null {
+  return weakestReceiver(analysis, criteria) ?? evidenceLead(analysis, criteria);
+}
+
+/** True when a budget move's weakest receiver has fewer than
+ *  HIGH_CONFIDENCE_OUTCOME_MULTIPLE × the purchase floor — the evidence
+ *  (and so confidence) caps at limited / medium. Never changes the
+ *  action; an unverifiable count never caps. */
+export function isReceiverVolumeBelowHighBar(analysis: AnalysisResult, criteria?: DecisionCriteria): boolean {
+  if (outcomeNounsFor(analysis) == null) return false;
+  const weakest = weakestReceiver(analysis, criteria);
+  return (
+    weakest != null &&
+    (weakest.conversions as number) < HIGH_CONFIDENCE_OUTCOME_MULTIPLE * receiverOutcomeMin(criteria)
+  );
 }
 
 /** Inclusive day count of the analysis window, or null when the range
@@ -351,7 +385,13 @@ export function deriveEvidenceState(
      results is not "strongly supported". Unverifiable counts never cap
      (missing is never treated as zero), and the action is untouched
      (evidenceState is a label, not a rule input). */
-  if (shapeSupported && !isOutcomeVolumeBelowFloor(analysis, criteria)) return "supported";
+  if (
+    shapeSupported &&
+    !isOutcomeVolumeBelowFloor(analysis, criteria) &&
+    !isReceiverVolumeBelowHighBar(analysis, criteria)
+  ) {
+    return "supported";
+  }
   return "limited";
 }
 
@@ -1219,9 +1259,14 @@ export function buildDecision(
      their criterion's own line above already carries the volume story. */
   /* Real-account follow-up: these volume lines describe the ad the read
      stands on — the primary receiver when the leader was passed over. */
-  const subject = evidenceLead(analysis, criteria);
+  const subject = volumeSubject(analysis, criteria);
   const subjectOutcomes = subject?.conversions ?? null;
-  const subjectRole = subject != null && subject !== top ? "The primary receiving ad" : "The leading ad";
+  const subjectRole =
+    weakestReceiver(analysis, criteria) != null
+      ? "The weakest ad receiving budget"
+      : subject != null && subject !== top
+        ? "The primary receiving ad"
+        : "The leading ad";
   if (
     isOutcomeVolumeBelowFloor(analysis, criteria) &&
     minOutcome == null &&
@@ -1234,6 +1279,24 @@ export function buildDecision(
     );
     criteriaClient.push(
       `${subjectRole} has ${subjectOutcomes} ${subjectOutcomes === 1 ? nouns.one : nouns.many} so far — too few results for a strong read, so the evidence is treated as limited while volume builds.`
+    );
+  }
+  /* Confidence follow-up: a budget move whose weakest receiver sits
+     under 3× the purchase floor reads "limited" — say why, once. */
+  const weakest = weakestReceiver(analysis, criteria);
+  if (
+    nouns != null &&
+    weakest != null &&
+    isReceiverVolumeBelowHighBar(analysis, criteria) &&
+    !isOutcomeVolumeBelowFloor(analysis, criteria)
+  ) {
+    const n = weakest.conversions as number;
+    const bar = HIGH_CONFIDENCE_OUTCOME_MULTIPLE * receiverOutcomeMin(criteria);
+    criteriaBuyer.push(
+      `The weakest ad receiving budget has ${n} ${n === 1 ? nouns.one : nouns.many} — under the ${bar} (${HIGH_CONFIDENCE_OUTCOME_MULTIPLE}× the ${receiverOutcomeMin(criteria)}-${nouns.one} floor) this read wants on every receiver before labeling evidence strongly supported. The move stands; the label stays limited until volume builds.`
+    );
+    criteriaClient.push(
+      `The ads getting more budget have a moderate number of ${nouns.many} so far (the fewest is ${n}), so we're treating this as a solid but not yet strong read.`
     );
   }
   /* Evidence Confidence V2 — a structurally strong read whose outcome
