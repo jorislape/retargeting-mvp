@@ -1755,7 +1755,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
         const tldr = m.tldr.join(" ");
         const client = m.clientSummary.join(" ");
         assert.equal(
-          tldr.includes("move budget toward it"),
+          /move budget toward (it|them)/.test(tldr),
           scaleSide,
           `${label}: buyer winner imperative iff shift/scale (action=${action}, variant=${budgetVariant})`
         );
@@ -1765,7 +1765,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
           `${label}: buyer kill imperative iff shift/cut`
         );
         assert.equal(
-          client.includes("earns a larger share of the budget"),
+          /earns? a larger share of the budget/.test(client),
           scaleSide,
           `${label}: client budget-increase promise iff shift/scale`
         );
@@ -1842,7 +1842,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       // Positive control: the pinned sample is a budget SHIFT — both
       // imperatives are present and correct.
       assert.equal(memo.decision.budgetVariant, "shift", "sample decision variant is shift");
-      assert.ok(memo.tldr[0].includes("move budget toward it"), "sample TLDR keeps the winner imperative");
+      assert.ok(memo.tldr[0].includes("move budget toward them"), "sample TLDR keeps the winner imperative (3 receivers)");
       assert.ok(memo.tldr[1].startsWith("Trim or pause"), "sample TLDR keeps the kill imperative");
       assert.ok(
         memo.losers.killInstruction.startsWith("Trim the weakest ads below and raise the receivers in steps"),

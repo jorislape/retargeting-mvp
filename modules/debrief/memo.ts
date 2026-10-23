@@ -331,6 +331,13 @@ function buildAtMedian(
   };
 }
 
+/** The decision's receivers as ranked ads, in the card's order. */
+function moveReceivers(analysis: AnalysisResult, decision: MemoDecision): RankedAd[] {
+  return (decision.budgetMove?.to ?? [])
+    .map((t) => analysis.winners.find((w) => w.name === t.name))
+    .filter((a): a is RankedAd => a != null);
+}
+
 /* TLDR Coherence fix: the verdict lines take the ALREADY-BUILT decision
    and voice an imperative ("move budget toward it", "Kill or shrink")
    ONLY when the committed call actually is that move — otherwise they
@@ -349,13 +356,25 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
   const scaleSide = decision.action === "budget" && decision.budgetVariant !== "cut";
   const cutSide = decision.action === "budget" && decision.budgetVariant !== "scale";
 
-  if (winners.length > 0) {
+  /* Real-account fix: under a budget move the verdict names the
+     decision's OWN receivers — never winners[0], which the receiver
+     floor may have passed over. */
+  const receivers = scaleSide ? moveReceivers(analysis, decision) : [];
+  if (receivers.length > 0) {
+    const top = receivers[0];
+    const topStats = `${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend`;
+    lines.push(
+      receivers.length === 1
+        ? top === winners[0]
+          ? `"${top.name}" is the clear winner at ${topStats} — move budget toward it.`
+          : `"${top.name}" earns the budget move at ${topStats} — move budget toward it (see Next move).`
+        : `${receivers.length} ads earn the budget move, led by "${top.name}" at ${topStats} — move budget toward them in steps (see Next move).`
+    );
+  } else if (winners.length > 0) {
     const top = winners[0];
     const topStats = `${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend`;
     lines.push(
-      scaleSide
-        ? `"${top.name}" is the clear winner at ${topStats} — move budget toward it.`
-        : `"${top.name}" leads at ${topStats} — the strongest observed result, though it hasn't earned a budget move (see Next move).`
+      `"${top.name}" leads at ${topStats} — the strongest observed result, though it hasn't earned a budget move (see Next move).`
     );
   } else if (medianLabel) {
     lines.push(
@@ -1630,13 +1649,21 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
   const scaleSide = decision.action === "budget" && decision.budgetVariant !== "cut";
   const cutSide = decision.action === "budget" && decision.budgetVariant !== "scale";
 
-  if (winners.length > 0) {
-    const top = winners[0];
-    const lead = `Your strongest ad this period was "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} — ${scaleSide ? "clearly " : ""}ahead of the middle ad (${median != null ? fmtKpiValue(median, kpi, currency) : "n/a"}).`;
+  const receivers = scaleSide ? moveReceivers(analysis, decision) : [];
+  const middle = median != null ? fmtKpiValue(median, kpi, currency) : "n/a";
+  if (receivers.length > 0) {
+    const top = receivers[0];
     lines.push(
-      scaleSide
-        ? `${lead} It earns a larger share of the budget.`
-        : `${lead} It hasn't pulled far enough ahead to earn more budget yet — the next step is set out above.`
+      receivers.length === 1 && top === winners[0]
+        ? `Your strongest ad this period was "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} — clearly ahead of the middle ad (${middle}). It earns a larger share of the budget.`
+        : receivers.length === 1
+        ? `"${top.name}" was clearly ahead of the middle ad (${middle}) at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel}, with real results behind it. It earns a larger share of the budget.`
+        : `${receivers.length} ads were clearly ahead of the middle ad (${middle}) with real results behind them, led by "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel}. They earn a larger share of the budget.`
+    );
+  } else if (winners.length > 0) {
+    const top = winners[0];
+    lines.push(
+      `Your strongest ad this period was "${top.name}" at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} — ahead of the middle ad (${middle}). It hasn't pulled far enough ahead to earn more budget yet — the next step is set out above.`
     );
   } else if (median != null) {
     lines.push(
