@@ -63,8 +63,23 @@ try {
   assert.ok(r.buyerText.includes(r.memo.scope.stageNote!.buyer), "TXT");
   assert.ok(d.limits.buyer.some((l) => l.startsWith("Each ad is compared with its own funnel stage's median (TOFU 2.00x across 6 ads and BOFU 4.00x across 6 ads); 3 ads with no stage")));
   assert.equal(r.memo.scope.stageWarning, undefined, "split ⇒ no mixed-stage warning");
-  /* Split ⇒ the decision confidence isn't capped for mixed stages. */
+  /* Split and every receiver read within its own stage ⇒ no stage cap. */
+  assert.ok(d.budgetMove!.to.every((t) => a.rankedAds.find((x) => x.name === t.name)?.stageBenchmark), "all receivers staged");
   assert.ok(!r.memo.confidence.decision.caps.buyer.some((c) => c.includes("funnel stages")));
+
+  /* ---- A-fix 3: an UNSTAGED receiver keeps the mixed-stage cap ---- */
+  {
+    const withPlain = run(dated([...TOFU, ...BOFU, ...PLAIN, row("U9", 40, 5.5)]), "roas", { targetRoas: 1.5 }).memo;
+    const plainReceivers = withPlain.decision.budgetMove!.to.filter((t) => !/_(TOFU|BOFU)$/.test(t.name));
+    assert.ok(plainReceivers.length > 0, "an unstaged ad receives budget");
+    const n = withPlain.decision.budgetMove!.to.length;
+    assert.ok(
+      withPlain.confidence.decision.caps.buyer.includes(
+        `${plainReceivers.length} of ${n} receiver${n === 1 ? " is" : "s are"} judged against the overall median, not ${plainReceivers.length === 1 ? "its" : "their"} own stage's (funnel stages are mixed)`
+      )
+    );
+    assert.notEqual(withPlain.confidence.decision.level, "high");
+  }
 
   /* ---- A stage under 5 judged ads falls back to the overall median ---- */
   const small = run(dated([...TOFU, ...BOFU.slice(0, 4), ...PLAIN]), "roas").analysis;

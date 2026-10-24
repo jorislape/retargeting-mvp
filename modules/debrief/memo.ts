@@ -363,9 +363,18 @@ function withDecisionConfidence(
     buyer.push("attribution windows are mixed across ads");
     client.push("ads were measured with different attribution windows");
   }
+  /* A-fix 3: a stage split lifts the mixed-stage cap only when EVERY
+     receiver was compared with its own stage's median. */
+  const receivers = isScaleActionSupported(analysis, criteria) ? budgetReceivers(analysis, criteria) : [];
+  const unstaged = receivers.filter((r) => !r.stageBenchmark);
   if (analysis.funnelMix && !analysis.stageBenchmark) {
     buyer.push("funnel stages are mixed and judged against one median");
     client.push("ads aimed at different audience stages are compared together");
+  } else if (analysis.funnelMix && unstaged.length > 0) {
+    buyer.push(
+      `${unstaged.length} of ${receivers.length} receiver${receivers.length === 1 ? " is" : "s are"} judged against the overall median, not ${unstaged.length === 1 ? "its" : "their"} own stage's (funnel stages are mixed)`
+    );
+    client.push("some ads getting more budget are compared with all ads rather than their own audience group");
   }
   const level = c.level === "high" && buyer.length > 0 ? "medium" : c.level;
   return { ...c, decision: { level, caps: { buyer, client } } };
