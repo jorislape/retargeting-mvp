@@ -1133,6 +1133,15 @@ export function buildLimits(
     client.push(
       `${names.length} ad${names.length === 1 ? "" : "s"} ran on several rows of the file and ${names.length === 1 ? "is" : "are"} shown as one creative each, with ${names.length === 1 ? "its" : "their"} results added together.`
     );
+    /* Bulletproof pass A6: how reliable the identity behind the merge is. */
+    if (analysis.mergedRows?.adIdColumn) {
+      buyer.push(
+        "Rows are matched by Ad ID; ads sharing one name across several Ad IDs are shown as one creative (creative-level view)."
+      );
+    } else {
+      buyer.push("Ads with identical names were combined; without an Ad ID column this is approximate.");
+      client.push("Ads with the same name were combined; without each ad's ID in the file, this is approximate.");
+    }
   }
   if (analysis.missingColumns.includes("Reporting date range")) {
     buyer.push(

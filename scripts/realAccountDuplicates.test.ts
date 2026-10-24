@@ -87,7 +87,7 @@ try {
       ["A,2025-04-01,100,5,400", "A,2025-04-02,120,6,480", "A,2025-04-03,90,4,300", "B,2025-04-01,150,5,300", "B,2025-04-02,140,4,280"].join("\n") + "\n";
     const b = run(csv, "roas");
     assert.deepEqual(b.columns.breakdowns, ["Day"]);
-    assert.deepEqual(b.analysis.mergedRows, { rows: 5, breakdowns: ["Day"], adSetColumn: false });
+    assert.deepEqual(b.analysis.mergedRows, { rows: 5, breakdowns: ["Day"], adSetColumn: false, adIdColumn: false });
     const a = b.memo.winners.find((x) => x.name === "A") ?? b.memo.losers.rows.find((x) => x.name === "A");
     assert.equal(a?.runsInLabel, "appears 3 times in this export", "a breakdown repeats ads; it doesn't prove ad sets");
     assert.ok(b.memo.decision.limits.buyer.some((l) => l.includes("(the export is broken down by Day)")));
@@ -108,6 +108,35 @@ try {
     assert.equal(aRow?.runsInLabel, "runs in 2 ad sets", "the ad set column proves the ad sets");
     assert.equal(a.adSetName, null, "mixed ad sets ⇒ no single ad set");
     assert.equal(s.ads.find((x) => x.name === "B")!.adSetName, "Set 1", "single rows untouched");
+  }
+
+  /* ---- Bulletproof pass A6: identity behind the merge ---- */
+  {
+    // Without an Ad ID column the name-based merge is disclosed as approximate.
+    assert.ok(r.memo.decision.limits.buyer.includes("Ads with identical names were combined; without an Ad ID column this is approximate."));
+    assert.ok(r.memo.decision.limits.client.includes("Ads with the same name were combined; without each ad's ID in the file, this is approximate."));
+    // With Ad IDs: same ID = one ad (even renamed); same name across IDs = one creative, labelled.
+    const csv =
+      "Ad ID,Ad name,Ad set name,Amount spent (EUR),Purchases,Purchases conversion value\n" +
+      [
+        "101,Hero,Set 1,200,10,800",
+        "101,Hero (renamed),Set 1,100,5,400",
+        "202,Hero,Set 2,150,6,450",
+        "303,Other,Set 1,300,10,600",
+        "404,Third,Set 2,300,10,900",
+        "505,Fourth,Set 1,300,10,700",
+        "606,Fifth,Set 2,300,10,650",
+      ].join("\n") + "\n";
+    const t = run(csv, "roas");
+    const hero = t.ads.find((x) => x.name === "Hero")!;
+    assert.equal(hero.rowsMerged, 3, "the renamed row joins its Ad ID; the second ID joins by name");
+    assert.equal(hero.spend, 450);
+    assert.equal(hero.adIdCount, 2);
+    assert.ok(!t.ads.some((x) => x.name === "Hero (renamed)"), "a renamed row of the same Ad ID is not a separate ad");
+    const row = [...t.memo.winners, ...t.memo.losers.rows, ...(t.memo.atMedian?.rows ?? [])].find((x) => x.name === "Hero");
+    assert.equal(row?.runsInLabel, "creative-level view: 2 Ad IDs in 2 ad sets");
+    assert.ok(t.memo.decision.limits.buyer.includes("Rows are matched by Ad ID; ads sharing one name across several Ad IDs are shown as one creative (creative-level view)."));
+    assert.ok(!t.memo.decision.limits.buyer.some((l) => l.includes("approximate")));
   }
 
   /* ---- Clean files: nothing merges, nothing changes ---- */

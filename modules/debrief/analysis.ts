@@ -336,6 +336,7 @@ export function analyze(
             rows: ads.reduce((n, a) => n + (a.rowsMerged ?? 1), 0),
             breakdowns: columns.breakdowns,
             adSetColumn: columns.adSetName != null,
+            adIdColumn: columns.adId != null,
           },
         }
       : {}),

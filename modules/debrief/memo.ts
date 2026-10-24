@@ -188,6 +188,12 @@ function buildLeadingConversion(
 function runsInFor(ad: RankedAd): { runsInLabel?: string } {
   const n = ad.rowsMerged ?? 1;
   if (n <= 1) return {};
+  /* Bulletproof pass A6: same name across several Ad IDs. */
+  if (ad.adIdCount != null && ad.adIdCount > 1) {
+    return {
+      runsInLabel: `creative-level view: ${ad.adIdCount} Ad IDs${ad.adSetCount != null ? ` in ${ad.adSetCount} ad set${ad.adSetCount === 1 ? "" : "s"}` : ""}`,
+    };
+  }
   if (ad.adSetCount != null) {
     return { runsInLabel: `runs in ${ad.adSetCount} ad set${ad.adSetCount === 1 ? "" : "s"}` };
   }

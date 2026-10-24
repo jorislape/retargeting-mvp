@@ -417,8 +417,19 @@ export function aggregateDuplicateRows(
   kpi: KpiKey
 ): ParsedAd[] {
   const groups = new Map<string, ParsedAd[]>();
+  /* Bulletproof pass A6: with an Ad ID on every row, rows sharing an ID
+     are one ad even if renamed (joined under the name it first had);
+     ads sharing a name across IDs still combine into one creative —
+     the creative-level view, labelled with its Ad ID count. */
+  const byId = rows.length > 0 && rows.every(({ ad }) => ad.id != null && ad.id !== "");
+  const keyById = new Map<string, string>();
   for (const { ad } of rows) {
-    const key = normalizeRowName(ad.name);
+    let key = normalizeRowName(ad.name);
+    if (byId) {
+      const known = keyById.get(ad.id as string);
+      if (known != null) key = known;
+      else keyById.set(ad.id as string, key);
+    }
     const group = groups.get(key);
     if (group) group.push(ad);
     else groups.set(key, [ad]);
@@ -486,6 +497,8 @@ function mergeAds(group: readonly ParsedAd[], kpi: KpiKey): ParsedAd {
     : {};
   const adSets = group.map((a) => a.adSetName?.trim() || null);
   const distinctAdSets = adSets.every((n) => n != null) ? new Set(adSets).size : null;
+  const ids = group.map((a) => a.id ?? null);
+  const distinctIds = ids.every((id) => id != null && id !== "") ? new Set(ids).size : 0;
   return {
     name: first.name.trim(),
     id: sharedOrNull(group.map((a) => a.id ?? null)),
@@ -510,6 +523,7 @@ function mergeAds(group: readonly ParsedAd[], kpi: KpiKey): ParsedAd {
     campaignName: sharedOrNull(group.map((a) => a.campaignName?.trim() || null)),
     rowsMerged: group.length,
     ...(distinctAdSets != null ? { adSetCount: distinctAdSets } : {}),
+    ...(distinctIds > 1 ? { adIdCount: distinctIds } : {}),
   };
 }
 

@@ -386,6 +386,10 @@ export interface ParsedAd {
   /** Distinct ad sets among the merged rows — present only when the
    *  export has an ad set column filled on every merged row. */
   adSetCount?: number;
+  /** Bulletproof pass A6 — with an Ad ID column: how many distinct Ad
+   *  IDs this creative combines (same name across IDs = creative-level
+   *  view). Present only when > 1. */
+  adIdCount?: number;
   /** Meta's Ad ID, when the export included an "Ad ID" column — the
    *  reliable cross-period identifier for Period Comparison V2 (it
    *  survives renames; names don't). null when the column is absent or
@@ -562,7 +566,7 @@ export interface AnalysisResult {
   /** Real-account fix 3 — present only when same-name rows were merged:
    *  the export rows behind the analyzed ads, and any breakdown columns
    *  (Day, Age, Placement, …) that caused the repetition. */
-  mergedRows?: { rows: number; breakdowns: string[]; adSetColumn: boolean };
+  mergedRows?: { rows: number; breakdowns: string[]; adSetColumn: boolean; adIdColumn?: boolean };
   /** Real-account fix 8 — present only when ≥50% of judged ads follow
    *  a naming convention with at least one comparable key. */
   namingPatterns?: NamingPatterns;

@@ -66,7 +66,11 @@ modules/debrief/               # the engine — pure, deterministic, no I/O
                   # summed, KPI recomputed from the sums, unknown parts stay unknown;
                   # "- Copy" variants stay separate; rowsMerged → "runs in N ad sets" only
                   # with an ad set column, else "appears N times in this export";
-                  # a limits line and the file card disclose it),
+                  # a limits line and the file card disclose it. Bulletproof A6: with an
+                  # Ad ID on every row, rows sharing an ID are one ad even if renamed,
+                  # and a name shared across IDs is one creative labelled "creative-level
+                  # view: N Ad IDs"; without an Ad ID column a limits line says the
+                  # name-based merge is approximate),
                   # applyFormatOverrides (Creative Format Confirmation V1: user-confirmed
                   # formats replace the ad-name tag GUESS and set formatConfirmed — they
                   # feed pattern/test/brief wording only, never spend/KPI/gate/ranking;
