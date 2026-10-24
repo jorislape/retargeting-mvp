@@ -443,21 +443,24 @@ function withTrimNotes(d: MemoDecision, analysis: AnalysisResult, context: Debri
  * Bulletproof pass A1 — the business layer on top of the median read.
  * Layer 1 (unchanged) places an ad above / near / below the median;
  * Layer 2 crosses it with the user's breakeven (target ROAS / target
- * CPA): above & above breakeven = Scale candidate; above & below =
- * Above average, not profitable — don't scale; below & above = Maintain
- * (reduce, don't pause); below & below = Reduce candidate; an
- * above-median ad under the purchase floor = Wait (not enough evidence
- * to scale); near / at the median = Hold. Without a breakeven the
- * statuses say "(profitability unknown)". Display only — the decision
- * still chooses the receivers and trims.
+ * CPA). "Scale candidate" means exactly "receives budget in this
+ * report" — the decision's receivers (30% bar AND receiver floor AND
+ * breakeven when set), so no status can contradict a "don't scale" line.
+ * Other above-median ads: under the purchase floor = Wait; below the
+ * breakeven = Above average, not profitable — don't scale; otherwise
+ * Above average — keep. Below median: beats breakeven = Maintain
+ * (reduce, don't pause), else Reduce candidate. Near / at the median =
+ * Hold. Without a breakeven, Scale / Reduce say "(profitability
+ * unknown)". Display only — the decision chooses the receivers and trims.
  */
-export type AdStatusKey = "scale" | "not_profitable" | "maintain" | "reduce" | "wait" | "hold";
+export type AdStatusKey = "scale" | "keep" | "not_profitable" | "maintain" | "reduce" | "wait" | "hold";
 function statusFor(
   ad: RankedAd,
   layer: "above" | "at" | "near" | "below",
   analysis: AnalysisResult,
   context: DebriefContext,
-  criteria: DecisionCriteria
+  criteria: DecisionCriteria,
+  receivers: ReadonlySet<string> = new Set()
 ): { status: NonNullable<MemoWinnerLoserRow["status"]> } {
   const target = targetFor(analysis, context);
   const unknown = target == null;
@@ -472,10 +475,11 @@ function statusFor(
     if (nouns != null && ad.conversions != null && ad.conversions < receiverOutcomeMin(criteria)) {
       return mk("wait", `Wait — ${ad.conversions} ${ad.conversions === 1 ? nouns.one : nouns.many}, not enough evidence to scale`, "Too early to call — not enough results yet");
     }
+    if (receivers.has(ad.name)) return mk("scale", `Scale candidate${tag}`, `Candidate for more budget${clientTag}`);
     if (!unknown && !beatsTarget(ad, analysis, target)) {
       return mk("not_profitable", "Above average, not profitable — don't scale", "Above average, but not profitable yet — not adding budget");
     }
-    return mk("scale", `Scale candidate${tag}`, `Candidate for more budget${clientTag}`);
+    return mk("keep", "Above average — keep", "Above average — keeping its budget as is");
   }
   if (!unknown && beatsTarget(ad, analysis, target)) {
     return mk("maintain", "Maintain (reduce, don't pause)", "Still profitable — reducing, not pausing");
@@ -2503,6 +2507,12 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     minLossSpendMultiple: context.minLossSpendMultiple,
   };
 
+  /* Bulletproof A-fix 1: the ads that actually receive budget — the
+     only ones a status may call "Scale candidate". */
+  const receiverNames = new Set(
+    isScaleActionSupported(analysis, criteria) ? budgetReceivers(analysis, criteria).map((a) => a.name) : []
+  );
+
   // Built once: the list feeds both the memo's tests section and the
   // Next-move decision (T1 recommends exactly nextTests[0]).
   const nextTests = buildNextTests(analysis, context, criteria);
@@ -2633,7 +2643,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     winners: byEvidence(analysis.winners, analysis, criteria).map((ad) => ({
       ...buildRow(ad, analysis, context),
       ...adjFor(ad, analysis, criteria),
-      ...statusFor(ad, "above", analysis, context, criteria),
+      ...statusFor(ad, "above", analysis, context, criteria, receiverNames),
     })),
     ...buildAtMedian(analysis, context, criteria),
     leadingConversion: buildLeadingConversion(analysis, criteria),

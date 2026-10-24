@@ -25,7 +25,7 @@ const H = "Ad name,Amount spent (EUR),Purchases,Purchases conversion value";
 const ROWS = ["A,600,40,3000", "B,600,36,2280", "C,400,5,1800", "M1,400,15,1200", "M2,400,15,1200", "M3,400,15,1200", "D,400,15,1120", "E,400,10,800", "F,400,6,480"];
 const CSV = dated(H, ROWS);
 
-const { run, cleanup } = loadEngine();
+const { run, buildSampleMemo, cleanup } = loadEngine();
 try {
   const statusOf = (memo: ReturnType<typeof run>["memo"]) =>
     Object.fromEntries(
@@ -37,7 +37,7 @@ try {
   assert.equal(none.analysis.median, 3);
   assert.deepEqual(statusOf(none.memo), {
     A: "Scale candidate (profitability unknown)",
-    B: "Scale candidate (profitability unknown)",
+    B: "Above average — keep",
     C: "Wait — 5 purchases, not enough evidence to scale",
     M1: "Hold — near median", M2: "Hold — near median", M3: "Hold — near median",
     D: "Hold — near median",
@@ -89,6 +89,33 @@ try {
   ).memo;
   assert.equal(statusOf(cpa).F, "Maintain (reduce, don't pause)", "$20 beats a $25 target");
   assert.equal(statusOf(cpa).G, "Reduce candidate");
+
+  /* ---- A-fix 1: "Scale candidate" ⇔ the ad receives budget ---- */
+  {
+    const fixture = (f: string) => readFileSync(join(ROOT, "scripts/fixtures", f), "utf8");
+    const memos = [
+      none.memo, b4.memo, b18.memo, b55.memo, cpa,
+      run(fixture("agency-naming-convention.csv"), "roas").memo,
+      run(fixture("agency-naming-convention.csv"), "roas", { targetRoas: 3.5 }).memo,
+      run(fixture("ecom-13ads.csv"), "roas").memo,
+      run(fixture("ecom-13ads.csv"), "ctr").memo, // proxy KPI: no budget move ⇒ no scale candidate
+      run(fixture("tester-cpa-8ads.csv"), "cpa").memo,
+      buildSampleMemo(),
+    ];
+    for (const memo of memos) {
+      const rows = [...memo.winners, ...(memo.atMedian?.rows ?? []), ...memo.losers.rows];
+      const scale = rows.filter((r) => r.status?.key === "scale").map((r) => r.name).sort();
+      const receivers = (memo.decision.budgetMove?.to ?? []).map((t) => t.name).sort();
+      assert.deepEqual(scale, receivers, `scale candidates = receivers (${memo.decision.headline})`);
+      for (const line of memo.avoid.buyer.filter((l) => l.startsWith("Do not scale anything except")))
+        for (const name of scale) assert.ok(line.includes(`"${name}"`), "never a scale candidate the report says not to scale");
+    }
+    // Past the 30% bar with enough purchases but outside the top 3 ⇒ keep.
+    const many = run(dated(H, ["A,600,40,3000", "B,600,38,2850", "C,600,36,2700", "D,600,34,2550", ...ROWS.slice(3)]), "roas").memo;
+    assert.equal(many.decision.budgetMove?.to.length, 3);
+    assert.equal(many.winners.filter((r) => r.status?.key === "scale").length, 3);
+    assert.ok(many.winners.some((r) => r.status?.buyer === "Above average — keep"), "a 4th qualifying ad keeps its budget");
+  }
 
   /* ---- Client register: plain words ---- */
   for (const memo of [none.memo, b4.memo, b55.memo]) {

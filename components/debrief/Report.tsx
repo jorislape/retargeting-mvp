@@ -1547,6 +1547,7 @@ function ClientStatCards({ memo }: { memo: Memo }) {
  *  scale = win, reduce / not-profitable = loss, the rest neutral. */
 const STATUS_TONE: Record<NonNullable<MemoWinnerLoserRow["status"]>["key"], string> = {
   scale: "print-win text-emerald-400",
+  keep: "text-zinc-300",
   not_profitable: "print-loss text-red-400",
   reduce: "print-loss text-red-400",
   maintain: "text-zinc-300",

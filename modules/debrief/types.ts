@@ -803,7 +803,7 @@ export interface MemoWinnerLoserRow {
   holdNote?: { buyer: string; client: string };
   /** Bulletproof pass A1 — the business status: median position × the
    *  user's breakeven (see memo.ts statusFor). Display only. */
-  status?: { key: "scale" | "not_profitable" | "maintain" | "reduce" | "wait" | "hold"; buyer: string; client: string };
+  status?: { key: "scale" | "keep" | "not_profitable" | "maintain" | "reduce" | "wait" | "hold"; buyer: string; client: string };
   /** Real-account review — above-median rows, ROAS with a purchase count:
    *  evidence-adjusted ROAS (pulled toward the median by few purchases),
    *  the table's sort key. Buyer view only. */
