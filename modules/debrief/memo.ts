@@ -1992,6 +1992,16 @@ function buildConfidence(
   const leadAd = evidenceLead(analysis, criteria);
   const leadRole = leadAd != null && leadAd !== winners[0] ? "The primary receiving ad" : "The top winner";
   const topPct = leadAd?.deltaPct ?? null;
+  /* Real-account review: "most ads had enough spend" only when it's
+     true — at least half the analyzed ads were judged. */
+  const mostJudged = adsAnalyzed > 0 && adsJudged / adsAnalyzed >= 0.5;
+  const highBar = HIGH_CONFIDENCE_OUTCOME_MULTIPLE * receiverOutcomeMin(criteria);
+  const receiverCount = decision.budgetMove?.to.length ?? 0;
+  /* The "N+ sales" claim needs every receiver's count in the export. */
+  const receiversVerified =
+    receiverCount > 0 &&
+    budgetReceivers(analysis, criteria).every((r) => r.conversions != null && r.conversions >= highBar);
+  const salesWord = outcomeNounsFor(analysis)?.many === "leads" ? "leads" : "sales";
 
   if (level === "high" && flat) {
     reasons.push(
@@ -2000,8 +2010,9 @@ function buildConfidence(
     reasons.push(
       "Every judged ad sits close to the median — a consistent flat read, not a missing signal."
     );
-    clientWhy =
-      "Confidence is high because most ads had enough spend to compare, and they performed consistently close to one another.";
+    clientWhy = mostJudged
+      ? "Confidence is high because most ads had enough spend to compare, and they performed consistently close to one another."
+      : "Confidence is high because the ads with enough spend to compare performed consistently close to one another.";
   } else if (level === "high") {
     reasons.push(
       `${adsJudged} of ${adsAnalyzed} ads reached the minimum spend — a fair sample to judge.`
@@ -2016,8 +2027,11 @@ function buildConfidence(
         `${fmtMoney(belowBenchmarkSpend, currency)} sat below the median — the cut side is material.`
       );
     }
-    clientWhy =
-      "Confidence is high because most ads had enough spend to judge fairly and the gap between what worked and what didn't is clear.";
+    clientWhy = mostJudged
+      ? "Confidence is high because most ads had enough spend to judge fairly and the gap between what worked and what didn't is clear."
+      : receiversVerified
+        ? `Confidence is high because the ${receiverCount === 1 ? "ad getting more budget has" : "ads getting more budget each have"} ${highBar}+ ${salesWord} behind ${receiverCount === 1 ? "it" : "them"} and the gap to the rest is clear.`
+        : "Confidence is high because the ads with enough spend to compare show a clear gap between what worked and what didn't.";
   } else if (level === "medium") {
     if (adsJudged < 10) {
       reasons.push(

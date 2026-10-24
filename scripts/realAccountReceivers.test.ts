@@ -170,6 +170,22 @@ try {
     );
   }
 
+  /* ---- Client confidence: "most ads had enough spend" only when true ---- */
+  {
+    const dated = (rows: string[]) =>
+      "Ad name,Amount spent (EUR),Purchases,Purchases conversion value,Reporting starts,Reporting ends\n" +
+      rows.map((r) => `${r},2026-06-01,2026-06-30`).join("\n") + "\n";
+    const judged = ["R1,600,40,3000", "R2,600,36,2700", "R3,600,34,2520", "M1,400,15,1200", "M2,400,15,1200", "M3,400,15,1200", "M4,400,15,1200", "M5,400,15,1200", "L1,400,10,600", "L2,400,10,600", "L3,400,10,600", "L4,400,10,600"];
+    const tiny = Array.from({ length: 13 }, (_, i) => `T${i},5,0,0`);
+    const few = run(dated([...judged, ...tiny]), "roas").memo; // 12 of 25 judged
+    assert.equal(few.confidence.level, "high");
+    assert.equal(few.confidence.clientWhy, "Confidence is high because the ads getting more budget each have 30+ sales behind them and the gap to the rest is clear.");
+    const most = run(dated(judged), "roas").memo; // 12 of 12 judged
+    assert.equal(most.confidence.level, "high");
+    assert.match(most.confidence.clientWhy, /^Confidence is high because most ads had enough spend/);
+    assert.match(buildSampleMemo().confidence.clientWhy, /^Confidence is high because most ads had enough spend/, "sample: 11 of 14 judged");
+  }
+
   /* ---- Real-account review: which default bars changed the call ----
      The print card shows only these (plus the user's own bars). */
   {
