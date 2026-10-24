@@ -655,7 +655,12 @@ export function zeroThinCopy(
         : `each needs ≥ ${money(thin.needs)} before 0 ${nouns.many} counts as a result`;
   return {
     buyer: `${n} ad${n === 1 ? "" : "s"} with 0 ${nouns.many} set aside — no ${nouns.many} yet, low spend: ${list}; ${bar}.`,
-    client: `${n} ad${n === 1 ? " hasn't" : "s haven't"} made a ${nouns.one} yet but also ${n === 1 ? "hasn't" : "haven't"} spent enough to call — ${list}.`,
+    /* Real-account review: past the named few, the client register is a
+       count only — a client report never lists hundreds of ad names. */
+    client:
+      n > ZERO_THIN_NAMED
+        ? `${n} ads haven't made a ${nouns.one} yet but also haven't spent enough to call.`
+        : `${n} ad${n === 1 ? " hasn't" : "s haven't"} made a ${nouns.one} yet but also ${n === 1 ? "hasn't" : "haven't"} spent enough to call — ${list}.`,
   };
 }
 

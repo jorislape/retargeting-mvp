@@ -1122,6 +1122,13 @@ function appendixOutcomes(r: MemoWinnerLoserRow): string {
   return /^0 (purchases|leads)\b/.test(r.vsMedianLabel) || /^0 (purchases|leads)$/.test(r.valueLabel) ? "0" : "—";
 }
 
+/** Real-account review: client appendix names stop at 40 characters. */
+const CLIENT_APPENDIX_NAME_MAX = 40;
+const clipQuotedNames = (text: string) =>
+  text.replace(/"([^"]+)"/g, (whole, name: string) =>
+    name.length > CLIENT_APPENDIX_NAME_MAX ? `"${middleTruncate(name, CLIENT_APPENDIX_NAME_MAX)}"` : whole
+  );
+
 /** Appendix ad names: middle-truncated harder than the body. */
 const APPENDIX_NAME_MAX = 50;
 
@@ -1214,7 +1221,7 @@ function PrintAppendix({
           </p>
           <ul className="space-y-0.5">
             {moreLimits.map((line, i) => (
-              <li key={i} className="text-[8px] leading-snug text-zinc-500"><Names text={line} /></li>
+              <li key={i} className="text-[8px] leading-snug text-zinc-500"><Names text={client ? clipQuotedNames(line) : line} /></li>
             ))}
           </ul>
         </>

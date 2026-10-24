@@ -68,6 +68,19 @@ try {
   assert.match(zeroLine!, new RegExp(`^${thin!.ads.length} ads with 0 purchases set aside`));
   assert.match(zeroLine!, /and \d+ more; each needs ≥ [\d.,]+ EUR — 2× the account's [\d.,]+ EUR cost per purchase/);
   assert.ok(!r.memo.decision.limits.buyer.some((l) => /had no purchases, so ROAS couldn't be computed/.test(l)));
+  /* Real-account review: past 3 ads the client line is a count only —
+     a client report never lists hundreds of names (the buyer keeps them). */
+  assert.ok(thin!.ads.length > 3, "fixture: more than the named few");
+  assert.ok(
+    r.memo.decision.limits.client.includes(`${thin!.ads.length} ads haven't made a purchase yet but also haven't spent enough to call.`),
+    "client: count only"
+  );
+  assert.ok(!r.memo.decision.limits.client.some((l) => thin!.ads.some((x) => l.includes(x.name))), "no zero-ad names in the client register");
+  {
+    const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
+    assert.match(report, /const CLIENT_APPENDIX_NAME_MAX = 40;/);
+    assert.match(report, /<Names text=\{client \? clipQuotedNames\(line\) : line\} \/>/, "client appendix names clipped to 40");
+  }
 
   /* ---- The "Set aside" tooltip names them too ---- */
   assert.deepEqual(r.memo.scope.zeroOutcomeAside, { count: thin!.ads.length, many: "purchases" });
@@ -122,6 +135,7 @@ try {
   assert.equal(sample.scope.adsJudged, 11);
   assert.equal(sample.scope.adsSetAside, 3);
   assert.ok(sample.decision.limits.buyer.some((l) => l.startsWith("1 ad with 0 purchases set aside — no purchases yet, low spend")));
+  assert.ok(sample.decision.limits.client.some((l) => l.includes('"Video_Hook_FastCut_V4"')), "≤3 ads: the client line still names them");
 
   console.log("real-account zero purchases: all assertions passed");
 } finally {
