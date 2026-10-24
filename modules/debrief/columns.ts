@@ -275,6 +275,9 @@ export interface ColumnMap {
   /** "Ad ID" when present — optional; used only for cross-period ad
    *  matching (Period Comparison V2), never required. */
   adId: string | null;
+  /** Bulletproof A-fix 2 — Meta's "Attribution setting" column (exact
+   *  header only: split headers embed the same words). Optional. */
+  attributionSetting?: string | null;
   spend: string | null;
   impressions: string | null;
   linkClicks: string | null;
@@ -350,6 +353,7 @@ export function resolveColumns(allHeaders: string[]): ColumnMap {
   return {
     adName: findHeader(headers, ALIASES.adName),
     adId: findHeader(headers, ALIASES.adId),
+    attributionSetting: headers.find((h) => h.trim().toLowerCase() === "attribution setting") ?? null,
     spend: spendHeader,
     impressions: findHeader(headers, ALIASES.impressions),
     linkClicks: findHeader(headers, ALIASES.linkClicks),

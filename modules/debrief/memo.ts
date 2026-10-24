@@ -359,6 +359,10 @@ function withDecisionConfidence(
     buyer.push("profitability unknown — no breakeven set");
     client.push("your break-even point isn't set");
   }
+  if ((analysis.attributionSettings?.length ?? 0) > 1) {
+    buyer.push("attribution windows are mixed across ads");
+    client.push("ads were measured with different attribution windows");
+  }
   if (analysis.funnelMix && !analysis.stageBenchmark) {
     buyer.push("funnel stages are mixed and judged against one median");
     client.push("ads aimed at different audience stages are compared together");
@@ -400,6 +404,18 @@ function stageScope(analysis: AnalysisResult): Pick<Memo["scope"], "stageMedians
   return {};
 }
 
+/** Bulletproof A-fix 2 — mixed attribution windows are a comparability
+ *  finding: one exec-summary line (buyer) and one plain client line. */
+function attributionScope(analysis: AnalysisResult): Pick<Memo["scope"], "attributionWarning" | "attributionClientLine"> {
+  const s = analysis.attributionSettings;
+  if (!s || s.length < 2) return {};
+  const parts = s.map((x) => `${shortWindow(x.value)} on ${x.rows} row${x.rows === 1 ? "" : "s"}`);
+  return {
+    attributionWarning: `Mixed attribution windows: ${parts.join(", ")} — ${kpiLabelFor(analysis)} isn't strictly comparable across them.`,
+    attributionClientLine: "Some ads were measured with a wider attribution window, so their results look better than they would otherwise.",
+  };
+}
+
 /** Real-account review — a below-median ad within the flat band. */
 const NEAR_MEDIAN_HOLD = {
   buyer: `Near median — hold (within ${FLAT_FIELD_DELTA_PCT}% of the median; not a trim).`,
@@ -411,6 +427,25 @@ const NEAR_MEDIAN_HOLD = {
 function adjFor(ad: RankedAd, analysis: AnalysisResult, criteria: DecisionCriteria): { adjValueLabel?: string } {
   const v = evidenceAdjustedKpi(ad, analysis, criteria);
   return v == null ? {} : { adjValueLabel: fmtKpiValue(v, analysis.kpi, analysis.currency) };
+}
+
+/** Bulletproof A-fix 2 — "7-day click, 1-day view or 1-day engaged view"
+ *  → "7d click + 1d view + 1d engaged view". */
+export function shortWindow(setting: string | null | undefined): string {
+  if (!setting) return "window not stated";
+  if (setting === "mixed") return "mixed windows";
+  return setting.replace(/(\d+)-day/g, "$1d").replace(/,? or /g, " + ").replace(/, /g, " + ");
+}
+const windowWidth = (setting: string | null | undefined) => shortWindow(setting).split(" + ").length;
+
+/** The judged ads' most common attribution setting (ties: the narrower). */
+function majorityWindow(analysis: AnalysisResult): string | null {
+  const counts = new Map<string, number>();
+  for (const a of analysis.rankedAds) {
+    if (a.attributionSetting) counts.set(a.attributionSetting, (counts.get(a.attributionSetting) ?? 0) + 1);
+  }
+  const ranked = [...counts.entries()].sort((x, y) => y[1] - x[1] || windowWidth(x[0]) - windowWidth(y[0]));
+  return ranked[0]?.[0] ?? null;
 }
 
 /** Copies each Pause / trim ad's trimNote (short form) onto the card's
@@ -436,7 +471,44 @@ function withTrimNotes(d: MemoDecision, analysis: AnalysisResult, context: Debri
           },
         }
       : {};
-  return { ...d, budgetMove: { ...d.budgetMove, from }, ...basis };
+  /* Bulletproof A-fix 2: each receiver's attribution window, and a line
+     when receivers sit on a different window than most judged ads. */
+  const byWinner = new Map(analysis.winners.map((a) => [a.name, a]));
+  const hasWindows = analysis.attributionSettings != null;
+  const to = d.budgetMove.to.map((t) => {
+    const ad = byWinner.get(t.name);
+    return hasWindows && ad ? { ...t, window: shortWindow(ad.attributionSetting) } : t;
+  });
+  const majority = (analysis.attributionSettings?.length ?? 0) > 1 ? majorityWindow(analysis) : null;
+  const differing = majority == null ? [] : to.filter((t) => byWinner.get(t.name)?.attributionSetting !== majority);
+  /* Direction matters: a receiver on a WIDER window may owe part of its
+     lead to the counting; on a NARROWER one its lead is, if anything,
+     understated; "mixed" merged rows on both. */
+  const settingOf = (t: { name: string }) => byWinner.get(t.name)?.attributionSetting;
+  const wider = differing.filter((t) => settingOf(t) !== "mixed" && windowWidth(settingOf(t)) > windowWidth(majority));
+  const narrower = differing.filter((t) => settingOf(t) !== "mixed" && windowWidth(settingOf(t)) <= windowWidth(majority));
+  const mixedRows = differing.filter((t) => settingOf(t) === "mixed");
+  const labels = (ts: typeof to) => [...new Set(ts.map((t) => t.window))].join(", ");
+  const parts = [
+    wider.length > 0 && `${wider.length} on a wider window (${labels(wider)}) — part of ${wider.length === 1 ? "its" : "their"} lead may come from the counting, not the ad`,
+    narrower.length > 0 && `${narrower.length} on a narrower window (${labels(narrower)}) — if anything, ${narrower.length === 1 ? "its" : "their"} lead is understated`,
+    mixedRows.length > 0 && `${mixedRows.length} combining rows counted on different windows`,
+  ].filter((p): p is string => typeof p === "string");
+  const windowNote =
+    majority != null && differing.length > 0
+      ? {
+          windowNote: {
+            buyer: `${differing.length} of ${to.length} receiver${to.length === 1 ? "" : "s"} ${differing.length === 1 ? "uses" : "use"} a different attribution window than most judged ads (${shortWindow(majority)}): ${parts.join("; ")}.`,
+            client:
+              wider.length > 0
+                ? "Some of the ads getting more budget were measured with a wider attribution window than most others, so part of their lead may come from how results were counted."
+                : narrower.length > 0
+                  ? "The ads getting more budget were measured with a narrower attribution window than most others, so if anything their lead is understated."
+                  : "Some of the ads getting more budget combine results counted in different ways.",
+          },
+        }
+      : {};
+  return { ...d, budgetMove: { ...d.budgetMove, from, to }, ...basis, ...windowNote };
 }
 
 /**
@@ -2635,6 +2707,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       totalSpendLabel: fmtMoney(analysis.totalSpend, currency),
       medianLabel: median != null ? fmtKpiValue(median, kpi, currency) : "Not enough data",
       ...stageScope(analysis),
+      ...attributionScope(analysis),
     },
     tldr: buildTldr(analysis, decision),
     clientSummary: buildClientSummary(analysis, decision),

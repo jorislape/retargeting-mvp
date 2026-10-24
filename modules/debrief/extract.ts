@@ -269,6 +269,8 @@ export function extractAds(
          an empty cell stays null. */
       const rawId = columns.adId ? row[columns.adId] : undefined;
       const id = rawId && rawId.trim() !== "" ? rawId.trim() : null;
+      /* Bulletproof A-fix 2: the row's attribution window, when exported. */
+      const window = columns.attributionSetting ? row[columns.attributionSetting]?.trim() || null : undefined;
       const rawKpiValue = kpiValueForRow(row, columns, kpi, spend, click);
       /* Real-account fix 1: a ROAS row with spend and no purchases is a
          0x result, not a missing value — it takes the same zero-outcome
@@ -285,6 +287,7 @@ export function extractAds(
       return {
         name,
         id,
+        ...(window !== undefined ? { attributionSetting: window } : {}),
         spend,
         kpiValue,
         /* Tester Feedback Fix 2 — key present only when true, so other
@@ -524,6 +527,12 @@ function mergeAds(group: readonly ParsedAd[], kpi: KpiKey): ParsedAd {
     rowsMerged: group.length,
     ...(distinctAdSets != null ? { adSetCount: distinctAdSets } : {}),
     ...(distinctIds > 1 ? { adIdCount: distinctIds } : {}),
+    ...(group.some((a) => a.attributionSetting !== undefined)
+      ? {
+          attributionSetting:
+            new Set(group.map((a) => a.attributionSetting ?? null)).size === 1 ? (first.attributionSetting ?? null) : "mixed",
+        }
+      : {}),
   };
 }
 

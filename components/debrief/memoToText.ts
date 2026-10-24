@@ -252,6 +252,8 @@ export function memoToText(
   /* Real-account review: buyer only, near the top. */
   if (view !== "client" && memo.spreadThin) lines.push(memo.spreadThin);
   if (view === "client" && memo.spreadThinPlan) lines.push(memo.spreadThinPlan);
+  if (view !== "client" && scope.attributionWarning) lines.push(scope.attributionWarning);
+  if (view === "client" && scope.attributionClientLine) lines.push(scope.attributionClientLine);
   /* Bulletproof pass A3: stage medians / the mixed-stage warning. */
   if (scope.stageNote) lines.push(view === "client" ? scope.stageNote.client : scope.stageNote.buyer);
   if (view !== "client" && scope.stageWarning) lines.push(scope.stageWarning);
@@ -331,9 +333,9 @@ export function memoToText(
   lines.push(view === "client" ? d.clientHeadline : d.headline);
   /* Trust Pass: every ad the budget move names, in full. */
   if (d.budgetMove) {
-    const list = (ads: { name: string; spendLabel: string; note?: { buyer: string; client: string } }[]) =>
+    const list = (ads: { name: string; spendLabel: string; window?: string; note?: { buyer: string; client: string } }[]) =>
       ads
-        .map((a) => `"${a.name}" (${a.spendLabel}${a.note ? ` — ${view === "client" ? a.note.client : a.note.buyer}` : ""})`)
+        .map((a) => `"${a.name}" (${a.spendLabel}${a.window ? ` · ${a.window}` : ""}${a.note ? ` — ${view === "client" ? a.note.client : a.note.buyer}` : ""})`)
         .join(", ");
     if (d.budgetMove.from.length > 0)
       lines.push(`${view === "client" ? "Pausing or reducing" : "Pause or trim"}: ${list(d.budgetMove.from)}`);
@@ -343,6 +345,7 @@ export function memoToText(
       );
     if (d.execution) lines.push(`${view === "client" ? "How we'll do it" : "How to execute"}: ${view === "client" ? d.execution.client : d.execution.buyer}`);
     if (d.profitBasisNote) lines.push(view === "client" ? d.profitBasisNote.client : d.profitBasisNote.buyer);
+    if (d.windowNote) lines.push(view === "client" ? d.windowNote.client : d.windowNote.buyer);
     if (d.budgetMove.belowSpendLabel)
       lines.push(
         view === "client"

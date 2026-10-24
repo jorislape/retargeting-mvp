@@ -121,6 +121,51 @@ try {
     for (const s of single.memo.decision.limits.client) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
   }
 
+  /* ---- A-fix 2: mixed windows are a comparability finding ---- */
+  {
+    const W = "7-day click, 1-day view or 1-day engaged view";
+    const N = "7-day click or 1-day view";
+    // Receivers (A, B, C) on the WIDER window; everyone else on the narrower one.
+    const rows = [
+      ["A", 600, 40, 3000, W], ["B", 600, 38, 2850, W], ["C", 600, 36, 2700, W],
+      ["M1", 400, 15, 1200, N], ["M2", 400, 15, 1200, N], ["M3", 400, 15, 1200, N], ["M4", 400, 15, 1200, N], ["M5", 400, 15, 1200, N],
+      ["L1", 400, 10, 600, N], ["L2", 400, 10, 600, N], ["L3", 400, 10, 600, N],
+    ];
+    const csv = "Ad name,Amount spent (EUR),Purchases,Purchases conversion value,Attribution setting\n" +
+      rows.map(([n, s, p, v, w]) => `${n},${s},${p},${v},"${w}"`).join("\n") + "\n";
+    const r = run(csv, "roas");
+    const d = r.memo.decision;
+    assert.deepEqual(d.budgetMove!.to.map((t) => t.window), Array(3).fill("7d click + 1d view + 1d engaged view"), "each receiver's window");
+    assert.equal(
+      d.windowNote?.buyer,
+      "3 of 3 receivers use a different attribution window than most judged ads (7d click + 1d view): 3 on a wider window (7d click + 1d view + 1d engaged view) — part of their lead may come from the counting, not the ad."
+    );
+    assert.match(d.windowNote!.client, /wider attribution window than most others/);
+    assert.equal(r.memo.scope.attributionWarning, "Mixed attribution windows: 7d click + 1d view on 8 rows, 7d click + 1d view + 1d engaged view on 3 rows — ROAS isn't strictly comparable across them.");
+    assert.equal(r.memo.scope.attributionClientLine, "Some ads were measured with a wider attribution window, so their results look better than they would otherwise.");
+    assert.ok(r.memo.confidence.decision.caps.buyer.includes("attribution windows are mixed across ads"));
+    assert.notEqual(r.memo.confidence.decision.level, "high", "capped at medium");
+    assert.ok(r.buyerText.includes("(600.00 EUR · 7d click + 1d view + 1d engaged view)"), "TXT shows the window beside the receiver");
+    assert.ok(r.clientText.includes(r.memo.scope.attributionClientLine!));
+    // Receivers on the NARROWER window: their lead is, if anything, understated.
+    const flipped = run(csv.replaceAll(`"${W}"`, "X").replaceAll(`"${N}"`, `"${W}"`).replaceAll("X", `"${N}"`), "roas").memo;
+    assert.match(flipped.decision.windowNote!.buyer, /3 on a narrower window \(7d click \+ 1d view\) — if anything, their lead is understated\.$/);
+    // One window everywhere ⇒ no finding, no cap, windows still shown.
+    const one = run(csv.replaceAll(`"${W}"`, `"${N}"`), "roas").memo;
+    assert.equal(one.decision.windowNote, undefined);
+    assert.equal(one.scope.attributionWarning, undefined);
+    assert.ok(!one.confidence.decision.caps.buyer.includes("attribution windows are mixed across ads"));
+    // Merged rows on different windows ⇒ "mixed windows".
+    const merged = run(csv + `A,100,5,500,"${N}"\n`, "roas").memo;
+    assert.equal(merged.decision.budgetMove!.to.find((t) => t.name === "A")?.window, "mixed windows");
+    // Report: exec summary, receiver window, card line, client line.
+    const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
+    assert.match(report, /\{ label: "Attribution", value: memo\.scope\.attributionWarning \}/);
+    assert.match(report, /\{a\.window \? ` · \$\{a\.window\}` : ""\}/);
+    assert.match(report, /\{client \? d\.windowNote\.client : d\.windowNote\.buyer\}/);
+    assert.match(report, /\{client && memo\.scope\.attributionClientLine && \(/);
+  }
+
   console.log("attributionColumns: all assertions passed");
 } finally {
   cleanup();

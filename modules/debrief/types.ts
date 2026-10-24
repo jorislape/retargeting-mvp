@@ -390,6 +390,9 @@ export interface ParsedAd {
    *  IDs this creative combines (same name across IDs = creative-level
    *  view). Present only when > 1. */
   adIdCount?: number;
+  /** Bulletproof A-fix 2 — the row's "Attribution setting" value when the
+   *  export has that column ("mixed" when merged rows disagree). */
+  attributionSetting?: string | null;
   /** Meta's Ad ID, when the export included an "Ad ID" column — the
    *  reliable cross-period identifier for Period Comparison V2 (it
    *  survives renames; names don't). null when the column is absent or
@@ -746,6 +749,10 @@ export interface MemoScope {
   /** Bulletproof pass A3 — stages mixed but none could be split: the
    *  buyer exec-summary warning. */
   stageWarning?: string;
+  /** Bulletproof A-fix 2 — mixed attribution windows: the buyer
+   *  exec-summary finding, and the client's one plain line. */
+  attributionWarning?: string;
+  attributionClientLine?: string;
 }
 
 export interface MemoWinnerLoserRow {
@@ -1242,7 +1249,9 @@ export interface MemoDecision {
   budgetMove?: {
     /** note: the row's trimNote short form (memo.ts), when it has one. */
     from: { name: string; spendLabel: string; note?: { buyer: string; client: string } }[];
-    to: { name: string; spendLabel: string }[];
+    /** window: the receiver's attribution window (short form), when the
+     *  export has an "Attribution setting" column. */
+    to: { name: string; spendLabel: string; window?: string }[];
     /** Trust Pass 3d — analysis.belowBenchmarkSpend, formatted: "about
      *  $X currently on below-median ads". Shift/cut only (a scale-only
      *  move takes from no one). */
@@ -1258,6 +1267,9 @@ export interface MemoDecision {
    *  account, not profit-based, and how to make it profit-based. Copy
    *  only. */
   profitBasisNote?: { buyer: string; client: string };
+  /** Bulletproof A-fix 2 — present when receivers sit on a different
+   *  attribution window than most judged ads. Copy only. */
+  windowNote?: { buyer: string; client: string };
   headline: string;
   /** Jargon-free counterpart — no "kill/gate/benchmark/median/judged". */
   clientHeadline: string;

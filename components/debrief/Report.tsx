@@ -183,6 +183,8 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
     { label: "Mixed stages", value: memo.scope.stageWarning },
     /* Bulletproof pass A8: a structural finding, on page 1. */
     { label: "Structure", value: memo.spreadThin },
+    /* Bulletproof A-fix 2: a comparability finding, on page 1. */
+    { label: "Attribution", value: memo.scope.attributionWarning },
     /* Bulletproof pass A2: two labels — how clearly the data separates
        the ads, and how safe the action is. */
     { label: "Evidence", value: memo.confidence.level },
@@ -487,13 +489,14 @@ function BudgetMoveNames({
   const [expanded, setExpanded] = useState(false);
   const SHOWN = 2;
   const variant = budgetVariantLabel;
-  const line = (label: string, ads: { name: string; spendLabel: string; note?: { buyer: string; client: string } }[]) =>
+  const line = (label: string, ads: { name: string; spendLabel: string; window?: string; note?: { buyer: string; client: string } }[]) =>
     ads.length === 0 ? null : (
       <p className="text-xs leading-relaxed text-zinc-400">
         <span className="font-medium text-zinc-300">{label}:</span>{" "}
         {ads.map((a, i) => (
           <span key={a.name + i} className={i >= SHOWN && !expanded ? "hidden" : ""}>
             {i > 0 ? ", " : ""}&ldquo;<AdName name={a.name} />&rdquo; ({a.spendLabel}
+            {a.window ? ` · ${a.window}` : ""}
             {a.note ? <span className="text-amber-300/80"> — {client ? a.note.client : a.note.buyer}</span> : null})
           </span>
         ))}
@@ -650,6 +653,12 @@ function DecisionCard({
       {d.profitBasisNote && (
         <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
           {client ? d.profitBasisNote.client : d.profitBasisNote.buyer}
+        </p>
+      )}
+      {/* Bulletproof A-fix 2 — receivers on a different attribution window. */}
+      {d.windowNote && (
+        <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
+          {client ? d.windowNote.client : d.windowNote.buyer}
         </p>
       )}
       {/* Trust Pass 4 — a budget move was withheld because this KPI is a
@@ -2541,6 +2550,10 @@ export function Report({
             <p className="mt-3 max-w-3xl border-l-2 border-accent/50 pl-3 text-xs leading-relaxed text-zinc-300">
               {memo.spreadThinPlan}
             </p>
+          )}
+          {/* Bulletproof A-fix 2 — mixed attribution windows, one plain line. */}
+          {client && memo.scope.attributionClientLine && (
+            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-300">{memo.scope.attributionClientLine}</p>
           )}
           {/* Trust Pass 2 — the user's own target, made visible: how many
               judged ads beat it. Display only; the action ignores it. */}
