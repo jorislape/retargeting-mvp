@@ -145,7 +145,7 @@ try {
     assert.equal(r.memo.scope.attributionClientLine, "Some ads were measured with a wider attribution window, so their results look better than they would otherwise.");
     assert.ok(r.memo.confidence.decision.caps.buyer.includes("attribution windows are mixed across ads"));
     assert.notEqual(r.memo.confidence.decision.level, "high", "capped at medium");
-    assert.ok(r.buyerText.includes("(600.00 EUR · 7d click + 1d view + 1d engaged view)"), "TXT shows the window beside the receiver");
+    assert.ok(r.buyerText.includes("(€600.00 · 7d click + 1d view + 1d engaged view)"), "TXT shows the window beside the receiver");
     assert.ok(r.clientText.includes(r.memo.scope.attributionClientLine!));
     // Receivers on the NARROWER window: their lead is, if anything, understated.
     const flipped = run(csv.replaceAll(`"${W}"`, "X").replaceAll(`"${N}"`, `"${W}"`).replaceAll("X", `"${N}"`), "roas").memo;

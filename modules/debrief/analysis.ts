@@ -144,6 +144,24 @@ function hasNameSignal(winners: RankedAd[], losers: RankedAd[]): boolean {
   );
 }
 
+/** Bulletproof pass B6: report dates read as ISO (YYYY-MM-DD). Converts
+ *  only unambiguous forms — YYYY/MM/DD, and D/M/YYYY or M/D/YYYY when one
+ *  part is over 12; anything else (e.g. 03/04/2025) stays as exported,
+ *  never guessed. */
+export function isoDate(raw: string): string {
+  const v = raw.trim();
+  const ymd = v.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  const pad = (n: string) => n.padStart(2, "0");
+  if (ymd) return `${ymd[1]}-${pad(ymd[2])}-${pad(ymd[3])}`;
+  const dmy = v.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (dmy) {
+    const [a, b] = [Number(dmy[1]), Number(dmy[2])];
+    if (a > 12 && b <= 12) return `${dmy[3]}-${pad(dmy[2])}-${pad(dmy[1])}`;
+    if (b > 12 && a <= 12) return `${dmy[3]}-${pad(dmy[1])}-${pad(dmy[2])}`;
+  }
+  return v;
+}
+
 function extractDateRange(
   rawRows: Record<string, string>[],
   columns: ColumnMap
@@ -152,10 +170,12 @@ function extractDateRange(
   const starts = rawRows
     .map((r) => r[columns.reportingStarts!])
     .filter((v) => v && v.trim() !== "")
+    .map(isoDate)
     .sort();
   const ends = rawRows
     .map((r) => r[columns.reportingEnds!])
     .filter((v) => v && v.trim() !== "")
+    .map(isoDate)
     .sort();
   if (starts.length === 0 || ends.length === 0) return null;
   return { start: starts[0], end: ends[ends.length - 1] };

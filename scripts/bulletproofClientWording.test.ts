@@ -37,7 +37,7 @@ try {
   assert.equal(trims.length, trimNames.size);
   const under = trims.filter((a) => (a.kpiValue ?? 0) < be).reduce((s, a) => s + a.spend, 0);
   assert.ok(under > 0, "fixture: some trims sit below a 2.5x breakeven");
-  const fmt = (n: number) => `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`;
+  const fmt = (n: number) => `€${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const beLine = withBe.clientSummary.find((l) => l.includes(OPT))!;
   assert.ok(beLine.includes(`${OPT}${fmt(under)} of it went to ads below your breakeven (2.50x).`), beLine);
   assert.ok(!beLine.includes("without a breakeven"));

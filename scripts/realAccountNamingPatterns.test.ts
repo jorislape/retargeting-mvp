@@ -74,7 +74,7 @@ try {
   assert.ok(r.buyerText.includes(`\n${np.coverageLine}\n`), "coverage line in TXT");
   assert.equal(np.keys[0].key, "[FOR]");
   assert.match(r.buyerText, /\nPATTERNS BY NAMING\n/);
-  assert.match(r.buyerText, /\n\[FOR\]:\n- \w+ \| \d+ ads \| [\d.,]+ EUR \| \d+ purchases \| [\d.]+x ROAS\n/);
+  assert.match(r.buyerText, /\n\[FOR\]:\n- \w+ \| \d+ ads \| €[\d.,]+ \| \d+ purchases \| [\d.]+x ROAS\n/);
   assert.ok(!r.clientText.includes("PATTERNS BY NAMING"), "client view never shows patterns");
   assert.ok(!r.memo.confidence.reasons.some((x) => x.startsWith("No clear ad-name pattern")));
   {

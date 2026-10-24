@@ -16,7 +16,7 @@ import { CLIENT_BANNED, ROOT, TESTER_CSV, clientStrings, loadEngine } from "./te
 import { MIN_OUTCOMES_FOR_SUPPORTED } from "../modules/debrief/decision.ts";
 
 const FULL =
-  "half the average spend per ad in this export (328.06 EUR avg) — a default, not a statistical guarantee. Set a target CPA to base it on 3× your CPA instead.";
+  "half the average spend per ad in this export (€328.06 avg) — a default, not a statistical guarantee. Set a target CPA to base it on 3× your CPA instead.";
 
 const { run, cleanup } = loadEngine();
 try {
@@ -28,11 +28,11 @@ try {
   assert.equal(m.scope.spendGateSource?.short, "half this export's average spend per ad");
   assert.equal(m.scope.spendGateSource?.buyer, FULL);
   // Decision bars applied.
-  assert.equal(m.decision.appliedCriteria[0].label, `Minimum spend to judge: 164.03 EUR per ad — Debrief default: ${FULL}`);
+  assert.equal(m.decision.appliedCriteria[0].label, `Minimum spend to judge: €164.03 per ad — Debrief default: ${FULL}`);
   // Evidence limits, both registers.
-  assert.ok(m.decision.limits.buyer.includes(`The 164.03 EUR minimum spend per ad is ${FULL}`));
+  assert.ok(m.decision.limits.buyer.includes(`The €164.03 minimum spend per ad is ${FULL}`));
   assert.ok(m.decision.limits.client.includes(
-    "The 164.03 EUR minimum spend used to include an ad is half the average spend per ad in this file (328.06 EUR) — a rule of thumb, not a guarantee."));
+    "The €164.03 minimum spend used to include an ad is half the average spend per ad in this file (€328.06) — a rule of thumb, not a guarantee."));
   for (const s of clientStrings(m))
     for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
   // Bulletproof pass A5: setups no longer size variants to the minimum
@@ -40,14 +40,14 @@ try {
   assert.ok(m.nextTests.every((x) => !x.setup.includes("164.03")), "no gate-sized variant budgets");
   assert.ok(m.nextTests.every((x) => /≥7 days/.test(x.winningLooksLike)));
   // Text export header (short) — client header never shows it.
-  assert.match(t.buyerText, /Minimum spend to judge \(evidence gate\): 164\.03 EUR per ad \(half this export's average spend per ad\)/);
+  assert.match(t.buyerText, /Minimum spend to judge \(evidence gate\): €164\.03 per ad \(half this export's average spend per ad\)/);
   assert.ok(!/evidence gate/.test(t.clientText));
 
   /* Target CPA basis: explained as 3× the target; no half-mean line. */
   const tc = run(TESTER_CSV, "cpa", { targetCpa: 20 });
   assert.equal(tc.analysis.spendGate, 60, "3 × 20");
   assert.equal(tc.memo.scope.spendGateSource?.short, "3× your target CPA");
-  assert.equal(tc.memo.scope.spendGateSource?.buyer, "3× your 20.00 EUR target CPA");
+  assert.equal(tc.memo.scope.spendGateSource?.buyer, "3× your €20.00 target CPA");
   assert.ok(!tc.memo.decision.limits.buyer.some((l) => l.includes("half the average spend")));
 
   /* Floor basis: tiny spends → the fixed floor wins, and it says so. */
@@ -55,7 +55,7 @@ try {
     ["A,12,2,6", "B,11,1,11", "C,10,1,10", "D,14,2,7", "E,13,1,13", "F,2,0,"].join("\n") + "\n";
   const f = run(tiny, "cpa");
   assert.equal(f.analysis.spendGate, 10);
-  assert.match(f.memo.scope.spendGateSource?.buyer ?? "", /^Debrief's fixed 10\.00 EUR floor, because half the average spend per ad in this export \(10\.33 EUR avg\) is lower — a default, not a statistical guarantee\./);
+  assert.match(f.memo.scope.spendGateSource?.buyer ?? "", /^Debrief's fixed €10\.00 floor, because half the average spend per ad in this export \(€10\.33 avg\) is lower — a default, not a statistical guarantee\./);
 
   /* Few-conversions note: buyer only, ratio KPIs only, copy only. */
   assert.ok(m.winners.every((w) => !w.fewOutcomesNote), "tester ads all have ≥12 purchases → no note");

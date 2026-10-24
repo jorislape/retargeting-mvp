@@ -45,9 +45,9 @@ try {
   assert.ok(rows.filter((r) => r !== h).every((r) => r.frequencyLabel && !r.fatigueNote), "below threshold: plain line only");
   assert.equal(h?.fatigueNote, "Frequency 5.1 — possible fatigue; check the trend in Ads Manager.");
   assert.deepEqual(rows.filter((r) => r.fatigueNote).map((r) => r.name), ["Ad_H"], "only ≥4 gets the note");
-  assert.match(t.buyerText, /- Ad_H \| 18\.93 EUR \(at median\) \| 548\.99 EUR \| 29 purchases \| Metrics only — angle unknown\. Frequency 5\.1 — possible fatigue; check the trend in Ads Manager\./);
+  assert.match(t.buyerText, /- Ad_H \| €18\.93 \(at median\) \| €548\.99 \| 29 purchases \| Metrics only — angle unknown\. Frequency 5\.1 — possible fatigue; check the trend in Ads Manager\./);
   assert.equal((t.buyerText.match(/Frequency 5\.1/g) ?? []).length, 1, "the number appears once");
-  assert.match(t.buyerText, /- Ad_D \| 15\.74 EUR .* \| 53 purchases \| Frequency 3\.2 \|/);
+  assert.match(t.buyerText, /- Ad_D \| €15\.74 .* \| 53 purchases \| Frequency 3\.2 \|/);
   assert.ok(!/Frequency|fatigue/i.test(t.clientText), "client register shows neither");
 
   /* Display-only: removing the columns changes nothing but the labels. */
@@ -82,14 +82,14 @@ try {
   assert.equal(t.analysis.adsJudged, 5);
   assert.ok(Math.abs((t.analysis.median ?? 0) - 18.93) < 0.01, `median ≈ 18.93 (got ${t.analysis.median})`);
   assert.equal(m.atMedian?.rows[0].name, "Ad_H", "the 548.99 ad is shown at the benchmark");
-  assert.equal(m.atMedian?.rows[0].spendLabel, "548.99 EUR");
+  assert.equal(m.atMedian?.rows[0].spendLabel, "€548.99");
   assert.match(t.buyerText, /At the median — this ad is the benchmark:/);
   for (const txt of [t.buyerText, t.clientText])
     for (const re of [/ceiling before fatigue/i, /hook problem/i, /or just the hook/i, /keep the angle, change the hook/i])
       assert.ok(!re.test(txt), `no hook-causal wording: ${re}`);
   assert.ok(m.decision.limits.buyer.some((l) => l.startsWith("No target CPA set — ads are ranked against this account's median CPA")));
   assert.ok(m.decision.limits.client.some((l) => l.startsWith("No cost target was set")));
-  assert.match(t.buyerText, /164\.03 EUR per ad \(half this export's average spend per ad\)/);
+  assert.match(t.buyerText, /€164\.03 per ad \(half this export's average spend per ad\)/);
 
   console.log("tester frequency + fixture acceptance: all assertions passed");
 } finally {

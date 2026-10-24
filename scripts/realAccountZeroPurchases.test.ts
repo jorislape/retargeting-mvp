@@ -66,7 +66,7 @@ try {
   const zeroLine = r.memo.decision.limits.buyer.find((l) => l.includes("no purchases yet, low spend"));
   assert.ok(zeroLine, "one named set-aside line");
   assert.match(zeroLine!, new RegExp(`^${thin!.ads.length} ads with 0 purchases set aside`));
-  assert.match(zeroLine!, /and \d+ more; each needs ≥ [\d.,]+ EUR — 2× the account's [\d.,]+ EUR cost per purchase/);
+  assert.match(zeroLine!, /and \d+ more; each needs ≥ €[\d.,]+ — 2× the account's €[\d.,]+ cost per purchase/);
   assert.ok(!r.memo.decision.limits.buyer.some((l) => /had no purchases, so ROAS couldn't be computed/.test(l)));
   /* Real-account review: past 3 ads the client line is a count only —
      a client report never lists hundreds of names (the buyer keeps them). */

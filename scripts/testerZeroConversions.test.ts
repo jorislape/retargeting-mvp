@@ -50,9 +50,9 @@ try {
     assert.equal(row.valueLabel, "0 purchases");
     assert.equal(row.vsMedianLabel, "no CPA — ranked last");
     assert.equal(row.deltaPct, null);
-    assert.ok(m.nextTests.some((x) => x.signals.includes('"ZeroBig" spent 500.00 EUR with 0 purchases.')));
-    assert.match(t.buyerText, /spent 500\.00 EUR with 0 purchases/);
-    assert.match(t.clientText, /spent 500\.00 EUR with 0 purchases/);
+    assert.ok(m.nextTests.some((x) => x.signals.includes('"ZeroBig" spent €500.00 with 0 purchases.')));
+    assert.match(t.buyerText, /spent €500\.00 with 0 purchases/);
+    assert.match(t.clientText, /spent €500\.00 with 0 purchases/);
     for (const txt of [t.buyerText, t.clientText, JSON.stringify(m)]) assert.ok(!/NaN|Infinity|undefined/.test(txt), "no NaN/Infinity leaks");
     for (const s of clientStrings(m))
       for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
@@ -85,13 +85,13 @@ try {
     assert.equal(ta.adsJudged, 5, "not judged");
     assert.ok(!ta.rankedAds.some((r) => r.name === "ZeroThin"));
     assert.deepEqual(ta.zeroOutcomeThin, { ads: [{ name: "ZeroThin", spend: 190 }], needs: 2 * (ta.median as number) });
-    const needs = `${(2 * (ta.median as number)).toFixed(2)} EUR`;
-    const buyerLine = `"ZeroThin" spent 190.00 EUR with 0 purchases — not enough spend yet to call it (needs ≥ ${needs}).`;
+    const needs = `€${(2 * (ta.median as number)).toFixed(2)}`;
+    const buyerLine = `"ZeroThin" spent €190.00 with 0 purchases — not enough spend yet to call it (needs ≥ ${needs}).`;
     assert.ok(thin.memo.decision.limits.buyer.includes(buyerLine), "buyer limits line");
     assert.ok(thin.memo.losers.setAsideNote.includes(buyerLine), "losers set-aside note");
     assert.ok(!/had too little spend \(below/.test(thin.memo.losers.setAsideNote), "never claimed to be below the minimum spend");
     assert.ok(thin.memo.decision.limits.client.includes(
-      `"ZeroThin" has spent 190.00 EUR without a purchase so far — too early to call (it needs about ${needs} of spend).`));
+      `"ZeroThin" has spent €190.00 without a purchase so far — too early to call (it needs about ${needs} of spend).`));
     assert.ok(thin.buyerText.includes(buyerLine));
     for (const st of clientStrings(thin.memo))
       for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(st), `client "${w}": ${st}`);

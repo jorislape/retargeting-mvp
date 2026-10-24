@@ -1,4 +1,4 @@
-import { KpiKey } from "./types";
+import { KpiKey, currencySymbol } from "./types";
 
 export function fmtMoney(value: number, currency: string | null): string {
   const rounded = Math.round(value * 100) / 100;
@@ -6,8 +6,11 @@ export function fmtMoney(value: number, currency: string | null): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  if (!currency || currency === "USD") return `$${formatted}`;
-  return `${formatted} ${currency}`;
+  /* Bulletproof pass B6: the export's symbol ("€1,234.00"); a code with
+     no common symbol keeps the code; no code ⇒ no symbol is invented. */
+  if (!currency) return formatted;
+  const sym = currencySymbol(currency);
+  return sym ? `${sym}${formatted}` : `${formatted} ${currency}`;
 }
 
 export function fmtCount(value: number): string {

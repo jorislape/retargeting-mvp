@@ -81,7 +81,7 @@ try {
     assert.ok(!t1.test.includes(leader.name) && !t1.hypothesis.includes(leader.name) && !t1.setup.includes(leader.name));
     assert.ok(!JSON.stringify(t1.brief).includes(leader.name), "the brief never names the passed-over leader");
     assert.ok(!t1.signals.some((x) => x.includes(leader.name)));
-    assert.match(t1.why, new RegExp(`Watch: "${leader.name.replace(/[[\]]/g, "\\$&")}" leads at [\\d.]+x ROAS but on 100\\.00 EUR and 8 purchases — under the receiver floor, so it isn't the base for this test\\.$`));
+    assert.match(t1.why, new RegExp(`Watch: "${leader.name.replace(/[[\]]/g, "\\$&")}" leads at [\\d.]+x ROAS but on €100\\.00 and 8 purchases — under the receiver floor, so it isn't the base for this test\\.$`));
     assert.match(t1.why, /^It's the strongest ad with the evidence to build on: /);
     assert.ok(d.nextControlledTest?.preserve.includes(`"${primary}"`), "Next controlled test preserves the primary receiver");
     assert.ok(!d.nextControlledTest?.preserve.includes(leader.name));
@@ -148,7 +148,7 @@ try {
     assert.equal(td.headline, 'Trim "F" and "E"; hold everything else steady.');
     assert.deepEqual(td.budgetMove?.from.map((x) => x.name), ["F", "E"], "the trimmed ads are named in the Pause list");
     assert.deepEqual(td.budgetMove?.to, []);
-    assert.match(td.rationale, /No ad qualifies to receive budget — "Thin" leads by \d+% but has 6 purchases, under the receiver floor \(≥10 purchases and ≥ [\d.,]+ EUR spent \(the minimum spend\)\) — so the move is trimming the leak, not scaling\./);
+    assert.match(td.rationale, /No ad qualifies to receive budget — "Thin" leads by \d+% but has 6 purchases, under the receiver floor \(≥10 purchases and ≥ €[\d.,]+ spent \(the minimum spend\)\) — so the move is trimming the leak, not scaling\./);
     for (const s of clientStrings(t.memo))
       for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
   }

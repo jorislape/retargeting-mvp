@@ -88,7 +88,7 @@ try {
     // present on every budget move without a breakeven.
     assert.ok(m.decision.profitBasisNote?.buyer.endsWith(HINT), "no breakeven ⇒ relative-move line ending in the hint");
     assert.ok(r.buyerText.includes(HINT) && r.buyerText.includes(NOTE));
-    assert.ok(r.buyerText.includes(`"Big_Mild" (1,000.00 EUR — below median, not necessarily unprofitable)`));
+    assert.ok(r.buyerText.includes(`"Big_Mild" (€1,000.00 — below median, not necessarily unprofitable)`));
 
     // The bar is the LOWER of 1.5x and half the median: median ≈ 2.0x ⇒ 1.0x.
     const low = run(H + ["A,400,30,1200", "B,400,28,1000", "C,400,25,900", "D,400,20,800", "E,400,20,800", "F,400,20,780", "Ok_1x,400,20,420", "Bad,400,10,300"].join("\n") + "\n", "roas").memo;
@@ -156,15 +156,15 @@ try {
       assert.equal(h.holdNote!.buyer, "Near median — hold (within 15% of the median; not a trim).");
       assert.equal(h.trimNote, undefined, "a hold carries no trim note");
     }
-    assert.match(n.memo.tldr[1], /^Trim or pause "[^"]+" and 2 other ads well below the median — combined [\d,.]+ EUR, plus 2 near-median holds\.$/);
+    assert.match(n.memo.tldr[1], /^Trim or pause "[^"]+" and 2 other ads well below the median — combined €[\d,.]+, plus 2 near-median holds\.$/);
     /* Every trim-context count is the trim count, holds mentioned
        (exec-summary Trim line / below-median intro, client Summary,
        client section 03); the spend-allocation bar keeps every
        below-median ad. */
-    assert.match(n.memo.losers.killInstruction, /Combined 1,200\.00 EUR sits on 3 ads well below the median, plus 2 near-median holds — context, not the amount to move\./);
+    assert.match(n.memo.losers.killInstruction, /Combined €1,200\.00 sits on 3 ads well below the median, plus 2 near-median holds — context, not the amount to move\./);
     // Bulletproof pass B5: the reduce-group sentence — relative, not a loss.
-    assert.match(n.memo.clientSummary[1], /^1,200\.00 EUR went to ads that trailed the middle ad — an area to optimise, not money lost; without a breakeven we can't say how much of it lost money\. We're reducing or pausing those 3 ads\. 2 more sit close to the middle ad and stay as they are\.$/);
-    assert.match(n.memo.losers.clientInstruction, /^1,200\.00 EUR went to ads that trailed the middle ad — .* We're reducing or pausing spend on 3 of the ads below .* 2 more sit close to the middle ad and stay as they are\.$/);
+    assert.match(n.memo.clientSummary[1], /^€1,200\.00 went to ads that trailed the middle ad — an area to optimise, not money lost; without a breakeven we can't say how much of it lost money\. We're reducing or pausing those 3 ads\. 2 more sit close to the middle ad and stay as they are\.$/);
+    assert.match(n.memo.losers.clientInstruction, /^€1,200\.00 went to ads that trailed the middle ad — .* We're reducing or pausing spend on 3 of the ads below .* 2 more sit close to the middle ad and stay as they are\.$/);
     assert.equal(n.memo.spendAllocation?.segments.find((s) => s.id === "below")?.count, 5, "the bar keeps every below-median ad");
     for (const s of clientStrings(n.memo)) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
     assert.ok(n.buyerText.includes("Hold — near median"), "the near-median status (replaces the hold note)");

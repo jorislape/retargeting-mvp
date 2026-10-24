@@ -26,7 +26,7 @@ try {
   /* ---- Success bars + decision rule on every test ---- */
   const r = run(csv(["Static_Hero,400,30,2400", "UGC_B,400,22,1200", "UGC_C,400,20,1000", "Video_D,400,20,950", "Video_E,400,18,800", "UGC_F,400,15,600", "Bad_G,400,8,240"]), "roas");
   const cpp = 2800 / (30 + 22 + 20 + 20 + 18 + 15 + 8);
-  const SUCCESS = `Success needs all three: ≥7 days; ≥10 purchases per variant or ≥ ${(10 * cpp).toFixed(2)} EUR spend each (10× the account's ${cpp.toFixed(2)} EUR cost per purchase); and a lift of more than 15% over the control.`;
+  const SUCCESS = `Success needs all three: ≥7 days; ≥10 purchases per variant or ≥ €${(10 * cpp).toFixed(2)} spend each (10× the account's €${cpp.toFixed(2)} cost per purchase); and a lift of more than 15% over the control.`;
   for (const t of r.memo.nextTests) {
     if (t.test.startsWith("Raise the budget on the ad set running ")) continue;
     assert.equal(t.winningLooksLike, SUCCESS, t.test);
@@ -48,7 +48,7 @@ try {
   assert.match(video.nextTests[0].test, /vary only the opening to test/);
 
   /* ---- Not yet / Reassess use the bars ---- */
-  assert.match(r.memo.decision.reassess.buyer, /^Reassess once the move has run ≥7 days with ≥10 purchases \(or ≥ [\d.]+ EUR spend\) on the changed ad sets\.$/);
+  assert.match(r.memo.decision.reassess.buyer, /^Reassess once the move has run ≥7 days with ≥10 purchases \(or ≥ €[\d.]+ spend\) on the changed ad sets\.$/);
 
   /* ---- T2: a loser spent past 5× the cost per purchase ⇒ rebuild ---- */
   assert.ok(400 >= 5 * cpp);
@@ -76,7 +76,7 @@ try {
   /* ---- The scale test has its own success (budget is the variable) ---- */
   const scale = run(csv(["A,400,30,1600", "B,400,20,1200", "C,400,20,1220", "D,400,20,1180", "E,400,20,1150", "F,400,20,1100"]), "roas").memo;
   const st = scale.nextTests.find((t) => t.test.startsWith("Raise the budget on the ad set running "))!;
-  assert.match(st.winningLooksLike, /^Success needs all three: ≥7 days at each new budget level; ≥10 purchases or ≥ [\d.]+ EUR spend \([^)]*\) at it; and ROAS within 15% of 4\.00x\.$/);
+  assert.match(st.winningLooksLike, /^Success needs all three: ≥7 days at each new budget level; ≥10 purchases or ≥ €[\d.]+ spend \([^)]*\) at it; and ROAS within 15% of 4\.00x\.$/);
   assert.match(st.decisionRule!, /^Holds → take the next ≤20% step; drops more than 15% → step back/);
 
   /* ---- Client wording ---- */

@@ -26,8 +26,8 @@ try {
   assert.equal(m.atMedian.rows.length, 1);
   const row = m.atMedian.rows[0];
   assert.equal(row.name, "Ad_H");
-  assert.equal(row.valueLabel, "18.93 EUR");
-  assert.equal(row.spendLabel, "548.99 EUR");
+  assert.equal(row.valueLabel, "€18.93");
+  assert.equal(row.spendLabel, "€548.99");
   assert.equal(row.vsMedianLabel, "at median");
   assert.equal(row.deltaPct, 0);
   assert.equal(m.atMedian.buyerLabel, "At the median — this ad is the benchmark");
@@ -35,8 +35,8 @@ try {
   assert.ok(!m.winners.some((w) => w.name === "Ad_H") && !m.losers.rows.some((l) => l.name === "Ad_H"));
 
   // Text export (= Copy) in both registers.
-  assert.match(t.buyerText, /At the median — this ad is the benchmark:\n- Ad_H \| 18\.93 EUR \(at median\) \| 548\.99 EUR \| 29 purchases/);
-  assert.match(t.clientText, /The middle ad — the one every other ad is compared against:\n- Ad_H \| 18\.93 EUR \(at the middle ad\) \| 548\.99 EUR/);
+  assert.match(t.buyerText, /At the median — this ad is the benchmark:\n- Ad_H \| €18\.93 \(at median\) \| €548\.99 \| 29 purchases/);
+  assert.match(t.clientText, /The middle ad — the one every other ad is compared against:\n- Ad_H \| €18\.93 \(at the middle ad\) \| €548\.99/);
   const clientAtLines = t.clientText.split("\n").filter((l) => /Ad_H|The middle ad — the one/.test(l));
   for (const l of [...clientAtLines, ...clientStrings(m)])
     for (const w of ["benchmark", "median", "gate", "kill"]) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(l), `client "${w}": ${l}`);

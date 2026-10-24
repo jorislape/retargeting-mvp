@@ -28,7 +28,7 @@ try {
   const cpp = (2500 + 60) / (100 + 4);
   assert.equal(
     r.memo.spreadThin,
-    `Spend is spread thin: 6 of 11 ads never reached the minimum spend (avg ${avg.toFixed(2)} EUR per ad vs ${cpp.toFixed(2)} EUR cost per purchase). Fewer ads per ad set would give each a fair read.`
+    `Spend is spread thin: 6 of 11 ads never reached the minimum spend (avg €${avg.toFixed(2)} per ad vs €${cpp.toFixed(2)} cost per purchase). Fewer ads per ad set would give each a fair read.`
   );
   assert.ok(r.buyerText.includes(r.memo.spreadThin!), "buyer TXT");
   assert.ok(r.buyerText.indexOf(r.memo.spreadThin!) < r.buyerText.indexOf("\n\n"), "…in the header block, near the top");
@@ -62,7 +62,7 @@ try {
       "Ad name,Amount spent (EUR),Link clicks,Impressions\n" +
       ["A,500,50,1000", "B,500,45,1000", "C,500,40,1000", "D,500,35,1000", "E,500,30,1000", "T1,10,1,30", "T2,12,1,40", "T3,8,1,30", "T4,6,1,20", "T5,14,1,50", "T6,10,1,30"].join("\n") + "\n";
     const line = run(csv, "ctr").memo.spreadThin!;
-    assert.match(line, /^Spend is spread thin: 6 of 11 ads never reached the minimum spend \(avg 10\.00 EUR per ad\)\. Fewer ads/);
+    assert.match(line, /^Spend is spread thin: 6 of 11 ads never reached the minimum spend \(avg €10\.00 per ad\)\. Fewer ads/);
   }
 
   /* ---- The fixture and the sample don't qualify (sample unchanged) ---- */

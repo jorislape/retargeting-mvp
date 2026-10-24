@@ -45,10 +45,10 @@ try {
   assert.equal(far.ads[0].adSetName, "Set A");
   assert.deepEqual(
     { ...far.analysis.mixedSegments, ratio: Number(far.analysis.mixedSegments?.ratio.toFixed(2)) },
-    { dimension: "ad set", segments: 2, lowLabel: "10.00 EUR", highLabel: "30.00 EUR", ratio: 3 }
+    { dimension: "ad set", segments: 2, lowLabel: "€10.00", highLabel: "€30.00", ratio: 3 }
   );
   const buyer =
-    "This export mixes 2 ad sets whose typical CPA ranges from 10.00 EUR to 30.00 EUR (3.0× apart) — ranking them against one account median may compare unlike products. For a fairer read, export one ad set or campaign at a time.";
+    "This export mixes 2 ad sets whose typical CPA ranges from €10.00 to €30.00 (3.0× apart) — ranking them against one account median may compare unlike products. For a fairer read, export one ad set or campaign at a time.";
   assert.ok(far.memo.decision.limits.buyer.includes(buyer), "buyer limits line");
   const client = far.memo.decision.limits.client.find((l) => l.startsWith("This file mixes 2 ad sets"));
   assert.ok(client, "client limits line");

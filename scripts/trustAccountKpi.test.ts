@@ -107,7 +107,7 @@ try {
   assert.match(report, /\{hasTarget && \(\s*<th[^>]*>\s*vs target/);
   // Target CPA: ≤ target beats.
   const tc = run(TESTER_CSV, "cpa", { targetCpa: 19 });
-  assert.equal(tc.memo.scope.targetSummary?.targetLabel, "≤ 19.00 EUR");
+  assert.equal(tc.memo.scope.targetSummary?.targetLabel, "≤ €19.00");
   assert.equal(tc.memo.scope.targetSummary?.beat, 3, "15.74, 17.65, 18.93 beat 19");
 
   console.log("trustAccountKpi: all assertions passed");

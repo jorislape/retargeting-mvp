@@ -17,7 +17,7 @@ export const KPI_LABELS: Record<KpiKey, string> = {
 /** Plain-language explainers for the client-facing report view and
  *  abbreviation helper text. One sentence, no jargon. */
 export const KPI_EXPLAINERS: Record<KpiKey, string> = {
-  roas: "Return on ad spend — revenue earned for every $1 spent on ads",
+  roas: "Return on ad spend — revenue earned for every unit of currency spent on ads",
   cpa: "Cost per acquisition — what one purchase or lead costs in ad spend",
   ctr: "Click-through rate — the share of people who saw an ad and clicked",
   cpc: "Cost per click — what one click on an ad costs",
@@ -74,8 +74,25 @@ export function kpiClientLabelFor(a: KpiWithBasis): string {
   return isCpl(a) ? "cost per lead" : KPI_LABELS[a.kpi];
 }
 
-export function kpiExplainerFor(a: KpiWithBasis): string {
-  return isCpl(a) ? "Cost per lead — what one lead costs in ad spend" : KPI_EXPLAINERS[a.kpi];
+/** Bulletproof pass B6 — the export's own currency symbol (from the spend
+ *  header's code). Codes without a common symbol keep the code; an export
+ *  with no code gets no symbol — never an assumed "$". */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥", INR: "₹", KRW: "₩", TRY: "₺", PLN: "zł",
+  AUD: "A$", CAD: "CA$", NZD: "NZ$", HKD: "HK$", SGD: "S$", MXN: "MX$", BRL: "R$", ZAR: "R",
+};
+export function currencySymbol(currency: string | null | undefined): string | null {
+  return currency ? CURRENCY_SYMBOLS[currency.toUpperCase()] ?? null : null;
+}
+
+export function kpiExplainerFor(a: KpiWithBasis & { currency?: string | null }): string {
+  if (isCpl(a)) return "Cost per lead — what one lead costs in ad spend";
+  if (a.kpi === "roas") {
+    const sym = currencySymbol(a.currency);
+    const unit = sym ? `${sym}1` : a.currency ? `1 ${a.currency}` : "unit of currency";
+    return `Return on ad spend — revenue earned for every ${unit} spent on ads`;
+  }
+  return KPI_EXPLAINERS[a.kpi];
 }
 
 /** outcomeNounsForKpi, basis-aware: lead-based CPA counts leads. */
