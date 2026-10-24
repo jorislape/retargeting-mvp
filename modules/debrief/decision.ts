@@ -961,6 +961,25 @@ export function buildLimits(
       `This export also splits conversions by attribution window (${analysis.attributionColumns.map((h) => `'${h}'`).join(", ")}); the ranking uses the blended column.`
     );
     client.push("The file also shows results split by whether people clicked the ad or only saw it.");
+  } else if (outcomeNounsFor(analysis) != null) {
+    /* Bulletproof pass A7: which attribution window the numbers use. */
+    const kpi = kpiLabelFor(analysis);
+    const settings = analysis.attributionSettings;
+    if (settings && settings.length > 1) {
+      const parts = settings.map((s) => `"${s.value}" (${s.rows} row${s.rows === 1 ? "" : "s"})`);
+      buyer.push(
+        `Results use the attribution setting stored in the export, and it is mixed: ${joinPlain(parts)} — ${kpi} isn't strictly comparable between ads on different windows.`
+      );
+      client.push("The ads in this file were measured with different attribution windows, so their results aren't perfectly comparable.");
+    } else if (settings && settings.length === 1) {
+      buyer.push(`Results use the export's attribution setting ("${settings[0].value}"); a different window changes ${kpi}.`);
+      client.push("Results are counted the way the ad account was set to count them when the file was exported; a different setting would change them.");
+    } else {
+      buyer.push(
+        `Results use the account's attribution setting at export time (Meta default: 7-day click, 1-day engage-through, 1-day view); a different window changes ${kpi}.`
+      );
+      client.push("Results are counted the way the ad account was set to count them when the file was exported; a different setting would change them.");
+    }
   }
 
   /* Tester Feedback Fix 5: CPA with no target ranks ads against each

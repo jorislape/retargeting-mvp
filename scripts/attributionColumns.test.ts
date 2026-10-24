@@ -12,7 +12,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ROOT, loadEngine } from "./testerFeedbackEngine.ts";
+import { CLIENT_BANNED, ROOT, loadEngine } from "./testerFeedbackEngine.ts";
 
 const SPLIT = readFileSync(join(ROOT, "scripts/fixtures/attribution-split.csv"), "utf8");
 const BRACKETS = SPLIT.replace(/\((7-day click|1-day click|1-day view)\)/g, "[$1]");
@@ -86,15 +86,39 @@ try {
     assert.equal(r.analysis.attributionColumns?.length, 6, "all six split columns detected, both formats");
   }
 
-  /* ---- No split columns ⇒ identical to the pre-feature engine ---- */
+  /* ---- No split columns ⇒ no split wording; Bulletproof pass A7 adds
+     ONE line naming the window the numbers use (outcome KPIs only). ---- */
   for (const f of ["ecom-13ads", "tester-cpa-8ads", "regional-semicolon"]) {
     const csv = readFileSync(join(ROOT, "scripts/fixtures", `${f}.csv`), "utf8");
     for (const kpi of ["roas", "cpa", "ctr"]) {
       let r;
       try { r = run(csv, kpi); } catch { continue; }
       assert.equal(r.analysis.attributionColumns, undefined, `${f}/${kpi}`);
-      assert.ok(!/attribution/i.test(JSON.stringify(r.memo)), `${f}/${kpi}: no attribution wording`);
+      const DEFAULT_LINE = /^Results use the account's attribution setting at export time \(Meta default: 7-day click, 1-day engage-through, 1-day view\); a different window changes (ROAS|CPA|cost per lead)\.$/;
+      const mentions = r.memo.decision.limits.buyer.filter((l) => /attribution/i.test(l));
+      if (kpi === "ctr") assert.equal(mentions.length, 0, `${f}/${kpi}: CTR isn't attributed — no line`);
+      else assert.ok(mentions.length === 1 && DEFAULT_LINE.test(mentions[0]), `${f}/${kpi}: the default-window line only`);
+      assert.ok(!/view-through excluded|splits conversions by attribution window/.test(JSON.stringify(r.memo)), `${f}/${kpi}: no split wording`);
     }
+  }
+
+  /* ---- Bulletproof pass A7: Meta's "Attribution setting" column ---- */
+  {
+    const rows = (setting: (i: number) => string) =>
+      "Ad name,Amount spent (EUR),Purchases,Purchases conversion value,Attribution setting\n" +
+      ["A,400,30,1600", "B,400,20,1200", "C,400,20,1220", "D,400,20,1180", "E,400,20,1150", "F,400,20,1100", "G,0,0,0"]
+        .map((r, i) => `${r},"${setting(i)}"`).join("\n") + "\n";
+    const mixed = run(rows((i) => (i < 4 ? "7-day click or 1-day view" : "7-day click, 1-day view or 1-day engaged view")), "roas");
+    assert.deepEqual(mixed.analysis.attributionSettings, [
+      { value: "7-day click or 1-day view", rows: 4 },
+      { value: "7-day click, 1-day view or 1-day engaged view", rows: 2 },
+    ], "rows with spend only");
+    assert.ok(mixed.memo.decision.limits.buyer.includes(
+      'Results use the attribution setting stored in the export, and it is mixed: "7-day click or 1-day view" (4 rows) and "7-day click, 1-day view or 1-day engaged view" (2 rows) — ROAS isn\'t strictly comparable between ads on different windows.'
+    ));
+    const single = run(rows(() => "7-day click or 1-day view"), "roas");
+    assert.ok(single.memo.decision.limits.buyer.includes('Results use the export\'s attribution setting ("7-day click or 1-day view"); a different window changes ROAS.'));
+    for (const s of single.memo.decision.limits.client) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
   }
 
   console.log("attributionColumns: all assertions passed");

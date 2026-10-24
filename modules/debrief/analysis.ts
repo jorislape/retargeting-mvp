@@ -7,6 +7,7 @@ import { detectLowIntent } from "./intentFlags";
 import { computeAccountKpi } from "./accountKpi";
 import { fmtKpiValue } from "./format";
 import { extractAds } from "./extract";
+import { parseNumericCell } from "./csv";
 import {
   AnalysisResult,
   DebriefContext,
@@ -367,6 +368,21 @@ export function analyze(
     /* Tester Feedback Fix 3: wording only; absent when none present. */
     ...(hookColumns.length > 0 ? { hookMetricColumns: hookColumns } : {}),
     ...(attributionColumns.length > 0 ? { attributionColumns } : {}),
+    /* Bulletproof pass A7: Meta's "Attribution setting" column, when the
+       export has it — each setting with how many rows with spend used
+       it. Exact header match only (split headers embed the same words). */
+    ...((): { attributionSettings?: NonNullable<AnalysisResult["attributionSettings"]> } => {
+      const header = Object.keys(rawRows[0] ?? {}).find((h) => h.trim().toLowerCase() === "attribution setting");
+      if (!header) return {};
+      const counts = new Map<string, number>();
+      for (const row of rawRows) {
+        const value = row[header]?.trim();
+        const spend = columns.spend ? parseNumericCell(row[columns.spend]) : null;
+        if (value && (spend ?? 0) > 0) counts.set(value, (counts.get(value) ?? 0) + 1);
+      }
+      if (counts.size === 0) return {};
+      return { attributionSettings: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value, rows]) => ({ value, rows })) };
+    })(),
     ...(lowIntent ? { lowIntent } : {}),
     /* Attribution & Intent 2: ranked on click-only (absent ⇒ blended). */
     ...((): { attributionBasis?: NonNullable<AnalysisResult["attributionBasis"]> } => {

@@ -595,6 +595,10 @@ export interface AnalysisResult {
    *  value, conversion count, the outcome floor and the zero rule then
    *  read those columns; view-through is excluded. */
   attributionBasis?: { windowLabel: "7-day click" | "1-day click"; headers: string[] };
+  /** Bulletproof pass A7 — the export's "Attribution setting" values
+   *  (rows with spend per value), most-used first. Absent without that
+   *  column. Copy only. */
+  attributionSettings?: { value: string; rows: number }[];
   /** Attribution & Intent 4 — judged ads flagged Low Intent. Present only
    *  when ≥ MIN_ADS_FOR_INTENT judged ads have the needed columns. */
   lowIntent?: string[];
