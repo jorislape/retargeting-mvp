@@ -519,6 +519,14 @@ export function trimCandidates(analysis: AnalysisResult): RankedAd[] {
   return trimOrder(analysis).filter((a) => !isNearMedian(a));
 }
 
+/** Bulletproof pass B9 — every ad whose status is Hold: the near-median
+ *  ads left off the trim list plus the ad(s) sitting exactly at the
+ *  median. The one count every surface states ("plus N near-median
+ *  holds"), so it matches the status column. */
+export function holdTotal(analysis: AnalysisResult): number {
+  return analysis.losers.length - trimCandidates(analysis).length + analysis.rankedAds.filter((a) => a.deltaFromMedian === 0).length;
+}
+
 /** A below-median ad within FLAT_FIELD_DELTA_PCT of the median. */
 export function isNearMedian(ad: RankedAd): boolean {
   return !ad.zeroConversions && ad.deltaPct != null && ad.deltaPct < 0 && ad.deltaPct >= -FLAT_FIELD_DELTA_PCT;
@@ -1881,7 +1889,7 @@ function decide(
     /* Bulletproof B4: the client's one "below" figure — the reduce
        group's spend plus how many near-median ads are held. */
     const trimSpendLabel = money(trimCandidates(analysis).reduce((s, a) => s + a.spend, 0));
-    const holdCount = analysis.losers.length - fromAds.length;
+    const holdCount = holdTotal(analysis);
     const toAds = receivers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     /* Trust Pass 3d: the already-computed below-median spend, so the move
        is concrete — no new percentage or amount is invented. */

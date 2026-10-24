@@ -1621,7 +1621,8 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
   /* Real-account review: with near-median holds, "below the middle ad"
      counts and names the trims only; the holds get one line. */
   const trims = memo.losers.rows.filter((r) => !r.holdNote);
-  const held = memo.losers.rows.length - trims.length;
+  /* Bulletproof B9: every Hold-status ad, at-median included. */
+  const held = memo.losers.rows.length - trims.length + (memo.atMedian?.rows.length ?? 0);
   const groups = [
     {
       title: "Above the middle ad",

@@ -50,7 +50,8 @@ try {
   assert.match(t.buyerText, /Pause or trim: "Clickbait_M" \(\$384\.00\), .*"Static_H" \(\$379\.00\)/);
   assert.match(t.clientText, /Pausing or reducing: /); // labels made concrete in Trust Pass 3d
   // TL;DR "others" = every other below-median ad.
-  assert.ok(m.tldr.some((l) => l.includes("and 5 other below-median ads")));
+  // Bulletproof B9: the at-median ad is a Hold, so the line counts it.
+  assert.ok(m.tldr.some((l) => l.includes("and 5 other ads well below the median — combined $2,109.00, plus 1 near-median hold.")));
 
   /* Report: no row is sliced away; collapsed rows are counted in print
      (Real-account fix 6 — a real account's PDF ran to 25 pages); counts

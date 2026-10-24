@@ -1,4 +1,5 @@
 import {
+  holdTotal,
   analysisWindowDays,
   budgetReceivers,
   buildDecision,
@@ -333,7 +334,9 @@ function trimNoteFor(
  *  leaves out (decision.ts trimCandidates), with the trims' spend. */
 function trimSplit(analysis: AnalysisResult): { trims: RankedAd[]; held: number; trimSpend: number } {
   const trims = trimCandidates(analysis);
-  return { trims, held: analysis.losers.length - trims.length, trimSpend: trims.reduce((s, a) => s + a.spend, 0) };
+  /* Bulletproof B9: `held` counts every Hold-status ad (near-median and
+     at-median), so the copy matches the status column. */
+  return { trims, held: holdTotal(analysis), trimSpend: trims.reduce((s, a) => s + a.spend, 0) };
 }
 /** Bulletproof pass B5 — the client's reduce-group sentence. Trailing
  *  the middle ad is relative, not a loss: without a breakeven the copy
@@ -717,8 +720,8 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
     /* Real-account review: near-median ads (within the flat band) are
        holds, not trims — a cut names only the trim list. */
     const trims = trimCandidates(analysis);
-    const held = losers.length - trims.length;
-    if (cutSide && held > 0) {
+    const held = holdTotal(analysis);
+    if (cutSide && held > 0 && trims.length > 0) {
       const more = trims.length - 1;
       lines.push(
         `Trim or pause "${trims[0].name}"${more > 0 ? ` and ${more} other ad${more === 1 ? "" : "s"} well below the median` : ""} — combined ${fmtMoney(trims.reduce((s, a) => s + a.spend, 0), currency)}, plus ${heldCount(held)}.`

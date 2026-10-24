@@ -50,7 +50,7 @@ try {
   const order = ["Zero_Big", "Big_Mild", "Zero_Small", "Tiny_Bad"];
   assert.deepEqual(m.losers.rows.map((x) => x.name), order, "below-median rows by money at stake");
   assert.deepEqual(m.decision.budgetMove?.from.map((x) => x.name), order, "Pause / trim in the same order");
-  assert.ok(m.tldr[1].startsWith('Trim or pause "Zero_Big" and 3 other below-median ads'), "the verdict names the most at stake");
+  assert.ok(m.tldr[1].startsWith('Trim or pause "Zero_Big" and 3 other ads well below the median') /* B9: plus the at-median hold */, "the verdict names the most at stake");
   assert.deepEqual(m.losers.rows.map((x) => x.valueLabel), ["0.00x", "2.10x", "0.00x", "0.60x"], "the ROAS column stays");
   assert.ok(m.losers.killInstruction.endsWith("Listed by money at stake — spend × gap to the median."));
 
@@ -156,15 +156,15 @@ try {
       assert.equal(h.holdNote!.buyer, "Near median — hold (within 15% of the median; not a trim).");
       assert.equal(h.trimNote, undefined, "a hold carries no trim note");
     }
-    assert.match(n.memo.tldr[1], /^Trim or pause "[^"]+" and 2 other ads well below the median — combined €[\d,.]+, plus 2 near-median holds\.$/);
+    assert.match(n.memo.tldr[1], /^Trim or pause "[^"]+" and 2 other ads well below the median — combined €[\d,.]+, plus 5 near-median holds\.$/); // B9: 2 near + 3 at the median (Mid_D/E/F)
     /* Every trim-context count is the trim count, holds mentioned
        (exec-summary Trim line / below-median intro, client Summary,
        client section 03); the spend-allocation bar keeps every
        below-median ad. */
-    assert.match(n.memo.losers.killInstruction, /Combined €1,200\.00 sits on 3 ads well below the median, plus 2 near-median holds — context, not the amount to move\./);
+    assert.match(n.memo.losers.killInstruction, /Combined €1,200\.00 sits on 3 ads well below the median, plus 5 near-median holds — context, not the amount to move\./);
     // Bulletproof pass B5: the reduce-group sentence — relative, not a loss.
-    assert.match(n.memo.clientSummary[1], /^€1,200\.00 went to ads that trailed the middle ad — an area to optimise, not money lost; without a breakeven we can't say how much of it lost money\. We're reducing or pausing those 3 ads\. 2 more sit close to the middle ad and stay as they are\.$/);
-    assert.match(n.memo.losers.clientInstruction, /^€1,200\.00 went to ads that trailed the middle ad — .* We're reducing or pausing spend on 3 of the ads below .* 2 more sit close to the middle ad and stay as they are\.$/);
+    assert.match(n.memo.clientSummary[1], /^€1,200\.00 went to ads that trailed the middle ad — an area to optimise, not money lost; without a breakeven we can't say how much of it lost money\. We're reducing or pausing those 3 ads\. 5 more sit close to the middle ad and stay as they are\.$/);
+    assert.match(n.memo.losers.clientInstruction, /^€1,200\.00 went to ads that trailed the middle ad — .* We're reducing or pausing spend on 3 of the ads below .* 5 more sit close to the middle ad and stay as they are\.$/);
     assert.equal(n.memo.spendAllocation?.segments.find((s) => s.id === "below")?.count, 5, "the bar keeps every below-median ad");
     for (const s of clientStrings(n.memo)) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
     assert.ok(n.buyerText.includes("Hold — near median"), "the near-median status (replaces the hold note)");
