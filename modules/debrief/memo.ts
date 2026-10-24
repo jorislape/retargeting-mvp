@@ -156,10 +156,14 @@ function conversionLabelFor(ad: RankedAd, analysis: AnalysisResult): string | un
  *  When the count column is absent, states that plainly — never a
  *  fabricated number. */
 function buildLeadingConversion(
-  analysis: AnalysisResult
+  analysis: AnalysisResult,
+  criteria?: DecisionCriteria
 ): { buyer: string; client: string } | null {
   const nouns = conversionNouns(analysis);
-  const top = analysis.winners[0] ?? null;
+  /* Real-account review: the table's first row (evidence-adjusted
+     order — the primary receiver under a budget move), never a raw
+     leader the table no longer shows first. */
+  const top = byEvidence(analysis.winners, analysis, criteria)[0] ?? null;
   if (nouns == null || top == null) return null;
   if (top.conversions == null) {
     const line = `This export does not include ${nouns.one} counts, so the number of ${nouns.many} behind this result cannot be verified.`;
@@ -2351,7 +2355,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       ...adjFor(ad, analysis, criteria),
     })),
     ...buildAtMedian(analysis, context),
-    leadingConversion: buildLeadingConversion(analysis),
+    leadingConversion: buildLeadingConversion(analysis, criteria),
     losers: {
       /* Real-account review: listed by money at stake, not by KPI. */
       rows: trimOrder(analysis).map((ad) => ({

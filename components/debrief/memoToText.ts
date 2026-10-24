@@ -165,7 +165,9 @@ export function evidenceLine(
     return `Strong support from this dataset — no ad separated meaningfully across ${adsJudged} judged ads.`;
   }
   if (scaleSide) {
-    return `Strong support from this dataset — one ad clearly pulled ahead across ${adsJudged} judged ads.`;
+    /* Real-account review: several receivers ⇒ never "one ad". */
+    const n = decision.budgetMove?.to.length ?? 1;
+    return `Strong support from this dataset — ${n > 1 ? `${n} ads clearly pulled ahead` : "one ad clearly pulled ahead"} across ${adsJudged} judged ads.`;
   }
   return decision.action === "budget"
     ? `Strong support from this dataset — the field separates clearly at the weak end across ${adsJudged} judged ads, though no ad has pulled far enough ahead to scale.`

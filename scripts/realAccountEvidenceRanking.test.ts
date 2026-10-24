@@ -54,6 +54,27 @@ try {
   assert.ok(!r.clientText.includes("adj."), "client TXT never does");
   for (const s of clientStrings(m)) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
 
+  /* ---- The leading-ad sentence describes the table's first row ---- */
+  {
+    // Lead (7.5x on 10 purchases) tops raw ROAS; the table's first row
+    // is Thin (evidence-adjusted) — the sentence follows the table.
+    const memo = run(H + ["Lead,300,10,2250", ...base].join("\n") + "\n", "roas").memo;
+    assert.equal(memo.winners[0].name, "Thin");
+    assert.equal(memo.leadingConversion?.buyer, "The leading ad recorded 18 purchases during this period.");
+    assert.equal(memo.leadingConversion?.client, "This ad generated 18 purchases during the selected period.");
+  }
+  /* ---- Several receivers ⇒ the evidence line never says "one ad" ---- */
+  {
+    // Dated, so nothing but the evidence decides the label.
+    const dated = (rows: string[]) =>
+      "Ad name,Amount spent (EUR),Purchases,Purchases conversion value,Reporting starts,Reporting ends\n" +
+      rows.map((r) => `${r},2026-06-01,2026-06-30`).join("\n") + "\n";
+    const s = run(dated(["R1,600,40,3000", "R2,600,36,2700", "R3,600,34,2520", ...mids, ...lows]), "roas");
+    assert.equal(s.memo.decision.evidenceState, "supported");
+    assert.equal(s.memo.decision.budgetMove?.to.length, 3);
+    assert.ok(s.buyerText.includes("Evidence: Strong support from this dataset — 3 ads clearly pulled ahead across "));
+  }
+
   /* ---- No reordering ⇒ no limits line ---- */
   const same = run(H + ["Big,1300,110,6240", "Mid,600,59,3180", ...mids, ...lows].join("\n") + "\n", "roas").memo;
   assert.ok(!same.decision.limits.buyer.some((l) => l.startsWith("Receivers are ranked")));
