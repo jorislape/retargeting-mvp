@@ -95,7 +95,7 @@ assert.match(report, /const PRINT_LIMITS_SHOWN = \{ buyer: 2, client: 2 \} as co
 assert.match(report, /\{limitsList\}\s*<PrintMore count=\{limits\.length - printLimits\} \/>/);
 
 /* ---- Client PDF names its ads once ---- */
-assert.match(between("function ClientAdList(", "function AtMedianRows("), /ad\{rows\.length === 1 \? "" : "s"\} in this group — the \{tone === "win" \? "strongest" : "weakest"\} are named in the Summary\./);
+assert.match(between("function ClientAdList(", "function AtMedianRows("), /ad\$\{rows\.length === 1 \? "" : "s"\} in this group — the \$\{tone === "win" \? "strongest" : "weakest"\} are named in the Summary\./);
 assert.match(report, /\{sections\.executiveSummary && !client && <ExecutiveSummary/);
 /* Real-account review: the summary is page 1 — in the masthead, right
    after the stat row — and its labels never break mid-word. */

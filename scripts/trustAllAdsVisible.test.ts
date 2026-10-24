@@ -62,7 +62,8 @@ try {
   assert.match(report, /\+\$\{count\} more — full list in the appendix/);
   assert.match(report, /<MoreToggle\s+names=\{rows\.slice\(topAdsShown\)\.map\(\(a\) => a\.name\)\}/);
   assert.match(report, /\{d\.budgetMove && <BudgetMoveNames move=\{d\.budgetMove\} client=\{client\}/);
-  assert.match(report, /count: memo\.losers\.rows\.length,/);
+  // Real-account review: the split counts the trims (holds get a clause).
+  assert.match(report, /count: trims\.length,/);
   assert.match(report, /\+\{group\.count - group\.names\.length\} more — listed below/);
 
   console.log("trustAllAdsVisible: all assertions passed");

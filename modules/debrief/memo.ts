@@ -314,6 +314,18 @@ function trimNoteFor(
   };
 }
 
+/** Real-account review — the trim list and the near-median holds it
+ *  leaves out (decision.ts trimCandidates), with the trims' spend. */
+function trimSplit(analysis: AnalysisResult): { trims: RankedAd[]; held: number; trimSpend: number } {
+  const trims = trimCandidates(analysis);
+  return { trims, held: analysis.losers.length - trims.length, trimSpend: trims.reduce((s, a) => s + a.spend, 0) };
+}
+const heldCount = (n: number) => `${fmtCount(n)} near-median hold${n === 1 ? "" : "s"}`;
+const clientHeldClause = (n: number) =>
+  n === 1
+    ? "1 more sits close to the middle ad and stays as it is."
+    : `${fmtCount(n)} more sit close to the middle ad and stay as they are.`;
+
 /** Real-account review — a below-median ad within the flat band. */
 const NEAR_MEDIAN_HOLD = {
   buyer: `Near median — hold (within ${FLAT_FIELD_DELTA_PCT}% of the median; not a trim).`,
@@ -487,7 +499,7 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
     if (cutSide && held > 0) {
       const more = trims.length - 1;
       lines.push(
-        `Trim or pause "${trims[0].name}"${more > 0 ? ` and ${more} other ad${more === 1 ? "" : "s"} well below the median` : ""} — combined ${fmtMoney(trims.reduce((s, a) => s + a.spend, 0), currency)}; ${held} near-median ad${held === 1 ? "" : "s"} hold${held === 1 ? "s" : ""}.`
+        `Trim or pause "${trims[0].name}"${more > 0 ? ` and ${more} other ad${more === 1 ? "" : "s"} well below the median` : ""} — combined ${fmtMoney(trims.reduce((s, a) => s + a.spend, 0), currency)}, plus ${heldCount(held)}.`
       );
     } else lines.push(
       cutSide
@@ -1824,7 +1836,14 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
     );
   }
 
-  if (losers.length > 0) {
+  const split = trimSplit(analysis);
+  if (losers.length > 0 && cutSide && split.held > 0) {
+    /* Real-account review: the trim count, never the whole below-median
+       pool, with the near-median holds named as staying put. */
+    lines.push(
+      `${fmtCount(split.trims.length)} ad${split.trims.length === 1 ? "" : "s"} performed well below the middle ad, together accounting for ${fmtMoney(split.trimSpend, currency)} of spend — we're reducing or pausing their budgets so that money works harder. ${clientHeldClause(split.held)}`
+    );
+  } else if (losers.length > 0) {
     const facts = `${fmtCount(belowBenchmarkCount)} ad${belowBenchmarkCount === 1 ? "" : "s"} performed below the middle ad, together accounting for ${fmtMoney(belowBenchmarkSpend, currency)} of spend.`;
     lines.push(
       cutSide
@@ -2348,13 +2367,19 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       killInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `${decision.budgetVariant === "cut" ? "Trim the weakest ads below; the freed budget stays with the current ads" : "Trim the weakest ads below and raise the receivers in steps"}. Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} sits on ${fmtCount(analysis.belowBenchmarkCount)} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} — context, not the amount to move.${analysis.losers.length > 1 ? ` ${TRIM_ORDER_NOTE}` : ""}`
+            ? `${decision.budgetVariant === "cut" ? "Trim the weakest ads below; the freed budget stays with the current ads" : "Trim the weakest ads below and raise the receivers in steps"}. ${
+                trimSplit(analysis).held > 0
+                  ? `Combined ${fmtMoney(trimSplit(analysis).trimSpend, currency)} sits on ${fmtCount(trimSplit(analysis).trims.length)} ad${trimSplit(analysis).trims.length === 1 ? "" : "s"} well below the median, plus ${heldCount(trimSplit(analysis).held)}`
+                  : `Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} sits on ${fmtCount(analysis.belowBenchmarkCount)} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"}`
+              } — context, not the amount to move.${analysis.losers.length > 1 ? ` ${TRIM_ORDER_NOTE}` : ""}`
             : `The ads below ran under the median — combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} across ${fmtCount(analysis.belowBenchmarkCount)} ad${analysis.belowBenchmarkCount === 1 ? "" : "s"} total. No cut clears this memo's bars yet (see Next move).${analysis.losers.length > 1 ? ` ${TRIM_ORDER_NOTE}` : ""}`
           : "No ad fell clearly below the median this period.",
       clientInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing below the middle ad${decision.budgetVariant === "cut" ? ". The freed budget stays with the current ads for now." : ", and we add budget to the ads that are working in steps."}`
+            ? trimSplit(analysis).held > 0
+              ? `We're reducing or pausing spend on ${fmtCount(trimSplit(analysis).trims.length)} of the ads below — together they spent ${fmtMoney(trimSplit(analysis).trimSpend, currency)} while performing well below the middle ad${decision.budgetVariant === "cut" ? ". The freed budget stays with the current ads for now." : ", and we add budget to the ads that are working in steps."} ${clientHeldClause(trimSplit(analysis).held)}`
+              : `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing below the middle ad${decision.budgetVariant === "cut" ? ". The freed budget stays with the current ads for now." : ", and we add budget to the ads that are working in steps."}`
             : `The ads below performed below the middle ad — together ${fmtMoney(analysis.belowBenchmarkSpend, currency)} of spend. We're not reducing their budgets yet; the decision above explains the next step.`
           : "No ad underperformed badly enough to pause this period.",
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),

@@ -1283,7 +1283,9 @@ function ClientAdList({
           Summary's worked / needs-improvement split; these per-section
           lists stay on screen and in TXT. */}
       <p className="print-only text-xs leading-relaxed text-zinc-400">
-        {rows.length} ad{rows.length === 1 ? "" : "s"} in this group — the {tone === "win" ? "strongest" : "weakest"} are named in the Summary.
+        {tone === "loss" && rows.some((r) => r.holdNote)
+          ? `${rows.filter((r) => !r.holdNote).length} ads well below the middle ad, plus ${rows.filter((r) => r.holdNote).length} close to it — the weakest are named in the Summary.`
+          : `${rows.length} ad${rows.length === 1 ? "" : "s"} in this group — the ${tone === "win" ? "strongest" : "weakest"} are named in the Summary.`}
       </p>
       <div className="divide-y divide-white/[0.06] print:hidden">
         {rows.map((ad, i) => (
@@ -1503,6 +1505,10 @@ function ClientStatCards({ memo }: { memo: Memo }) {
    enough data yet. Counts are the groups the report itself shows
    (winners/losers lists, set-aside total) — no new math. */
 function ClientDecisionSplit({ memo }: { memo: Memo }) {
+  /* Real-account review: with near-median holds, "needs improvement"
+     counts and names the trims only; the holds get one line. */
+  const trims = memo.losers.rows.filter((r) => !r.holdNote);
+  const held = memo.losers.rows.length - trims.length;
   const groups = [
     {
       title: "Worked well",
@@ -1519,9 +1525,12 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
       titleClass: "print-loss text-red-400",
       rail: "border-l-red-400/50 print-loss",
       tint: "bg-red-400/[0.04]",
-      count: memo.losers.rows.length,
-      names: memo.losers.rows.slice(0, 3).map((a) => a.name),
-      meaning: "These ads performed below the middle ad.",
+      count: trims.length,
+      names: trims.slice(0, 3).map((a) => a.name),
+      meaning:
+        held > 0
+          ? `These ads performed well below the middle ad — plus ${held} close to it, kept as ${held === 1 ? "it is" : "they are"}.`
+          : "These ads performed below the middle ad.",
     },
     {
       title: "Not enough data yet",

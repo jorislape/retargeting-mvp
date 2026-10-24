@@ -154,7 +154,16 @@ try {
       assert.equal(h.holdNote!.buyer, "Near median — hold (within 15% of the median; not a trim).");
       assert.equal(h.trimNote, undefined, "a hold carries no trim note");
     }
-    assert.match(n.memo.tldr[1], /^Trim or pause "[^"]+" and 2 other ads well below the median — combined [\d,.]+ EUR; 2 near-median ads hold\.$/);
+    assert.match(n.memo.tldr[1], /^Trim or pause "[^"]+" and 2 other ads well below the median — combined [\d,.]+ EUR, plus 2 near-median holds\.$/);
+    /* Every trim-context count is the trim count, holds mentioned
+       (exec-summary Trim line / below-median intro, client Summary,
+       client section 03); the spend-allocation bar keeps every
+       below-median ad. */
+    assert.match(n.memo.losers.killInstruction, /Combined 1,200\.00 EUR sits on 3 ads well below the median, plus 2 near-median holds — context, not the amount to move\./);
+    assert.match(n.memo.clientSummary[1], /^3 ads performed well below the middle ad, together accounting for 1,200\.00 EUR of spend — we're reducing or pausing their budgets so that money works harder\. 2 more sit close to the middle ad and stay as they are\.$/);
+    assert.match(n.memo.losers.clientInstruction, /^We're reducing or pausing spend on 3 of the ads below — together they spent 1,200\.00 EUR while performing well below the middle ad, .* 2 more sit close to the middle ad and stay as they are\.$/);
+    assert.equal(n.memo.spendAllocation?.segments.find((s) => s.id === "below")?.count, 5, "the bar keeps every below-median ad");
+    for (const s of clientStrings(n.memo)) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
     assert.ok(n.buyerText.includes("Near median — hold"));
     // The cut bar still reads every below-median ad (the decision is unchanged).
     assert.equal(d.budgetVariant, "shift");
@@ -165,6 +174,10 @@ try {
     const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
     assert.match(report, /hold: client \? "Close to the middle ad" : "Near median — hold"/);
     assert.match(report, /\{view === "client" \? ad\.holdNote\.client : ad\.holdNote\.buyer\}/);
+    // Client split + per-section list: trims counted, holds one clause.
+    assert.match(report, /const trims = memo\.losers\.rows\.filter\(\(r\) => !r\.holdNote\);/);
+    assert.match(report, /count: trims\.length,\s*names: trims\.slice\(0, 3\)/);
+    assert.match(report, /ads well below the middle ad, plus \$\{rows\.filter\(\(r\) => r\.holdNote\)\.length\} close to it/);
   }
 
   console.log("real-account trim order: all assertions passed");
