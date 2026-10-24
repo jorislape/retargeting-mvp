@@ -1180,8 +1180,6 @@ const clipQuotedNames = (text: string, shorten: (name: string, max?: number) => 
     name.length > CLIENT_APPENDIX_NAME_MAX ? `"${shorten(name, CLIENT_APPENDIX_NAME_MAX)}"` : whole
   );
 
-/** Appendix ad names: middle-truncated harder than the body. */
-const APPENDIX_NAME_MAX = 50;
 
 /* Real-account review — the print-only appendix. Buyer: one compact
    table of every judged ad (name, spend, outcomes, KPI) grouped by the
@@ -1257,7 +1255,9 @@ function PrintAppendix({
           <tbody>
             {rows.map(({ r, group }, i) => (
               <tr key={r.name + i} className="print-avoid-break">
-                <td className={`${td} font-sans text-zinc-300`} title={r.name}>{shorten(r.name, APPENDIX_NAME_MAX)}</td>
+                {/* Bulletproof B2: the Ads Manager lookup table — the FULL
+                    name, small, wrapping where it must. */}
+                <td className="py-0 pr-2 align-top font-sans text-[7px] leading-[9px] text-zinc-300 [overflow-wrap:anywhere]">{r.name}</td>
                 <td className={`${td} font-sans whitespace-nowrap`}>{group}</td>
                 <td className={`${td} text-right whitespace-nowrap`}>{r.spendLabel}</td>
                 {outcomeHeader && <td className={`${td} text-right`}>{appendixOutcomes(r)}</td>}

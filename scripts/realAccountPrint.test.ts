@@ -41,8 +41,9 @@ assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline co
 /* ---- The appendix: what print collapses, listed on the last page(s) ---- */
 {
   const app = between("function PrintAppendix(", "/* Client view: the top N");
-  assert.match(report, /const APPENDIX_NAME_MAX = 50;/);
-  assert.match(app, /shorten\(r\.name, APPENDIX_NAME_MAX\)/);
+  // Bulletproof B2: full names (the Ads Manager lookup table), small, wrapping.
+  assert.ok(!/[^_]APPENDIX_NAME_MAX/.test(report), "no buyer appendix name cap");
+  assert.match(app, /<td className="py-0 pr-2 align-top font-sans text-\[7px\] leading-\[9px\] text-zinc-300 \[overflow-wrap:anywhere\]">\{r\.name\}<\/td>/);
   // Every judged ad once, in the role the report gives it.
   assert.match(app, /memo\.winners\.map\(\(r\) => \(\{ r, group: to\.has\(r\.name\) \? label\.receives : label\.above \}\)\)/);
   assert.match(app, /\(memo\.atMedian\?\.rows \?\? \[\]\)\.map\(\(r\) => \(\{ r, group: label\.at \}\)\)/);
