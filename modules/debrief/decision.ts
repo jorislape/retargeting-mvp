@@ -1557,7 +1557,7 @@ function decide(
   if (scaleEligible && !proxyHeld && evidenceReordersReceivers(analysis, criteria) && analysis.median != null) {
     const k = EVIDENCE_ADJUST_FLOOR_MULTIPLE * receiverMin;
     criteriaBuyer.push(
-      `Receivers are ranked by evidence-adjusted ROAS — ads with few purchases are pulled toward the median: (purchases × ROAS + ${k} × median) ÷ (purchases + ${k}). Each still clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar on raw ROAS.`
+      `Receivers are ranked by evidence-adjusted ROAS (ranking heuristic, not a forecast) — ads with few purchases are pulled toward the median: (purchases × ROAS + ${k} × median) ÷ (purchases + ${k}). Each still clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar on raw ROAS.`
     );
     criteriaClient.push(
       "Ads with more sales behind them count for more when choosing where budget goes — a high return on a handful of sales is pulled toward the typical result."

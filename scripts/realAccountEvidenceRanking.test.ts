@@ -49,8 +49,10 @@ try {
   assert.deepEqual(m.winners.map((x) => x.adjValueLabel), ["4.89x", "4.72x", "4.52x", "4.00x"]);
   assert.equal(r.analysis.winners[0].name, "Thin", "analysis order (eligibility) untouched");
   const line = m.decision.limits.buyer.filter((l) => l.startsWith("Receivers are ranked by evidence-adjusted ROAS"));
-  assert.deepEqual(line, ["Receivers are ranked by evidence-adjusted ROAS — ads with few purchases are pulled toward the median: (purchases × ROAS + 20 × median) ÷ (purchases + 20). Each still clears the 30% bar on raw ROAS."]);
+  assert.deepEqual(line, ["Receivers are ranked by evidence-adjusted ROAS (ranking heuristic, not a forecast) — ads with few purchases are pulled toward the median: (purchases × ROAS + 20 × median) ÷ (purchases + 20). Each still clears the 30% bar on raw ROAS."]);
   assert.ok(r.buyerText.includes("- Big | 4.80x · adj. 4.52x ("), "buyer TXT carries adj.");
+  // Bulletproof pass B7: labelled a ranking heuristic everywhere it appears.
+  assert.ok(r.buyerText.includes("\nadj. = evidence-adjusted ROAS (ranking heuristic, not a forecast)\n"), "TXT legend");
   assert.ok(!r.clientText.includes("adj."), "client TXT never does");
   for (const s of clientStrings(m)) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
 
@@ -98,7 +100,7 @@ try {
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
   assert.match(report, /const hasAdj = view !== "client" && rows\.some\(\(r\) => r\.adjValueLabel != null\);/);
   assert.match(report, /<Term tip=\{TIP_ADJ\}>adj\.<\/Term>/);
-  assert.match(report, /const TIP_ADJ =\s*"Evidence-adjusted ROAS — ads with few purchases are pulled toward the median/);
+  assert.match(report, /const TIP_ADJ =\s*"Evidence-adjusted ROAS \(ranking heuristic, not a forecast\) — ads with few purchases are pulled toward the median/);
 
   console.log("real-account evidence ranking: all assertions passed");
 } finally {

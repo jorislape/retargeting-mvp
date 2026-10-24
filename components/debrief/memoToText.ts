@@ -572,6 +572,9 @@ export function memoToText(
         : "None cleared the benchmark this period."
     );
   } else {
+    /* Bulletproof pass B7: TXT has no tooltip — the adj. column says what it is. */
+    if (view !== "client" && memo.winners.some((r) => r.adjValueLabel != null))
+      lines.push("adj. = evidence-adjusted ROAS (ranking heuristic, not a forecast)");
     pushRows(memo.winners);
   }
   lines.push("");

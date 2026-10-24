@@ -490,7 +490,7 @@ function isoDateTime(ms: number): string {
 
 const TIP_BELOW_BENCHMARK = "Performing below the middle ad (the median).";
 const TIP_ADJ =
-  "Evidence-adjusted ROAS — ads with few purchases are pulled toward the median: (purchases × ROAS + k × median) ÷ (purchases + k), k = 2× the purchase floor (20 by default). This table and the budget receivers are ranked by it; the 30% bar still reads raw ROAS.";
+  "Evidence-adjusted ROAS (ranking heuristic, not a forecast) — ads with few purchases are pulled toward the median: (purchases × ROAS + k × median) ÷ (purchases + k), k = 2× the purchase floor (20 by default). This table and the budget receivers are ranked by it; the 30% bar still reads raw ROAS.";
 const TIP_BRIEF_READINESS =
   "Whether this winner has enough results behind it to build the next creative brief on.";
 const TIP_DECISION_BARS =
