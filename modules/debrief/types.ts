@@ -1344,7 +1344,16 @@ export interface Memo {
     client: string[];
   };
   confidence: {
+    /** The EVIDENCE label: how clearly the data separates the ads. */
     level: "high" | "medium" | "low";
+    /** Bulletproof pass A2 — the DECISION label: how safe the action is.
+     *  The evidence level, capped at medium (caps named, both registers)
+     *  when profitability is unknown or funnel stages are mixed without
+     *  per-stage medians. */
+    decision: {
+      level: "high" | "medium" | "low";
+      caps: { buyer: string[]; client: string[] };
+    };
     notes: string[];
     /** Why the level is what it is — buyer register, bullet-ready. */
     reasons: string[];

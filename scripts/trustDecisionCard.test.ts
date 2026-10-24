@@ -91,7 +91,10 @@ try {
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
   const card = report.slice(report.indexOf("function DecisionCard("), report.indexOf("\nfunction AdTable("));
   assert.ok(!/briefReadiness/.test(card.replace(/\/\*[\s\S]*?\*\//g, "")), "no Brief readiness on the card");
-  assert.ok(!/memo\.confidence/.test(card), "no confidence.level on the card");
+  // Bulletproof pass A2: the card carries the evidence line plus the
+  // DECISION label (how safe the action is) — never confidence.level.
+  assert.ok(!/memo\.confidence\.level/.test(card), "no confidence.level on the card");
+  assert.match(card, /decisionLine\(memo\.confidence, view\)/, "the decision label");
   assert.match(report, /<Term tip=\{TIP_BRIEF_READINESS\}>Brief readiness<\/Term>:/, "explained in the tests section");
 
   console.log("trustDecisionCard: all assertions passed");

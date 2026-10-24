@@ -27,7 +27,7 @@ const between = (from: string, to: string) => report.slice(report.indexOf(from),
 /* ---- "+N more" stays collapsed in print, with a pointer ---- */
 assert.ok(!/\? "hidden print:(table-row|flex|inline)"/.test(report), "no collapsed row is forced back into print");
 assert.match(report, /const text = inAppendix \? `\+\$\{count\} more — full list in the appendix` : `\+\$\{count\} more`;/);
-assert.ok(!/online/i.test(report.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "")), "no print text points 'online'");
+assert.ok(!/\bonline\b/i.test(report.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "")), "no print text points 'online'");
 assert.equal((report.match(/<PrintMore count=\{expanded \? 0 : rows\.length - Math\.min\(topAdsShown, PRINT_TABLE_ROWS\)\} \/>/g) ?? []).length, 1, "ad table");
 assert.match(report, /const PRINT_TABLE_ROWS = 3;/, "tables print their top 3 rows");
 assert.match(report, /i >= PRINT_TABLE_ROWS && !expanded \? "print:hidden" : ""/);

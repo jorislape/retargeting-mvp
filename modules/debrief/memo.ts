@@ -331,6 +331,32 @@ const clientHeldClause = (n: number) =>
     ? "1 more sits close to the middle ad and stays as it is."
     : `${fmtCount(n)} more sit close to the middle ad and stay as they are.`;
 
+/**
+ * Bulletproof pass A2 — the second confidence label. `level` stays the
+ * EVIDENCE read (how clearly the data separates the ads); `decision` is
+ * how safe the action is: the same level, capped at medium when
+ * profitability is unknown (no breakeven / target) and when the funnel
+ * stages are mixed but compared against one median. Each cap is named.
+ */
+function withDecisionConfidence(
+  c: Omit<Memo["confidence"], "decision">,
+  analysis: AnalysisResult,
+  criteria: DecisionCriteria
+): Memo["confidence"] {
+  const buyer: string[] = [];
+  const client: string[] = [];
+  if (criteria.breakeven == null) {
+    buyer.push("profitability unknown — no breakeven set");
+    client.push("your break-even point isn't set");
+  }
+  if (analysis.funnelMix) {
+    buyer.push("funnel stages are mixed and judged against one median");
+    client.push("ads aimed at different audience stages are compared together");
+  }
+  const level = c.level === "high" && buyer.length > 0 ? "medium" : c.level;
+  return { ...c, decision: { level, caps: { buyer, client } } };
+}
+
 /** Real-account review — a below-median ad within the flat band. */
 const NEAR_MEDIAN_HOLD = {
   buyer: `Near median — hold (within ${FLAT_FIELD_DELTA_PCT}% of the median; not a trim).`,
@@ -1987,7 +2013,7 @@ function buildConfidence(
   analysis: AnalysisResult,
   decision: MemoDecision,
   criteria?: DecisionCriteria
-): Memo["confidence"] {
+): Omit<Memo["confidence"], "decision"> {
   const { adsJudged, adsAnalyzed, winners, losers, median, hasNameSignal, missingColumns, spendGate, currency, belowBenchmarkSpend } =
     analysis;
   const flat = decision.evidenceShape === "flatness";
@@ -2520,6 +2546,6 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
     avoid: buildAvoid(analysis, context, decision),
-    confidence: buildConfidence(analysis, decision, criteria),
+    confidence: withDecisionConfidence(buildConfidence(analysis, decision, criteria), analysis, criteria),
   };
 }

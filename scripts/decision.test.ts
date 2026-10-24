@@ -1398,7 +1398,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       "buyer text carries the plain-language evidence sentence for the pinned supported/separation sample"
     );
     assert.ok(
-      clientText.includes("How sure we are: Strong — the available results show a clear enough difference"),
+      clientText.includes("How clear the results are: Strong — the available results show a clear enough difference"),
       "client text carries the plain-language client evidence sentence"
     );
     for (const text of [buyerText, clientText]) {
@@ -1432,7 +1432,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
 
     // Section order intact: the decision leads, everything else follows
     // in the pre-existing order.
-    const order = ["NEXT MOVE", "THE CALL", "ABOVE MEDIAN", "BELOW MEDIAN", "PATTERNS", "NEXT 3 TESTS", "CONFIDENCE:"]; // Trust Pass 2: no target → relative section names
+    const order = ["NEXT MOVE", "THE CALL", "ABOVE MEDIAN", "BELOW MEDIAN", "PATTERNS", "NEXT 3 TESTS", "CONFIDENCE — EVIDENCE:"]; // Bulletproof A2: two labels. Trust Pass 2: no target → relative section names
     const positions = order.map((h) => buyerText.indexOf(h));
     assert.ok(positions.every((p) => p >= 0), "all buyer section headers present");
     assert.deepEqual([...positions].sort((a, b) => a - b), positions, "buyer section order unchanged, NEXT MOVE first");

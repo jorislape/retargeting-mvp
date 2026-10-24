@@ -20,7 +20,7 @@ import {
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
-import { belowSpendLine, CLIENT_BRIEF_LEGEND, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { belowSpendLine, CLIENT_BRIEF_LEGEND, CONFIDENCE_LABELS, decisionLine, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
@@ -179,7 +179,10 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
       value: client ? memo.losers.clientInstruction : memo.losers.killInstruction,
     },
     { label: "Top recommended test", value: memo.nextTests[0]?.test },
-    { label: "Confidence", value: memo.confidence.level },
+    /* Bulletproof pass A2: two labels — how clearly the data separates
+       the ads, and how safe the action is. */
+    { label: "Evidence", value: memo.confidence.level },
+    { label: "Decision", value: decisionLine(memo.confidence, "buyer") },
   ];
   const lines = candidates.filter(
     (l): l is { label: string; value: string } => Boolean(l.value)
@@ -675,13 +678,21 @@ function DecisionCard({
           className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${EVIDENCE_COLOR[d.evidenceState]}`}
         >
           {client ? (
-            "How sure we are"
+            CONFIDENCE_LABELS.evidence.client
           ) : (
             <Term tip={evidenceLine(d, memo.scope.adsJudged, "client")}>Evidence</Term>
           )}
         </span>
         {": "}
         {evidenceLine(d, memo.scope.adsJudged, view)}
+      </p>
+      {/* Bulletproof pass A2 — how safe the action is, with what caps it. */}
+      <p className="mt-1 max-w-3xl text-xs leading-relaxed text-zinc-400">
+        <span className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${CONFIDENCE_COLOR[memo.confidence.decision.level]}`}>
+          {CONFIDENCE_LABELS.decision[client ? "client" : "buyer"]}
+        </span>
+        {": "}
+        {decisionLine(memo.confidence, view)}
       </p>
       {/* Evidence Confidence V2 — cross-period consistency of the
           current leader, sourced from memo.comparison (presentation
@@ -2985,17 +2996,26 @@ export function Report({
             n={sectionNumbers.confidence!}
             title={client ? "Confidence & data used" : "Confidence & missing data"}
             right={
-              <span
-                className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${CONFIDENCE_COLOR[memo.confidence.level]}`}
-              >
-                {memo.confidence.level}
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">
+                <span className={CONFIDENCE_COLOR[memo.confidence.level]}>
+                  {client ? "Results" : "Evidence"} {memo.confidence.level}
+                </span>
+                <span className="text-zinc-500"> · </span>
+                <span className={CONFIDENCE_COLOR[memo.confidence.decision.level]}>
+                  {client ? "Next step" : "Decision"} {memo.confidence.decision.level}
+                </span>
               </span>
             }
           />
           {client ? (
             <>
               <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-300">
-                {memo.confidence.clientWhy}
+                <span className="font-semibold">{CONFIDENCE_LABELS.evidence.client}:</span>{" "}
+                {memo.confidence.level.charAt(0).toUpperCase() + memo.confidence.level.slice(1)}. {memo.confidence.clientWhy}
+              </p>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-300">
+                <span className="font-semibold">{CONFIDENCE_LABELS.decision.client}:</span>{" "}
+                {decisionLine(memo.confidence, "client")}.
               </p>
               <p className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-400">
                 This result is based on {memo.scope.adsAnalyzed} ads and{" "}
@@ -3008,10 +3028,15 @@ export function Report({
               </p>
             </>
           ) : (
+            <>
+            <p className="mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-300">
+              <span className="font-semibold">Decision: </span>
+              {decisionLine(memo.confidence, "buyer")}
+            </p>
             <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-                  Why {memo.confidence.level}
+                  Why evidence is {memo.confidence.level}
                 </p>
                 <ul className="mt-2.5 space-y-2">
                   {memo.confidence.reasons.map((reason, i) => (
@@ -3040,6 +3065,7 @@ export function Report({
                 </ul>
               </div>
             </div>
+            </>
           )}
         </section>
         )}

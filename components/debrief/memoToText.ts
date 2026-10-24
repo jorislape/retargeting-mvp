@@ -127,6 +127,22 @@ export function clientDataUsedSentence(
  * significance, causal proof, external validation, or a guarantee of
  * future performance.
  */
+/** Bulletproof pass A2 — the DECISION confidence label, active register:
+ *  its level and every cap that holds it down, e.g. "Medium — profitability
+ *  unknown — no breakeven set". */
+export function decisionLine(confidence: Memo["confidence"], view: ReportView): string {
+  const { level, caps } = confidence.decision;
+  const name = `${level.charAt(0).toUpperCase()}${level.slice(1)}`;
+  const list = view === "client" ? caps.client : caps.buyer;
+  return list.length > 0 ? `${name} — ${list.join(view === "client" ? " and " : "; ")}` : name;
+}
+
+/** The two confidence labels' names, per register. */
+export const CONFIDENCE_LABELS = {
+  evidence: { buyer: "Evidence", client: "How clear the results are" },
+  decision: { buyer: "Decision", client: "How safe the next step is" },
+} as const;
+
 export function evidenceLine(
   decision: Memo["decision"],
   adsJudged: number,
@@ -331,8 +347,9 @@ export function memoToText(
   }
   lines.push(view === "client" ? d.clientRationale : d.rationale);
   lines.push(
-    `${view === "client" ? "How sure we are" : "Evidence"}: ${evidenceLine(d, scope.adsJudged, view)}`
+    `${CONFIDENCE_LABELS.evidence[view === "client" ? "client" : "buyer"]}: ${evidenceLine(d, scope.adsJudged, view)}`
   );
+  lines.push(`${CONFIDENCE_LABELS.decision[view === "client" ? "client" : "buyer"]}: ${decisionLine(memo.confidence, view)}`);
   /* Evidence Confidence V2 — cross-period consistency context, same
      position as the on-screen card (comparison-sourced; decision and
      evidenceState stay comparison-blind). */
@@ -652,14 +669,16 @@ export function memoToText(
   }
 
   if (view === "client") {
-    lines.push(`CONFIDENCE & DATA USED: ${memo.confidence.level.toUpperCase()}`);
-    lines.push(memo.confidence.clientWhy);
+    lines.push("CONFIDENCE & DATA USED");
+    lines.push(`How clear the results are: ${memo.confidence.level.toUpperCase()}. ${memo.confidence.clientWhy}`);
+    lines.push(`How safe the next step is: ${decisionLine(memo.confidence, "client")}`);
     lines.push(
       `This result is based on ${scope.adsAnalyzed} ads and ${scope.totalSpendLabel} in ad spend${scope.dateRangeLabel ? ` between ${scope.dateRangeLabel}` : ""}. ${clientDataUsedSentence(scope, scope.kpiLabelClient ?? scope.kpiLabel)} Every number comes from the exported ad data.`
     );
   } else {
-    lines.push(`CONFIDENCE: ${memo.confidence.level.toUpperCase()}`);
-    lines.push(`Why ${memo.confidence.level}:`);
+    lines.push(`CONFIDENCE — EVIDENCE: ${memo.confidence.level.toUpperCase()} · DECISION: ${memo.confidence.decision.level.toUpperCase()}`);
+    lines.push(`Decision: ${decisionLine(memo.confidence, "buyer")}`);
+    lines.push(`Why evidence is ${memo.confidence.level}:`);
     memo.confidence.reasons.forEach((r) => lines.push(`- ${r}`));
     lines.push("Caveats:");
     memo.confidence.notes.forEach((n) => lines.push(`- ${n}`));
