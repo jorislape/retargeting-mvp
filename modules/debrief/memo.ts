@@ -794,13 +794,15 @@ function buildNamingClientLine(analysis: AnalysisResult): { namingClientLine?: s
 
 /** Real-account review — one insight line when most ads never got a
  *  fair read. Restates analysis.spreadThin; never a decision input. */
-function buildSpreadThin(analysis: AnalysisResult): { spreadThin?: string } {
+function buildSpreadThin(analysis: AnalysisResult): { spreadThin?: string; spreadThinPlan?: string } {
   const t = analysis.spreadThin;
   if (!t) return {};
   const nouns = outcomeNounsFor(analysis);
   const avg = `avg ${fmtMoney(t.avgSpend, analysis.currency)} per ad`;
   const vs = t.costPerOutcome != null && nouns != null ? ` vs ${fmtMoney(t.costPerOutcome, analysis.currency)} cost per ${nouns.one}` : "";
   return {
+    /* Bulletproof pass A8: the client sees the same fact as a plan. */
+    spreadThinPlan: "We're concentrating budget into fewer ads so each one gets enough data to judge.",
     spreadThin: `Spend is spread thin: ${fmtCount(t.thin)} of ${fmtCount(t.total)} ads never reached the minimum spend (${avg}${vs}). Fewer ads per ad set would give each a fair read.`,
   };
 }

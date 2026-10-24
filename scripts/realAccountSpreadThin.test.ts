@@ -33,6 +33,11 @@ try {
   assert.ok(r.buyerText.includes(r.memo.spreadThin!), "buyer TXT");
   assert.ok(r.buyerText.indexOf(r.memo.spreadThin!) < r.buyerText.indexOf("\n\n"), "…in the header block, near the top");
   assert.ok(!r.clientText.includes("spread thin"), "never in client TXT");
+  /* Bulletproof pass A8: the client sees it as the plan, never as blame. */
+  assert.equal(r.memo.spreadThinPlan, "We're concentrating budget into fewer ads so each one gets enough data to judge.");
+  assert.ok(r.clientText.includes(r.memo.spreadThinPlan!), "client TXT, near the top");
+  assert.ok(r.clientText.indexOf(r.memo.spreadThinPlan!) < r.clientText.indexOf("NEXT MOVE"));
+  assert.ok(!r.buyerText.includes(r.memo.spreadThinPlan!), "the buyer keeps the finding itself");
   assert.ok(!clientStrings(r.memo).some((s) => s.includes("spread thin")), "never in a client string");
 
   /* ---- Display only ---- */
@@ -68,6 +73,11 @@ try {
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
   const at = report.indexOf("{!client && memo.spreadThin && (");
   assert.ok(at > 0 && at < report.indexOf("</header>"), "near the top of the buyer view");
+  // Bulletproof pass A8: a structural finding in the buyer exec summary
+  // (page 1 of the PDF), and the client plan line in the masthead.
+  assert.match(report, /\{ label: "Structure", value: memo\.spreadThin \}/);
+  const plan = report.indexOf("{client && memo.spreadThinPlan && (");
+  assert.ok(plan > 0 && plan < report.indexOf("</header>"), "client: near the top");
 
   console.log("real-account spread thin: all assertions passed");
 } finally {

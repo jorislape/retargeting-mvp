@@ -1372,6 +1372,9 @@ export interface Memo {
    *  the top + buyer TXT; absent unless analysis.spreadThin). Display
    *  only. */
   spreadThin?: string;
+  /** Bulletproof pass A8 — the client's version of spreadThin, framed as
+   *  the plan, never as blame. Present exactly when spreadThin is. */
+  spreadThinPlan?: string;
   /** Real-account review — client "What worked" only: the strongest vs
    *  weakest value of up to 2 naming keys in plain words. Absent
    *  without a naming convention. Display only. */

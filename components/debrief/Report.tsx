@@ -181,6 +181,8 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
     { label: "Top recommended test", value: memo.nextTests[0]?.test },
     /* Bulletproof pass A3: stages mixed but not splittable — page 1. */
     { label: "Mixed stages", value: memo.scope.stageWarning },
+    /* Bulletproof pass A8: a structural finding, on page 1. */
+    { label: "Structure", value: memo.spreadThin },
     /* Bulletproof pass A2: two labels — how clearly the data separates
        the ads, and how safe the action is. */
     { label: "Evidence", value: memo.confidence.level },
@@ -2522,9 +2524,21 @@ export function Report({
           )}
           {/* Real-account review — most ads never got a fair read. Buyer
               only, near the top; display only (amber = warning). */}
+          {/* Bulletproof pass A8: in print the exec summary carries it as
+              "Structure", so this line is screen-only there. */}
           {!client && memo.spreadThin && (
-            <p className="mt-3 max-w-3xl border-l-2 border-amber-300/50 pl-3 text-xs leading-relaxed text-zinc-300">
+            <p
+              className={`mt-3 max-w-3xl border-l-2 border-amber-300/50 pl-3 text-xs leading-relaxed text-zinc-300 ${
+                sections.executiveSummary ? "print:hidden" : ""
+              }`}
+            >
               {memo.spreadThin}
+            </p>
+          )}
+          {/* Bulletproof pass A8 — the client sees the plan, not blame. */}
+          {client && memo.spreadThinPlan && (
+            <p className="mt-3 max-w-3xl border-l-2 border-accent/50 pl-3 text-xs leading-relaxed text-zinc-300">
+              {memo.spreadThinPlan}
             </p>
           )}
           {/* Trust Pass 2 — the user's own target, made visible: how many

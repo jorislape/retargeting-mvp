@@ -251,6 +251,7 @@ export function memoToText(
   }
   /* Real-account review: buyer only, near the top. */
   if (view !== "client" && memo.spreadThin) lines.push(memo.spreadThin);
+  if (view === "client" && memo.spreadThinPlan) lines.push(memo.spreadThinPlan);
   /* Bulletproof pass A3: stage medians / the mixed-stage warning. */
   if (scope.stageNote) lines.push(view === "client" ? scope.stageNote.client : scope.stageNote.buyer);
   if (view !== "client" && scope.stageWarning) lines.push(scope.stageWarning);
