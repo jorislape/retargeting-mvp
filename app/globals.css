@@ -186,8 +186,8 @@ body {
 /* Opposite of .print-hidden: report-only chrome (the branded masthead
    and disclaimer footer baked into the printed document itself, since
    the on-screen nav/footer are .print-hidden and the browser's own
-   print header/footer isn't something this stylesheet can control —
-   see Report.tsx / CompetitorDebriefResult.tsx). Invisible on screen,
+   print header/footer is suppressed only where the zero-margin rule
+   below applies — see Report.tsx / CompetitorDebriefResult.tsx). Invisible on screen,
    shown only when printing. */
 .print-only {
   display: none;
@@ -428,5 +428,29 @@ body {
     margin-block: 0 !important;
     padding-inline: 4mm !important;
     padding-block: 0 !important;
+  }
+
+  /* Bulletproof pass B8 — no browser header/footer. With a zero page
+     margin there is no room for the browser's own header/footer (URL,
+     date, title, page number), so they can't print even with the
+     checkbox on; the 12mm margin moves inside the content and repeats
+     on every page via box-decoration-break: clone. Gated on that
+     support (Chromium, Firefox): WebKit can't clone padding across
+     pages, so it keeps the 12mm @page margin above — and WebKit draws
+     its header/footer whenever the print dialog asks, whatever the CSS
+     margin. Same geometry either way: a 172mm content column 19mm from
+     the page edge. The build (Lightning CSS) widens the first condition
+     to "-webkit-box-decoration-break or box-decoration-break", which
+     WebKit matches (prefixed, inline-only support) — so WebKit is also
+     excluded explicitly by a keyword only it parses. */
+  @supports (box-decoration-break: clone) and (not (font: -apple-system-body)) {
+    @page {
+      margin: 0;
+    }
+    .report-print-page {
+      max-width: 204mm !important;
+      padding: 12mm 16mm !important;
+      box-decoration-break: clone;
+    }
   }
 }
