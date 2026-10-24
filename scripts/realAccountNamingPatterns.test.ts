@@ -17,7 +17,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ROOT, loadEngine } from "./testerFeedbackEngine.ts";
+import { CLIENT_BANNED, ROOT, clientStrings, loadEngine } from "./testerFeedbackEngine.ts";
 import { parseNameTokens } from "../modules/debrief/namingPatterns.ts";
 
 const AGENCY = readFileSync(join(ROOT, "scripts/fixtures/agency-naming-convention.csv"), "utf8");
@@ -148,8 +148,30 @@ try {
   assert.match(report, /useReportCustomization\(\s*PERFORMANCE_SECTION_IDS,\s*PERFORMANCE_PRESETS,\s*modeDefaults\s*\)/);
   assert.match(report, /\{np\.coverageLine\}/);
 
+  /* ---- Client "What worked": one plain line from the table ---- */
+  {
+    const c = run(readFileSync(join(ROOT, "scripts/fixtures/agency-naming-convention.csv"), "utf8"), "roas");
+    const np = c.analysis.namingPatterns!;
+    const fmt = (v: number | null) => `${(v as number).toFixed(2)}x`;
+    const k0 = np.keys[0], k1 = np.keys[1];
+    assert.equal(k0.key, "FOR");
+    assert.equal(k1.key, "AN");
+    assert.equal(
+      c.memo.namingClientLine,
+      `By format, UGC ads returned ${fmt(k0.rows[0].kpiValue)} vs ${fmt(k0.rows[k0.rows.length - 1].kpiValue)} for image ads; by angle, "${k1.rows[0].value}" ads returned ${fmt(k1.rows[0].kpiValue)} vs ${fmt(k1.rows[k1.rows.length - 1].kpiValue)} for "${k1.rows[k1.rows.length - 1].value}" ads — read from how the ads are named; a pattern in this period, not proof of what caused it.`,
+      "strongest vs weakest of the first 2 keys (rows already carry the ≥2× minimum-spend rule)"
+    );
+    for (const k of [k0, k1]) for (const row of k.rows) assert.ok(row.spend >= np.minSpend && row.ads >= 2);
+    assert.ok(c.clientText.includes(c.memo.namingClientLine!), "client TXT");
+    assert.ok(!c.buyerText.includes(c.memo.namingClientLine!), "buyer has the table instead");
+    for (const s of [...clientStrings(c.memo), c.memo.namingClientLine!])
+      for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
+    assert.match(report, /\{client && memo\.namingClientLine && \(/, "client view only");
+  }
+
   const sample = buildSampleMemo();
   assert.equal(sample.namingPatterns, undefined, "sample untouched");
+  assert.equal(sample.namingClientLine, undefined);
   assert.ok(!memoToText(sample, "buyer", 5, []).includes("PATTERNS BY NAMING"));
 
   console.log("real-account naming patterns: all assertions passed");

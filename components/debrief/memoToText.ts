@@ -508,6 +508,7 @@ export function memoToText(
       view === "client" ? memo.leadingConversion.client : memo.leadingConversion.buyer
     );
   }
+  if (view === "client" && memo.namingClientLine) lines.push(memo.namingClientLine);
   if (memo.winners.length === 0) {
     lines.push(
       view === "client"

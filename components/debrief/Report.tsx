@@ -2656,6 +2656,11 @@ export function Report({
               {client ? memo.leadingConversion.client : memo.leadingConversion.buyer}
             </p>
           )}
+          {/* Real-account review: the naming table, in one plain line —
+              client only (the buyer has the table itself). */}
+          {client && memo.namingClientLine && (
+            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-300">{memo.namingClientLine}</p>
+          )}
           <div className="mt-4">
             {memo.winners.length === 0 ? (
               <p className="border-l-2 border-white/15 py-1 pl-4 text-sm leading-relaxed text-zinc-400">

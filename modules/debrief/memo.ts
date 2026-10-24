@@ -603,6 +603,60 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
   return { winners: winnerNotes, losers: loserNotes };
 }
 
+/** Real-account review — what a naming key reads as in client copy. */
+const NAMING_KEY_WORDS: Record<string, string> = {
+  FOR: "format",
+  AN: "angle",
+  HK: "hook",
+  STG: "funnel stage",
+  CN: "concept",
+  PR: "product",
+  AUD: "audience",
+};
+/** Common format tokens in plain words; anything else stays quoted. */
+const NAMING_VALUE_WORDS: Record<string, string> = {
+  UGC: "UGC",
+  IMG: "image",
+  IMAGE: "image",
+  STATIC: "static",
+  VID: "video",
+  VIDEO: "video",
+  CAR: "carousel",
+  CAROUSEL: "carousel",
+};
+
+/**
+ * Real-account review — client "What worked": one plain-language line
+ * with the strongest and weakest value of up to 2 naming keys, from
+ * analysis.namingPatterns (whose rows already need ≥ 2× the minimum
+ * spend and ≥ 2 ads). Display only; never a cause.
+ */
+function buildNamingClientLine(analysis: AnalysisResult): { namingClientLine?: string } {
+  const np = analysis.namingPatterns;
+  if (!np) return {};
+  const fmt = (v: number) => fmtKpiValue(v, analysis.kpi, analysis.currency);
+  const verb = analysis.kpi === "roas" ? "returned" : "came in at";
+  const word = (key: string, value: string) =>
+    key === "FOR" && NAMING_VALUE_WORDS[value.toUpperCase()] ? NAMING_VALUE_WORDS[value.toUpperCase()] : `"${value}"`;
+  const parts = np.keys
+    .map((k) => {
+      const rows = k.rows.filter((r) => r.kpiValue != null);
+      if (rows.length < 2) return null;
+      const best = rows[0];
+      const worst = rows[rows.length - 1];
+      if (best.kpiValue === worst.kpiValue) return null;
+      const label = np.basis === "segments" ? `name part ${k.key.replace(/^Part /, "")}` : NAMING_KEY_WORDS[k.key] ?? `the ${k.key} tag`;
+      return `by ${label}, ${word(k.key, best.value)} ads ${verb} ${fmt(best.kpiValue as number)} vs ${fmt(worst.kpiValue as number)} for ${word(k.key, worst.value)} ads`;
+    })
+    .filter((p): p is string => p != null)
+    .slice(0, 2);
+  if (parts.length === 0) return {};
+  const line = parts.join("; ");
+  return {
+    namingClientLine: `${line.charAt(0).toUpperCase()}${line.slice(1)} — read from how the ads are named; a pattern in this period, not proof of what caused it.`,
+  };
+}
+
 /** Real-account review — one insight line when most ads never got a
  *  fair read. Restates analysis.spreadThin; never a decision input. */
 function buildSpreadThin(analysis: AnalysisResult): { spreadThin?: string } {
@@ -2427,6 +2481,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     patterns: buildPatterns(analysis),
     ...buildNamingPatterns(analysis),
     ...buildSpreadThin(analysis),
+    ...buildNamingClientLine(analysis),
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
     avoid: buildAvoid(analysis, context, decision),

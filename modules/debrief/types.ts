@@ -1318,6 +1318,10 @@ export interface Memo {
    *  the top + buyer TXT; absent unless analysis.spreadThin). Display
    *  only. */
   spreadThin?: string;
+  /** Real-account review — client "What worked" only: the strongest vs
+   *  weakest value of up to 2 naming keys in plain words. Absent
+   *  without a naming convention. Display only. */
+  namingClientLine?: string;
   /** Present only when the user pasted market/competitor context. */
   marketSignal: MemoMarketSignal | null;
   nextTests: MemoTest[];
