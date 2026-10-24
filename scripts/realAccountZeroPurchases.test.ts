@@ -79,7 +79,7 @@ try {
   {
     const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
     assert.match(report, /const CLIENT_APPENDIX_NAME_MAX = 40;/);
-    assert.match(report, /<Names text=\{client \? clipQuotedNames\(line\) : line\} \/>/, "client appendix names clipped to 40");
+    assert.match(report, /<Names text=\{client \? clipQuotedNames\(line, shorten\) : line\} \/>/, "client appendix names clipped to 40 (collision-safe)");
   }
 
   /* ---- The "Set aside" tooltip names them too ---- */

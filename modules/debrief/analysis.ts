@@ -298,6 +298,9 @@ export function analyze(
   return {
     kpi,
     adsAnalyzed: ads.length,
+    /* Bulletproof B1: every analyzed ad's name — the universe the report
+       makes collision-safe display names over. */
+    adNames: ads.map((a) => a.name),
     adsJudged: judged.length,
     adsSetAside: ads.length - judged.length,
     totalSpend: ads.reduce((sum, a) => sum + a.spend, 0),

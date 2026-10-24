@@ -42,7 +42,7 @@ assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline co
 {
   const app = between("function PrintAppendix(", "/* Client view: the top N");
   assert.match(report, /const APPENDIX_NAME_MAX = 50;/);
-  assert.match(app, /middleTruncate\(r\.name, APPENDIX_NAME_MAX\)/);
+  assert.match(app, /shorten\(r\.name, APPENDIX_NAME_MAX\)/);
   // Every judged ad once, in the role the report gives it.
   assert.match(app, /memo\.winners\.map\(\(r\) => \(\{ r, group: to\.has\(r\.name\) \? label\.receives : label\.above \}\)\)/);
   assert.match(app, /\(memo\.atMedian\?\.rows \?\? \[\]\)\.map\(\(r\) => \(\{ r, group: label\.at \}\)\)/);
@@ -71,9 +71,9 @@ assert.match(css, /\.print-only-inline \{\s*display: inline !important;\s*\}/);
 /* ---- Names: tighter truncation in print ---- */
 assert.ok(NAME_PRINT_MAX < NAME_DISPLAY_MAX);
 assert.equal(middleTruncate("x".repeat(160), NAME_PRINT_MAX).length, NAME_PRINT_MAX);
-assert.match(report, /<span className="hidden print:inline">\{middleTruncate\(part\.name, NAME_PRINT_MAX\)\}<\/span>/, "names in sentences");
-assert.match(between("function FullAdName(", "function safeFilenamePart("), /middleTruncate\(name, NAME_PRINT_MAX\)/, "table names");
-assert.match(chart, /middleTruncate\(chartRow\.row\.name, NAME_PRINT_MAX\)/, "ranking chart labels");
+assert.match(report, /<span className="hidden print:inline">\{short\(part\.name, NAME_PRINT_MAX\)\}<\/span>/, "names in sentences");
+assert.match(between("function FullAdName(", "function safeFilenamePart("), /useShortName\(\)\(name, NAME_PRINT_MAX\)/, "table names");
+assert.match(chart, /shorten\(chartRow\.row\.name, NAME_PRINT_MAX\)/, "ranking chart labels");
 
 /* ---- Tests print title + Hypothesis + Win only ---- */
 const testRow = between("function TestRow(", "function BriefCard(");
@@ -131,13 +131,13 @@ assert.match(css, /@media print \{[\s\S]*?nextjs-portal \{\s*display: none !impo
 {
   const split = between("function ClientDecisionSplit(", "/* Client next-steps roadmap");
   assert.match(split, /shrink-0 whitespace-nowrap font-mono text-\[17px\]/, "split counts never break (\"23 / 0\")");
-  assert.match(split, /\{middleTruncate\(name, CARD_NAME_MAX\)\}/, "split names truncated, wrap at spaces only");
+  assert.match(split, /\{shorten\(name, CARD_NAME_MAX\)\}/, "split names truncated, wrap at spaces only");
   assert.match(report, /const CARD_NAME_MAX = 28;/);
   // Client stat-card values: clamped font, wrap only at their own spaces.
   assert.match(report, /print-kv-value mt-1\.5 \[overflow-wrap:normal\] font-mono/);
   assert.match(report, /text-\[clamp\(13px,3\.4vw,15px\)\]/);
   assert.match(report, /card\.value\.split\(" "\)\.map\(\(part, i\) => \(\s*<Fragment key=\{i\}>\s*\{i > 0 && " "\}\s*<span className="whitespace-nowrap">\{part\}<\/span>/, "never mid-number");
-  assert.match(report, /\{card\.isName \? middleTruncate\(card\.sub, CARD_NAME_MAX\) : card\.sub\}/);
+  assert.match(report, /\{card\.isName \? shorten\(card\.sub, CARD_NAME_MAX\) : card\.sub\}/);
   const table = between("function AdTable(", "function ClientAdList(");
   assert.ok(!/<th className="(?!whitespace-nowrap)/.test(table), "every buyer table header is nowrap (no VALU/E)");
   for (const cell of ["{ad.valueLabel}", "{ad.spendLabel}", '{ad.adjValueLabel ?? "—"}']) {

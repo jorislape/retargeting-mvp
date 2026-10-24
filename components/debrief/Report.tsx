@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useId, useState } from "react";
+import { Fragment, useId, useMemo, useState } from "react";
 import type {
   Memo,
   MemoBrief,
@@ -33,7 +33,8 @@ import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS, performanceModeDefault
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
 import { MovementChart } from "./MovementChart";
-import { middleTruncate, NAME_PRINT_MAX, splitLongNames } from "./longNames";
+import { buildNameShortener, NAME_PRINT_MAX, splitLongNames } from "./longNames";
+import { NameDisplayContext, useShortName } from "./NameDisplay";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -61,13 +62,15 @@ const CONFIDENCE_COLOR: Record<Memo["confidence"]["level"], string> = {
    60 characters middle-truncated (full name on hover); optional glossary
    terms apply to the plain parts only. Copy/TXT never pass through here. */
 function Names({ text, terms }: { text: string; terms?: { phrase: string; tip: string }[] }) {
+  /* Bulletproof B1: collision-safe — never two ads with one display. */
+  const short = useShortName();
   return (
     <>
       {splitLongNames(text).map((part, i) =>
         "name" in part ? (
           <span key={i} title={part.name}>
-            &quot;<span className="print:hidden">{part.short}</span>
-            <span className="hidden print:inline">{middleTruncate(part.name, NAME_PRINT_MAX)}</span>&quot;
+            &quot;<span className="print:hidden">{short(part.name)}</span>
+            <span className="hidden print:inline">{short(part.name, NAME_PRINT_MAX)}</span>&quot;
           </span>
         ) : (
           <Fragment key={i}>{terms ? withTerms(part.text, terms) : part.text}</Fragment>
@@ -79,12 +82,13 @@ function Names({ text, terms }: { text: string; terms?: { phrase: string; tip: s
 
 /* A bare ad name, middle-truncated with the full name on hover. */
 function AdName({ name }: { name: string }) {
-  const short = middleTruncate(name);
+  const shorten = useShortName();
+  const short = shorten(name);
   if (short === name && name.length <= NAME_PRINT_MAX) return <>{name}</>;
   return (
     <span title={name}>
       <span className="print:hidden">{short}</span>
-      <span className="hidden print:inline">{middleTruncate(name, NAME_PRINT_MAX)}</span>
+      <span className="hidden print:inline">{shorten(name, NAME_PRINT_MAX)}</span>
     </span>
   );
 }
@@ -92,7 +96,7 @@ function AdName({ name }: { name: string }) {
 /* A table/list ad name: full and wrapping anywhere on screen, middle-
    truncated in print (Real-account fixes 5–6). */
 function FullAdName({ name }: { name: string }) {
-  const short = middleTruncate(name, NAME_PRINT_MAX);
+  const short = useShortName()(name, NAME_PRINT_MAX);
   if (short === name) return <>{name}</>;
   return (
     <>
@@ -1171,9 +1175,9 @@ function appendixOutcomes(r: MemoWinnerLoserRow): string {
 
 /** Real-account review: client appendix names stop at 40 characters. */
 const CLIENT_APPENDIX_NAME_MAX = 40;
-const clipQuotedNames = (text: string) =>
+const clipQuotedNames = (text: string, shorten: (name: string, max?: number) => string) =>
   text.replace(/"([^"]+)"/g, (whole, name: string) =>
-    name.length > CLIENT_APPENDIX_NAME_MAX ? `"${middleTruncate(name, CLIENT_APPENDIX_NAME_MAX)}"` : whole
+    name.length > CLIENT_APPENDIX_NAME_MAX ? `"${shorten(name, CLIENT_APPENDIX_NAME_MAX)}"` : whole
   );
 
 /** Appendix ad names: middle-truncated harder than the body. */
@@ -1197,6 +1201,7 @@ function PrintAppendix({
   showAds: boolean;
   showNaming: boolean;
 }) {
+  const shorten = useShortName();
   const client = view === "client";
   const d = memo.decision;
   const to = new Set(d.budgetMove?.to.map((a) => a.name) ?? []);
@@ -1252,7 +1257,7 @@ function PrintAppendix({
           <tbody>
             {rows.map(({ r, group }, i) => (
               <tr key={r.name + i} className="print-avoid-break">
-                <td className={`${td} font-sans text-zinc-300`} title={r.name}>{middleTruncate(r.name, APPENDIX_NAME_MAX)}</td>
+                <td className={`${td} font-sans text-zinc-300`} title={r.name}>{shorten(r.name, APPENDIX_NAME_MAX)}</td>
                 <td className={`${td} font-sans whitespace-nowrap`}>{group}</td>
                 <td className={`${td} text-right whitespace-nowrap`}>{r.spendLabel}</td>
                 {outcomeHeader && <td className={`${td} text-right`}>{appendixOutcomes(r)}</td>}
@@ -1270,7 +1275,7 @@ function PrintAppendix({
           </p>
           <ul className="space-y-0">
             {moreLimits.map((line, i) => (
-              <li key={i} className="text-[8px] leading-snug text-zinc-500"><Names text={client ? clipQuotedNames(line) : line} /></li>
+              <li key={i} className="text-[8px] leading-snug text-zinc-500"><Names text={client ? clipQuotedNames(line, shorten) : line} /></li>
             ))}
           </ul>
         </>
@@ -1481,6 +1486,7 @@ function AtMedianRows({
 
 /* Executive summary cards — the client's version of the stat row. */
 function ClientStatCards({ memo }: { memo: Memo }) {
+  const shorten = useShortName();
   const { scope } = memo;
   const best = memo.winners[0] ?? null;
   /* tone colors the value only — the standout metrics (best performer,
@@ -1559,7 +1565,7 @@ function ClientStatCards({ memo }: { memo: Memo }) {
             ))}
           </p>
           <p className="mt-1.5 [overflow-wrap:normal] text-[11px] leading-snug text-zinc-400" title={card.sub}>
-            {card.isName ? middleTruncate(card.sub, CARD_NAME_MAX) : card.sub}
+            {card.isName ? shorten(card.sub, CARD_NAME_MAX) : card.sub}
           </p>
         </div>
       ))}
@@ -1594,6 +1600,7 @@ const CARD_NAME_MAX = 28;
    enough data yet. Counts are the groups the report itself shows
    (winners/losers lists, set-aside total) — no new math. */
 function ClientDecisionSplit({ memo }: { memo: Memo }) {
+  const shorten = useShortName();
   /* Real-account review: with near-median holds, "needs improvement"
      counts and names the trims only; the holds get one line. */
   const trims = memo.losers.rows.filter((r) => !r.holdNote);
@@ -1659,7 +1666,7 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
                   className="text-xs leading-snug text-zinc-300 [overflow-wrap:normal]"
                   title={name}
                 >
-                  {middleTruncate(name, CARD_NAME_MAX)}
+                  {shorten(name, CARD_NAME_MAX)}
                 </li>
               ))}
               {/* Trust Pass: the count and the names come from the same
@@ -2285,8 +2292,18 @@ export function Report({
      same numbers rather than tracked as a second, parallel scheme. */
   const staggerFor = (n: string | null) => (n === null ? 0 : Number(n) + 1);
   const stagger = (i: number) => ({ animationDelay: `${i * 80}ms` });
+  /* Bulletproof B1: one collision-safe name resolver for the whole report. */
+  const shortener = useMemo(
+    () =>
+      buildNameShortener([
+        ...(memo.scope.adNames ?? []),
+        ...[...memo.winners, ...(memo.atMedian?.rows ?? []), ...memo.losers.rows].map((r) => r.name),
+      ]),
+    [memo]
+  );
 
   return (
+    <NameDisplayContext.Provider value={shortener}>
     <div style={accentCssVars(accent) as React.CSSProperties}>
       {/* ---- Toolbar: view tabs + actions. Never prints. ---- */}
       <div
@@ -3266,5 +3283,6 @@ export function Report({
         showMovementChartControl
       />
     </div>
+    </NameDisplayContext.Provider>
   );
 }

@@ -523,6 +523,8 @@ export interface KpiGaps {
 export interface AnalysisResult {
   kpi: KpiKey;
   adsAnalyzed: number;
+  /** Bulletproof B1 — every analyzed ad's name (display-name universe). */
+  adNames?: string[];
   adsJudged: number;
   adsSetAside: number;
   totalSpend: number;
@@ -734,6 +736,10 @@ export interface MemoScope {
   kpiExplainer: string;
   dateRangeLabel: string | null;
   adsAnalyzed: number;
+  /** Bulletproof B1 — every analyzed ad's name: the universe the report
+   *  builds collision-safe display names over (no two ads ever share a
+   *  displayed name). */
+  adNames?: string[];
   adsJudged: number;
   adsSetAside: number;
   /** First-Run Fixes: present only when some set-aside ads cleared the

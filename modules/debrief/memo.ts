@@ -2684,6 +2684,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
         ? `${analysis.dateRange.start} – ${analysis.dateRange.end}`
         : null,
       adsAnalyzed: analysis.adsAnalyzed,
+      adNames: analysis.adNames ?? analysis.rankedAds.map((a) => a.name),
       adsJudged: analysis.adsJudged,
       adsSetAside: analysis.adsSetAside,
       /* First-Run Fixes: only when some set-aside ads have no KPI value

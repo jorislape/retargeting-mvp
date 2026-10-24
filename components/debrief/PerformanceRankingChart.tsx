@@ -1,5 +1,6 @@
 import type { MemoWinnerLoserRow } from "@/modules/debrief";
-import { middleTruncate, NAME_DISPLAY_MAX, NAME_PRINT_MAX } from "./longNames";
+import { NAME_DISPLAY_MAX, NAME_PRINT_MAX } from "./longNames";
+import { useShortName } from "./NameDisplay";
 import type { Density } from "@/components/report/reportCustomization";
 import { clientizeText, type ReportView } from "./memoToText";
 import {
@@ -27,6 +28,7 @@ export function PerformanceRankingChart({
   view: ReportView;
   density: Density;
 }) {
+  const shorten = useShortName();
   const rows = buildRankingChartRows(winners, losers);
   if (rows.length === 0) return null;
 
@@ -95,8 +97,8 @@ export function PerformanceRankingChart({
                   className="min-w-0 font-medium text-zinc-200 [overflow-wrap:anywhere]"
                   title={chartRow.row.name.length > NAME_DISPLAY_MAX ? chartRow.row.name : undefined}
                 >
-                  <span className="print:hidden">{middleTruncate(chartRow.row.name)}</span>
-                  <span className="hidden print:inline">{middleTruncate(chartRow.row.name, NAME_PRINT_MAX)}</span>
+                  <span className="print:hidden">{shorten(chartRow.row.name)}</span>
+                  <span className="hidden print:inline">{shorten(chartRow.row.name, NAME_PRINT_MAX)}</span>
                 </span>
                 <span className="flex shrink-0 items-baseline gap-x-2">
                   <span className="font-mono font-semibold tabular-nums text-zinc-100">
