@@ -179,6 +179,8 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
       value: client ? memo.losers.clientInstruction : memo.losers.killInstruction,
     },
     { label: "Top recommended test", value: memo.nextTests[0]?.test },
+    /* Bulletproof pass A3: stages mixed but not splittable — page 1. */
+    { label: "Mixed stages", value: memo.scope.stageWarning },
     /* Bulletproof pass A2: two labels — how clearly the data separates
        the ads, and how safe the action is. */
     { label: "Evidence", value: memo.confidence.level },
@@ -2422,6 +2424,8 @@ export function Report({
                 ? [[`Account ${viewKpiLabel}`, memo.scope.accountKpiLabel]]
                 : []),
               [`Median ${viewKpiLabel}`, memo.scope.medianLabel],
+              /* Bulletproof pass A3: each split stage's own median. */
+              ...(memo.scope.stageMedians ?? []).map((s) => [`${s.stage} median`, s.label]),
             ].map(([label, value], i) => (
               <div
                 key={label}
@@ -2458,6 +2462,13 @@ export function Report({
               the stat row. The client PDF opens on its own "What this
               means" box, which this print-only summary would repeat. */}
           {sections.executiveSummary && !client && <ExecutiveSummary memo={memo} view={view} />}
+          {/* Bulletproof pass A3 — how ads were benchmarked when funnel
+              stages were split (visible, both views). */}
+          {memo.scope.stageNote && (
+            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-300">
+              {client ? memo.scope.stageNote.client : memo.scope.stageNote.buyer}
+            </p>
+          )}
           {/* Report Clarity Pass — the buyer register's FIRST mention of
               the evidence gate, always above the fold: defined once here
               in plain words; every later mention says "minimum spend". */}

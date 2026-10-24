@@ -6,11 +6,15 @@
  * segment warning couldn't see it — that export had no ad set or
  * campaign column, and the stage lived only in the ad names.
  *
- * Display-only by construction: it re-reads the already-ranked judged
- * ads and returns facts for ONE limits line. It never touches the spend
- * gate, the median, ranking, the committed action or evidenceState.
+ * detectFunnelMix is display-only: it re-reads the already-ranked judged
+ * ads and returns facts for ONE limits line / the exec-summary warning.
+ *
+ * Bulletproof pass A3 — stageBenchmarks DOES feed the ranking: when a
+ * stage has ≥ STAGE_MIN_JUDGED judged ads, analysis.ts compares each of
+ * its ads with that stage's own median instead of the account's; every
+ * other ad (no stage, or a smaller stage) keeps the overall median.
  */
-import type { RankedAd } from "./types";
+import type { GatedAd, RankedAd } from "./types";
 
 export type FunnelStage = "TOFU" | "MOFU" | "BOFU";
 
@@ -28,7 +32,7 @@ export function stageFromLabel(label: string | null | undefined): FunnelStage | 
 
 /** An ad's stage: its own name first (the most specific label), then
  *  its campaign, then its ad set. */
-export function stageForAd(ad: Pick<RankedAd, "name" | "campaignName" | "adSetName">): FunnelStage | null {
+export function stageForAd(ad: Pick<GatedAd, "name" | "campaignName" | "adSetName">): FunnelStage | null {
   return stageFromLabel(ad.name) ?? stageFromLabel(ad.campaignName) ?? stageFromLabel(ad.adSetName);
 }
 
@@ -37,6 +41,47 @@ export interface FunnelMix {
   stages: { stage: FunnelStage; judged: number; median: number | null }[];
   /** Judged ads whose stage couldn't be read. */
   unknown: number;
+}
+
+/** A stage needs at least this many judged ads to be its own benchmark. */
+export const STAGE_MIN_JUDGED = 5;
+
+export interface StageSplit {
+  /** Stage → its own median, for stages with ≥ STAGE_MIN_JUDGED judged ads. */
+  byStage: Map<FunnelStage, number>;
+  /** The qualifying stages, funnel order. */
+  stages: { stage: FunnelStage; judged: number; median: number }[];
+  /** Judged ads that keep the overall median (no stage, or a stage under
+   *  STAGE_MIN_JUDGED). */
+  fallback: number;
+}
+
+/** null unless the judged ads span more than one stage AND at least one
+ *  stage has ≥ STAGE_MIN_JUDGED judged ads with a median. Medians are over
+ *  each stage's ads with a KPI value (zero-outcome ads stay out, exactly
+ *  as in the account median). */
+export function stageBenchmarks(judged: readonly GatedAd[]): StageSplit | null {
+  const byStageAds = new Map<FunnelStage, GatedAd[]>();
+  for (const ad of judged) {
+    const stage = stageForAd(ad);
+    if (stage != null) byStageAds.set(stage, [...(byStageAds.get(stage) ?? []), ad]);
+  }
+  if (byStageAds.size < 2) return null;
+  const order: FunnelStage[] = ["TOFU", "MOFU", "BOFU"];
+  const stages = order
+    .filter((s) => (byStageAds.get(s)?.length ?? 0) >= STAGE_MIN_JUDGED)
+    .map((stage) => {
+      const ads = byStageAds.get(stage)!;
+      return {
+        stage,
+        judged: ads.length,
+        median: median(ads.filter((a) => a.kpiValue != null && !a.zeroConversions).map((a) => a.kpiValue as number)),
+      };
+    })
+    .filter((s): s is { stage: FunnelStage; judged: number; median: number } => s.median != null);
+  if (stages.length === 0) return null;
+  const covered = stages.reduce((n, s) => n + s.judged, 0);
+  return { byStage: new Map(stages.map((s) => [s.stage, s.median])), stages, fallback: judged.length - covered };
 }
 
 function median(values: number[]): number | null {

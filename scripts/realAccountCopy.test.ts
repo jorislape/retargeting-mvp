@@ -123,7 +123,7 @@ try {
   /* ---- The avoid line names the receivers ---- */
   const to = r.memo.decision.budgetMove!.to.map((t) => `"${t.name}"`);
   assert.ok(to.length > 1);
-  assert.ok(r.memo.avoid.buyer.some((l) => l.startsWith(`Do not scale anything except ${to[0]}, `) && l.includes("those ads")));
+  assert.ok(r.memo.avoid.buyer.some((l) => l.startsWith(`Do not scale anything except ${to[0]}`) && to.every((t) => l.includes(t)) && l.includes("those ads")));
   assert.ok(sample.avoid.buyer.some((l) => l.includes('"UGC_MorningRoutine_V1", "Testimonial_CustomerReview_V3" and "UGC_UnboxingReaction_V2"')));
 
   console.log("real-account copy: all assertions passed");

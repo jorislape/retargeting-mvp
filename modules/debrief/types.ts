@@ -467,6 +467,10 @@ export interface GatedAd extends ParsedAd {
 }
 
 export interface RankedAd extends GatedAd {
+  /** Bulletproof pass A3 — present only when this ad was compared with
+   *  its own funnel stage's median (stage split applied and its stage has
+   *  ≥ STAGE_MIN_JUDGED judged ads). Absent ⇒ the overall median. */
+  stageBenchmark?: { stage: "TOFU" | "MOFU" | "BOFU"; median: number };
   /** Signed distance from the median in the "better" direction. */
   deltaFromMedian: number;
   /** deltaFromMedian as a % of the median, when the median is non-zero. */
@@ -644,6 +648,14 @@ export interface AnalysisResult {
   /** Real-account fix 4 — present only when the judged ads span more
    *  than one funnel stage (TOFU/MOFU/BOFU, read from ad, campaign or ad
    *  set names). Copy only: one limits line, never the action. */
+  /** Bulletproof pass A3 — present only when stages were split: each
+   *  qualifying stage's median (pre-formatted too) and how many judged
+   *  ads kept the overall median. The ranking, receivers and trims are
+   *  stage-relative whenever this exists. */
+  stageBenchmark?: {
+    stages: { stage: "TOFU" | "MOFU" | "BOFU"; judged: number; median: number; medianLabel: string }[];
+    fallback: number;
+  };
   funnelMix?: {
     stages: { stage: "TOFU" | "MOFU" | "BOFU"; judged: number; medianLabel: string | null }[];
     /** Judged ads with no readable stage. */
@@ -714,6 +726,14 @@ export interface MemoScope {
   setAsideBreakdown?: { spend: number; noValue: number };
   totalSpendLabel: string;
   medianLabel: string;
+  /** Bulletproof pass A3 — split stages' medians, for the stat row. */
+  stageMedians?: { stage: string; label: string }[];
+  /** Bulletproof pass A3 — the visible note on how ads were benchmarked
+   *  when stages were split (both registers). */
+  stageNote?: { buyer: string; client: string };
+  /** Bulletproof pass A3 — stages mixed but none could be split: the
+   *  buyer exec-summary warning. */
+  stageWarning?: string;
 }
 
 export interface MemoWinnerLoserRow {

@@ -41,9 +41,10 @@ try {
   assert.ok(be.buyerText.includes("Decision: High\n"));
 
   /* ---- Mixed stages with no per-stage split possible ⇒ capped, named ---- */
+  // 4 TOFU + 4 BOFU (both under the 5-ad stage minimum) + 4 unstaged.
   const staged = STRONG.map((r, i) => {
     const [n, ...rest] = r.split(",");
-    return [`${n}_${i < 10 ? "TOFU" : "BOFU"}`, ...rest].join(",");
+    return [i % 3 === 0 ? `${n}_TOFU` : i % 3 === 1 ? `${n}_BOFU` : n, ...rest].join(",");
   });
   const mixed = run(dated(staged), "roas", { targetRoas: 2 });
   assert.ok(mixed.analysis.funnelMix, "stages detected");

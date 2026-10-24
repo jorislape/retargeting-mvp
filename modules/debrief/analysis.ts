@@ -1,7 +1,7 @@
 import { ColumnMap, attributionFieldsFor, attributionSplitHeaders, clickBasisFor, hookMetricColumns, kpiColumnSourcesFor, requiredColumnsFor } from "./columns";
 import { kpiUsability, preferredUsableKpi } from "./kpiUsability";
 import { detectSegmentSpread } from "./segmentSpread";
-import { detectFunnelMix } from "./funnelStages";
+import { detectFunnelMix, stageBenchmarks, stageForAd } from "./funnelStages";
 import { detectNamingPatterns } from "./namingPatterns";
 import { detectLowIntent } from "./intentFlags";
 import { computeAccountKpi } from "./accountKpi";
@@ -95,19 +95,30 @@ function gateAds(ads: ParsedAd[], spendGate: number): GatedAd[] {
   });
 }
 
-function rankJudged(judged: GatedAd[], kpi: KpiKey, benchmark: number): RankedAd[] {
+function rankJudged(
+  judged: GatedAd[],
+  kpi: KpiKey,
+  overall: number,
+  byStage?: ReadonlyMap<"TOFU" | "MOFU" | "BOFU", number>
+): RankedAd[] {
   const higherBetter = HIGHER_IS_BETTER[kpi];
   return judged.map((ad) => {
+    /* Bulletproof pass A3: an ad in a split stage is measured against
+       that stage's median; every other ad against the overall one. */
+    const stage = byStage ? stageForAd(ad) : null;
+    const stageMedian = stage != null ? byStage?.get(stage) : undefined;
+    const benchmark = stageMedian ?? overall;
+    const tag = stage != null && stageMedian != null ? { stageBenchmark: { stage, median: stageMedian } } : {};
     /* Tester Feedback Fix 2: a zero-conversion CPA ad has no value to
        compare. It ranks below every real loser via the most-negative
        finite delta (finite on purpose — never Infinity, which JSON
        turns into null and arithmetic turns into NaN); deltaPct stays
        null so no surface invents a percentage for it. */
-    if (ad.zeroConversions) return { ...ad, deltaFromMedian: -Number.MAX_VALUE, deltaPct: null };
+    if (ad.zeroConversions) return { ...ad, ...tag, deltaFromMedian: -Number.MAX_VALUE, deltaPct: null };
     const value = ad.kpiValue as number; // every other judged ad has a value
     const delta = higherBetter ? value - benchmark : benchmark - value;
     const deltaPct = benchmark !== 0 ? (delta / Math.abs(benchmark)) * 100 : null;
-    return { ...ad, deltaFromMedian: delta, deltaPct };
+    return { ...ad, ...tag, deltaFromMedian: delta, deltaPct };
   });
 }
 
@@ -227,10 +238,16 @@ export function analyze(
   const judged = gated.filter((a) => a.gate === "judged");
   const kpiGaps = computeKpiGaps(gated, kpi, rawRows, columns);
 
-  const ranked = benchmark != null ? rankJudged(judged, kpi, benchmark) : [];
+  /* Bulletproof pass A3: per-stage benchmarks when a stage has enough
+     judged ads; absent ⇒ one overall median, byte-identical to before. */
+  const stageSplit = benchmark != null ? stageBenchmarks(judged) : null;
+  const ranked = benchmark != null ? rankJudged(judged, kpi, benchmark, stageSplit?.byStage) : [];
+  /* With stage benchmarks, absolute gaps aren't comparable across stages
+     (a TOFU and a BOFU median differ) — order by the relative gap. */
+  const gap = (a: RankedAd) => (stageSplit ? (a.deltaPct ?? 0) : a.deltaFromMedian);
   const winnerPool = ranked
     .filter((a) => a.deltaFromMedian > 0)
-    .sort((a, b) => b.deltaFromMedian - a.deltaFromMedian);
+    .sort((a, b) => gap(b) - gap(a));
   const loserPool = ranked
     .filter((a) => a.deltaFromMedian < 0)
     /* Zero-conversion ads share one sentinel delta; among them, more
@@ -238,7 +255,9 @@ export function analyze(
     .sort((a, b) =>
       a.zeroConversions && b.zeroConversions
         ? b.spend - a.spend
-        : a.deltaFromMedian - b.deltaFromMedian
+        : a.zeroConversions || b.zeroConversions
+          ? a.deltaFromMedian - b.deltaFromMedian
+          : gap(a) - gap(b)
     );
   /* Spend Allocation V1: the third bucket rankedAds' own doc comment
      already names ("winners ∪ losers ∪ ads exactly at the median") but
@@ -380,6 +399,14 @@ export function analyze(
       return acct ? { accountKpi: acct } : {};
     })(),
     ...(naming ? { namingPatterns: naming } : {}),
+    ...(stageSplit
+      ? {
+          stageBenchmark: {
+            stages: stageSplit.stages.map((s) => ({ ...s, medianLabel: fmtKpiValue(s.median, kpi, columns.currency) })),
+            fallback: stageSplit.fallback,
+          },
+        }
+      : {}),
     ...(funnel
       ? {
           funnelMix: {

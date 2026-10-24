@@ -6,8 +6,10 @@
  * campaign column (detectSegmentSpread needs one), and the stage lived
  * only in the ad names. Proves: stages are read from name tokens, then
  * campaign, then ad set names; >1 stage among judged ads draws ONE
- * limits line per register; the action, median and ranking are
- * untouched; single-stage and stage-less exports are byte-identical.
+ * limits line per register — "run once per stage" when no stage has
+ * enough judged ads for its own median (Bulletproof pass A3 splits the
+ * benchmark otherwise; see bulletproofStageBenchmark.test.ts);
+ * single-stage and stage-less exports are byte-identical.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -45,21 +47,21 @@ try {
     r.analysis.adsJudged,
     "every judged ad is counted once"
   );
-  const line = r.memo.decision.limits.buyer.find((l) => l.startsWith("Judged ads mix funnel stages — TOFU ("));
+  /* The fixture's stages are big enough to split (A3): one line says how
+     each ad was benchmarked instead of "run once per stage". */
+  assert.ok(r.analysis.stageBenchmark, "TOFU and BOFU each have ≥5 judged ads");
+  const line = r.memo.decision.limits.buyer.find((l) => l.startsWith("Each ad is compared with its own funnel stage's median (TOFU "));
   assert.ok(line, "one buyer limits line");
-  assert.match(line!, /TOFU \(\d+ ads, median [\d.]+x\) and BOFU \(\d+ ads, median [\d.]+x\)/);
-  assert.match(line!, /run the debrief once per stage/);
-  assert.ok(r.memo.decision.limits.client.some((l) => l.includes("ads aimed at new audiences")));
+  assert.ok(r.memo.decision.limits.client.some((l) => /ads aimed at new audiences/i.test(l)));
   for (const s of clientStrings(r.memo))
     for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
 
-  /* ---- Copy only: removing the stage tokens changes nothing else ---- */
+  /* ---- Removing the stage tokens: no line, one overall median ---- */
   const stageless = AGENCY.replace(/\[STG\](TOFU|BOFU)/g, "[STG]X").replace(/_(TOFU|BOFU)\b/g, "_X");
   const s = run(stageless, "roas");
   assert.equal(s.analysis.funnelMix, undefined, "no stages ⇒ no line");
-  assert.equal(s.memo.decision.action, r.memo.decision.action);
-  assert.equal(s.memo.decision.headline.replace(/TOFU|BOFU/g, "X"), r.memo.decision.headline.replace(/TOFU|BOFU/g, "X"));
-  assert.equal(s.analysis.median, r.analysis.median);
+  assert.equal(s.analysis.stageBenchmark, undefined);
+  assert.equal(s.analysis.median, r.analysis.median, "the overall median itself never changes");
 
   /* ---- Ad set names carry the stage when the ad names don't ---- */
   {
@@ -68,6 +70,14 @@ try {
       ["A,Prospecting TOFU,300,10,900", "B,Prospecting TOFU,300,10,800", "C,Retargeting BOFU,300,10,1500", "D,Retargeting BOFU,300,10,1400", "E,Retargeting BOFU,300,10,1300"].join("\n") + "\n";
     const t = run(csv, "roas");
     assert.deepEqual(t.analysis.funnelMix?.stages.map((x) => [x.stage, x.judged]), [["TOFU", 2], ["BOFU", 3]]);
+    /* Too few per stage to split ⇒ the original "run once per stage"
+       warning — and it leads the exec summary (A3). */
+    assert.equal(t.analysis.stageBenchmark, undefined);
+    const warn = t.memo.decision.limits.buyer.find((l) => l.startsWith("Judged ads mix funnel stages — TOFU ("));
+    assert.ok(warn, "the one-median warning");
+    assert.match(warn!, /TOFU \(2 ads, median [\d.]+x\) and BOFU \(3 ads, median [\d.]+x\)/);
+    assert.match(warn!, /run the debrief once per stage/);
+    assert.match(t.memo.scope.stageWarning ?? "", /^Funnel stages are mixed \(TOFU 2, BOFU 3 judged ads\) and no stage has 5\+ judged ads for its own median/);
   }
 
   /* ---- Single-stage / stage-less exports: untouched ---- */

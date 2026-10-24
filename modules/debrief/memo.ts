@@ -219,7 +219,7 @@ function buildRow(
   return {
     name: ad.name,
     valueLabel: fmtKpiValue(ad.kpiValue as number, analysis.kpi, analysis.currency),
-    vsMedianLabel: fmtDeltaVsMedian(ad.deltaFromMedian, ad.deltaPct),
+    vsMedianLabel: fmtDeltaVsMedian(ad.deltaFromMedian, ad.deltaPct, ad.stageBenchmark?.stage),
     deltaPct: ad.deltaPct,
     spendLabel: fmtMoney(ad.spend, analysis.currency),
     ...runsInFor(ad),
@@ -349,12 +349,45 @@ function withDecisionConfidence(
     buyer.push("profitability unknown — no breakeven set");
     client.push("your break-even point isn't set");
   }
-  if (analysis.funnelMix) {
+  if (analysis.funnelMix && !analysis.stageBenchmark) {
     buyer.push("funnel stages are mixed and judged against one median");
     client.push("ads aimed at different audience stages are compared together");
   }
   const level = c.level === "high" && buyer.length > 0 ? "medium" : c.level;
   return { ...c, decision: { level, caps: { buyer, client } } };
+}
+
+/**
+ * Bulletproof pass A3 — what the masthead shows about funnel stages:
+ * the split stages' medians (stat row) plus one visible note on which
+ * ads kept the overall median; or, when stages are mixed but none can be
+ * split, the warning the exec summary leads with.
+ */
+function stageScope(analysis: AnalysisResult): Pick<Memo["scope"], "stageMedians" | "stageNote" | "stageWarning"> {
+  const sb = analysis.stageBenchmark;
+  const overall = analysis.median != null ? fmtKpiValue(analysis.median, analysis.kpi, analysis.currency) : null;
+  const kpiLabel = kpiLabelFor(analysis);
+  if (sb) {
+    const parts = sb.stages.map((s) => `${s.stage} ${s.medianLabel}`);
+    return {
+      stageMedians: sb.stages.map((s) => ({ stage: s.stage, label: s.medianLabel })),
+      stageNote: {
+        buyer: `Each ad is compared with its own funnel stage's median (${parts.join(", ")})${
+          sb.fallback > 0
+            ? `; ${sb.fallback} ad${sb.fallback === 1 ? "" : "s"} with no stage (or in a stage with under 5 judged ads) use${sb.fallback === 1 ? "s" : ""} the overall ${overall ?? ""} median`
+            : ""
+        }.`,
+        client: "Ads aimed at new audiences and ads aimed at people who already know the brand are each compared with their own group.",
+      },
+    };
+  }
+  if (analysis.funnelMix) {
+    const parts = analysis.funnelMix.stages.map((s) => `${s.stage} ${s.judged}`);
+    return {
+      stageWarning: `Funnel stages are mixed (${parts.join(", ")} judged ads) and no stage has 5+ judged ads for its own median — every ad is judged against one ${kpiLabel} median; run the debrief once per stage for a fairer read.`,
+    };
+  }
+  return {};
 }
 
 /** Real-account review — a below-median ad within the flat band. */
@@ -490,7 +523,7 @@ function buildAtMedian(
   if (ads.length === 0) return {};
   return {
     atMedian: {
-      rows: ads.map((ad) => ({ ...buildRow(ad, analysis, context), vsMedianLabel: "at median", ...statusFor(ad, "at", analysis, context, criteria) })),
+      rows: ads.map((ad) => ({ ...buildRow(ad, analysis, context), vsMedianLabel: ad.stageBenchmark ? `at the ${ad.stageBenchmark.stage} median` : "at median", ...statusFor(ad, "at", analysis, context, criteria) })),
       buyerLabel:
         ads.length === 1 ? AT_MEDIAN_BUYER_LABEL : "At the median — these ads set the benchmark",
       clientLabel:
@@ -535,7 +568,7 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
   const receivers = scaleSide ? moveReceivers(analysis, decision) : [];
   if (receivers.length > 0) {
     const top = receivers[0];
-    const topStats = `${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend`;
+    const topStats = `${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend`;
     lines.push(
       receivers.length === 1
         ? top === winners[0]
@@ -545,7 +578,7 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
     );
   } else if (winners.length > 0) {
     const top = winners[0];
-    const topStats = `${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend`;
+    const topStats = `${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend`;
     lines.push(
       `"${top.name}" leads at ${topStats} — the strongest observed result, though it hasn't earned a budget move (see Next move).`
     );
@@ -1182,8 +1215,8 @@ function buildNextTests(
       : "";
   const topSignal = top
     ? passedOver
-      ? `"${top.name}" runs at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend${topConversions} — ${overByEvidence ? "the strongest evidence-adjusted result" : "the strongest ad that clears the receiver floor"}.`
-      : `"${top.name}" leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend.`
+      ? `"${top.name}" runs at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend${topConversions} — ${overByEvidence ? "the strongest evidence-adjusted result" : "the strongest ad that clears the receiver floor"}.`
+      : `"${top.name}" leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend.`
     : null;
   /* The passed-over leader: a watch note on T1 only, never its base. */
   const watchNote = passedOver
@@ -1195,7 +1228,7 @@ function buildNextTests(
   const worstSignal = worst
     ? worst.zeroConversions
       ? `"${worst.name}" spent ${fmtMoney(worst.spend, currency)} with 0 ${zeroMany}.`
-      : `"${worst.name}" spent ${fmtMoney(worst.spend, currency)} and ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}.`
+      : `"${worst.name}" spent ${fmtMoney(worst.spend, currency)} and ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct, worst.stageBenchmark?.stage)}.`
     : null;
   const tagSignal = winnerTag
     ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots${
@@ -1331,8 +1364,8 @@ function buildNextTests(
         : `Brief 2 new ${format}variants of "${top.name}" — vary only the opening to test whether the angle has more headroom.`,
       why: `${
         passedOver
-          ? `It's the strongest ad with the evidence to build on: ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend${topConversions}.`
-          : `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend — the strongest observed result in the current dataset.`
+          ? `It's the strongest ad with the evidence to build on: ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend${topConversions}.`
+          : `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend — the strongest observed result in the current dataset.`
       } One way to test whether the angle has more headroom: vary only the opening. ${openingEvidence}${
         founderLed
           ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of this leading angle. Adapt, don't copy."
@@ -1428,7 +1461,7 @@ function buildNextTests(
   /* T2 — rebuild the worst judged ad (creative), before killing the
      angle outright. */
   if (worst) {
-    const worstStats = `${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}) on ${fmtMoney(worst.spend, currency)} spend`;
+    const worstStats = `${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct, worst.stageBenchmark?.stage)}) on ${fmtMoney(worst.spend, currency)} spend`;
     const problemFirst = market?.has("problem-first") ?? false;
     if (worst.zeroConversions) {
       /* Tester Feedback Fix 2: the weakest judged ad recorded nothing —
@@ -1511,7 +1544,7 @@ function buildNextTests(
       );
       tests.push({
         test: `Reshoot "${worst.name}"'s message in the ${winnerTag.tag} format carrying your winners.`,
-        why: `The message got ${fmtMoney(worst.spend, currency)} of spend but ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}, while ${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots — test whether changing the format improves performance while keeping the message comparable.${
+        why: `The message got ${fmtMoney(worst.spend, currency)} of spend but ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct, worst.stageBenchmark?.stage)}, while ${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots — test whether changing the format improves performance while keeping the message comparable.${
           problemFirst
             ? " Give the reshoot a problem-first opening — a repeating pattern in your market notes (directional)."
             : ""
@@ -1519,7 +1552,7 @@ function buildNextTests(
         setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateSetupLabel}, same audience and offer.`,
         winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
         signals,
-        hypothesis: `If we reshoot "${worst.name}"'s message as ${winnerTag.tag} while holding the message, audience, and offer constant, ${loserThin ? "we want to test whether it approaches" : "we expect it to approach"} ${medianLabel} — because ${winnerTag.tag} ads already hold ${winnerTag.count}/${winners.length} winner slots in this dataset, while the loser ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)} on ${fmtMoney(worst.spend, currency)} spend.`,
+        hypothesis: `If we reshoot "${worst.name}"'s message as ${winnerTag.tag} while holding the message, audience, and offer constant, ${loserThin ? "we want to test whether it approaches" : "we expect it to approach"} ${medianLabel} — because ${winnerTag.tag} ads already hold ${winnerTag.count}/${winners.length} winner slots in this dataset, while the loser ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct, worst.stageBenchmark?.stage)} on ${fmtMoney(worst.spend, currency)} spend.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `${winnerTag.tag} reshoot of "${worst.name}"`,
@@ -1652,18 +1685,18 @@ function buildNextTests(
   const scaleTarget = receivers[0] ?? null;
   if (scaleJustified && scaleTarget && !shiftCommitted) {
     const top = scaleTarget;
-    const topSignal = `"${top.name}" ${top === winners[0] ? "leads" : "runs"} at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)}) on ${fmtMoney(top.spend, currency)} spend.`;
+    const topSignal = `"${top.name}" ${top === winners[0] ? "leads" : "runs"} at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend.`;
     const signals = sig(
       topSignal,
       `The lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`
     );
     tests.push({
       test: `Scale "${top.name}" daily budget by a single moderate step.`,
-      why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} on ${fmtMoney(top.spend, currency)} already spent. The clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before making broader budget moves.`,
+      why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)} on ${fmtMoney(top.spend, currency)} already spent. The clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before making broader budget moves.`,
       setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
       winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
       signals,
-      hypothesis: `If we raise "${top.name}"'s daily budget by a single moderate step while holding its creative, audience, and placements constant, we expect ${kpiLabel} to stay within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} — because it already leads this dataset ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct)} on ${fmtMoney(top.spend, currency)} of real spend, past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`,
+      hypothesis: `If we raise "${top.name}"'s daily budget by a single moderate step while holding its creative, audience, and placements constant, we expect ${kpiLabel} to stay within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} — because it already leads this dataset ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)} on ${fmtMoney(top.spend, currency)} of real spend, past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`,
       brief: {
         title: `Scale readiness: "${top.name}"`,
         objective: `Learn whether the winner holds its ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} at a moderately higher spend level.`,
@@ -1820,7 +1853,7 @@ function buildAvoid(
       `Do not launch more discount-led ads until a rebuilt version has been tested — "${worst.name}" ${
         worst.zeroConversions
           ? `spent ${fmtMoney(worst.spend, currency)} with 0 ${outcomeNounsFor(analysis)?.many ?? "conversions"}`
-          : `ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct)}`
+          : `ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct, worst.stageBenchmark?.stage)}`
       }.`
     );
     client.push(
@@ -2472,6 +2505,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
         : {}),
       totalSpendLabel: fmtMoney(analysis.totalSpend, currency),
       medianLabel: median != null ? fmtKpiValue(median, kpi, currency) : "Not enough data",
+      ...stageScope(analysis),
     },
     tldr: buildTldr(analysis, decision),
     clientSummary: buildClientSummary(analysis, decision),

@@ -256,6 +256,10 @@ export const RECEIVER_MIN_GATE_MULTIPLE = 1;
 const RECEIVER_SPEND_WORDS =
   RECEIVER_MIN_GATE_MULTIPLE === 1 ? "the minimum spend" : `${RECEIVER_MIN_GATE_MULTIPLE}× the minimum spend`;
 
+/** Mirrors funnelStages.ts's STAGE_MIN_JUDGED for copy (decision.ts
+ *  stays free of runtime imports beyond types for the plain-Node runner). */
+const STAGE_MIN_JUDGED_LABEL = 5;
+
 /** At most this many ads share a shift/scale. */
 export const MAX_BUDGET_RECEIVERS = 3;
 
@@ -334,13 +338,16 @@ export const EVIDENCE_ADJUST_FLOOR_MULTIPLE = 2;
  * table — never eligibility (the 30% bar stays on raw ROAS).
  */
 export function evidenceAdjustedKpi(
-  ad: Pick<RankedAd, "conversions" | "kpiValue">,
+  ad: Pick<RankedAd, "conversions" | "kpiValue"> & { stageBenchmark?: RankedAd["stageBenchmark"] },
   analysis: AnalysisResult,
   criteria?: DecisionCriteria
 ): number | null {
-  if (analysis.kpi !== "roas" || analysis.median == null || ad.conversions == null || ad.kpiValue == null) return null;
+  /* Bulletproof pass A3: shrink toward the ad's OWN benchmark — its
+     stage median when stages were split, else the overall median. */
+  const median = ad.stageBenchmark?.median ?? analysis.median;
+  if (analysis.kpi !== "roas" || median == null || ad.conversions == null || ad.kpiValue == null) return null;
   const k = EVIDENCE_ADJUST_FLOOR_MULTIPLE * receiverOutcomeMin(criteria);
-  return (ad.conversions * ad.kpiValue + k * analysis.median) / (ad.conversions + k);
+  return (ad.conversions * ad.kpiValue + k * median) / (ad.conversions + k);
 }
 
 /** Ads ordered by evidence-adjusted ROAS (best first; ties keep KPI
@@ -914,7 +921,21 @@ export function buildLimits(
 
   /* Real-account fix 4: judged ads span funnel stages — one median
      compares cold prospecting with warm retargeting. Copy only. */
-  if (analysis.funnelMix) {
+  if (analysis.funnelMix && analysis.stageBenchmark) {
+    /* Bulletproof pass A3: stages were split — say how each ad was read. */
+    const sb = analysis.stageBenchmark;
+    const parts = sb.stages.map((s) => `${s.stage} ${s.medianLabel} across ${s.judged} ad${s.judged === 1 ? "" : "s"}`);
+    buyer.push(
+      `Each ad is compared with its own funnel stage's median (${joinPlain(parts)})${
+        sb.fallback > 0
+          ? `; ${sb.fallback} ad${sb.fallback === 1 ? "" : "s"} with no stage, or in a stage under ${STAGE_MIN_JUDGED_LABEL} judged ads, use the overall median`
+          : ""
+      }.`
+    );
+    client.push(
+      "Ads aimed at new audiences and ads aimed at people who already know the brand are each compared with their own group, so cold and warm traffic aren't measured on one yardstick."
+    );
+  } else if (analysis.funnelMix) {
     const f = analysis.funnelMix;
     const label = kpiLabelFor(analysis);
     const parts = f.stages.map(
@@ -1780,7 +1801,7 @@ function decide(
     const receiverFacts = receivers
       .map(
         (r) =>
-          `"${r.name}" is ${pct(r.deltaPct!)}% better than the median ${kpiLabel} on ${money(r.spend)}${
+          `"${r.name}" is ${pct(r.deltaPct!)}% better than ${r.stageBenchmark ? `the ${r.stageBenchmark.stage} median` : "the median"} ${kpiLabel} on ${money(r.spend)}${
             nouns != null && r.conversions != null ? ` with ${r.conversions} ${r.conversions === 1 ? nouns.one : nouns.many}` : ""
           }`
       )

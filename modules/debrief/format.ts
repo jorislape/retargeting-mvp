@@ -38,8 +38,9 @@ export function fmtKpiValue(
   }
 }
 
-export function fmtDeltaVsMedian(deltaFromMedian: number, deltaPct: number | null): string {
+export function fmtDeltaVsMedian(deltaFromMedian: number, deltaPct: number | null, stage?: string): string {
   const direction = deltaFromMedian > 0 ? "better" : "worse";
   if (deltaPct == null) return direction;
-  return `${Math.abs(deltaPct).toFixed(0)}% ${direction} than median`;
+  /* Bulletproof pass A3: an ad read against its own stage says which. */
+  return `${Math.abs(deltaPct).toFixed(0)}% ${direction} than ${stage ? `the ${stage} median` : "median"}`;
 }
