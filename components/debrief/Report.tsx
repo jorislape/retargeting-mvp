@@ -853,7 +853,7 @@ const PRINT_NAMING_ROWS = 4;
 const namingRowPrinted = (_ki: number, ri: number) => ri < PRINT_NAMING_ROWS;
 
 function NamingPatternsTable({ np }: { np: NonNullable<Memo["namingPatterns"]> }) {
-  const th = "py-1.5 pr-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400";
+  const th = "whitespace-nowrap py-1.5 pr-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400";
   return (
     <div className="mt-8">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-300">Patterns by naming</p>
@@ -969,29 +969,29 @@ function AdTable({
       <table className="w-full min-w-[540px] text-sm">
         <thead>
           <tr className="border-b border-white/10 text-left">
-            <th className="w-8 py-2 pr-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <th className="whitespace-nowrap w-8 py-2 pr-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               #
             </th>
-            <th className="py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <th className="whitespace-nowrap py-2 pr-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Ad
             </th>
-            <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <th className="whitespace-nowrap py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Value
             </th>
             {hasAdj && (
-              <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              <th className="whitespace-nowrap py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 <Term tip={TIP_ADJ}>adj.</Term>
               </th>
             )}
-            <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <th className="whitespace-nowrap py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {view === "client" ? "vs middle ad" : "vs median"}
             </th>
             {hasTarget && (
-              <th className="py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              <th className="whitespace-nowrap py-2 pr-4 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 vs target
               </th>
             )}
-            <th className="py-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <th className="whitespace-nowrap py-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Spend
             </th>
           </tr>
@@ -1073,16 +1073,16 @@ function AdTable({
                   </p>
                 )}
               </td>
-              <td className="py-3 pr-4 text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
+              <td className="py-3 pr-4 whitespace-nowrap text-right align-top font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
                 {ad.valueLabel}
               </td>
               {hasAdj && (
-                <td className="py-3 pr-4 text-right align-top font-mono text-xs tabular-nums text-zinc-400">
+                <td className="py-3 pr-4 whitespace-nowrap text-right align-top font-mono text-xs tabular-nums text-zinc-400">
                   {ad.adjValueLabel ?? "—"}
                 </td>
               )}
               <td
-                className={`py-3 pr-4 text-right align-top font-mono text-xs font-semibold tabular-nums ${
+                className={`py-3 pr-4 [overflow-wrap:normal] text-right align-top font-mono text-xs font-semibold tabular-nums ${
                   tone === "win" ? "print-win text-emerald-400" : "print-loss text-red-400"
                 }`}
               >
@@ -1090,14 +1090,14 @@ function AdTable({
               </td>
               {hasTarget && (
                 <td
-                  className={`py-3 pr-4 text-right align-top font-mono text-xs font-semibold tabular-nums ${
+                  className={`py-3 pr-4 whitespace-nowrap text-right align-top font-mono text-xs font-semibold tabular-nums ${
                     ad.vsTarget === "beats" ? "print-win text-emerald-400" : "print-loss text-red-400"
                   }`}
                 >
                   {ad.vsTarget === "beats" ? "✓ beats" : "✗ misses"}
                 </td>
               )}
-              <td className="py-3 text-right align-top font-mono text-xs tabular-nums text-zinc-400">
+              <td className="py-3 whitespace-nowrap text-right align-top font-mono text-xs tabular-nums text-zinc-400">
                 {ad.spendLabel}
               </td>
             </tr>
@@ -1183,7 +1183,7 @@ function PrintAppendix({
       : [];
   if (rows.length === 0 && moreLimits.length === 0 && bars.length === 0 && naming.length === 0) return null;
 
-  const th = "py-0.5 pr-2 text-left text-[8px] font-semibold uppercase tracking-[0.06em] text-zinc-400";
+  const th = "whitespace-nowrap py-0.5 pr-2 text-left text-[8px] font-semibold uppercase tracking-[0.06em] text-zinc-400";
   const td = "py-0 pr-2 align-top font-mono text-[8px] leading-[10px] tabular-nums text-zinc-400";
   const head = "print-section-label print-heading mt-3 mb-1 text-[9px] font-bold uppercase tracking-[0.08em]";
   return (
@@ -1438,7 +1438,7 @@ function ClientStatCards({ memo }: { memo: Memo }) {
   /* tone colors the value only — the standout metrics (best performer,
      next tests) get a subtle accent so the card grid reads at a glance.
      print-win keeps the best-performer green in the PDF. */
-  const cards: { label: string; value: string; sub: string; tone?: string }[] =
+  const cards: { label: string; value: string; sub: string; tone?: string; isName?: boolean }[] =
     [
       /* Trust Pass 2: the account's real result is the headline number;
          the median is never presented as the account's "typical" KPI. */
@@ -1462,6 +1462,7 @@ function ClientStatCards({ memo }: { memo: Memo }) {
               label: "Best performer",
               value: best.valueLabel,
               sub: best.name,
+              isName: true,
               tone: "print-win text-emerald-400",
             },
           ]
@@ -1489,7 +1490,7 @@ function ClientStatCards({ memo }: { memo: Memo }) {
             {card.label}
           </p>
           <p
-            className={`print-kv-value mt-1.5 [overflow-wrap:anywhere] font-mono font-semibold tabular-nums ${
+            className={`print-kv-value mt-1.5 whitespace-nowrap font-mono font-semibold tabular-nums ${
               card.tone ?? "text-zinc-50"
             } ${
               card.value.length > 12
@@ -1499,14 +1500,18 @@ function ClientStatCards({ memo }: { memo: Memo }) {
           >
             {card.value}
           </p>
-          <p className="mt-1.5 [overflow-wrap:anywhere] text-[11px] leading-snug text-zinc-400">
-            {card.sub}
+          <p className="mt-1.5 [overflow-wrap:normal] text-[11px] leading-snug text-zinc-400" title={card.sub}>
+            {card.isName ? middleTruncate(card.sub, CARD_NAME_MAX) : card.sub}
           </p>
         </div>
       ))}
     </div>
   );
 }
+
+/** Real-account review: ad names inside client cards are middle-truncated
+ *  to fit a card and wrap only at spaces — never mid-word. */
+const CARD_NAME_MAX = 28;
 
 /* The at-a-glance decision split: worked / needs improvement / not
    enough data yet. Counts are the groups the report itself shows
@@ -1564,7 +1569,7 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
               {group.title}
             </p>
             <span
-              className={`font-mono text-[17px] font-semibold leading-none tabular-nums ${group.titleClass}`}
+              className={`shrink-0 whitespace-nowrap font-mono text-[17px] font-semibold leading-none tabular-nums ${group.titleClass}`}
             >
               {group.count}
             </span>
@@ -1574,9 +1579,10 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
               {group.names.map((name) => (
                 <li
                   key={name}
-                  className="text-xs leading-snug text-zinc-300 [overflow-wrap:anywhere]"
+                  className="text-xs leading-snug text-zinc-300 [overflow-wrap:normal]"
+                  title={name}
                 >
-                  <AdName name={name} />
+                  {middleTruncate(name, CARD_NAME_MAX)}
                 </li>
               ))}
               {/* Trust Pass: the count and the names come from the same

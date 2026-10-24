@@ -127,6 +127,23 @@ assert.match(css, /@media print \{[\s\S]*?nextjs-portal \{\s*display: none !impo
   assert.ok(toolbar.indexOf("Tip: turn off") > toolbar.indexOf("Print / Save PDF"), "beside the print action, in the print-hidden toolbar");
 }
 
+/* ---- No mid-word breaks: counts, card values, names, table headers ---- */
+{
+  const split = between("function ClientDecisionSplit(", "/* Client next-steps roadmap");
+  assert.match(split, /shrink-0 whitespace-nowrap font-mono text-\[17px\]/, "split counts never break (\"23 / 0\")");
+  assert.match(split, /\{middleTruncate\(name, CARD_NAME_MAX\)\}/, "split names truncated, wrap at spaces only");
+  assert.match(report, /const CARD_NAME_MAX = 28;/);
+  assert.match(report, /print-kv-value mt-1\.5 whitespace-nowrap font-mono/, "client stat-card values never break");
+  assert.match(report, /\{card\.isName \? middleTruncate\(card\.sub, CARD_NAME_MAX\) : card\.sub\}/);
+  const table = between("function AdTable(", "function ClientAdList(");
+  assert.ok(!/<th className="(?!whitespace-nowrap)/.test(table), "every buyer table header is nowrap (no VALU/E)");
+  for (const cell of ["{ad.valueLabel}", "{ad.spendLabel}", '{ad.adjValueLabel ?? "—"}']) {
+    const at = table.indexOf(cell);
+    assert.ok(/whitespace-nowrap/.test(table.slice(table.lastIndexOf("<td", at), at)), `${cell} cell never breaks`);
+  }
+  assert.match(report, /const th = "whitespace-nowrap py-1\.5 pr-3/, "naming table headers");
+}
+
 /* ---- White-label client PDF: agency name only, never Debrief ---- */
 {
   const brand = between("Real-account review: the client PDF is white-label", "{/* ---- Masthead ---- */}");

@@ -336,7 +336,10 @@ Run `scripts/fixtures/agency-naming-convention.csv` (ROAS).
       the call plus your own, and the first 2 evidence limits. The buyer
       appendix follows the sign-off: every judged ad once (name ≤50 chars,
       role, spend, outcomes, KPI), then the collapsed limits / bars / naming
-      values; the client appendix carries only collapsed limits. Names are middle-truncated (~40 chars); each test
+      values; the client appendix carries only collapsed limits. No mid-word
+      breaks in client stat cards / the split counts ("230", not "23 / 0") or
+      buyer table headers and numbers ("VALUE", "9.00x"), and no last page
+      with fewer than 5 lines (real CSV: last pages carry 35–63 lines). Names are middle-truncated (~40 chars); each test
       prints only its title, Hypothesis and Win (client: title + Success);
       the client PDF names ads once, in the Summary split. Repeat in
       Safari's print preview — its pagination differs from Chromium's.
