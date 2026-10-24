@@ -62,7 +62,7 @@ assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline co
   assert.ok(report.indexOf("<PrintAppendix") > report.indexOf("</footer>"), "after the sign-off");
   /* Flows on after the sign-off: a forced page break cost a real
      account a whole extra page. */
-  assert.match(app, /className=\{`print-only \$\{rows\.length > 0 \? "mt-6 border-t border-white\/\[0\.08\] pt-1" : "mt-3"\}`\}/);
+  assert.match(app, /className=\{`print-only \$\{rows\.length > 0 \? "mt-4 border-t border-white\/\[0\.08\] pt-1" : "mt-3"\}`\}/);
   assert.ok(!/break-before: page/.test(css), "no forced page break");
 }
 assert.match(css, /\.print-only-inline \{\s*display: none;\s*\}/);
@@ -133,7 +133,10 @@ assert.match(css, /@media print \{[\s\S]*?nextjs-portal \{\s*display: none !impo
   assert.match(split, /shrink-0 whitespace-nowrap font-mono text-\[17px\]/, "split counts never break (\"23 / 0\")");
   assert.match(split, /\{middleTruncate\(name, CARD_NAME_MAX\)\}/, "split names truncated, wrap at spaces only");
   assert.match(report, /const CARD_NAME_MAX = 28;/);
-  assert.match(report, /print-kv-value mt-1\.5 whitespace-nowrap font-mono/, "client stat-card values never break");
+  // Client stat-card values: clamped font, wrap only at their own spaces.
+  assert.match(report, /print-kv-value mt-1\.5 \[overflow-wrap:normal\] font-mono/);
+  assert.match(report, /text-\[clamp\(13px,3\.4vw,15px\)\]/);
+  assert.match(report, /card\.value\.split\(" "\)\.map\(\(part, i\) => \(\s*<Fragment key=\{i\}>\s*\{i > 0 && " "\}\s*<span className="whitespace-nowrap">\{part\}<\/span>/, "never mid-number");
   assert.match(report, /\{card\.isName \? middleTruncate\(card\.sub, CARD_NAME_MAX\) : card\.sub\}/);
   const table = between("function AdTable(", "function ClientAdList(");
   assert.ok(!/<th className="(?!whitespace-nowrap)/.test(table), "every buyer table header is nowrap (no VALU/E)");

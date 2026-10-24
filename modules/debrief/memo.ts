@@ -173,7 +173,8 @@ function buildLeadingConversion(
   const label = `${fmtCount(n)} ${n === 1 ? nouns.one : nouns.many}`;
   return {
     buyer: `The leading ad recorded ${label} during this period.`,
-    client: `This ad generated ${label} during the selected period.`,
+    /* Real-account review: the client line names the ad. */
+    client: `"${top.name}" led with ${label} during the selected period.`,
   };
 }
 
@@ -603,17 +604,8 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
   return { winners: winnerNotes, losers: loserNotes };
 }
 
-/** Real-account review — what a naming key reads as in client copy. */
-const NAMING_KEY_WORDS: Record<string, string> = {
-  FOR: "format",
-  AN: "angle",
-  HK: "hook",
-  STG: "funnel stage",
-  CN: "concept",
-  PR: "product",
-  AUD: "audience",
-};
-/** Common format tokens in plain words; anything else stays quoted. */
+/** Real-account review — format tokens a client can read; any other
+ *  value (and every other naming key) stays in the buyer's table. */
 const NAMING_VALUE_WORDS: Record<string, string> = {
   UGC: "UGC",
   IMG: "image",
@@ -627,33 +619,26 @@ const NAMING_VALUE_WORDS: Record<string, string> = {
 
 /**
  * Real-account review — client "What worked": one plain-language line
- * with the strongest and weakest value of up to 2 naming keys, from
- * analysis.namingPatterns (whose rows already need ≥ 2× the minimum
- * spend and ≥ 2 ads). Display only; never a cause.
+ * comparing the strongest and weakest FORMAT in the naming table
+ * ([FOR] values with a plain word: UGC / image / video …). Other keys
+ * carry raw agency tokens ("QUAL", "PREC") a client can't read — the
+ * buyer keeps them in the table. Rows already need ≥ 2× the minimum
+ * spend and ≥ 2 ads. Display only; never a cause.
  */
 function buildNamingClientLine(analysis: AnalysisResult): { namingClientLine?: string } {
   const np = analysis.namingPatterns;
-  if (!np) return {};
+  const format = np?.basis === "tokens" ? np.keys.find((k) => k.key === "FOR") : undefined;
+  if (!format) return {};
+  const rows = format.rows.filter((r) => r.kpiValue != null && NAMING_VALUE_WORDS[r.value.toUpperCase()] != null);
+  if (rows.length < 2) return {};
+  const best = rows[0];
+  const worst = rows[rows.length - 1];
+  if (best.kpiValue === worst.kpiValue) return {};
   const fmt = (v: number) => fmtKpiValue(v, analysis.kpi, analysis.currency);
+  const word = (value: string) => NAMING_VALUE_WORDS[value.toUpperCase()];
   const verb = analysis.kpi === "roas" ? "returned" : "came in at";
-  const word = (key: string, value: string) =>
-    key === "FOR" && NAMING_VALUE_WORDS[value.toUpperCase()] ? NAMING_VALUE_WORDS[value.toUpperCase()] : `"${value}"`;
-  const parts = np.keys
-    .map((k) => {
-      const rows = k.rows.filter((r) => r.kpiValue != null);
-      if (rows.length < 2) return null;
-      const best = rows[0];
-      const worst = rows[rows.length - 1];
-      if (best.kpiValue === worst.kpiValue) return null;
-      const label = np.basis === "segments" ? `name part ${k.key.replace(/^Part /, "")}` : NAMING_KEY_WORDS[k.key] ?? `the ${k.key} tag`;
-      return `by ${label}, ${word(k.key, best.value)} ads ${verb} ${fmt(best.kpiValue as number)} vs ${fmt(worst.kpiValue as number)} for ${word(k.key, worst.value)} ads`;
-    })
-    .filter((p): p is string => p != null)
-    .slice(0, 2);
-  if (parts.length === 0) return {};
-  const line = parts.join("; ");
   return {
-    namingClientLine: `${line.charAt(0).toUpperCase()}${line.slice(1)} — read from how the ads are named; a pattern in this period, not proof of what caused it.`,
+    namingClientLine: `By format, ${word(best.value)} ads ${verb} ${fmt(best.kpiValue as number)} vs ${fmt(worst.kpiValue as number)} for ${word(worst.value)} ads — read from how the ads are named; a pattern in this period, not proof of what caused it.`,
   };
 }
 

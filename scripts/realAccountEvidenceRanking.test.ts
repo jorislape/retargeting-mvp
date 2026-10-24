@@ -61,7 +61,7 @@ try {
     const memo = run(H + ["Lead,300,10,2250", ...base].join("\n") + "\n", "roas").memo;
     assert.equal(memo.winners[0].name, "Thin");
     assert.equal(memo.leadingConversion?.buyer, "The leading ad recorded 18 purchases during this period.");
-    assert.equal(memo.leadingConversion?.client, "This ad generated 18 purchases during the selected period.");
+    assert.equal(memo.leadingConversion?.client, '"Thin" led with 18 purchases during the selected period.');
   }
   /* ---- Several receivers ⇒ the evidence line never says "one ad" ---- */
   {

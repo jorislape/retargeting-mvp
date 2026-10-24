@@ -1458,12 +1458,12 @@ console.log("decision (stage 1 — rules): all assertions passed");
     );
     assert.equal(
       memo.leadingConversion?.client,
-      "This ad generated 34 purchases during the selected period.",
+      '"UGC_MorningRoutine_V1" led with 34 purchases during the selected period.',
       "sample leading-ad conversion line (client wording)"
     );
     assert.equal(memo.winners[0].conversionLabel, "34 purchases", "leading winner row carries a neutral count");
     assert.ok(buyerText.includes("34 purchases"), "buyer text carries the conversion count");
-    assert.ok(clientText.includes("This ad generated 34 purchases"), "client text carries the client conversion line");
+    assert.ok(clientText.includes('"UGC_MorningRoutine_V1" led with 34 purchases'), "client text carries the client conversion line");
 
     // Sample numeric/decision pins are unaffected by conversion visibility.
     assert.equal(memo.decision.action, "budget", "conversion visibility didn't change the sample action");

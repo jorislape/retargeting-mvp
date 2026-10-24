@@ -653,7 +653,7 @@ export function memoToText(
     lines.push(`CONFIDENCE & DATA USED: ${memo.confidence.level.toUpperCase()}`);
     lines.push(memo.confidence.clientWhy);
     lines.push(
-      `This result is based on ${scope.adsAnalyzed} ads and ${scope.totalSpendLabel} in ad spend${scope.dateRangeLabel ? ` between ${scope.dateRangeLabel}` : ""}. ${clientDataUsedSentence(scope, scope.kpiLabelClient ?? scope.kpiLabel)} Every number comes directly from the ad account — nothing is estimated.`
+      `This result is based on ${scope.adsAnalyzed} ads and ${scope.totalSpendLabel} in ad spend${scope.dateRangeLabel ? ` between ${scope.dateRangeLabel}` : ""}. ${clientDataUsedSentence(scope, scope.kpiLabelClient ?? scope.kpiLabel)} Every number comes from the exported ad data.`
     );
   } else {
     lines.push(`CONFIDENCE: ${memo.confidence.level.toUpperCase()}`);

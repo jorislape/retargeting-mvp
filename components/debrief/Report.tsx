@@ -1185,9 +1185,11 @@ function PrintAppendix({
 
   const th = "whitespace-nowrap py-0.5 pr-2 text-left text-[8px] font-semibold uppercase tracking-[0.06em] text-zinc-400";
   const td = "py-0 pr-2 align-top font-mono text-[8px] leading-[10px] tabular-nums text-zinc-400";
-  const head = "print-section-label print-heading mt-3 mb-1 text-[9px] font-bold uppercase tracking-[0.08em]";
+  /* Tight on purpose: the appendix is reference material, and every
+     line saved keeps a near-empty last page off the buyer PDF. */
+  const head = "print-section-label print-heading mt-2 mb-0.5 text-[9px] font-bold uppercase tracking-[0.08em]";
   return (
-    <section aria-label="Appendix" className={`print-only ${rows.length > 0 ? "mt-6 border-t border-white/[0.08] pt-1" : "mt-3"}`}>
+    <section aria-label="Appendix" className={`print-only ${rows.length > 0 ? "mt-4 border-t border-white/[0.08] pt-1" : "mt-3"}`}>
       {rows.length > 0 && <p className={head}>Appendix — all {rows.length} judged ads</p>}
       {rows.length > 0 && (
         <table className="w-full">
@@ -1219,7 +1221,7 @@ function PrintAppendix({
             {rows.length > 0 ? "" : "Appendix — "}
             {client ? "what we still can't conclude (continued)" : "Evidence limits (continued)"}
           </p>
-          <ul className="space-y-0.5">
+          <ul className="space-y-0">
             {moreLimits.map((line, i) => (
               <li key={i} className="text-[8px] leading-snug text-zinc-500"><Names text={client ? clipQuotedNames(line) : line} /></li>
             ))}
@@ -1229,7 +1231,7 @@ function PrintAppendix({
       {bars.length > 0 && (
         <>
           <p className={head}>Decision bars applied (continued)</p>
-          <ul className="space-y-0.5">
+          <ul className="space-y-0">
             {bars.map((c, i) => (
               <li key={i} className="text-[9px] leading-snug text-zinc-500">Default — {c.label}</li>
             ))}
@@ -1489,16 +1491,26 @@ function ClientStatCards({ memo }: { memo: Memo }) {
           <p className="print-kv-label text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             {card.label}
           </p>
+          {/* Real-account review: a value must fit its card at every width
+              and in print — the font clamps down, and it may wrap ONLY at
+              its spaces ("18,839.37" / "EUR", "73" / "of 303"), never
+              mid-number or past the card edge. */}
           <p
-            className={`print-kv-value mt-1.5 whitespace-nowrap font-mono font-semibold tabular-nums ${
+            data-card-value
+            className={`print-kv-value mt-1.5 [overflow-wrap:normal] font-mono font-semibold leading-tight tabular-nums ${
               card.tone ?? "text-zinc-50"
             } ${
               card.value.length > 12
-                ? "text-[15px] leading-tight"
-                : "text-[19px] leading-none"
+                ? "text-[clamp(13px,3.4vw,15px)]"
+                : "text-[clamp(15px,4.4vw,19px)]"
             }`}
           >
-            {card.value}
+            {card.value.split(" ").map((part, i) => (
+              <Fragment key={i}>
+                {i > 0 && " "}
+                <span className="whitespace-nowrap">{part}</span>
+              </Fragment>
+            ))}
           </p>
           <p className="mt-1.5 [overflow-wrap:normal] text-[11px] leading-snug text-zinc-400" title={card.sub}>
             {card.isName ? middleTruncate(card.sub, CARD_NAME_MAX) : card.sub}
@@ -2659,7 +2671,7 @@ export function Report({
           />
           {memo.leadingConversion && (
             <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
-              {client ? memo.leadingConversion.client : memo.leadingConversion.buyer}
+              <Names text={client ? memo.leadingConversion.client : memo.leadingConversion.buyer} />
             </p>
           )}
           {/* Real-account review: the naming table, in one plain line —
@@ -2977,7 +2989,7 @@ export function Report({
                   ? ` between ${memo.scope.dateRangeLabel}`
                   : ""}
                 . {clientDataUsedSentence(memo.scope, viewKpiLabel)} Every number
-                comes directly from the ad account — nothing is estimated.
+                comes from the exported ad data.
               </p>
             </>
           ) : (
