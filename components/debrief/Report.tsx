@@ -635,6 +635,16 @@ function DecisionCard({
       {d.budgetMove && <BudgetMoveNames move={d.budgetMove} client={client} budgetVariantLabel={d.budgetVariant} />}
       {/* Real-account review: a top trim candidate may still be
           profitable — ask for the breakeven that makes the list profit-based. */}
+      {/* Bulletproof pass A4 — budget lives at ad set level: how to act. */}
+      {d.execution && (
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-300">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            {client ? "How we'll do it" : "How to execute"}
+          </span>
+          {": "}
+          <Names text={client ? d.execution.client : d.execution.buyer} />
+        </p>
+      )}
       {d.profitBasisNote && (
         <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
           {client ? d.profitBasisNote.client : d.profitBasisNote.buyer}

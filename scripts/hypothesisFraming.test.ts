@@ -226,14 +226,15 @@ WorstAd,380.00,10,2.90`;
   {
     const memo = runCsv(scaleCsv);
     const t3 = memo.nextTests[2];
-    assert.match(t3.test, /single moderate step/, "T3 title uses qualitative step language");
+    // Bulletproof pass A4: ad set budget in ≤20% steps every 2–3 days.
+    assert.match(t3.test, /by ≤20% every 2–3 days\.$/, "T3 title states the ad set step rule");
     assert.ok(!t3.test.includes("25") && !t3.test.includes("50"), "no numeric range in T3 title");
     const allText = JSON.stringify(t3);
     assert.ok(!allText.includes("25–50") && !allText.includes("25-50"), "no 25-50% anywhere in the T3 test object");
     assert.equal(t3.briefReadiness, undefined, "T3 never carries brief readiness — a budget-elasticity test, not a creative claim");
     // Controlled one-variable semantics remain intact.
     assert.ok(t3.brief.keepConstant.length > 0);
-    assert.equal(t3.brief.change, "Daily budget only, one step up.");
+    assert.equal(t3.brief.change, "The ad set's daily budget only, in ≤20% steps.");
     assert.ok(t3.brief.successMetric.length > 0);
     assertNoOverclaim(t3.hypothesis, "F: T3 hypothesis");
     assertNoOverclaim(t3.why, "F: T3 why");

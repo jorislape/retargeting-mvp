@@ -65,9 +65,12 @@ try {
   );
 
   /* ---- The below-median total is descriptive, never "move it all" ---- */
-  assert.match(d.rationale, /where the money sits, not the amount to move: trim the weakest first and raise the receivers? in steps/);
-  assert.match(r.buyerText, /currently sits on below-median ads — context, not the amount to move: trim the weakest and raise the receivers in steps\./);
-  assert.match(r.clientText, /we trim the weakest and add budget to the leaders in steps, not all at once\./);
+  assert.match(d.rationale, /where the money sits, not the amount to move\./);
+  assert.match(r.buyerText, /currently sits on below-median ads — context, not the amount to move\./);
+  /* Bulletproof pass A4: HOW to move it — at ad set level, in ≤20% steps. */
+  assert.match(d.execution!.buyer, /^Pause or trim the weakest ads \(Meta re-spreads their ad set's budget to the remaining ads\) and raise budget on the ad sets running the scale candidates by ≤20% every 2–3 days, re-reading after each step — larger jumps can restart Meta's learning phase\. Past ROAS doesn't guarantee the same return on extra budget\.$/);
+  assert.ok(r.buyerText.includes(`How to execute: ${d.execution!.buyer}`));
+  assert.ok(r.clientText.includes(`How we'll do it: ${d.execution!.client}`));
 
   /* ---- T1, its brief and the Next controlled test build on the
      PRIMARY receiver; the passed-over leader is only a watch note ---- */

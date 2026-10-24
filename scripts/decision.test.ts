@@ -1734,7 +1734,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
            descriptive variant. Both registers. */
         const hasLosers = m.losers.rows.length > 0;
         assert.equal(
-          m.losers.killInstruction.startsWith("Trim the weakest ads below"),
+          m.losers.killInstruction.startsWith("Pause or trim the weakest ads"),
           cutSide && hasLosers,
           `${label}: buyer losers instruction cuts iff the decision cuts`
         );
@@ -1795,7 +1795,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
            leader, so the separate scale test appears only for a
            scale-only call (never beside a shift). */
         assert.equal(
-          m.nextTests.some((t) => t.test.startsWith("Scale ")),
+          m.nextTests.some((t) => t.test.startsWith("Raise the budget on the ad set running ")),
           m.decision.action === "budget" && m.decision.budgetVariant === "scale",
           `${label}: T3 scale action iff the decision is a scale-only move`
         );
@@ -1846,7 +1846,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       assert.ok(memo.tldr[0].includes("move budget toward them"), "sample TLDR keeps the winner imperative (3 receivers)");
       assert.ok(memo.tldr[1].startsWith("Trim or pause"), "sample TLDR keeps the kill imperative");
       assert.ok(
-        memo.losers.killInstruction.startsWith("Trim the weakest ads below and raise the receivers in steps"),
+        memo.losers.killInstruction.startsWith("Pause or trim the weakest ads (Meta re-spreads their ad set's budget to the remaining ads) and raise budget on the ad sets running the scale candidates"),
         "shift decision keeps the losers-section cut imperative"
       );
       assertCoherent(memo, "sample/shift");
@@ -1938,7 +1938,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
       const mBlocked = runEngine(blockedScaleCsv, "roas", { minOutcomeCount: 50 });
       assert.equal(mBlocked.decision.action, "test", "blocked-scale dataset lands on test");
       assert.ok(
-        !mBlocked.nextTests.some((t: { test: string }) => t.test.startsWith("Scale ")),
+        !mBlocked.nextTests.some((t: { test: string }) => t.test.startsWith("Raise the budget on the ad set running ")),
         "no Scale test proposed while the user's outcome bar withholds the move"
       );
       assert.ok(
@@ -2206,7 +2206,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
         "shift sample keeps the scale-only-the-leader line"
       );
       assert.ok(
-        mScale.nextTests.some((t: { test: string }) => t.test.startsWith("Scale ")),
+        mScale.nextTests.some((t: { test: string }) => t.test.startsWith("Raise the budget on the ad set running ")),
         "scale-only decision keeps the T3 scale action"
       );
 

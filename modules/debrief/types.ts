@@ -1229,6 +1229,11 @@ export interface MemoDecision {
      *  move takes from no one). */
     belowSpendLabel?: string;
   };
+  /** Bulletproof pass A4 — present on a budget move: how to execute it at
+   *  ad set level (pause/trim lets Meta re-spread the ad set's budget;
+   *  raise the receivers' ad sets ≤20% every 2–3 days). Both registers;
+   *  names the ad sets when the export has an ad set column. */
+  execution?: { buyer: string; client: string };
   /** Bulletproof pass A1 — present on a budget move with an outcome KPI
    *  (ROAS / CPA) and no breakeven/target: the move is relative to the
    *  account, not profit-based, and how to make it profit-based. Copy

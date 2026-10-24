@@ -395,6 +395,45 @@ export function passedOverLeader(analysis: AnalysisResult, criteria?: DecisionCr
   return top != null && evidenceLead(analysis, criteria) !== top ? top : null;
 }
 
+/**
+ * Bulletproof pass A4 — how a budget move is actually executed. Budget
+ * lives at ad set / campaign level, not on the ad: pausing or trimming
+ * an ad lets Meta re-spread its ad set's budget, and the scale side is a
+ * budget raise on the ad sets running the receivers — in ≤20% steps every
+ * 2–3 days, because larger jumps can restart the learning phase. Names
+ * the receivers' ad sets when the export has an ad set column.
+ */
+export const SCALE_STEP_MAX_PCT = 20;
+export function executionCopy(
+  variant: "shift" | "scale" | "cut",
+  receivers: readonly RankedAd[],
+  analysis: AnalysisResult
+): { buyer: string; client: string } {
+  const sets = [...new Set(receivers.map((r) => r.adSetName).filter((n): n is string => n != null && n !== ""))];
+  const named = sets.length > 0 ? ` (${joinPlain(sets.map((n) => `"${n}"`))})` : "";
+  const past =
+    analysis.kpi === "roas"
+      ? "Past ROAS doesn't guarantee the same return on extra budget."
+      : `Past ${kpiLabelFor(analysis)} doesn't guarantee the same result on extra budget.`;
+  const trim = "Pause or trim the weakest ads (Meta re-spreads their ad set's budget to the remaining ads)";
+  const raise = `raise budget on the ad sets running the scale candidates${named} by ≤${SCALE_STEP_MAX_PCT}% every 2–3 days, re-reading after each step — larger jumps can restart Meta's learning phase.`;
+  const clientTrim = "We reduce or pause the weakest ads (Meta moves their budget to the other ads in the same group)";
+  const clientRaise = `raise budget on the groups running the leading ads by up to ${SCALE_STEP_MAX_PCT}% every 2–3 days, checking results after each step — bigger jumps can reset Meta's learning. Past results don't guarantee the same return on extra budget.`;
+  if (variant === "cut") {
+    return {
+      buyer: `${trim}, re-reading after each step; the freed budget stays with the current ads.`,
+      client: `${clientTrim}, checking results after each step; the freed budget stays with the current ads.`,
+    };
+  }
+  if (variant === "scale") {
+    return {
+      buyer: `${raise.charAt(0).toUpperCase()}${raise.slice(1)} ${past}`,
+      client: `We ${clientRaise}`,
+    };
+  }
+  return { buyer: `${trim} and ${raise} ${past}`, client: `${clientTrim} and ${clientRaise}` };
+}
+
 /** Quoted receiver names: "A", "A" and "B", or "A", "B" and "C". */
 function receiverNames(receivers: readonly RankedAd[]): string {
   return joinPlain(receivers.map((a) => `"${a.name}"`));
@@ -1847,13 +1886,14 @@ function decide(
         action: "budget",
         budgetVariant: "shift",
         budgetMove: { from: fromAds, to: toAds, belowSpendLabel },
+        execution: executionCopy("shift", receivers, analysis),
         headline: countForm
           ? `Shift budget in steps from ${losersCounted} into ${receiversCounted}.`
           : `Shift budget in steps from ${loserNames(analysis)} into ${receiverNames(receivers)}.`,
         clientHeadline: many
           ? `Trim the weakest ads and step up budget on the ${receivers.length} clear leaders.`
           : `Trim the weakest ads and step up budget on "${lead!.name}", the clear leader.`,
-        rationale: `${receiverFacts}.${passedOver} ${analysis.belowBenchmarkCount} below-median ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}) — where the money sits, not the amount to move: trim the weakest first and raise ${many ? "the receivers" : "the receiver"} in steps, re-reading after each.${heldNote}`,
+        rationale: `${receiverFacts}.${passedOver} ${analysis.belowBenchmarkCount} below-median ads hold ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}) — where the money sits, not the amount to move.${heldNote}`,
         clientRationale: `${many ? "These ads are" : `"${lead!.name}" is`} clearly ahead with real results behind ${many ? "them" : "it"} while several ads sit well behind — trimming the weakest and stepping up the leader${many ? "s" : ""} captures that gap without betting everything at once.`,
         avoidNow: { buyer: avoidBuyer.slice(0, 2), client: avoidClient.slice(0, 2) },
         reassess,
@@ -1872,6 +1912,7 @@ function decide(
         action: "budget",
         budgetVariant: "scale",
         budgetMove: { from: [], to: toAds },
+        execution: executionCopy("scale", receivers, analysis),
         headline: many
           ? `Scale ${receiversCounted} in steps — each over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`
           : `Scale "${lead!.name}" in steps — ${pct(lead!.deltaPct!)}% better than the median, over the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
@@ -1902,6 +1943,7 @@ function decide(
       action: "budget",
       budgetVariant: "cut",
       budgetMove: { from: fromAds, to: [], belowSpendLabel },
+      execution: executionCopy("cut", [], analysis),
       headline:
         trimCandidates(analysis).length > 2
           ? `Trim ${trimCountLabel(analysis)}; hold everything else steady.`

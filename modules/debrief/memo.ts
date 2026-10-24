@@ -17,6 +17,7 @@ import {
   SCALE_TEST_MIN_DELTA_PCT,
   SHORT_WINDOW_DAYS,
   spendGateSource,
+  SCALE_STEP_MAX_PCT,
   trimOrder,
   trimCandidates,
   isNearMedian,
@@ -1691,12 +1692,13 @@ function buildNextTests(
       `The lead clears the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`
     );
     tests.push({
-      test: `Scale "${top.name}" daily budget by a single moderate step.`,
+      /* Bulletproof pass A4: budget lives at ad set level — steps ≤20%. */
+      test: `Raise the budget on the ad set running "${top.name}" by ≤${SCALE_STEP_MAX_PCT}% every 2–3 days.`,
       why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)} on ${fmtMoney(top.spend, currency)} already spent. The clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before making broader budget moves.`,
-      setup: `Raise the budget in a single step, then hold for 5–7 days. No creative or audience edits while measuring, so scaling is the only variable.`,
+      setup: `Budget lives at ad set level: raise the ad set running it by ≤${SCALE_STEP_MAX_PCT}% every 2–3 days, re-reading after each step — larger jumps can restart Meta's learning phase. No creative or audience edits while measuring, so scaling is the only variable.`,
       winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
       signals,
-      hypothesis: `If we raise "${top.name}"'s daily budget by a single moderate step while holding its creative, audience, and placements constant, we expect ${kpiLabel} to stay within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} — because it already leads this dataset ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)} on ${fmtMoney(top.spend, currency)} of real spend, past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`,
+      hypothesis: `If we raise the budget on the ad set running "${top.name}" in ≤${SCALE_STEP_MAX_PCT}% steps while holding its creative, audience, and placements constant, we expect ${kpiLabel} to stay within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} — because it already leads this dataset ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)} on ${fmtMoney(top.spend, currency)} of real spend, past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`,
       brief: {
         title: `Scale readiness: "${top.name}"`,
         objective: `Learn whether the winner holds its ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} at a moderately higher spend level.`,
@@ -1710,12 +1712,12 @@ function buildNextTests(
         ],
         assetDirection: [
           `No edits to "${top.name}" while measuring — creative, audience, and placements stay frozen.`,
-          "Raise the budget in a single moderate step, then hold 5–7 days.",
+          `Raise the ad set budget by ≤${SCALE_STEP_MAX_PCT}% every 2–3 days, re-reading after each step — larger jumps can restart the learning phase.`,
           "Watch frequency and early-drop-off for fatigue signals.",
           "Produce both refresh openings now; launch only after the window closes.",
         ],
         keepConstant: "Everything about the live ad — this is a budget test, not a creative one.",
-        change: "Daily budget only, one step up.",
+        change: `The ad set's daily budget only, in ≤${SCALE_STEP_MAX_PCT}% steps.`,
         successMetric: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
         guardrails: [
           "Do not change creative or audience during the 5–7 day window — scaling must stay the only variable.",
@@ -2534,7 +2536,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       killInstruction:
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
-            ? `${decision.budgetVariant === "cut" ? "Trim the weakest ads below; the freed budget stays with the current ads" : "Trim the weakest ads below and raise the receivers in steps"}. ${
+            ? `${decision.execution?.buyer ?? "Trim the weakest ads below."} ${
                 trimSplit(analysis).held > 0
                   ? `Combined ${fmtMoney(trimSplit(analysis).trimSpend, currency)} sits on ${fmtCount(trimSplit(analysis).trims.length)} ad${trimSplit(analysis).trims.length === 1 ? "" : "s"} well below the median, plus ${heldCount(trimSplit(analysis).held)}`
                   : `Combined ${fmtMoney(analysis.belowBenchmarkSpend, currency)} sits on ${fmtCount(analysis.belowBenchmarkCount)} below-median ad${analysis.belowBenchmarkCount === 1 ? "" : "s"}`

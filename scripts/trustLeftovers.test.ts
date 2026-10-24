@@ -59,7 +59,8 @@ try {
   assert.match(readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8"), /phrase: "below-median", tip: TIP_BELOW_BENCHMARK/);
 
   /* ---- (c) ---- */
-  const SCALE_TEST = /daily budget by a single moderate step/;
+  // Bulletproof pass A4: the scale test steps the ad set budget ≤20%.
+  const SCALE_TEST = /^Raise the budget on the ad set running "[^"]+" by ≤20% every 2–3 days\.$/;
   for (const [label, m] of [["sample", sample], ["ecom roas", run(ECOM, "roas").memo]] as const) {
     assert.equal(m.decision.budgetVariant, "shift", label);
     assert.ok(!m.nextTests.some((t) => SCALE_TEST.test(t.test)), `${label}: no separate scale move beside the shift`);

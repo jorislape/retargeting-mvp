@@ -35,8 +35,8 @@ export function belowSpendLine(label: string, client: boolean, trimOnly = false)
       : `About ${label} currently sits on below-median ads — context, not the amount to cut: trim the weakest; no ad qualifies to receive budget yet.`;
   }
   return client
-    ? `About ${label} is currently going to ads below the middle ad — we trim the weakest and add budget to the leaders in steps, not all at once.`
-    : `About ${label} currently sits on below-median ads — context, not the amount to move: trim the weakest and raise the receivers in steps.`;
+    ? `About ${label} is currently going to ads below the middle ad.`
+    : `About ${label} currently sits on below-median ads — context, not the amount to move.`;
 }
 
 export function clientizeText(text: string): string {
@@ -340,6 +340,7 @@ export function memoToText(
       lines.push(
         `${view === "client" ? "Getting more budget" : d.budgetVariant === "scale" ? "Gets more budget" : "Receives the budget"}: ${list(d.budgetMove.to)}`
       );
+    if (d.execution) lines.push(`${view === "client" ? "How we'll do it" : "How to execute"}: ${view === "client" ? d.execution.client : d.execution.buyer}`);
     if (d.profitBasisNote) lines.push(view === "client" ? d.profitBasisNote.client : d.profitBasisNote.buyer);
     if (d.budgetMove.belowSpendLabel)
       lines.push(

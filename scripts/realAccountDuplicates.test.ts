@@ -49,7 +49,10 @@ try {
   const row = [...r.memo.winners, ...r.memo.losers.rows].find((x) => sku("00240")(x.name) && !/Copy$/.test(x.name));
   assert.equal(row?.runsInLabel, "appears 2 times in this export");
   assert.match(r.buyerText, /\(appears 2 times in this export\) \|/);
-  assert.ok(!JSON.stringify(r.memo).includes("ad sets"), "no ad set claim without an ad set column");
+  assert.ok(
+    [...r.memo.winners, ...r.memo.losers.rows].every((x) => !/ad sets?/.test(x.runsInLabel ?? "")),
+    "no ad set claim on a row without an ad set column"
+  );
   assert.equal(r.analysis.duplicateAdNames.length, 2);
   assert.ok(
     r.memo.decision.limits.buyer.some((l) =>
