@@ -1262,6 +1262,10 @@ export interface MemoDecision {
      *  $X currently on below-median ads". Shift/cut only (a scale-only
      *  move takes from no one). */
     belowSpendLabel?: string;
+    /** Bulletproof B4 — the reduce group's own spend and the number of
+     *  near-median holds: the client's single "below" figure. */
+    trimSpendLabel?: string;
+    holdCount?: number;
   };
   /** Bulletproof pass A4 — present on a budget move: how to execute it at
    *  ad set level (pause/trim lets Meta re-spread the ad set's budget;

@@ -108,7 +108,7 @@ try {
       const receivers = (memo.decision.budgetMove?.to ?? []).map((t) => t.name).sort();
       assert.deepEqual(scale, receivers, `scale candidates = receivers (${memo.decision.headline})`);
       for (const line of memo.avoid.buyer.filter((l) => l.startsWith("Do not scale anything except")))
-        for (const name of scale) assert.ok(line.includes(`"${name}"`), "never a scale candidate the report says not to scale");
+        assert.ok(line.includes(scale.length === 1 ? "the scale candidate" : `the ${scale.length} scale candidates`), "never a scale candidate the report says not to scale");
     }
     // Past the 30% bar with enough purchases but outside the top 3 ⇒ keep.
     const many = run(dated(H, ["A,600,40,3000", "B,600,38,2850", "C,600,36,2700", "D,600,34,2550", ...ROWS.slice(3)]), "roas").memo;

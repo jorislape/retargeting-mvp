@@ -129,7 +129,7 @@ try {
   assert.equal(sample.decision.budgetVariant, "shift");
   assert.equal(sample.decision.evidenceState, "supported"); // weakest receiver 31 ≥ 30
   assert.equal(sample.scope.spendGateLabel, "$126.11");
-  assert.match(sample.decision.rationale, /is 100% better than the median ROAS on \$428\.60/);
+  assert.match(sample.decision.rationale, /^The 3 scale candidates are 100%, 81% and 61% better than the median ROAS on \$428\.60, /);
   assert.ok(
     sample.decision.appliedCriteria.some((c: { label: string }) => c.label.startsWith("Minimum spend to judge: $126.11 per ad")),
     "decision bars use the plain label"

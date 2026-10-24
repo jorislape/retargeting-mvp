@@ -166,7 +166,9 @@ const wrapperAndAfter = testRowSrc.slice(wrapperIdx);
 {
   assert.ok(!memoToTextSrc.includes("setupExpanded"), "memoToText.ts has no reference to the new screen-only disclosure state");
   assert.match(memoToTextSrc, /\$\{view === "client" \? "How" : "Setup"\}: \$\{c\(t\.setup\)\}/, "Setup line is unconditional on any disclosure state");
-  assert.match(memoToTextSrc, /if \(t\.signals\.length > 0\) \{/, "Signals used gating is unchanged (only on signal count, never on screen state)");
+  // Bulletproof pass B4: the client's signal list drops the below-median
+  // total (testSignalsFor) — still gated only on signal count.
+  assert.match(memoToTextSrc, /const signals = testSignalsFor\(view, t\.signals\);\n    if \(signals\.length > 0\) \{/, "Signals used gating is unchanged (only on signal count, never on screen state)");
 
   const dist = mkdtempSync(join(tmpdir(), "debrief-next-tests-disclosure-"));
   try {

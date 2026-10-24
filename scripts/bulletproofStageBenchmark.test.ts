@@ -50,7 +50,7 @@ try {
   const d = r.memo.decision;
   assert.ok(d.budgetMove!.to.some((x) => x.name === "T1_TOFU"), "a TOFU ad 60% over its stage receives");
   assert.ok(d.budgetMove!.from.some((x) => x.name === "B5_BOFU"), "a BOFU ad 20% under its stage is trimmed");
-  assert.match(d.rationale, /"T1_TOFU" is 60% better than the TOFU median ROAS/);
+  assert.match(d.rationale, /^The 2 scale candidates are 50% and 60% better than their own median ROAS \(BOFU, TOFU\)/);
   const t1 = r.memo.winners.find((x) => x.name === "T1_TOFU")!;
   assert.equal(t1.vsMedianLabel, "60% better than the TOFU median");
 

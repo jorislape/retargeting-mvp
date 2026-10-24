@@ -120,11 +120,12 @@ try {
   const route = readFileSync(join(ROOT, "app/api/debrief/route.ts"), "utf8");
   assert.match(route, /const base = file\.name\.replace\(\/\\\.\[A-Za-z0-9\]\{1,5\}\$\/, ""\)/, "route strips the extension");
 
-  /* ---- The avoid line names the receivers ---- */
+  /* ---- The avoid line counts the scale candidates (B4: named in full
+     once, in the Next move lists) ---- */
   const to = r.memo.decision.budgetMove!.to.map((t) => `"${t.name}"`);
   assert.ok(to.length > 1);
-  assert.ok(r.memo.avoid.buyer.some((l) => l.startsWith(`Do not scale anything except ${to[0]}`) && to.every((t) => l.includes(t)) && l.includes("those ads")));
-  assert.ok(sample.avoid.buyer.some((l) => l.includes('"UGC_MorningRoutine_V1", "Testimonial_CustomerReview_V3" and "UGC_UnboxingReaction_V2"')));
+  assert.ok(r.memo.avoid.buyer.some((l) => l.startsWith(`Do not scale anything except the ${to.length} scale candidates yet`) && to.every((t) => !l.includes(t))));
+  assert.ok(sample.avoid.buyer.some((l) => l.startsWith("Do not scale anything except the 3 scale candidates yet")));
 
   console.log("real-account copy: all assertions passed");
 } finally {

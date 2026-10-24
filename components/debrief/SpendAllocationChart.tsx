@@ -9,7 +9,9 @@ import {
  *  inline referenceName/caveat: small, invariant, and view-aware, so it
  *  lives in the component rather than the memo. */
 const SEGMENT_LABEL: Record<SpendAllocationSegmentId, { buyer: string; client: string }> = {
-  below: { buyer: "Below median", client: "Below the middle ad" },
+  /* Bulletproof B4: the client's one "below" figure is the reduce group;
+     this bar is the full below-median total, labelled as such. */
+  below: { buyer: "Below median", client: "Below the middle ad — total" },
   at: { buyer: "At median", client: "Level with the middle ad" },
   above: { buyer: "Above median", client: "Above the middle ad" },
 };

@@ -29,7 +29,19 @@ export const CLIENT_BRIEF_LEGEND =
 /** Real-account fix 2 — the below-median total under a budget move,
  *  shared by the report and TXT. Descriptive only: it says where money
  *  sits, never that the whole amount moves. */
-export function belowSpendLine(label: string, client: boolean, trimOnly = false): string {
+export function belowSpendLine(
+  label: string,
+  client: boolean,
+  trimOnly = false,
+  /** Bulletproof B4: the client's one "below" figure — the reduce
+   *  group's spend and size, plus the near-median holds. */
+  reduce?: { spendLabel: string; count: number; holds: number }
+): string {
+  if (client && reduce) {
+    return `About ${reduce.spendLabel} is going to the ${reduce.count} ad${reduce.count === 1 ? "" : "s"} we're reducing${
+      reduce.holds > 0 ? `; ${reduce.holds} more sit close to the middle ad and stay as they are` : ""
+    }${trimOnly ? " — the freed budget stays with the current ads for now" : ""}.`;
+  }
   if (trimOnly) {
     return client
       ? `About ${label} is currently going to ads below the middle ad — we trim the weakest; the freed budget stays with the current ads for now.`
@@ -38,6 +50,22 @@ export function belowSpendLine(label: string, client: boolean, trimOnly = false)
   return client
     ? `About ${label} is currently going to ads below the middle ad.`
     : `About ${label} currently sits on below-median ads — context, not the amount to move.`;
+}
+
+/** The reduce-group figure a budget move carries (B4), when it has one. */
+/** Bulletproof pass B4: the client gets ONE "below" figure (the reduce
+ *  group), so a test's below-median-total signal is buyer-only — the total
+ *  appears for the client only in spend allocation, labelled as a total. */
+export function testSignalsFor(view: ReportView, signals: readonly string[]): readonly string[] {
+  return view === "client" ? signals.filter((s) => !/^Combined .+ spent below the median across /.test(s)) : signals;
+}
+
+export function reduceFigure(
+  move: NonNullable<Memo["decision"]["budgetMove"]>
+): { spendLabel: string; count: number; holds: number } | undefined {
+  return move.trimSpendLabel != null
+    ? { spendLabel: move.trimSpendLabel, count: move.from.length, holds: move.holdCount ?? 0 }
+    : undefined;
 }
 
 export function clientizeText(text: string): string {
@@ -350,7 +378,7 @@ export function memoToText(
     if (d.budgetMove.belowSpendLabel)
       lines.push(
         view === "client"
-          ? belowSpendLine(d.budgetMove.belowSpendLabel, true, d.budgetMove.to.length === 0)
+          ? belowSpendLine(d.budgetMove.belowSpendLabel, true, d.budgetMove.to.length === 0, reduceFigure(d.budgetMove))
           : belowSpendLine(d.budgetMove.belowSpendLabel, false, d.budgetMove.to.length === 0)
       );
   }
@@ -645,9 +673,10 @@ export function memoToText(
         : `   Success: ${t.winningLooksLike}`
     );
     if (t.decisionRule) lines.push(`   ${view === "client" ? "What happens next" : "Decision rule"}: ${view === "client" ? t.clientDecisionRule ?? t.decisionRule : t.decisionRule}`);
-    if (t.signals.length > 0) {
+    const signals = testSignalsFor(view, t.signals);
+    if (signals.length > 0) {
       lines.push(`   ${view === "client" ? "Why it's worth testing" : "Signals used"}:`);
-      t.signals.forEach((s) => lines.push(`   - ${c(s)}`));
+      signals.forEach((s) => lines.push(`   - ${c(s)}`));
     }
   });
   lines.push("");

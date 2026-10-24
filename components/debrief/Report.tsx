@@ -20,7 +20,7 @@ import {
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
-import { belowSpendLine, CLIENT_BRIEF_LEGEND, CONFIDENCE_LABELS, decisionLine, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { belowSpendLine, reduceFigure, testSignalsFor, CLIENT_BRIEF_LEGEND, CONFIDENCE_LABELS, decisionLine, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
@@ -509,19 +509,25 @@ function BudgetMoveNames({
   const [expanded, setExpanded] = useState(false);
   const SHOWN = 2;
   const variant = budgetVariantLabel;
-  const line = (label: string, ads: { name: string; spendLabel: string; window?: string; note?: { buyer: string; client: string } }[]) =>
+  /* Bulletproof B4: the scale candidates (≤3) are listed in FULL here —
+     their one complete listing; only the Pause / trim list collapses. */
+  const line = (
+    label: string,
+    ads: { name: string; spendLabel: string; window?: string; note?: { buyer: string; client: string } }[],
+    showAll = false
+  ) =>
     ads.length === 0 ? null : (
       <p className="text-xs leading-relaxed text-zinc-400">
         <span className="font-medium text-zinc-300">{label}:</span>{" "}
         {ads.map((a, i) => (
-          <span key={a.name + i} className={i >= SHOWN && !expanded ? "hidden" : ""}>
+          <span key={a.name + i} className={i >= SHOWN && !expanded && !showAll ? "hidden" : ""}>
             {i > 0 ? ", " : ""}&ldquo;<AdName name={a.name} />&rdquo; ({a.spendLabel}
             {a.window ? ` · ${a.window}` : ""}
             {a.note ? <span className="text-amber-300/80"> — {client ? a.note.client : a.note.buyer}</span> : null})
           </span>
         ))}
-        {ads.length > SHOWN && !expanded && <PrintMore inline count={ads.length - SHOWN} inAppendix={!client} />}
-        {ads.length > SHOWN && (
+        {ads.length > SHOWN && !expanded && !showAll && <PrintMore inline count={ads.length - SHOWN} inAppendix={!client} />}
+        {ads.length > SHOWN && !showAll && (
           <span className="print-hidden">
             {" "}
             {expanded ? null : `+${ads.length - SHOWN} more `}
@@ -545,11 +551,12 @@ function BudgetMoveNames({
       {line(client ? "Pausing or reducing" : "Pause or trim", move.from)}
       {line(
         client ? "Getting more budget" : variant === "scale" ? "Gets more budget" : "Receives the budget",
-        move.to
+        move.to,
+        true
       )}
       {move.belowSpendLabel && (
         <p className="text-xs leading-relaxed text-zinc-400">
-          {belowSpendLine(move.belowSpendLabel, client, move.to.length === 0)}
+          {belowSpendLine(move.belowSpendLabel, client, move.to.length === 0, reduceFigure(move))}
         </p>
       )}
     </div>
@@ -2008,13 +2015,13 @@ function TestRow({
             </div>
           </dl>
           {/* The receipts: which signals produced this recommendation. */}
-          {test.signals.length > 0 && (
+          {testSignalsFor(view, test.signals).length > 0 && (
             <div className="print-accent-border mt-3 border-l border-white/10 pl-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 {view === "client" ? "Why it's worth testing" : "Signals used"}
               </p>
               <ul className="mt-1.5 space-y-1">
-                {test.signals.map((signal, i) => (
+                {testSignalsFor(view, test.signals).map((signal, i) => (
                   <li
                     key={i}
                     className="flex gap-2 text-xs leading-relaxed text-zinc-400"

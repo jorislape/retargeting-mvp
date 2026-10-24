@@ -36,7 +36,8 @@ assert.match(report, /i >= PRINT_TABLE_ROWS && !expanded \? "print:hidden" : ""/
 assert.match(report, /const criterionPrinted = \(c: Memo\["decision"\]\["appliedCriteria"\]\[number\]\) =>\s*c\.decisive === true \|\| c\.source === "user";/);
 assert.match(report, /criterionPrinted\(criterion\) \? "" : "print:hidden"/);
 assert.ok(!report.includes("PRINT_CRITERIA_SHOWN"), "no positional cap on bars");
-assert.match(report, /\{ads\.length > SHOWN && !expanded && <PrintMore inline count=\{ads\.length - SHOWN\} inAppendix=\{!client\} \/>\}/, "Pause / Receives lists");
+assert.match(report, /\{ads\.length > SHOWN && !expanded && !showAll && <PrintMore inline count=\{ads\.length - SHOWN\} inAppendix=\{!client\} \/>\}/, "Pause / trim collapses; the scale candidates are listed in full");
+assert.match(report, /move\.to,\s*true\s*\)/, "the receivers list shows all (≤3)");
 
 /* ---- The appendix: what print collapses, listed on the last page(s) ---- */
 {

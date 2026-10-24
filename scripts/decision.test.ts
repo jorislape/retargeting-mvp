@@ -1111,7 +1111,7 @@ console.log("decision (stage 1 — rules): all assertions passed");
   {
     const capped = buildDecision(supportedShape(24), "Fallback test.", money);
     assert.equal(capped.action, "budget", "the move stands — the bar caps only the label");
-    assert.ok(capped.limits.buyer.some((l) => l.startsWith("The weakest ad receiving budget has 24 purchases — under the 30 (3× the 10-purchase floor)")));
+    assert.ok(capped.limits.buyer.some((l) => l.startsWith("The weakest scale candidate has 24 purchases — under the 30 (3× the 10-purchase floor)")));
     assert.ok(capped.limits.client.some((l) => l.includes("(the fewest is 24)")));
     // The user's own scaling minimum is the floor the 3× is taken of.
     assert.equal(deriveEvidenceState(supportedShape(40), false, { minOutcomeCount: 13 }), "supported", "40 ≥ 3 × 13");
@@ -1348,8 +1348,8 @@ console.log("decision (stage 1 — rules): all assertions passed");
     // floor — so it reads SUPPORTED / high (the sample shows that path).
     assert.equal(memo.decision.evidenceState, "supported", "sample: weakest receiver (31) clears the 30 bar");
     assert.equal(memo.confidence.level, "high");
-    assert.ok(!memo.confidence.reasons.some((r: string) => r.startsWith("The weakest ad receiving budget")), "no volume cap reason");
-    assert.ok(memo.confidence.reasons.includes("The 3 ads receiving budget have 34, 31 and 32 purchases."));
+    assert.ok(!memo.confidence.reasons.some((r: string) => r.startsWith("The weakest scale candidate")), "no volume cap reason");
+    assert.ok(memo.confidence.reasons.includes("The 3 scale candidates have 34, 31 and 32 purchases."));
     assert.equal(memo.decision.evidenceShape, "separation", "sample field is materially separated");
     assert.ok(memo.decision.nextControlledTest, "sample surfaces a controlled next test");
     assert.ok(

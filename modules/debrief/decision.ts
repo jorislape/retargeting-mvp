@@ -1574,7 +1574,7 @@ function decide(
   }
   if (rawScaleEligible && !proxyHeld && topBelowFloor && lead != null && top != null) {
     criteriaBuyer.push(
-      `"${top.name}" leads by ${pct(top.deltaPct!)}% but has ${floorGaps(top)} — under the receiver floor (${floorPhrase}), so budget goes to ${receiverNames(receivers)} instead.`
+      `"${top.name}" leads by ${pct(top.deltaPct!)}% but has ${floorGaps(top)} — under the receiver floor (${floorPhrase}), so budget goes to ${receivers.length === 1 ? "the scale candidate" : `the ${receivers.length} scale candidates`} instead.`
     );
     criteriaClient.push(
       `"${top.name}" is ahead, but on too little spend and too few results to put more budget behind it yet — the extra budget goes to ads with a longer track record.`
@@ -1600,9 +1600,9 @@ function decide(
   const subjectOutcomes = subject?.conversions ?? null;
   const subjectRole =
     weakestReceiver(analysis, criteria) != null
-      ? "The weakest ad receiving budget"
+      ? "The weakest scale candidate"
       : subject != null && subject !== top
-        ? "The primary receiving ad"
+        ? "The primary scale candidate"
         : "The leading ad";
   if (
     isOutcomeVolumeBelowFloor(analysis, criteria) &&
@@ -1630,7 +1630,7 @@ function decide(
     const n = weakest.conversions as number;
     const bar = HIGH_CONFIDENCE_OUTCOME_MULTIPLE * receiverOutcomeMin(criteria);
     criteriaBuyer.push(
-      `The weakest ad receiving budget has ${n} ${n === 1 ? nouns.one : nouns.many} — under the ${bar} (${HIGH_CONFIDENCE_OUTCOME_MULTIPLE}× the ${receiverOutcomeMin(criteria)}-${nouns.one} floor) this read wants on every receiver before labeling evidence strongly supported. The move stands; the label stays limited until volume builds.`
+      `The weakest scale candidate has ${n} ${n === 1 ? nouns.one : nouns.many} — under the ${bar} (${HIGH_CONFIDENCE_OUTCOME_MULTIPLE}× the ${receiverOutcomeMin(criteria)}-${nouns.one} floor) this read wants on every receiver before labeling evidence strongly supported. The move stands; the label stays limited until volume builds.`
     );
     criteriaClient.push(
       `The ads getting more budget have a moderate number of ${nouns.many} so far (the fewest is ${n}), so we're treating this as a solid but not yet strong read.`
@@ -1878,6 +1878,10 @@ function decide(
     }
     /* Trust Pass: the full from/to lists behind the headline's names. */
     const fromAds = trimCandidates(analysis).map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
+    /* Bulletproof B4: the client's one "below" figure — the reduce
+       group's spend plus how many near-median ads are held. */
+    const trimSpendLabel = money(trimCandidates(analysis).reduce((s, a) => s + a.spend, 0));
+    const holdCount = analysis.losers.length - fromAds.length;
     const toAds = receivers.map((a) => ({ name: a.name, spendLabel: money(a.spend) }));
     /* Trust Pass 3d: the already-computed below-median spend, so the move
        is concrete — no new percentage or amount is invented. */
@@ -1907,14 +1911,25 @@ function decide(
        visibly earned — and the below-median total is described as where
        money sits, never as the amount to move. */
     const many = receivers.length > 1;
-    const receiverFacts = receivers
-      .map(
-        (r) =>
-          `"${r.name}" is ${pct(r.deltaPct!)}% better than ${r.stageBenchmark ? `the ${r.stageBenchmark.stage} median` : "the median"} ${kpiLabel} on ${money(r.spend)}${
-            nouns != null && r.conversions != null ? ` with ${r.conversions} ${r.conversions === 1 ? nouns.one : nouns.many}` : ""
-          }`
-      )
-      .join("; ");
+    /* Bulletproof B4: the scale candidates are named in full once — in
+       the Next move lists — so "What we know" states their evidence
+       without repeating the names. */
+    const benchmarks = receivers.map((r) => (r.stageBenchmark ? r.stageBenchmark.stage : "overall"));
+    const medianPhrase = benchmarks.every((b) => b === "overall")
+      ? `the median ${kpiLabel}`
+      : benchmarks.every((b) => b === benchmarks[0])
+        ? `the ${benchmarks[0]} median ${kpiLabel}`
+        : `their own median ${kpiLabel} (${benchmarks.join(", ")})`;
+    const counted = nouns != null && receivers.every((r) => r.conversions != null);
+    const receiverFacts = receivers.length === 0
+      ? ""
+      : many
+      ? `The ${receivers.length} scale candidates are ${joinPlain(receivers.map((r) => `${pct(r.deltaPct!)}%`))} better than ${medianPhrase} on ${joinPlain(receivers.map((r) => money(r.spend)))}${
+          counted ? ` with ${joinPlain(receivers.map((r) => String(r.conversions)))} ${nouns!.many}` : ""
+        }`
+      : `The scale candidate is ${pct(receivers[0].deltaPct!)}% better than ${medianPhrase} on ${money(receivers[0].spend)}${
+          counted ? ` with ${receivers[0].conversions} ${receivers[0].conversions === 1 ? nouns!.one : nouns!.many}` : ""
+        }`;
     /* Real-account follow-up: >2 trimmed ads or >1 receiver ⇒ the
        headline counts; the names stay in the Pause / Receives lines. */
     const trimCount = trimCandidates(analysis).length;
@@ -1955,7 +1970,7 @@ function decide(
         ),
         action: "budget",
         budgetVariant: "shift",
-        budgetMove: { from: fromAds, to: toAds, belowSpendLabel },
+        budgetMove: { from: fromAds, to: toAds, belowSpendLabel, trimSpendLabel, holdCount },
         execution: executionCopy("shift", receivers, analysis),
         headline: countForm
           ? `Shift budget in steps from ${losersCounted} into ${receiversCounted}.`
@@ -2012,7 +2027,7 @@ function decide(
       limits: withMaterialActionVerificationGuardrail(evidence.limits),
       action: "budget",
       budgetVariant: "cut",
-      budgetMove: { from: fromAds, to: [], belowSpendLabel },
+      budgetMove: { from: fromAds, to: [], belowSpendLabel, trimSpendLabel, holdCount },
       execution: executionCopy("cut", [], analysis),
       headline:
         trimCandidates(analysis).length > 2

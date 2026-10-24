@@ -669,7 +669,7 @@ function buildTldr(analysis: AnalysisResult, decision: MemoDecision): string[] {
         ? top === winners[0]
           ? `"${top.name}" is the clear winner at ${topStats} — move budget toward it.`
           : `"${top.name}" earns the budget move at ${topStats} — move budget toward it (see Next move).`
-        : `${receivers.length} ads earn the budget move, led by "${top.name}" at ${topStats} — move budget toward them in steps (see Next move).`
+        : `"${top.name}" and ${receivers.length - 1} more scale candidate${receivers.length === 2 ? "" : "s"} earn the budget move; the primary runs at ${topStats} — move budget toward them in steps (see Next move).`
     );
   } else if (winners.length > 0) {
     const top = winners[0];
@@ -2092,14 +2092,13 @@ function buildAvoid(
       /* Real-account fix 2: the ads the move goes INTO — the receivers,
          which may not be the raw leader and may be up to three. */
       const to = decision.budgetMove?.to.map((t) => t.name) ?? [top.name];
-      const quoted = to.map((n) => `"${n}"`);
-      const list = quoted.length <= 1 ? quoted.join("") : `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]}`;
-      const where = to.length === 1 && to[0] === top.name ? "the leading ad" : to.length === 1 ? "that ad" : "those ads";
+      /* Bulletproof B4: named in full once (Next move); here, counted. */
+      const who = to.length === 1 ? "the scale candidate" : `the ${to.length} scale candidates`;
       buyer.push(
-        `Do not scale anything except ${list} yet — the clearest budget signal is concentrated in ${where}; investigate the remaining gaps through controlled creative tests before broader budget moves.`
+        `Do not scale anything except ${who} yet — the clearest budget signal is concentrated in ${to.length === 1 ? "that ad" : "those ads"}; investigate the remaining gaps through controlled creative tests before broader budget moves.`
       );
       client.push(
-        `We're only increasing budget behind ${list} for now — the clearest case for more budget is ${where}. For the remaining ads, controlled creative tests are safer than broader budget changes.`
+        `We're only increasing budget behind ${to.length === 1 ? "the ad" : `the ${to.length} ads`} listed in the next step for now. For the remaining ads, controlled creative tests are safer than broader budget changes.`
       );
     } else if (top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT) {
       buyer.push(
@@ -2269,9 +2268,9 @@ function buildConfidence(
   const weakest = weakestReceiver(analysis, criteria);
   const subjectRole =
     weakest != null
-      ? "The weakest ad receiving budget"
+      ? "The weakest scale candidate"
       : subject != null && subject !== winners[0]
-        ? "The primary receiving ad"
+        ? "The primary scale candidate"
         : "The leading ad";
   /* Confidence follow-up: "high" only when every receiver has ≥3× the
      purchase floor; otherwise medium, and this says why. */
@@ -2339,7 +2338,7 @@ function buildConfidence(
   const reasons: string[] = [];
   let clientWhy: string;
   const leadAd = evidenceLead(analysis, criteria);
-  const leadRole = leadAd != null && leadAd !== winners[0] ? "The primary receiving ad" : "The top winner";
+  const leadRole = leadAd != null && leadAd !== winners[0] ? "The primary scale candidate" : "The top winner";
   const topPct = leadAd?.deltaPct ?? null;
   /* Real-account review: "most ads had enough spend" only when it's
      true — at least half the analyzed ads were judged. */
@@ -2419,7 +2418,7 @@ function buildConfidence(
       const n = Math.round(weakest.conversions);
       const nouns = outcomeNounsFor(analysis);
       reasons.push(
-        `The weakest ad receiving budget has ${fmtCount(n)} ${n === 1 ? nouns?.one ?? "result" : nouns?.many ?? "results"}. High confidence needs at least ${HIGH_CONFIDENCE_OUTCOME_MULTIPLE * receiverOutcomeMin(criteria)} on every ad receiving budget.`
+        `The weakest scale candidate has ${fmtCount(n)} ${n === 1 ? nouns?.one ?? "result" : nouns?.many ?? "results"}. High confidence needs at least ${HIGH_CONFIDENCE_OUTCOME_MULTIPLE * receiverOutcomeMin(criteria)} on every scale candidate.`
       );
     }
     clientWhy =
@@ -2456,8 +2455,8 @@ function buildConfidence(
     const list = counts.length === 1 ? counts[0] : `${counts.slice(0, -1).join(", ")} and ${counts[counts.length - 1]}`;
     reasons.push(
       receiverAds.length === 1
-        ? `The ad receiving budget has ${list} ${receiverAds[0].conversions === 1 ? nouns.one : nouns.many}.`
-        : `The ${receiverAds.length} ads receiving budget have ${list} ${nouns.many}.`
+        ? `The scale candidate has ${list} ${receiverAds[0].conversions === 1 ? nouns.one : nouns.many}.`
+        : `The ${receiverAds.length} scale candidates have ${list} ${nouns.many}.`
     );
   }
   return { level, notes, reasons: reasons.slice(0, 4), clientWhy };

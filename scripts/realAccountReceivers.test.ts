@@ -95,7 +95,7 @@ try {
     const counts = to.map((n) => a.rankedAds.find((x) => x.name === n)!.conversions);
     const conf = r.memo.confidence;
     const list = counts.length === 1 ? `${counts[0]}` : `${counts.slice(0, -1).join(", ")} and ${counts[counts.length - 1]}`;
-    assert.ok(conf.reasons.includes(`The ${counts.length} ads receiving budget have ${list} purchases.`), "receivers' counts in the Why");
+    assert.ok(conf.reasons.includes(`The ${counts.length} scale candidates have ${list} purchases.`), "receivers' counts in the Why");
     for (const line of [...conf.reasons, ...conf.notes, ...d.limits.buyer, ...d.limits.client]) {
       assert.ok(!/(leading ad|top winner) has 8 /i.test(line), `no passed-over-leader volume caveat: ${line}`);
       assert.ok(!/8 recorded results?/.test(line), line);
@@ -107,8 +107,8 @@ try {
     if (weakestCount < 30) {
       assert.equal(d.evidenceState, "limited");
       assert.equal(r.memo.confidence.level, "medium");
-      assert.ok(conf.reasons.includes(`The weakest ad receiving budget has ${weakestCount} purchases. High confidence needs at least 30 on every ad receiving budget.`));
-      assert.ok(d.limits.buyer.some((l) => l.startsWith(`The weakest ad receiving budget has ${weakestCount} purchases — under the 30`)));
+      assert.ok(conf.reasons.includes(`The weakest scale candidate has ${weakestCount} purchases. High confidence needs at least 30 on every ad receiving budget.`));
+      assert.ok(d.limits.buyer.some((l) => l.startsWith(`The weakest scale candidate has ${weakestCount} purchases — under the 30`)));
     } else {
       assert.notEqual(r.memo.confidence.level, "medium");
     }
