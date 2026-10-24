@@ -1351,7 +1351,7 @@ function ClientAdList({
   return (
     <div>
       {/* Real-account fix 6: the client PDF names its ads once, in the
-          Summary's worked / needs-improvement split; these per-section
+          Summary's above / below split; these per-section
           lists stay on screen and in TXT. */}
       <p className="print-only text-xs leading-relaxed text-zinc-400">
         {tone === "loss" && rows.some((r) => r.holdNote)
@@ -1606,28 +1606,28 @@ function StatusLine({ status, client }: { status: NonNullable<MemoWinnerLoserRow
  *  to fit a card and wrap only at spaces — never mid-word. */
 const CARD_NAME_MAX = 28;
 
-/* The at-a-glance decision split: worked / needs improvement / not
+/* The at-a-glance decision split: above / below the middle ad / not
    enough data yet. Counts are the groups the report itself shows
    (winners/losers lists, set-aside total) — no new math. */
 function ClientDecisionSplit({ memo }: { memo: Memo }) {
   const shorten = useShortName();
-  /* Real-account review: with near-median holds, "needs improvement"
+  /* Real-account review: with near-median holds, "below the middle ad"
      counts and names the trims only; the holds get one line. */
   const trims = memo.losers.rows.filter((r) => !r.holdNote);
   const held = memo.losers.rows.length - trims.length;
   const groups = [
     {
-      title: "Worked well",
+      title: "Above the middle ad",
       titleClass: "print-win text-emerald-400",
       /* Colored left-rail + tint: green survives PDF via print-win. */
       rail: "border-l-emerald-400/60 print-win",
       tint: "bg-emerald-400/[0.04]",
       count: memo.winners.length,
       names: memo.winners.slice(0, 3).map((a) => a.name),
-      meaning: "These ads performed above the middle ad.",
+      meaning: "Ahead of the typical result this period.",
     },
     {
-      title: "Needs improvement",
+      title: "Below the middle ad",
       titleClass: "print-loss text-red-400",
       rail: "border-l-red-400/50 print-loss",
       tint: "bg-red-400/[0.04]",
@@ -1635,8 +1635,8 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
       names: trims.slice(0, 3).map((a) => a.name),
       meaning:
         held > 0
-          ? `These ads performed well below the middle ad — plus ${held} close to it, kept as ${held === 1 ? "it is" : "they are"}.`
-          : "These ads performed below the middle ad.",
+          ? `Well behind the typical result — an area to optimise, not money lost. Plus ${held} close to it, kept as ${held === 1 ? "it is" : "they are"}.`
+          : "Behind the typical result — an area to optimise, not money lost.",
     },
     {
       title: "Not enough data yet",
@@ -3032,9 +3032,9 @@ export function Report({
                 </p>
               )}
               <p className="mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-400">
-                We&apos;ll test new creative based on what performed strongest
-                this period — each test says why it&apos;s worth running and
-                what success looks like.
+                We&apos;ll test variations based on the strongest observed
+                results — each test says why it&apos;s worth running and what
+                success looks like.
               </p>
               <ClientTestCards tests={memo.nextTests} />
             </>

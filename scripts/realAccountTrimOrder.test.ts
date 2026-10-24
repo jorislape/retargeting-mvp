@@ -162,8 +162,9 @@ try {
        client section 03); the spend-allocation bar keeps every
        below-median ad. */
     assert.match(n.memo.losers.killInstruction, /Combined 1,200\.00 EUR sits on 3 ads well below the median, plus 2 near-median holds — context, not the amount to move\./);
-    assert.match(n.memo.clientSummary[1], /^3 ads performed well below the middle ad, together accounting for 1,200\.00 EUR of spend — we're reducing or pausing their budgets so that money works harder\. 2 more sit close to the middle ad and stay as they are\.$/);
-    assert.match(n.memo.losers.clientInstruction, /^We're reducing or pausing spend on 3 of the ads below — together they spent 1,200\.00 EUR while performing well below the middle ad, .* 2 more sit close to the middle ad and stay as they are\.$/);
+    // Bulletproof pass B5: the reduce-group sentence — relative, not a loss.
+    assert.match(n.memo.clientSummary[1], /^1,200\.00 EUR went to ads that trailed the middle ad — an area to optimise, not money lost; without a breakeven we can't say how much of it lost money\. We're reducing or pausing those 3 ads\. 2 more sit close to the middle ad and stay as they are\.$/);
+    assert.match(n.memo.losers.clientInstruction, /^1,200\.00 EUR went to ads that trailed the middle ad — .* We're reducing or pausing spend on 3 of the ads below .* 2 more sit close to the middle ad and stay as they are\.$/);
     assert.equal(n.memo.spendAllocation?.segments.find((s) => s.id === "below")?.count, 5, "the bar keeps every below-median ad");
     for (const s of clientStrings(n.memo)) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
     assert.ok(n.buyerText.includes("Hold — near median"), "the near-median status (replaces the hold note)");

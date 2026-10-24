@@ -335,6 +335,22 @@ function trimSplit(analysis: AnalysisResult): { trims: RankedAd[]; held: number;
   const trims = trimCandidates(analysis);
   return { trims, held: analysis.losers.length - trims.length, trimSpend: trims.reduce((s, a) => s + a.spend, 0) };
 }
+/** Bulletproof pass B5 — the client's reduce-group sentence. Trailing
+ *  the middle ad is relative, not a loss: without a breakeven the copy
+ *  says how much lost money can't be known; with one, it states the part
+ *  of that spend on ads below breakeven (0x ads count as below). */
+function clientReduceSentence(trims: readonly RankedAd[], analysis: AnalysisResult, context: DebriefContext): string {
+  const { currency } = analysis;
+  const spend = fmtMoney(trims.reduce((s, a) => s + a.spend, 0), currency);
+  const target = targetFor(analysis, context);
+  if (target == null)
+    return `${spend} went to ads that trailed the middle ad — an area to optimise, not money lost; without a breakeven we can't say how much of it lost money.`;
+  const under = trims.filter((a) => !beatsTarget(a, analysis, target)).reduce((s, a) => s + a.spend, 0);
+  const be = fmtKpiValue(target, analysis.kpi, currency);
+  return under > 0
+    ? `${spend} went to ads that trailed the middle ad — an area to optimise, not money lost; ${fmtMoney(under, currency)} of it went to ads below your breakeven (${be}).`
+    : `${spend} went to ads that trailed the middle ad — an area to optimise, not money lost; none of it went to ads below your breakeven (${be}).`;
+}
 const heldCount = (n: number) => `${fmtCount(n)} near-median hold${n === 1 ? "" : "s"}`;
 const clientHeldClause = (n: number) =>
   n === 1
@@ -2152,7 +2168,7 @@ function buildAvoid(
  *  "benchmark", "spend gate"). TLDR Coherence fix: like buildTldr, the
  *  action sentences follow the committed decision — never a budget
  *  promise the Next-move card didn't make. */
-function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): string[] {
+function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision, context: DebriefContext): string[] {
   const { winners, losers, median, kpi, currency, belowBenchmarkSpend, belowBenchmarkCount } =
     analysis;
   const kpiLabel = kpiClientLabelFor(analysis);
@@ -2193,13 +2209,13 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
     /* Real-account review: the trim count, never the whole below-median
        pool, with the near-median holds named as staying put. */
     lines.push(
-      `${fmtCount(split.trims.length)} ad${split.trims.length === 1 ? "" : "s"} performed well below the middle ad, together accounting for ${fmtMoney(split.trimSpend, currency)} of spend — we're reducing or pausing their budgets so that money works harder. ${clientHeldClause(split.held)}`
+      `${clientReduceSentence(split.trims, analysis, context)} We're reducing or pausing ${split.trims.length === 1 ? "that ad" : `those ${fmtCount(split.trims.length)} ads`}. ${clientHeldClause(split.held)}`
     );
   } else if (losers.length > 0) {
     const facts = `${fmtCount(belowBenchmarkCount)} ad${belowBenchmarkCount === 1 ? "" : "s"} performed below the middle ad, together accounting for ${fmtMoney(belowBenchmarkSpend, currency)} of spend.`;
     lines.push(
       cutSide
-        ? `${facts} We're reducing or pausing their budgets so that money works harder.`
+        ? `${clientReduceSentence(split.trims, analysis, context)} We're reducing or pausing ${split.trims.length === 1 ? "that ad" : `those ${fmtCount(split.trims.length)} ads`}.`
         : `${facts} We're keeping their budgets steady for now — the decision above explains the next step.`
     );
   } else {
@@ -2218,7 +2234,7 @@ function buildClientSummary(analysis: AnalysisResult, decision: MemoDecision): s
     );
   } else {
     lines.push(
-      `Next, we're testing new creative built on what this data shows works — the specific tests are listed below.`
+      `Next, we'll test variations based on the strongest observed results — the specific tests are listed below.`
     );
   }
 
@@ -2719,7 +2735,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
       ...attributionScope(analysis),
     },
     tldr: buildTldr(analysis, decision),
-    clientSummary: buildClientSummary(analysis, decision),
+    clientSummary: buildClientSummary(analysis, decision, context),
     /* Real-account review: ranked by evidence-adjusted ROAS (raw ROAS
        stays the row's value; "adj." beside it in the buyer view). */
     winners: byEvidence(analysis.winners, analysis, criteria).map((ad) => ({
@@ -2756,8 +2772,8 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
         analysis.losers.length > 0
           ? decision.action === "budget" && decision.budgetVariant !== "scale"
             ? trimSplit(analysis).held > 0
-              ? `We're reducing or pausing spend on ${fmtCount(trimSplit(analysis).trims.length)} of the ads below — together they spent ${fmtMoney(trimSplit(analysis).trimSpend, currency)} while performing well below the middle ad${decision.budgetVariant === "cut" ? ". The freed budget stays with the current ads for now." : ", and we add budget to the ads that are working in steps."} ${clientHeldClause(trimSplit(analysis).held)}`
-              : `We're reducing or pausing spend on the ads below — together they spent ${fmtMoney(analysis.belowBenchmarkSpend, currency)} while performing below the middle ad${decision.budgetVariant === "cut" ? ". The freed budget stays with the current ads for now." : ", and we add budget to the ads that are working in steps."}`
+              ? `${clientReduceSentence(trimSplit(analysis).trims, analysis, context)} We're reducing or pausing spend on ${fmtCount(trimSplit(analysis).trims.length)} of the ads below${decision.budgetVariant === "cut" ? "; the freed budget stays with the current ads for now." : " and adding budget to the ads that are working, in steps."} ${clientHeldClause(trimSplit(analysis).held)}`
+              : `${clientReduceSentence(trimSplit(analysis).trims, analysis, context)} We're reducing or pausing spend on the ads below${decision.budgetVariant === "cut" ? "; the freed budget stays with the current ads for now." : " and adding budget to the ads that are working, in steps."}`
             : `The ads below performed below the middle ad — together ${fmtMoney(analysis.belowBenchmarkSpend, currency)} of spend. We're not reducing their budgets yet; the decision above explains the next step.`
           : "No ad underperformed badly enough to pause this period.",
       belowBenchmarkSpendLabel: fmtMoney(analysis.belowBenchmarkSpend, currency),

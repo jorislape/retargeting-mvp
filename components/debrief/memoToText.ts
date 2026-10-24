@@ -639,6 +639,7 @@ export function memoToText(
   if (view === "client" && memo.nextTests.some((t) => t.briefReadiness)) {
     lines.push(`Ready for a creative brief? ${CLIENT_BRIEF_LEGEND}`);
   }
+  if (view === "client") lines.push("We'll test variations based on the strongest observed results.");
   memo.nextTests.forEach((t, i) => {
     lines.push(`${i + 1}. ${c(t.test)}`);
     if (t.briefReadiness) {

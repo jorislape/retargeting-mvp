@@ -1773,7 +1773,8 @@ console.log("decision (stage 1 — rules): all assertions passed");
           `${label}: client budget-increase promise iff shift/scale`
         );
         assert.equal(
-          client.includes("reducing or pausing their budgets"),
+          /* Bulletproof pass B5: "We're reducing or pausing that ad / those N ads". */
+          /reducing or pausing (their budgets|that ad|those [\d,]+ ads)/.test(client),
           cutSide && !client.includes("No ad underperformed badly enough"),
           `${label}: client pause promise iff shift/cut`
         );
