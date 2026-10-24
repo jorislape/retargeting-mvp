@@ -147,6 +147,22 @@ assert.match(css, /@media print \{[\s\S]*?nextjs-portal \{\s*display: none !impo
   assert.match(report, /const th = "whitespace-nowrap py-1\.5 pr-3/, "naming table headers");
 }
 
+/* ---- Bulletproof A-fix 4: page budget (buyer ≤7, client ≤4 in Chromium AND WebKit) ---- */
+{
+  // Success / Decision rule print once above the tests when identical.
+  assert.match(report, /function sharedTestRules\(tests: readonly MemoTest\[\]\): MemoTest \| null \{/);
+  assert.match(report, /\{sharedTestRules\(memo\.nextTests\) && <SharedTestRules test=\{sharedTestRules\(memo\.nextTests\)!\} client=\{false\} \/>\}/);
+  assert.match(report, /sharedRules=\{sharedTestRules\(memo\.nextTests\) != null\}/);
+  assert.match(report, /<div className=\{sharedRules \? "print:hidden" : undefined\}>\s*<dt[^>]*>\s*Success\{" "\}/, "per-test Success is screen-only when shared");
+  assert.match(report, /\{shared && <SharedTestRules test=\{shared\} client \/>\}/, "client cards too");
+  // Duplicates are print-hidden; the exec summary keeps page 1 short.
+  assert.match(report, /<div className="print:hidden">\s*<SpendAllocationChart/);
+  assert.match(report, /<span className="print:hidden">\{memo\.decision\.execution\.buyer\} <\/span>/, "execution prints once (card)");
+  // Print density: tighter section spacing and a 94% print scale.
+  assert.match(css, /\.report-print-page article section\.mt-12,\s*\.report-print-page article section\.mt-10 \{\s*margin-top: 20px !important;/);
+  assert.match(css, /\.report-print-page article \{\s*zoom: 0\.94;/);
+}
+
 /* ---- White-label client PDF: agency name only, never Debrief ---- */
 {
   const brand = between("Real-account review: the client PDF is white-label", "{/* ---- Masthead ---- */}");

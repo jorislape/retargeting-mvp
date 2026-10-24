@@ -74,7 +74,8 @@ const decisionCardSrc = reportSrc.slice(decisionCardStart, decisionCardEnd);
   // "Not yet" / "What we're deliberately not doing yet" list.
   assert.match(decisionCardSrc, /className="print-avoid-break mt-4">\s*<p className="text-\[10px\][^"]*">\s*\{client \? "What we're deliberately not doing yet" : "Not yet"\}/, "the avoid list wrapper has print-avoid-break");
   // "Next controlled test" dl wrapper.
-  assert.match(decisionCardSrc, /className=\{`print-avoid-break mt-4 \$\{client \? "print:hidden" : ""\}`\}>\s*<p className="text-\[10px\][^"]*">\s*Next controlled test/, "the Next controlled test wrapper has print-avoid-break (client print drops it — Real-account fix 6)");
+  // Bulletproof A-fix 4: print drops it in both views (T1 carries it).
+  assert.match(decisionCardSrc, /className="print-avoid-break mt-4 print:hidden">\s*<p className="text-\[10px\][^"]*">\s*Next controlled test/, "the Next controlled test wrapper is print-hidden (T1 carries it)");
   // Always-visible "What we don't know" (expandLimits=true) branch.
   assert.match(decisionCardSrc, /className="print-avoid-break mt-4 border-t border-white\/\[0\.08\] pt-3">\s*<p className="text-\[10px\][^"]*">\s*\{client \? "What we still can't conclude" : "What we don't know"\}/, "the always-visible limits branch has print-avoid-break");
   // "Evidence limits" print-only mirror.

@@ -176,7 +176,13 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
     { label: "Verdict", value: (client ? memo.clientSummary : memo.tldr)[0] },
     {
       label: client ? "Main action" : "Trim / reduce",
-      value: client ? memo.losers.clientInstruction : memo.losers.killInstruction,
+      /* A-fix 4: the execution sentence lives on the Next move card —
+         page 1's summary keeps only the trim facts. */
+      value: client
+        ? memo.losers.clientInstruction
+        : memo.decision.execution && memo.losers.killInstruction.startsWith(memo.decision.execution.buyer)
+          ? memo.losers.killInstruction.slice(memo.decision.execution.buyer.length).trim()
+          : memo.losers.killInstruction,
     },
     { label: "Top recommended test", value: memo.nextTests[0]?.test },
     /* Bulletproof pass A3: stages mixed but not splittable — page 1. */
@@ -188,7 +194,14 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
     /* Bulletproof pass A2: two labels — how clearly the data separates
        the ads, and how safe the action is. */
     { label: "Evidence", value: memo.confidence.level },
-    { label: "Decision", value: decisionLine(memo.confidence, "buyer") },
+    {
+      label: "Decision",
+      /* A-fix 4: the caps are spelled out in the Confidence section. */
+      value:
+        memo.confidence.decision.caps.buyer.length > 0
+          ? `${memo.confidence.decision.level} — capped (${memo.confidence.decision.caps.buyer.length} reason${memo.confidence.decision.caps.buyer.length === 1 ? "" : "s"}, see Confidence)`
+          : memo.confidence.decision.level,
+    },
   ];
   const lines = candidates.filter(
     (l): l is { label: string; value: string } => Boolean(l.value)
@@ -786,7 +799,9 @@ function DecisionCard({
         </div>
       )}
       {d.nextControlledTest && (
-        <div className={`print-avoid-break mt-4 ${client ? "print:hidden" : ""}`}>
+        /* A-fix 4: print-hidden in both views — T1 in the tests section
+           carries the same preserve / change / watch. */
+        <div className="print-avoid-break mt-4 print:hidden">
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             Next controlled test
           </p>
@@ -1216,7 +1231,7 @@ function PrintAppendix({
   if (rows.length === 0 && moreLimits.length === 0 && bars.length === 0 && naming.length === 0) return null;
 
   const th = "whitespace-nowrap py-0.5 pr-2 text-left text-[8px] font-semibold uppercase tracking-[0.06em] text-zinc-400";
-  const td = "py-0 pr-2 align-top font-mono text-[8px] leading-[10px] tabular-nums text-zinc-400";
+  const td = "py-0 pr-2 align-top font-mono text-[8px] leading-[9px] tabular-nums text-zinc-400";
   /* Tight on purpose: the appendix is reference material, and every
      line saved keeps a near-empty last page off the buyer PDF. */
   const head = "print-section-label print-heading mt-2 mb-0.5 text-[9px] font-bold uppercase tracking-[0.08em]";
@@ -1668,8 +1683,43 @@ function ClientDecisionSplit({ memo }: { memo: Memo }) {
 /* Client next-steps roadmap: the same three tests as scannable cards —
    test idea, why, success. Setup detail stays in the buyer view and in
    the Copy output; the recommendation logic is untouched. */
-function ClientTestCards({ tests }: { tests: MemoTest[] }) {
+/* Bulletproof A-fix 4 — when every test carries the same Success and
+   Decision rule (the usual case: three creative tests on one account's
+   bars), print states them ONCE above the tests and the per-test copies
+   are print-hidden. Screen and TXT keep them on every test. */
+function sharedTestRules(tests: readonly MemoTest[]): MemoTest | null {
+  if (tests.length < 2) return null;
+  const [first] = tests;
+  const same = tests.every(
+    (t) =>
+      t.winningLooksLike === first.winningLooksLike &&
+      t.decisionRule === first.decisionRule &&
+      t.clientSuccess === first.clientSuccess &&
+      t.clientDecisionRule === first.clientDecisionRule
+  );
+  return same && first.decisionRule ? first : null;
+}
+
+function SharedTestRules({ test, client }: { test: MemoTest; client: boolean }) {
   return (
+    <div className="print-only print-avoid-break mt-3 space-y-0.5 text-xs leading-relaxed text-zinc-400">
+      <p>
+        <span className="font-semibold text-zinc-300">{client ? "Success looks like (every test):" : "Success (every test):"}</span>{" "}
+        {client ? (test.clientSuccess ?? clientizeText(test.winningLooksLike)) : test.winningLooksLike}
+      </p>
+      <p>
+        <span className="font-semibold text-zinc-300">{client ? "What happens next:" : "Decision rule (every test):"}</span>{" "}
+        {client ? (test.clientDecisionRule ?? test.decisionRule) : test.decisionRule}
+      </p>
+    </div>
+  );
+}
+
+function ClientTestCards({ tests }: { tests: MemoTest[] }) {
+  const shared = sharedTestRules(tests.slice(0, 3));
+  return (
+    <>
+    {shared && <SharedTestRules test={shared} client />}
     <div className="mt-5 grid gap-3 sm:grid-cols-3 print:grid-cols-1">
       {tests.slice(0, 3).map((test, i) => (
         <article
@@ -1705,19 +1755,20 @@ function ClientTestCards({ tests }: { tests: MemoTest[] }) {
           <p className="print-hidden mt-1 text-xs leading-relaxed text-zinc-400">
             <Names text={clientizeText(test.why)} />
           </p>
-          <p className="mt-2.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-400 print-win">
+          <p className={`mt-2.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-400 print-win ${shared ? "print:hidden" : ""}`}>
             <CheckIcon className="h-3 w-3" />
             Success looks like
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+          <p className={`mt-1 text-xs leading-relaxed text-zinc-400 ${shared ? "print:hidden" : ""}`}>
             <Names text={test.clientSuccess ?? clientizeText(test.winningLooksLike)} />
           </p>
           {test.clientDecisionRule && (
-            <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">{test.clientDecisionRule}</p>
+            <p className={`mt-1.5 text-xs leading-relaxed text-zinc-400 ${shared ? "print:hidden" : ""}`}>{test.clientDecisionRule}</p>
           )}
         </article>
       ))}
     </div>
+    </>
   );
 }
 
@@ -1728,12 +1779,15 @@ function TestRow({
   checked,
   onToggle,
   view,
+  sharedRules = false,
 }: {
   test: MemoTest;
   index: number;
   checked: boolean;
   onToggle: () => void;
   view: ReportView;
+  /** A-fix 4: Success / Decision rule print once above the tests. */
+  sharedRules?: boolean;
 }) {
   /* Client view gets the plain-English register; buyer untouched. */
   const c = (text: string) =>
@@ -1900,14 +1954,14 @@ function TestRow({
               <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.variable)} /></dd>
             </div>
           )}
-          <div>
+          <div className={sharedRules ? "print:hidden" : undefined}>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Success{" "}
             </dt>
             <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.winningLooksLike)} /></dd>
           </div>
           {test.decisionRule && (
-            <div>
+            <div className={sharedRules ? "print:hidden" : undefined}>
               <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 Decision rule{" "}
               </dt>
@@ -2747,8 +2801,13 @@ export function Report({
             customization.topAdsShown / sections.winners /
             sections.underperformers, which only slice the row-level
             detail below. */}
+        {/* A-fix 4: screen-only — its figures (below-median share and
+            spend, set-aside spend) are stated in the rationale and the
+            summaries, and the PDF has a page budget. */}
         {customization.showSpendAllocationChart && (
-          <SpendAllocationChart allocation={memo.spendAllocation} view={view} />
+          <div className="print:hidden">
+            <SpendAllocationChart allocation={memo.spendAllocation} view={view} />
+          </div>
         )}
 
         {/* ---- Winners / What worked ---- */}
@@ -2815,7 +2874,17 @@ export function Report({
             }
           />
           <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-300">
-            {client ? memo.losers.clientInstruction : memo.losers.killInstruction}
+            {client ? (
+              memo.losers.clientInstruction
+            ) : memo.decision.execution && memo.losers.killInstruction.startsWith(memo.decision.execution.buyer) ? (
+              /* A-fix 4: the execution sentence prints once — on the card. */
+              <>
+                <span className="print:hidden">{memo.decision.execution.buyer} </span>
+                {memo.losers.killInstruction.slice(memo.decision.execution.buyer.length).trim()}
+              </>
+            ) : (
+              memo.losers.killInstruction
+            )}
           </p>
           {memo.losers.rows.length > 0 && (
             <div className="mt-4">
@@ -2953,6 +3022,7 @@ export function Report({
               enough evidence).
             </p>
           )}
+          {sharedTestRules(memo.nextTests) && <SharedTestRules test={sharedTestRules(memo.nextTests)!} client={false} />}
           <ol className="mt-1 divide-y divide-white/[0.08]">
             {memo.nextTests.map((test, i) => (
               <TestRow
@@ -2961,6 +3031,7 @@ export function Report({
                 index={i}
                 checked={queued[i]}
                 view={view}
+                sharedRules={sharedTestRules(memo.nextTests) != null}
                 onToggle={() => {
                   const wasQueued = queued[i];
                   setQueued((prev) => prev.map((q, j) => (j === i ? !q : q)));

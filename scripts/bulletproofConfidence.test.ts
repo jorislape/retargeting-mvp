@@ -62,7 +62,9 @@ try {
 
   /* ---- Report: both labels in the exec summary, card and confidence section ---- */
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
-  assert.match(report, /\{ label: "Evidence", value: memo\.confidence\.level \},\s*\{ label: "Decision", value: decisionLine\(memo\.confidence, "buyer"\) \},/);
+  assert.match(report, /\{ label: "Evidence", value: memo\.confidence\.level \},\s*\{\s*label: "Decision",/);
+  // A-fix 4: page 1 keeps the level; the caps are spelled out under Confidence.
+  assert.match(report, /\$\{memo\.confidence\.decision\.level\} — capped \(\$\{memo\.confidence\.decision\.caps\.buyer\.length\} reason/);
   assert.ok(!report.includes('{ label: "Confidence", value: memo.confidence.level }'), "the single label is gone");
   assert.match(report, /\{CONFIDENCE_LABELS\.decision\[client \? "client" : "buyer"\]\}/, "card");
   assert.match(report, /\{client \? "Next step" : "Decision"\} \{memo\.confidence\.decision\.level\}/, "section badge");

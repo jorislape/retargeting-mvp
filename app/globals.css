@@ -217,6 +217,18 @@ body {
   .print-hidden {
     display: none !important;
   }
+  /* Bulletproof A-fix 4 — page budget: report sections sit 40–48px
+     apart on screen (scroll rhythm); on paper half that reads the same
+     and keeps the buyer PDF within 7 pages, the client within 4. */
+  .report-print-page article section.mt-12,
+  .report-print-page article section.mt-10 {
+    margin-top: 20px !important;
+  }
+  /* …and the report prints at 94% — the same layout, slightly denser
+     type (13px body → ~12.2px), in both Chromium and WebKit. */
+  .report-print-page article {
+    zoom: 0.94;
+  }
   /* Next.js's dev-mode indicator (the "N" badge) is a <nextjs-portal>
      custom element outside the app tree — never part of a PDF. */
   nextjs-portal {

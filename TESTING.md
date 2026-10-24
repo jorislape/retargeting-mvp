@@ -328,18 +328,17 @@ Run `scripts/fixtures/agency-naming-convention.csv` (ROAS).
       lists, test titles and client cards show names middle-truncated
       (~60 chars, "start…end"), full name on hover. Tables show full names
       wrapping. Copy/TXT keep full names.
-- [ ] **PDF length**: Print / Save PDF (A4). Buyer ≤ 7 pages, client ≤ 4
-      (Chromium: 7 / 4 on the fixture and on a real 341-ad account, which
-      started at 25 / 15). Collapsed lists print "+N more — full list in the
-      appendix" (ad tables print their top 3 rows). Buyer print shows every
+- [ ] **PDF length**: Print / Save PDF (A4). Buyer ≤ 7 pages, client ≤ 4, last page ≥ 15 lines — in Chromium AND Safari/WebKit
+      (real 341-ad account: Chromium 7 / 4, WebKit 7 / 4; it started at 25 / 15). Print runs at 94% with tighter section
+      spacing; Success / Decision rule print once above the tests when identical; spend allocation is screen-only.
+      Collapsed lists print "+N more — full list in the appendix" (ad tables print their top 3 rows). Buyer print shows every
       naming key (top 4 values each), only the decision bars that changed
       the call plus your own, and the first 2 evidence limits. The buyer
       appendix follows the sign-off: every judged ad once (name ≤50 chars,
       role, spend, outcomes, KPI), then the collapsed limits / bars / naming
       values; the client appendix carries only collapsed limits. No mid-word
       breaks in client stat cards / the split counts ("230", not "23 / 0") or
-      buyer table headers and numbers ("VALUE", "9.00x"), and no last page
-      with fewer than 5 lines (real CSV: last pages carry 35–63 lines). Names are middle-truncated (~40 chars); each test
+      buyer table headers and numbers ("VALUE", "9.00x"). Names are middle-truncated (~40 chars); each test
       prints only its title, Hypothesis and Win (client: title + Success);
       the client PDF names ads once, in the Summary split. Repeat in
       Safari's print preview — its pagination differs from Chromium's.
