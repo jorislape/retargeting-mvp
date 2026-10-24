@@ -618,6 +618,10 @@ export interface AnalysisResult {
       aboveMedian: string[];
     };
   };
+  /** Bulletproof pass A5 — total spend ÷ total outcomes (purchases /
+   *  leads) across every analyzed ad; null for CTR/CPC or no outcomes.
+   *  Feeds the test success bars only. */
+  costPerOutcome?: number | null;
   /** Real-account review — present ONLY when ≥ SPREAD_THIN_SHARE of
    *  analyzed ads were set aside for low spend / no purchases on low
    *  spend. avgSpend = the average spend of those set-aside ads;
@@ -1072,6 +1076,13 @@ export interface MemoTest {
    *  on any other test. Buyer-only, decision-blind. */
   evidenceDiagnostic?: MemoEvidenceDiagnostic;
   brief: MemoBrief;
+  /** Bulletproof pass A5 — the one thing the test varies (the brief's
+   *  "change"), the decision rule (win → scale in steps; lose → retire;
+   *  inconclusive → extend once, then stop) and the client versions. */
+  variable?: string;
+  decisionRule?: string;
+  clientSuccess?: string;
+  clientDecisionRule?: string;
 }
 
 /** Summary of user-pasted market/competitor context. Directional by

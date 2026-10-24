@@ -376,7 +376,7 @@ const GUARDRAIL_CLIENT =
   assert.ok(scale.headline.startsWith('Scale "W"'), "unrelated field: headline unaffected");
   assert.ok(scale.rationale.includes(`${SCALE_TEST_MIN_DELTA_PCT}%`), "unrelated field: rationale unaffected");
   assert.equal(scale.avoidNow.buyer[0], "No new creative test alongside the scale — one variable at a time.", "unrelated field: avoidNow unaffected");
-  assert.ok(scale.reassess.buyer.startsWith("Reassess once the new allocation"), "unrelated field: reassess unaffected");
+  assert.ok(scale.reassess.buyer.startsWith("Reassess once the move has run ≥7 days"), "unrelated field: reassess unaffected");
 
   // 4. No spend-size gating: a low-spend and a high-spend fixture with
   //    the same shape receive byte-identical guardrail copy.
@@ -1337,7 +1337,9 @@ console.log("decision (stage 1 — rules): all assertions passed");
     );
     assert.ok(memo.decision.rationale.includes("100%"), "documented +100% vs median ROAS");
     assert.ok(memo.decision.rationale.includes("34%"), "documented 34% below-benchmark spend share");
-    assert.ok(memo.decision.reassess.buyer.includes("$126.11"), "documented spend gate in the reassess trigger");
+    // Bulletproof pass A5: the reassess trigger is the test bars (≥7 days,
+    // ≥10 purchases or ≥10× the account's cost per purchase), not the gate.
+    assert.match(memo.decision.reassess.buyer, /^Reassess once the move has run ≥7 days with ≥10 purchases \(or ≥ \$[\d,.]+ spend\) on the changed ad sets\.$/);
     assertContract(memo.decision, "sample");
 
     // Evidence-Explicit Decision V1 — pinned evidence read on the sample:

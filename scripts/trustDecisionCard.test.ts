@@ -80,7 +80,7 @@ try {
 
   const ecom = run(ECOM, "roas").memo;
   assert.equal(ecom.decision.budgetMove?.belowSpendLabel, "$2,109.00", "= belowBenchmarkSpend, formatted");
-  assert.ok(ecom.decision.avoidNow.buyer.includes("Run the test below only after the budget move has ~$171.00 of fresh spend — one variable at a time."));
+  assert.ok(ecom.decision.avoidNow.buyer.some((l) => /^Run the test below only after the budget move has run ≥7 days with ≥10 purchases \(or ≥ \$[\d,.]+ spend\) on the changed ad sets — one variable at a time\.$/.test(l)));
 
   const cut = run(NINE_ZERO, "cpa").memo;
   assert.equal(cut.decision.budgetVariant, "cut");

@@ -18,6 +18,8 @@ import {
   SHORT_WINDOW_DAYS,
   spendGateSource,
   SCALE_STEP_MAX_PCT,
+  testBars,
+  TEST_MIN_DAYS,
   trimOrder,
   trimCandidates,
   isNearMedian,
@@ -41,12 +43,13 @@ import {
   AnalysisResult,
   CREATIVE_FORMAT_LABELS,
   DebriefContext,
-  HIGHER_IS_BETTER,
   DecisionCriteria,
   Memo,
   MemoDecision,
   MemoMarketSignal,
   MemoNamingPatterns,
+  NamingPatternRow,
+  HIGHER_IS_BETTER as HIGHER_IS_BETTER_KPI,
   MemoSpendAllocation,
   MemoSpendAllocationSegment,
   MemoSpendAllocationSetAside,
@@ -711,6 +714,40 @@ function buildPatterns(analysis: AnalysisResult): { winners: string[]; losers: s
   return { winners: winnerNotes, losers: loserNotes };
 }
 
+/** Bulletproof pass A5 — a loser is worth rebuilding only once it has
+ *  spent this multiple of the account's cost per purchase; a naming
+ *  contrast needs this many outcomes on each side. */
+export const REBUILD_MIN_CPP_MULTIPLE = 5;
+export const CONTRAST_MIN_OUTCOMES = 20;
+/** Naming keys a creative test can vary, in plain words. Stage,
+ *  audience and placement keys aren't creative — never contrasted. */
+const CONTRAST_KEY_WORDS: Record<string, string> = { FOR: "format", AN: "angle", HK: "hook", CN: "concept" };
+
+/** The naming key whose strongest and weakest value (each with ≥
+ *  CONTRAST_MIN_OUTCOMES outcomes) differ the most, relative to the
+ *  weaker. null when no creative key qualifies. */
+function namingContrast(
+  analysis: AnalysisResult
+): { key: string; label: string; best: NamingPatternRow; worst: NamingPatternRow } | null {
+  const np = analysis.namingPatterns;
+  if (!np || np.basis !== "tokens") return null;
+  const higher = HIGHER_IS_BETTER_KPI[analysis.kpi];
+  let pick: { key: string; label: string; best: NamingPatternRow; worst: NamingPatternRow; gap: number } | null = null;
+  for (const k of np.keys) {
+    const label = CONTRAST_KEY_WORDS[k.key];
+    if (!label) continue;
+    const rows = k.rows.filter((r) => r.kpiValue != null && r.outcomes != null && r.outcomes >= CONTRAST_MIN_OUTCOMES);
+    if (rows.length < 2) continue;
+    const best = rows[0];
+    const worst = rows[rows.length - 1];
+    const b = best.kpiValue as number;
+    const w = worst.kpiValue as number;
+    const gap = higher ? (w > 0 ? (b - w) / w : 0) : b > 0 ? (w - b) / b : 0;
+    if (gap > 0 && (pick == null || gap > pick.gap)) pick = { key: k.key, label, best, worst, gap };
+  }
+  return pick && { key: pick.key, label: pick.label, best: pick.best, worst: pick.worst };
+}
+
 /** Real-account review — format tokens a client can read; any other
  *  value (and every other naming key) stays in the buyer's table. */
 const NAMING_VALUE_WORDS: Record<string, string> = {
@@ -1104,8 +1141,9 @@ function buildNextTests(
   const kpiLabel = kpiLabelFor(analysis);
   const medianLabel = median != null ? fmtKpiValue(median, kpi, currency) : "the benchmark";
   const gateLabel = fmtMoney(spendGate, currency);
-  /* Tester Feedback Fix 4: setup lines say where the minimum comes from. */
-  const gateSetupLabel = `${gateLabel} (${spendGateSource(analysis, (v) => fmtMoney(v, currency)).short})`;
+  /* Bulletproof pass A5: every test's success bars and decision rule. */
+  const bars = testBars(analysis, (v) => fmtMoney(v, currency));
+  const LIFT = `by more than ${FLAT_FIELD_DELTA_PCT}%`;
   const tests: MemoTest[] = [];
 
   /* First-Run Robustness 3a: in a proxy run (CTR/CPC/Purchases/Leads)
@@ -1141,6 +1179,10 @@ function buildNextTests(
     analysis.rankedAds.find((a) => a.name === name)?.nameTags.includes("static")
       ? "headline / first visual"
       : "opening 3 seconds / first frame";
+  /* Bulletproof pass A5: T1's wording follows the ad's format — a
+     static has a headline / first visual, not an "opening". */
+  const openWord = (name: string) =>
+    openingUnit(name) === "headline / first visual" ? "headline / first visual" : "opening";
   const winnerTag = dominantTag(winners);
 
   /* Evidence Sufficiency V1 — Brief Readiness. Computed once (per test
@@ -1269,14 +1311,7 @@ function buildNextTests(
     median != null
       ? `the ${medianLabel} typical result`
       : "the account benchmark (once enough ads reach the minimum spend to set one)";
-  const successMetric =
-    kpi === "cpa" && context.targetCpa != null
-      ? `CPA below your ${fmtMoney(context.targetCpa, currency)} target once the ~${gateLabel} minimum spend is reached.`
-      : kpi === "roas" && context.targetRoas != null
-        ? `ROAS above your ${context.targetRoas.toFixed(2)}x target once the ~${gateLabel} minimum spend is reached.`
-        : kpi === "ctr"
-          ? `CTR above ${typicalLabel} once the ~${gateLabel} minimum spend is reached, without cost per click worsening materially.`
-          : `${kpiLabel} ${HIGHER_IS_BETTER[kpi] ? "above" : "below"} ${typicalLabel} once the ~${gateLabel} minimum spend is reached.`;
+  const successMetric = bars.success;
   /* Creative / brand constraints the user typed (tone, geo, claims to
      avoid, required offer language). Surfaced as a brief guardrail so
      the hand-off respects them — never touches scoring, ranking, or the
@@ -1292,8 +1327,8 @@ function buildNextTests(
       ]
     : [];
   const briefGuardrails = (marketInformed: boolean): string[] => [
-    `Do not judge before ~${gateLabel} of spend — below the minimum spend the ad is set aside, not failed.`,
-    `Do not scale until the test beats ${typicalLabel} by ${SCALE_TEST_MIN_DELTA_PCT}%+.`,
+    `Do not judge before the success bars: ≥${TEST_MIN_DAYS} days and ${bars.perVariant}.`,
+    `Do not scale until the test beats its control ${LIFT} on those bars.`,
     ...(marketInformed
       ? [
           "Do not copy competitor ads directly — adapt the observed pattern to your own claim.",
@@ -1323,14 +1358,14 @@ function buildNextTests(
       `On ${kpiLabel}, the leading ads sit below the median on ${outcome.label}.`,
       gateSignal
     );
-    const outcomeMetric = `${outcome.label} ${outcome.kpi === "roas" ? "above" : "below"} ${outcome.medianLabel} once the ~${gateLabel} minimum spend is reached.`;
+    const outcomeMetric = bars.success;
     tests.push({
-      test: `Brief 2 new variants of "${L.name}" — the leader on ${outcome.label} — varying only the opening.`,
+      test: `Brief 2 new variants of "${L.name}" — the leader on ${outcome.label} — varying only the ${openWord(L.name)}.`,
       why: `On ${kpiLabel}, the leading ads sit below the median on ${outcome.label} (${outcome.medianLabel}), so a test built on them would chase ${kpiLabel} rather than results. "${L.name}" leads on ${outcome.label} at ${L.valueLabel} — one way to test whether that angle has more headroom: vary only the opening. ${openingEvidence}`,
-      setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the ${openingUnit(L.name)} between variants.`,
-      winningLooksLike: `At least one variant beats ${outcome.medianLabel} ${outcome.label} within 7 days — read it on ${outcome.label}, not ${kpiLabel}.`,
+      setup: `Same audience, placement, and offer as the original. Matched budget per variant, run until each clears the success bars. Change only the ${openingUnit(L.name)} between variants.`,
+      winningLooksLike: bars.success,
       signals,
-      hypothesis: `If we change only the opening while holding "${L.name}"'s angle, ${offerLabel}, and audience constant, we want to test whether at least one variant beats ${outcome.medianLabel} ${outcome.label} — because "${L.name}" leads this export on ${outcome.label} at ${L.valueLabel}.`,
+      hypothesis: `If we change only the ${openWord(L.name)} while holding "${L.name}"'s angle, ${offerLabel}, and audience constant, we want to test whether at least one variant beats the original ${LIFT} on ${outcome.label} — because "${L.name}" leads this export on ${outcome.label} at ${L.valueLabel}.`,
       brief: {
         title: `Opening variants of "${L.name}"`,
         objective: `Learn whether the leading ${outcome.label} angle has more headroom by varying only the opening.`,
@@ -1361,21 +1396,21 @@ function buildNextTests(
     );
     tests.push({
       test: founderLed
-        ? `Brief 2 new ${format}variants of "${top.name}" — make one a founder-led version (market signal); vary only the opening on the other.`
-        : `Brief 2 new ${format}variants of "${top.name}" — vary only the opening to test whether the angle has more headroom.`,
+        ? `Brief 2 new ${format}variants of "${top.name}" — make one a founder-led version (market signal); vary only the ${openWord(top.name)} on the other.`
+        : `Brief 2 new ${format}variants of "${top.name}" — vary only the ${openWord(top.name)} to test whether the angle has more headroom.`,
       why: `${
         passedOver
           ? `It's the strongest ad with the evidence to build on: ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend${topConversions}.`
           : `It leads the account at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)}) on ${fmtMoney(top.spend, currency)} spend — the strongest observed result in the current dataset.`
-      } One way to test whether the angle has more headroom: vary only the opening. ${openingEvidence}${
+      } One way to test whether the angle has more headroom: vary only the ${openWord(top.name)}. ${openingEvidence}${
         founderLed
           ? " Your market notes flag founder-led video as an observed pattern — worth testing as an adaptation of this leading angle. Adapt, don't copy."
           : ""
       }${watchNote}`,
-      setup: `Same audience, placement, and offer as the original. ~${gateSetupLabel} per variant so each reaches the minimum spend. Change only the ${openingUnit(top.name)} between variants.`,
-      winningLooksLike: `At least one variant beats the ${medianLabel} median ${kpiLabel} within 7 days.`,
+      setup: `Same audience, placement, and offer as the original. Matched budget per variant, run until each clears the success bars. Change only the ${openingUnit(top.name)} between variants.`,
+      winningLooksLike: bars.success,
       signals,
-      hypothesis: `If we change only the opening while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} ${medianLabel} — because "${top.name}" ${passedOver ? "already runs at" : "already leads this dataset at"} ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend${passedOver ? `${topConversions}, ${leadBasis}` : ""}.`,
+      hypothesis: `If we change only the ${openWord(top.name)} while holding "${top.name}"'s angle, ${offerLabel}, and audience constant, ${winnerThin ? "we want to test whether at least one variant beats" : "we expect at least one variant to beat"} the original ${LIFT} — because "${top.name}" ${passedOver ? "already runs at" : "already leads this dataset at"} ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} on ${fmtMoney(top.spend, currency)} spend${passedOver ? `${topConversions}, ${leadBasis}` : ""}.`,
       briefReadiness: winnerReadiness ?? undefined,
       evidenceDiagnostic: evidenceDiagnostic ?? undefined,
       brief: {
@@ -1429,10 +1464,10 @@ function buildNextTests(
           ? ` Your market notes point the same way (${market.hooks.join(", ")}) — directional support for the problem-led slot.`
           : ""
       }`,
-      setup: `Matched budget (~${gateSetupLabel} per ad), same audience and placement across all three, so the angle is the only variable.`,
-      winningLooksLike: `At least one angle clears ${gateLabel} spend and beats ${medianLabel}.`,
+      setup: `Matched budget per ad until each clears the success bars, same audience and placement across all three, so the angle is the only variable.`,
+      winningLooksLike: bars.success,
       signals,
-      hypothesis: `If we run three deliberately different angles at matched budget while holding audience, placement, and offer constant, we expect at least one to clear ${gateLabel} spend and beat ${medianLabel} — because no ad in the current dataset has separated from the median yet, so the next signal has to come from a new angle, not more spend behind an existing one.`,
+      hypothesis: `If we run three deliberately different angles at matched budget while holding audience, placement, and offer constant, we expect at least one to beat the current best ad ${LIFT} — because no ad in the current dataset has separated from the median yet, so the next signal has to come from a new angle, not more spend behind an existing one.`,
       brief: {
         title: "Angle exploration: problem-led vs social-proof vs offer-led",
         objective: `Find a first winning angle — nothing beat ${typicalLabel} this period, so the account needs new direction, not iteration.`,
@@ -1450,7 +1485,7 @@ function buildNextTests(
           "Burned-in captions; assume sound-off viewing.",
           "Identical end card across all three: product + current offer.",
         ],
-        keepConstant: `Audience, placement, budget (~${gateLabel} each), and the live offer.`,
+        keepConstant: "Audience, placement, matched budget, and the live offer.",
         change: "The angle — problem-led vs social-proof-led vs offer-led. Nothing else.",
         successMetric,
         guardrails: briefGuardrails(marketAngles),
@@ -1460,8 +1495,14 @@ function buildNextTests(
   }
 
   /* T2 — rebuild the worst judged ad (creative), before killing the
-     angle outright. */
-  if (worst) {
+     angle outright. Bulletproof pass A5: only when it spent ≥
+     REBUILD_MIN_CPP_MULTIPLE × the account's cost per purchase — less is
+     too little to call a loser worth rebuilding; then the strongest
+     naming contrast (both sides ≥ CONTRAST_MIN_OUTCOMES) is the sharper
+     question, and with neither there is no T2. */
+  const rebuildable = worst != null && (bars.cpp == null || worst.spend >= REBUILD_MIN_CPP_MULTIPLE * bars.cpp);
+  const contrast = worst != null && !rebuildable ? namingContrast(analysis) : null;
+  if (worst && rebuildable) {
     const worstStats = `${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} (${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct, worst.stageBenchmark?.stage)}) on ${fmtMoney(worst.spend, currency)} spend`;
     const problemFirst = market?.has("problem-first") ?? false;
     if (worst.zeroConversions) {
@@ -1473,8 +1514,8 @@ function buildNextTests(
       tests.push({
         test: `Test one rebuilt version of "${worst.name}" before it gets more budget — it spent ${spent} with 0 ${zeroMany}.`,
         why: `It spent ${spent}, past the ~${gateLabel} minimum spend, with 0 ${zeroMany} — the weakest result among ads past the minimum spend. The data shows that it didn't convert, not why, so one controlled rebuild is the cheapest way to learn whether anything in it is worth keeping.`,
-        setup: `Pause or reduce the original. One rebuild at ~${gateSetupLabel}, same audience, placement, and offer — change one element of the creative so the result is readable.`,
-        winningLooksLike: `The rebuild records ${zeroMany} and reaches ${medianLabel} or better; if it records none again by ~${gateLabel}, retire the angle.`,
+        setup: `Pause or reduce the original. One rebuild at matched budget, run until it clears the success bars, same audience, placement, and offer — change one element of the creative so the result is readable.`,
+        winningLooksLike: bars.success,
         signals,
         hypothesis: `If we rebuild "${worst.name}" while holding audience, offer, and placement constant, we want to test whether it records ${zeroMany} at all — because the original spent ${spent} with 0 ${zeroMany}.`,
         briefReadiness: loserReadiness ?? undefined,
@@ -1509,10 +1550,10 @@ function buildNextTests(
             ? " Problem-first hooks also repeat in your market notes — an observed pattern worth adapting to your own claim, not copying."
             : ""
         }`,
-        setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at ~${gateSetupLabel} with the same audience, placement, and offer — creative is the only change.`,
-        winningLooksLike: `The rebuild beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} and closes to within 20% of ${medianLabel}.`,
+        setup: `Reduce the original's spend (it's in the losers list). Launch the rebuild at matched budget with the same audience, placement, and offer — creative is the only change.`,
+        winningLooksLike: bars.success,
         signals,
-        hypothesis: `If we rebuild "${worst.name}" leading with the problem instead of the discount, while holding the offer, audience, and placement constant, ${loserThin ? "we want to test whether it closes toward" : "we expect it to close toward"} ${medianLabel} — because the current version ran ${worstStats}, and an offer-led opening on a discount ad is a common reason a discount alone isn't earning attention.`,
+        hypothesis: `If we rebuild "${worst.name}" leading with the problem instead of the discount, while holding the offer, audience, and placement constant, ${loserThin ? "we want to test whether it beats" : "we expect it to beat"} the original ${LIFT} — because the current version ran ${worstStats}, and an offer-led opening on a discount ad is a common reason a discount alone isn't earning attention.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `Problem-first rebuild of "${worst.name}"`,
@@ -1550,10 +1591,10 @@ function buildNextTests(
             ? " Give the reshoot a problem-first opening — a repeating pattern in your market notes (directional)."
             : ""
         }`,
-        setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at ~${gateSetupLabel}, same audience and offer.`,
-        winningLooksLike: `The reshoot beats the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} and approaches ${medianLabel}.`,
+        setup: `Reduce the original's spend. Launch the ${winnerTag.tag} version at matched budget against the original, same audience and offer.`,
+        winningLooksLike: bars.success,
         signals,
-        hypothesis: `If we reshoot "${worst.name}"'s message as ${winnerTag.tag} while holding the message, audience, and offer constant, ${loserThin ? "we want to test whether it approaches" : "we expect it to approach"} ${medianLabel} — because ${winnerTag.tag} ads already hold ${winnerTag.count}/${winners.length} winner slots in this dataset, while the loser ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct, worst.stageBenchmark?.stage)} on ${fmtMoney(worst.spend, currency)} spend.`,
+        hypothesis: `If we reshoot "${worst.name}"'s message as ${winnerTag.tag} while holding the message, audience, and offer constant, ${loserThin ? "we want to test whether it beats" : "we expect it to beat"} the original ${LIFT} — because ${winnerTag.tag} ads already hold ${winnerTag.count}/${winners.length} winner slots in this dataset, while the loser ran ${fmtDeltaVsMedian(worst.deltaFromMedian, worst.deltaPct, worst.stageBenchmark?.stage)} on ${fmtMoney(worst.spend, currency)} spend.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `${winnerTag.tag} reshoot of "${worst.name}"`,
@@ -1591,10 +1632,10 @@ function buildNextTests(
             ? " Your market notes flag problem-first hooks as a repeating pattern — directional, and the cheapest place to test it."
             : ""
         }`,
-        setup: `Reduce the original's spend. One rebuild at ~${gateSetupLabel}, changing only the hook — same body, audience, and offer.`,
-        winningLooksLike: `The rebuild beats ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} clearly; if it doesn't, retire the angle.`,
+        setup: `Reduce the original's spend. One rebuild at matched budget, changing only the hook — same body, audience, and offer.`,
+        winningLooksLike: bars.success,
         signals,
-        hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, ${loserThin ? "we want to test whether it clearly beats" : "we expect it to clearly beat"} ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} — because at ${worstStats} it's the account's weakest judged ad, and changing only the opening is the cheapest controlled way to learn whether the result moves with it.`,
+        hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, ${loserThin ? "we want to test whether it beats" : "we expect it to beat"} the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} ${LIFT} — because at ${worstStats} it's the account's weakest judged ad, and changing only the opening is the cheapest controlled way to learn whether the result moves with it.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `Hook rebuild of "${worst.name}"`,
@@ -1618,7 +1659,48 @@ function buildNextTests(
         },
       });
     }
-  } else if (!skipRebuild) {
+  } else if (worst && contrast) {
+    const c = contrast;
+    const nouns = outcomeNounsFor(analysis) ?? { one: "purchase", many: "purchases" };
+    const fmt = (v: number) => fmtKpiValue(v, kpi, currency);
+    const verb = kpi === "roas" ? "returned" : "came in at";
+    const side = (r: NamingPatternRow) => `"${r.value}" (${fmt(r.kpiValue as number)} on ${fmtCount(r.outcomes as number)} ${nouns.many}, ${r.ads} ads)`;
+    const spent = fmtMoney(worst.spend, currency);
+    const signals = sig(
+      `${c.key} ${side(c.best)} vs ${side(c.worst)} in this export.`,
+      `"${worst.name}" spent ${spent} — under ${REBUILD_MIN_CPP_MULTIPLE}× the account's ${fmtMoney(bars.cpp as number, currency)} cost per ${nouns.one}, so no rebuild yet.`
+    );
+    tests.push({
+      test: `Test the strongest naming contrast — ${c.label} "${c.best.value}" vs "${c.worst.value}": matched ads that differ only in the ${c.label}.`,
+      why: `The weakest ad, "${worst.name}", spent ${spent} — under ${REBUILD_MIN_CPP_MULTIPLE}× the account's ${fmtMoney(bars.cpp as number, currency)} cost per ${nouns.one}, too little to justify a rebuild. The naming table asks a sharper question: across this export, "${c.best.value}" ads ${verb} ${fmt(c.best.kpiValue as number)} on ${fmtCount(c.best.outcomes as number)} ${nouns.many} vs ${fmt(c.worst.kpiValue as number)} on ${fmtCount(c.worst.outcomes as number)} for "${c.worst.value}" — a pattern, not proof the ${c.label} caused it.`,
+      setup: `Build one pair of ads that share format, offer, and audience and differ only in the ${c.label} ("${c.best.value}" vs "${c.worst.value}"); matched budget until both clear the success bars.`,
+      winningLooksLike: bars.success,
+      signals,
+      hypothesis: `If we run matched ads that differ only in the ${c.label} — "${c.best.value}" vs "${c.worst.value}" — while holding format, audience, and offer constant, we want to test whether "${c.best.value}" beats "${c.worst.value}" ${LIFT} — because across this export "${c.best.value}" ads ${verb} ${fmt(c.best.kpiValue as number)} on ${fmtCount(c.best.outcomes as number)} ${nouns.many} vs ${fmt(c.worst.kpiValue as number)} on ${fmtCount(c.worst.outcomes as number)}.`,
+      brief: {
+        title: `Naming contrast: ${c.label} "${c.best.value}" vs "${c.worst.value}"`,
+        objective: `Learn whether the ${c.label} itself drives the gap the naming table shows — one controlled pair, nothing else changed.`,
+        basedOn: signals,
+        concept: `Two ads built from the same brief: identical format, offer, and audience — one carries the "${c.best.value}" ${c.label}, the other "${c.worst.value}".`,
+        hooks: [
+          `Open each ad inside its ${c.label} within the first beat — no shared intro.`,
+          "Keep the first line of copy parallel across both, so only the tagged attribute differs.",
+          "Use only claims, reviews, and offer terms that already exist.",
+        ],
+        assetDirection: [
+          "Same format and length for both ads — the tagged attribute stays the only variable.",
+          `Name both ads with the same convention so the next debrief reads the ${c.label} correctly.`,
+          "Burned-in captions; assume sound-off viewing.",
+          "Identical end card: product + current offer.",
+        ],
+        keepConstant: `Format, audience, offer, and placement — only the ${c.label} changes.`,
+        change: `The ${c.label} only — "${c.best.value}" vs "${c.worst.value}".`,
+        successMetric,
+        guardrails: briefGuardrails(false),
+        basisNote: basisNote(false),
+      },
+    });
+  } else if (!worst && !skipRebuild) {
     const pick = chooseChallenger(winners, analysis.rankedAds, controlFormatOf(top, winnerTag?.tag ?? null).tag, "a new creative format");
     const challenger = pick.text;
     const signals = sig(
@@ -1632,10 +1714,10 @@ function buildNextTests(
       why: hasNameSignal
         ? `Nothing is clearly failing, so the next signal comes from challenging the dominant format rather than fixing losers.`
         : `Nothing is clearly failing and no format pattern is visible yet — a controlled format test creates the pattern data future debriefs need.`,
-      setup: `One challenger, one control, matched budget (~${gateSetupLabel} each), same audience and offer.`,
-      winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
+      setup: `One challenger, one control, matched budget, same audience and offer, until both clear the success bars.`,
+      winningLooksLike: bars.success,
       signals,
-      hypothesis: `If we test ${challenger} against the current best ad at matched budget while holding message, audience, and offer constant, we expect the challenger to clear ${gateLabel} spend and beat ${medianLabel} — because no ad is clearly failing this period, so the next signal has to come from a controlled format comparison rather than fixing a loser.`,
+      hypothesis: `If we test ${challenger} against the current best ad at matched budget while holding message, audience, and offer constant, we expect the challenger to beat the control ${LIFT} — because no ad is clearly failing this period, so the next signal has to come from a controlled format comparison rather than fixing a loser.`,
       brief: {
         title: `Format challenger: ${challenger}`,
         objective:
@@ -1737,10 +1819,10 @@ function buildNextTests(
     tests.push({
       test: `Test "${top.name}"'s leading angle with a bundle offer variant (market signal).`,
       why: `Bundle offers repeat in your market notes while the account runs ${context.offer ? `"${context.offer}"` : "a single offer"} — an offer variant on the angle already leading at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel} is the cheapest adaptation to test. Directional only: the notes don't show how competitors' ads performed.`,
-      setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. ~${gateSetupLabel} until it reaches the minimum spend.`,
-      winningLooksLike: `The bundle variant clears ${gateLabel} spend and beats the ${medianLabel} median ${kpiLabel}.`,
+      setup: `Same creative and audience as "${top.name}"; only the offer changes to a bundle. Matched budget against the current offer until both clear the success bars.`,
+      winningLooksLike: bars.success,
       signals,
-      hypothesis: `If we swap only the offer to a bundle while holding "${top.name}"'s creative and audience constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because bundle offers repeat in your market notes (directional) and the angle already leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel}, making an offer swap the cheapest adaptation to test.`,
+      hypothesis: `If we swap only the offer to a bundle while holding "${top.name}"'s creative and audience constant, we expect it to beat the current offer ${LIFT} — because bundle offers repeat in your market notes (directional) and the angle already leads at ${fmtKpiValue(top.kpiValue as number, kpi, currency)} ${kpiLabel}, making an offer swap the cheapest adaptation to test.`,
       brief: {
         title: `Bundle offer variant of "${top.name}"`,
         objective:
@@ -1786,16 +1868,16 @@ function buildNextTests(
     tests.push({
       test: `Test ${challenger} against ${controlLabel}.`,
       why: shiftCommitted
-        ? `The shift above is this debrief's one budget move — it already moves budget into ${receiverList}. Alongside it, a structured challenger against it as the control builds the next comparison; launch it once the shift has ~${gateLabel} of fresh spend.`
+        ? `The shift above is this debrief's one budget move — it already moves budget into ${receiverList}. Alongside it, a structured challenger against it as the control builds the next comparison; launch it once the shift has run ≥${TEST_MIN_DAYS} days.`
         : leadPastBar
         ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar, but this debrief doesn't commit a budget move yet (see Next move) — a structured challenger builds comparison data while that evidence firms up.`
         : winnerTag
           ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive — a structured challenger shows whether the format or the message is doing the work.`
           : `No format is clearly winning${hasNameSignal ? "" : " and names carry no format signal"} — the fastest way to a pattern is one controlled format-vs-format test.${context.creativeNotes ? ` Use your notes ("${context.creativeNotes.slice(0, 60)}…") to pick the challenger.` : ""}`,
-      setup: `Launch the challenger at ~${gateSetupLabel} alongside the control, same audience and offer, until both reach the minimum spend.`,
-      winningLooksLike: `The challenger clears ${gateLabel} spend and beats ${medianLabel}.`,
+      setup: `Launch the challenger alongside the control at matched budget, same audience and offer, until both clear the success bars.`,
+      winningLooksLike: bars.success,
       signals,
-      hypothesis: `If we launch ${challenger} at matched budget alongside the current control while holding audience and offer constant, we expect it to clear ${gateLabel} spend and beat ${medianLabel} — because ${shiftCommitted ? `the shift above is already the budget move, so the next signal has to come from a controlled creative comparison` : leadPastBar ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar but this debrief isn't committing a budget move on it yet, so a structured challenger builds comparison data while that evidence firms up` : winnerTag ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive enough to say the format itself is the reason` : "no format is clearly winning yet, so a controlled comparison is the fastest way to a real pattern"}.`,
+      hypothesis: `If we launch ${challenger} at matched budget alongside the current control while holding audience and offer constant, we expect it to beat the control ${LIFT} — because ${shiftCommitted ? `the shift above is already the budget move, so the next signal has to come from a controlled creative comparison` : leadPastBar ? `"${top!.name}" leads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar but this debrief isn't committing a budget move on it yet, so a structured challenger builds comparison data while that evidence firms up` : winnerTag ? `${winnerTag.tag} ads hold ${winnerTag.count}/${winners.length} winner slots but the lead isn't decisive enough to say the format itself is the reason` : "no format is clearly winning yet, so a controlled comparison is the fastest way to a real pattern"}.`,
       brief: {
         title: `Format challenger: ${challenger}`,
         objective:
@@ -1820,7 +1902,34 @@ function buildNextTests(
     });
   }
 
-  return tests;
+  /* Bulletproof pass A5: every test states Hypothesis / Variable /
+     Success / Decision rule. Success needs ≥7 days, the per-variant
+     volume bar, AND a lift beyond the flat band over the control; the
+     scale test has its own (the ad set budget is the variable). */
+  return tests.map((t) => {
+    if (t.test.startsWith("Raise the budget on the ad set running ")) {
+      const current = t.winningLooksLike.match(/within 15% of ([^ ]+)/)?.[1] ?? "today's level";
+      const success = `Success needs all three: ≥${TEST_MIN_DAYS} days at each new budget level; ${bars.perVariant.replace(/ per variant| each/g, "")} at it; and ${kpiLabel} within ${FLAT_FIELD_DELTA_PCT}% of ${current}.`;
+      return {
+        ...t,
+        winningLooksLike: success,
+        variable: t.brief.change,
+        decisionRule: `Holds → take the next ≤${SCALE_STEP_MAX_PCT}% step; drops more than ${FLAT_FIELD_DELTA_PCT}% → step back; inconclusive → hold the step once (${TEST_MIN_DAYS} more days), then stop.`,
+        clientSuccess: `It works if results stay within ${FLAT_FIELD_DELTA_PCT}% of today's level for at least ${TEST_MIN_DAYS} days at each higher budget.`,
+        clientDecisionRule: "If results hold, we take the next small step; if they drop, we step back.",
+        brief: { ...t.brief, successMetric: success },
+      };
+    }
+    return {
+      ...t,
+      winningLooksLike: bars.success,
+      variable: t.brief.change,
+      decisionRule: bars.decisionRule,
+      clientSuccess: bars.clientSuccess,
+      clientDecisionRule: bars.clientDecisionRule,
+      brief: { ...t.brief, successMetric: bars.success },
+    };
+  });
 }
 
 /**

@@ -632,8 +632,14 @@ export function memoToText(
       lines.push(`   Evidence diagnostic: ${c(t.evidenceDiagnostic.buyer)}`);
     }
     lines.push(`   Hypothesis: ${c(t.hypothesis)}`);
+    if (view !== "client" && t.variable) lines.push(`   Variable: ${t.variable}`);
     lines.push(`   ${view === "client" ? "How" : "Setup"}: ${c(t.setup)}`);
-    lines.push(`   ${view === "client" ? "Success looks like" : "Winning looks like"}: ${c(t.winningLooksLike)}`);
+    lines.push(
+      view === "client"
+        ? `   Success looks like: ${t.clientSuccess ?? c(t.winningLooksLike)}`
+        : `   Success: ${t.winningLooksLike}`
+    );
+    if (t.decisionRule) lines.push(`   ${view === "client" ? "What happens next" : "Decision rule"}: ${view === "client" ? t.clientDecisionRule ?? t.decisionRule : t.decisionRule}`);
     if (t.signals.length > 0) {
       lines.push(`   ${view === "client" ? "Why it's worth testing" : "Signals used"}:`);
       t.signals.forEach((s) => lines.push(`   - ${c(s)}`));

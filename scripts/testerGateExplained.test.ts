@@ -35,10 +35,10 @@ try {
     "The 164.03 EUR minimum spend used to include an ad is half the average spend per ad in this file (328.06 EUR) — a rule of thumb, not a guarantee."));
   for (const s of clientStrings(m))
     for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
-  // Every setup line that names the minimum says where it comes from.
-  const setups = m.nextTests.map((x) => x.setup).filter((s) => s.includes("164.03"));
-  assert.ok(setups.length >= 2);
-  for (const s of setups) assert.match(s, /164\.03 EUR \(half this export's average spend per ad\)/);
+  // Bulletproof pass A5: setups no longer size variants to the minimum
+  // spend — they run until the success bars (days, volume, lift) are met.
+  assert.ok(m.nextTests.every((x) => !x.setup.includes("164.03")), "no gate-sized variant budgets");
+  assert.ok(m.nextTests.every((x) => /≥7 days/.test(x.winningLooksLike)));
   // Text export header (short) — client header never shows it.
   assert.match(t.buyerText, /Minimum spend to judge \(evidence gate\): 164\.03 EUR per ad \(half this export's average spend per ad\)/);
   assert.ok(!/evidence gate/.test(t.clientText));

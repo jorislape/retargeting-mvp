@@ -1698,8 +1698,11 @@ function ClientTestCards({ tests }: { tests: MemoTest[] }) {
             Success looks like
           </p>
           <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-            <Names text={clientizeText(test.winningLooksLike)} />
+            <Names text={test.clientSuccess ?? clientizeText(test.winningLooksLike)} />
           </p>
+          {test.clientDecisionRule && (
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">{test.clientDecisionRule}</p>
+          )}
         </article>
       ))}
     </div>
@@ -1876,12 +1879,29 @@ function TestRow({
             </dt>
             <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.hypothesis)} /></dd>
           </div>
+          {/* Bulletproof pass A5: Hypothesis / Variable / Success / Decision rule. */}
+          {test.variable && (
+            <div>
+              <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                Variable{" "}
+              </dt>
+              <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.variable)} /></dd>
+            </div>
+          )}
           <div>
             <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-              {view === "client" ? "Success = " : "Win = "}
+              Success{" "}
             </dt>
             <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.winningLooksLike)} /></dd>
           </div>
+          {test.decisionRule && (
+            <div>
+              <dt className="print-kv-label inline text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                Decision rule{" "}
+              </dt>
+              <dd className="print-kv-value inline [overflow-wrap:anywhere]"><Names text={c(test.decisionRule)} /></dd>
+            </div>
+          )}
         </dl>
         {/* Next Tests Setup/Signals Progressive Disclosure V1 — Setup
             and Signals used are real implementation detail / evidence

@@ -434,6 +434,46 @@ export function executionCopy(
   return { buyer: `${trim} and ${raise} ${past}`, client: `${clientTrim} and ${clientRaise}` };
 }
 
+/**
+ * Bulletproof pass A5 — the bars every test (and every "after the move"
+ * reassessment) must clear: ≥ TEST_MIN_DAYS days; ≥ TEST_MIN_OUTCOMES
+ * purchases per variant OR spend ≥ TEST_SPEND_CPP_MULTIPLE × the
+ * account's cost per purchase (3× the minimum spend when the KPI has no
+ * outcome count); and a lift beyond the FLAT_FIELD_DELTA_PCT band over
+ * the control — never "beats the median". Plus the decision rule: win →
+ * scale in steps; lose → retire; inconclusive → extend once, then stop.
+ */
+export const TEST_MIN_DAYS = 7;
+export const TEST_MIN_OUTCOMES = 10;
+export const TEST_SPEND_CPP_MULTIPLE = 10;
+export function testBars(analysis: AnalysisResult, money: MoneyFormatter) {
+  const nouns = outcomeNounsFor(analysis);
+  const cpp = nouns != null ? analysis.costPerOutcome ?? null : null;
+  const spendBar = cpp != null ? TEST_SPEND_CPP_MULTIPLE * cpp : 3 * analysis.spendGate;
+  const perVariant =
+    cpp != null && nouns != null
+      ? `≥${TEST_MIN_OUTCOMES} ${nouns.many} per variant or ≥ ${money(spendBar)} spend each (${TEST_SPEND_CPP_MULTIPLE}× the account's ${money(cpp)} cost per ${nouns.one})`
+      : `≥ ${money(spendBar)} spend per variant (3× the minimum spend)`;
+  const volume =
+    cpp != null && nouns != null
+      ? `≥${TEST_MIN_DAYS} days with ≥${TEST_MIN_OUTCOMES} ${nouns.many} (or ≥ ${money(spendBar)} spend) on the changed ad sets`
+      : `≥${TEST_MIN_DAYS} days with ≥ ${money(spendBar)} spend on the changed ad sets`;
+  const sales = nouns?.many === "leads" ? "leads" : "sales";
+  return {
+    spendBar,
+    cpp,
+    perVariant,
+    /** One test's success, buyer register. */
+    success: `Success needs all three: ≥${TEST_MIN_DAYS} days; ${perVariant}; and a lift of more than ${FLAT_FIELD_DELTA_PCT}% over the control.`,
+    clientSuccess: `We call it a win only after at least ${TEST_MIN_DAYS} days, with enough ${sales} on each version (${TEST_MIN_OUTCOMES} or more, or about ${money(spendBar)} spent), and a lead of more than ${FLAT_FIELD_DELTA_PCT}% over the current ad.`,
+    decisionRule: `Win → scale the winner in ≤${SCALE_STEP_MAX_PCT}% budget steps every 2–3 days; lose → retire it; inconclusive → extend once (${TEST_MIN_DAYS} more days), then stop and keep the control.`,
+    clientDecisionRule: `If it wins, we add budget in small steps; if it loses, we retire it; if it's unclear, we run it one more week, then stop.`,
+    /** "After the move" volume, for reassessments and sequencing. */
+    volume,
+    clientVolume: `at least ${TEST_MIN_DAYS} days, once the changed ads have enough ${sales} to read`,
+  };
+}
+
 /** Quoted receiver names: "A", "A" and "B", or "A", "B" and "C". */
 function receiverNames(receivers: readonly RankedAd[]): string {
   return joinPlain(receivers.map((a) => `"${a.name}"`));
@@ -1336,6 +1376,8 @@ function decide(
   const kpiLabel = kpiLabelFor(analysis);
   const kpiClient = kpiClientLabelFor(analysis);
   const gateLabel = money(analysis.spendGate);
+  /* Bulletproof pass A5: the bars every follow-up read must clear. */
+  const bars = testBars(analysis, money);
   /* Decision Criteria V2 — gate provenance, woven into the exact
      strings that cite the gate so a user-set bar is always labeled as
      the user's own. Buyer register carries the explicit provenance;
@@ -1817,8 +1859,8 @@ function decide(
        contradict it. The avoid line sequences the test instead. */
     const testOnCard = nextTestFacts != null;
     const sequenceTest = {
-      buyer: `Run the test below only after the budget move has ~${gateLabel} of fresh spend — one variable at a time.`,
-      client: `We'll start the test below only after the budget change has had about ${gateLabel} of new spend, so each result stays readable.`,
+      buyer: `Run the test below only after the budget move has run ${bars.volume} — one variable at a time.`,
+      client: `We'll start the test below only after the budget change has run ${bars.clientVolume}, so each result stays readable.`,
     };
     const avoidBuyer: string[] = [];
     const avoidClient: string[] = [];
@@ -1870,8 +1912,8 @@ function decide(
       ? ` "${top.name}" leads but sits under the receiver floor, so it isn't scaled.`
       : "";
     const reassess = {
-      buyer: `Reassess once the new allocation has ≥${gateLabel} of fresh spend behind it.`,
-      client: `We'll revisit after the new setup has about ${gateLabel} of new spend to show results.`,
+      buyer: `Reassess once the move has run ${bars.volume}.`,
+      client: `We'll revisit after ${bars.clientVolume}.`,
     };
 
     if (scaleEligible && cutEligible) {
@@ -1929,12 +1971,12 @@ function decide(
     // cut-only
     avoidBuyer.push(
       testOnCard
-        ? `Park the freed budget behind current ads; start the test below only after the cut has ~${gateLabel} of fresh spend.`
+        ? `Park the freed budget behind current ads; start the test below only after the cut has run ≥${TEST_MIN_DAYS} days.`
         : "Don't move the freed budget into a new test yet — park it behind current ads."
     );
     avoidClient.push(
       testOnCard
-        ? `The freed budget stays with the current ads; the test below starts once that change has had about ${gateLabel} of new spend.`
+        ? `The freed budget stays with the current ads; the test below starts once that change has run at least ${TEST_MIN_DAYS} days.`
         : "We're not starting anything new with the freed budget yet."
     );
     return {
@@ -2006,8 +2048,8 @@ function decide(
           client: ["We're not moving budget until the ads are compared on actual results."],
         },
         reassess: {
-          buyer: `Re-run this debrief on ${switchTo.label} before any budget decision; reassess the test at the ${gatePhrase}.`,
-          client: `We'll re-check the ads on ${switchTo.clientLabel} before any budget change, and revisit the test once it has spent about ${gateLabel}${clientGateSuffix}.`,
+          buyer: `Re-run this debrief on ${switchTo.label} before any budget decision; reassess the test once each variant has run ≥${TEST_MIN_DAYS} days with ${bars.perVariant}.`,
+          client: `We'll re-check the ads on ${switchTo.clientLabel} before any budget change, and revisit the test once it has run at least ${TEST_MIN_DAYS} days with enough results on each version.`,
         },
       };
     }
@@ -2048,8 +2090,8 @@ function decide(
         ],
       },
       reassess: {
-        buyer: `Reassess when the test reaches the ${gatePhrase} — then judge it against the median.`,
-        client: `We'll revisit once the test has spent about ${gateLabel}${clientGateSuffix} — enough for a fair read.`,
+        buyer: `Reassess once each variant has run ≥${TEST_MIN_DAYS} days with ${bars.perVariant}, judging the lift over the control (more than ${FLAT_FIELD_DELTA_PCT}%), not the median.`,
+        client: `We'll revisit once the test has run at least ${TEST_MIN_DAYS} days with enough results on each version — enough for a fair read.`,
       },
     };
   }

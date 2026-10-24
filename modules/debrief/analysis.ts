@@ -393,6 +393,9 @@ export function analyze(
         },
       };
     })(),
+    /* Bulletproof pass A5: what one outcome costs this account — the
+       test success bars (≥ 10× it per variant). Display/copy only. */
+    costPerOutcome: outcomeNounsForKpi(kpi) != null ? accountCostPerOutcome(ads) : null,
     /* Trust Pass 2: the blended account result (display-only). */
     ...((): { accountKpi?: NonNullable<AnalysisResult["accountKpi"]> } => {
       const acct = computeAccountKpi(ads, kpi);
