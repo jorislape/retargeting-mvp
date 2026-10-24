@@ -3,6 +3,7 @@
 // webpack path aliases) to test the serialized decision block against
 // the real engine. Type-only, so it changes nothing at runtime.
 import type { Memo } from "../../modules/debrief";
+import { buildClientLabels } from "./longNames.ts";
 
 export type ReportView = "buyer" | "client";
 
@@ -698,5 +699,12 @@ export function memoToText(
     memo.confidence.notes.forEach((n) => lines.push(`- ${n}`));
   }
 
-  return lines.join("\n");
+  const text = lines.join("\n");
+  /* Bulletproof B3: the client reads token labels, not raw agency names
+     (longest first, so a name never corrupts its "- Copy" twin). */
+  if (view !== "client") return text;
+  const labels = buildClientLabels(memo.scope.adNames ?? []);
+  return [...labels.entries()]
+    .sort((a, b) => b[0].length - a[0].length)
+    .reduce((out, [name, label]) => out.split(name).join(label), text);
 }

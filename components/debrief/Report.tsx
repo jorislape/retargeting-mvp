@@ -33,8 +33,8 @@ import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS, performanceModeDefault
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
 import { MovementChart } from "./MovementChart";
-import { buildNameShortener, NAME_PRINT_MAX, splitLongNames } from "./longNames";
-import { NameDisplayContext, useShortName } from "./NameDisplay";
+import { buildClientLabels, buildNameShortener, NAME_DISPLAY_MAX, NAME_PRINT_MAX, splitLongNames } from "./longNames";
+import { NameDisplayContext, useLabelAll, useShortName } from "./NameDisplay";
 
 /* ------------------------------------------------------------------ */
 /* The report as an intelligence DOCUMENT: no sheet-box, no cards-on-  */
@@ -62,11 +62,14 @@ const CONFIDENCE_COLOR: Record<Memo["confidence"]["level"], string> = {
    60 characters middle-truncated (full name on hover); optional glossary
    terms apply to the plain parts only. Copy/TXT never pass through here. */
 function Names({ text, terms }: { text: string; terms?: { phrase: string; tip: string }[] }) {
-  /* Bulletproof B1: collision-safe — never two ads with one display. */
+  /* Bulletproof B1: collision-safe — never two ads with one display.
+     B3: the client view resolves EVERY quoted name (labels), not just
+     long ones. */
   const short = useShortName();
+  const labelAll = useLabelAll();
   return (
     <>
-      {splitLongNames(text).map((part, i) =>
+      {splitLongNames(text, labelAll ? 0 : NAME_DISPLAY_MAX).map((part, i) =>
         "name" in part ? (
           <span key={i} title={part.name}>
             &quot;<span className="print:hidden">{short(part.name)}</span>
@@ -2292,18 +2295,22 @@ export function Report({
      same numbers rather than tracked as a second, parallel scheme. */
   const staggerFor = (n: string | null) => (n === null ? 0 : Number(n) + 1);
   const stagger = (i: number) => ({ animationDelay: `${i * 80}ms` });
-  /* Bulletproof B1: one collision-safe name resolver for the whole report. */
-  const shortener = useMemo(
-    () =>
-      buildNameShortener([
-        ...(memo.scope.adNames ?? []),
-        ...[...memo.winners, ...(memo.atMedian?.rows ?? []), ...memo.losers.rows].map((r) => r.name),
-      ]),
-    [memo]
-  );
+  /* Bulletproof B1/B3: one collision-safe name resolver for the whole
+     report — shortened raw names for the buyer, readable token labels
+     for the client (raw names where an ad carries no tokens). */
+  const nameDisplay = useMemo(() => {
+    const universe = [
+      ...(memo.scope.adNames ?? []),
+      ...[...memo.winners, ...(memo.atMedian?.rows ?? []), ...memo.losers.rows].map((r) => r.name),
+    ];
+    const shortener = buildNameShortener(universe);
+    if (!client) return { short: shortener, labelAll: false };
+    const labels = buildClientLabels(universe);
+    return { short: (name: string, max?: number) => labels.get(name) ?? shortener(name, max), labelAll: true };
+  }, [memo, client]);
 
   return (
-    <NameDisplayContext.Provider value={shortener}>
+    <NameDisplayContext.Provider value={nameDisplay}>
     <div style={accentCssVars(accent) as React.CSSProperties}>
       {/* ---- Toolbar: view tabs + actions. Never prints. ---- */}
       <div

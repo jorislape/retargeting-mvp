@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, loadEngine } from "./testerFeedbackEngine.ts";
-import { NAME_DISPLAY_MAX, NAME_PRINT_MAX, buildNameShortener, disambiguateNames, middleTruncate } from "../components/debrief/longNames.ts";
+import { NAME_DISPLAY_MAX, NAME_PRINT_MAX, buildClientLabels, buildNameShortener, disambiguateNames, middleTruncate } from "../components/debrief/longNames.ts";
 
 const CAPS = [NAME_DISPLAY_MAX, 50, NAME_PRINT_MAX, 28];
 const collisions = (names: string[], show: (n: string) => string) => {
@@ -60,8 +60,46 @@ try {
     assert.ok(!/middleTruncate\(/.test(src), `${f}: no raw middleTruncate — use useShortName()`);
   }
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
-  assert.match(report, /<NameDisplayContext\.Provider value=\{shortener\}>/);
-  assert.match(report, /buildNameShortener\(\[\s*\.\.\.\(memo\.scope\.adNames \?\? \[\]\)/);
+  assert.match(report, /<NameDisplayContext\.Provider value=\{nameDisplay\}>/);
+  assert.match(report, /const universe = \[\s*\.\.\.\(memo\.scope\.adNames \?\? \[\]\)/);
+  assert.match(report, /const shortener = buildNameShortener\(universe\);/);
+
+  /* ---- B3: readable client labels, collision-safe too ---- */
+  {
+    const labels = buildClientLabels(names);
+    assert.equal(labels.size, names.length, "every tokened name gets a label");
+    assert.equal(collisions(names, (n) => labels.get(n)!), 0, "no two ads share a label");
+    for (const [name, label] of labels) {
+      assert.ok(!label.includes("["), `no raw token syntax: ${label}`);
+      assert.match(label, /^(UGC|Image|Video|Carousel|Static|[A-Z]+) · /, "format first");
+      const sku = name.match(/\[SKU\](\d+)/)?.[1];
+      if (sku) assert.ok(label.includes(`SKU ${sku}`));
+      const dte = name.match(/\[DTE\](\d{2})(\d{2})(\d{2})_/);
+      if (dte) assert.ok(label.includes(`20${dte[1]}-${dte[2]}-${dte[3]}`), "ISO date");
+    }
+    // Labels never collide with an untokened raw name, and a "- Copy" twin is told apart.
+    const target = buildClientLabels([names[0]]).get(names[0])!;
+    const ml = buildClientLabels([names[0], "Plain ad", target]);
+    assert.notEqual(ml.get(names[0]), target, "a label never equals another ad's raw name");
+    const copy = buildClientLabels([names[0], `${names[0]} - Copy`]);
+    assert.notEqual(copy.get(names[0]), copy.get(`${names[0]} - Copy`));
+    assert.match(copy.get(`${names[0]} - Copy`)!, / · copy$/);
+    assert.ok([...labels.values()].every((l) => l.length <= 80), "labels stay short");
+
+    // Fixture: the client TXT reads labels, the buyer TXT keeps full names.
+    const fixLabels = buildClientLabels(agency.memo.scope.adNames!);
+    const someLong = agency.ads.map((a) => a.name).find((n) => fixLabels.has(n) && agency.clientText.includes(fixLabels.get(n)!));
+    assert.ok(someLong, "client TXT uses a label");
+    assert.ok(!agency.clientText.includes(someLong!), "…and never the raw tokened name");
+    assert.ok(agency.buyerText.includes(someLong!), "buyer TXT keeps the full name");
+
+    // Sample: no tokens ⇒ no labels; client text unchanged.
+    assert.equal(buildClientLabels(sampleNames).size, 0);
+
+    const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
+    assert.match(report, /const labels = buildClientLabels\(universe\);/);
+    assert.match(report, /splitLongNames\(text, labelAll \? 0 : NAME_DISPLAY_MAX\)/, "client resolves every quoted name");
+  }
 
   console.log("bulletproof names: all assertions passed");
 } finally {

@@ -133,3 +133,86 @@ export function buildNameShortener(universe: readonly string[]): (name: string, 
     return m.get(name) ?? middleTruncate(name, max);
   };
 }
+
+/**
+ * Bulletproof pass B3 — readable client labels. A name that carries
+ * `[KEY]VALUE` tokens reads, for a client, as its format, angle, SKU and
+ * date ("UGC · QUAL · SKU 00147 · 2025-02-13") instead of the raw
+ * string. Collision-safe like the buyer names: when two ads would share
+ * a label, more tokens join (hook, file number, variant, concept, …), then
+ * a "copy" marker; if they still tie, the label carries the raw name's
+ * distinguishing segment. Untokened names get no label (null) — callers
+ * show the collision-safe raw name instead.
+ */
+const LABEL_TOKEN = /\[([A-Z][A-Z0-9]{0,7})\]([^[]*)/g;
+const FORMAT_WORDS: Record<string, string> = { UGC: "UGC", IMG: "Image", IMAGE: "Image", VID: "Video", VIDEO: "Video", CAR: "Carousel", STATIC: "Static" };
+const BASE_KEYS = ["FOR", "AN", "SKU", "DTE"];
+const EXTRA_KEYS = ["HK", "FN", "VAR", "CN", "PR", "STG", "AUD", "PLT", "TP", "CR", "EM", "CTA", "OLD", "CD", "ED"];
+
+function nameTokens(name: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of name.matchAll(LABEL_TOKEN)) {
+    const v = m[2].replace(/\s*[-–—]\s*Copy(?:\s*\d+)?\s*$/i, "").replace(/^[\s_\-.]+|[\s_\-.]+$/g, "");
+    if (v !== "" && !out.has(m[1])) out.set(m[1], v);
+  }
+  return out;
+}
+
+function tokenPart(key: string, value: string): string {
+  if (key === "FOR") return FORMAT_WORDS[value.toUpperCase()] ?? value;
+  if (key === "SKU") return `SKU ${value}`;
+  if (key === "DTE") {
+    const d = value.match(/^(?:20)?(\d{2})(\d{2})(\d{2})$/);
+    return d ? `20${d[1]}-${d[2]}-${d[3]}` : value;
+  }
+  if (["AN", "CN", "PR", "STG", "AUD", "PLT", "TP", "CR", "EM", "CTA"].includes(key)) return value.replace(/_/g, " ");
+  return `${key} ${value}`;
+}
+
+/** name → label for every tokened name in `universe` (collision-safe
+ *  against every other label AND every untokened raw name). Within a
+ *  colliding group only the FIRST token whose values differ joins (then
+ *  "copy" when only copy status differs), so labels stay short. */
+export function buildClientLabels(universe: readonly string[]): Map<string, string> {
+  const names = [...new Set(universe)];
+  const tokens = new Map(names.map((n) => [n, nameTokens(n)] as const).filter(([, t]) => t.size > 0));
+  const tokened = [...tokens.keys()];
+  const isCopy = (n: string) => /[-–—]\s*Copy(?:\s*\d+)?\s*$/i.test(n);
+  const extras = new Map<string, string[]>(tokened.map((n) => [n, []]));
+  const copyMark = new Set<string>();
+  const rawTail = new Map<string, string>();
+  const labelOf = (n: string) => {
+    const t = tokens.get(n)!;
+    const parts = [...BASE_KEYS, ...extras.get(n)!].filter((k) => t.has(k)).map((k) => tokenPart(k, t.get(k)!));
+    if (copyMark.has(n)) parts.push("copy");
+    if (rawTail.has(n)) parts.push(rawTail.get(n)!);
+    return parts.join(" · ");
+  };
+  const taken = new Set(names.filter((n) => !tokens.has(n)));
+  for (let round = 0; round < 40; round++) {
+    const by = new Map<string, string[]>();
+    for (const n of tokened) by.set(labelOf(n), [...(by.get(labelOf(n)) ?? []), n]);
+    let changed = false;
+    for (const [l, group] of by) {
+      if (group.length === 1 && !taken.has(l)) continue;
+      const used = new Set(extras.get(group[0])!);
+      const candidates = [...EXTRA_KEYS, ...[...new Set(group.flatMap((n) => [...tokens.get(n)!.keys()]))].sort()].filter(
+        (k) => !BASE_KEYS.includes(k) && !used.has(k)
+      );
+      const key = candidates.find((k) => new Set(group.map((n) => tokens.get(n)!.get(k) ?? "")).size > 1);
+      if (key) {
+        for (const n of group) extras.get(n)!.push(key);
+        changed = true;
+      } else if (group.some(isCopy) && group.some((n) => !isCopy(n)) && !group.some((n) => copyMark.has(n))) {
+        for (const n of group) if (isCopy(n)) copyMark.add(n);
+        changed = true;
+      } else if (!group.some((n) => rawTail.has(n))) {
+        const raw = disambiguateNames(group, 40);
+        for (const n of group) rawTail.set(n, raw.get(n)!);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return new Map(tokened.map((n) => [n, labelOf(n)]));
+}
