@@ -321,7 +321,7 @@ export function memoToText(
       lines.push(
         `${view === "client" ? "Getting more budget" : d.budgetVariant === "scale" ? "Gets more budget" : "Receives the budget"}: ${list(d.budgetMove.to)}`
       );
-    if (d.trimTargetHint) lines.push(view === "client" ? d.trimTargetHint.client : d.trimTargetHint.buyer);
+    if (d.profitBasisNote) lines.push(view === "client" ? d.profitBasisNote.client : d.profitBasisNote.buyer);
     if (d.budgetMove.belowSpendLabel)
       lines.push(
         view === "client"
@@ -475,13 +475,15 @@ export function memoToText(
     const buyer = view !== "client";
     const freq = buyer && r.frequencyLabel ? ` | ${r.frequencyLabel}` : "";
     const notes = buyer
-      ? [r.fewOutcomesNote, r.fatigueNote, r.viewThroughNote?.buyer, r.lowIntentNote?.buyer, r.trimNote?.buyer, r.holdNote?.buyer].filter(Boolean).map((n) => ` ${n}`).join("")
-      : [r.viewThroughNote?.client, r.lowIntentNote?.client, r.trimNote?.client, r.holdNote?.client].filter(Boolean).map((n) => ` ${n}`).join("");
+      ? [r.fewOutcomesNote, r.fatigueNote, r.viewThroughNote?.buyer, r.lowIntentNote?.buyer, r.status?.key !== "maintain" ? r.trimNote?.buyer : undefined].filter(Boolean).map((n) => ` ${n}`).join("")
+      : [r.viewThroughNote?.client, r.lowIntentNote?.client, r.status?.key !== "maintain" ? r.trimNote?.client : undefined].filter(Boolean).map((n) => ` ${n}`).join("");
+    /* Bulletproof pass A1: the business status, active register. */
+    const status = r.status ? ` | ${buyer ? r.status.buyer : r.status.client}` : "";
     const target = r.vsTarget
       ? ` | ${r.vsTarget === "beats" ? (buyer ? "✓ beats target" : "✓ beats your target") : buyer ? "✗ misses target" : "✗ below your target"}`
       : "";
     const adj = buyer && r.adjValueLabel ? ` · adj. ${r.adjValueLabel}` : "";
-    return `- ${r.name}${r.runsInLabel ? ` (${r.runsInLabel})` : ""} | ${r.valueLabel}${adj} (${c(r.vsMedianLabel)})${target} | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""}${freq} | ${r.reason}${notes}`;
+    return `- ${r.name}${r.runsInLabel ? ` (${r.runsInLabel})` : ""} | ${r.valueLabel}${adj} (${c(r.vsMedianLabel)})${target} | ${r.spendLabel}${r.conversionLabel ? ` | ${r.conversionLabel}` : ""}${freq} | ${r.reason}${notes}${status}`;
   };
   /* Trust Pass: TXT/Copy lists EVERY row. The first topAdsShown match
      the on-screen table; a "+N more:" line marks where the screen

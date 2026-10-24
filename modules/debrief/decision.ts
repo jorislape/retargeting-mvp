@@ -295,11 +295,30 @@ export function budgetReceivers(analysis: AnalysisResult, criteria?: DecisionCri
   return byEvidence(qualifyingReceivers(analysis, criteria), analysis, criteria).slice(0, MAX_BUDGET_RECEIVERS);
 }
 
-/** Every winner past the scale bar (raw KPI) AND the receiver floor, KPI order. */
+/** Every winner past the scale bar (raw KPI) AND the receiver floor —
+ *  and, with a breakeven set, past the breakeven — KPI order. */
 function qualifyingReceivers(analysis: AnalysisResult, criteria?: DecisionCriteria): RankedAd[] {
   return analysis.winners.filter(
-    (a) => a.deltaPct != null && a.deltaPct >= SCALE_TEST_MIN_DELTA_PCT && passesReceiverFloor(a, analysis, criteria)
+    (a) =>
+      a.deltaPct != null &&
+      a.deltaPct >= SCALE_TEST_MIN_DELTA_PCT &&
+      passesReceiverFloor(a, analysis, criteria) &&
+      beatsBreakeven(a, analysis, criteria)
   );
+}
+
+/** Bulletproof pass A1: true unless a breakeven is set and the ad
+ *  doesn't beat it (ROAS ≥ breakeven; CPA ≤ breakeven). */
+export function beatsBreakeven(
+  ad: Pick<RankedAd, "kpiValue">,
+  analysis: AnalysisResult,
+  criteria?: DecisionCriteria
+): boolean {
+  const b = criteria?.breakeven;
+  if (b == null || !(b > 0) || ad.kpiValue == null) return true;
+  if (analysis.kpi === "roas") return ad.kpiValue >= b;
+  if (analysis.kpi === "cpa") return ad.kpiValue <= b;
+  return true;
 }
 
 /** Real-account review: k in the evidence adjustment, as a multiple of
@@ -1329,6 +1348,21 @@ function decide(
   const outcomeNames = outcomeKpis.map((o) => o.label).join("/");
   const outcomeClientNames = outcomeKpis.map((o) => o.clientLabel).join(" or ");
   const receiverBlocked = rawScaleEligible && !proxyHeld && receivers.length === 0;
+  /* Bulletproof pass A1: ads past the bar and the floor that the user's
+     breakeven alone keeps from receiving budget. */
+  const breakeven = criteria?.breakeven != null && criteria.breakeven > 0 ? criteria.breakeven : null;
+  const breakevenLabel =
+    breakeven == null ? "" : analysis.kpi === "roas" ? `${breakeven.toFixed(2)}x` : money(breakeven);
+  const underBreakeven = breakeven == null || proxyHeld
+    ? []
+    : analysis.winners.filter(
+        (a) =>
+          a.deltaPct != null &&
+          a.deltaPct >= SCALE_TEST_MIN_DELTA_PCT &&
+          passesReceiverFloor(a, analysis, criteria) &&
+          !beatsBreakeven(a, analysis, criteria)
+      );
+  const breakevenBlocked = receiverBlocked && underBreakeven.length > 0 && top != null && passesReceiverFloor(top, analysis, criteria);
   const winnerShare =
     lead != null && analysis.judgedSpend > 0
       ? (lead.spend / analysis.judgedSpend) * 100
@@ -1397,6 +1431,15 @@ function decide(
     );
     criteriaClient.push(
       "Ads with more sales behind them count for more when choosing where budget goes — a high return on a handful of sales is pulled toward the typical result."
+    );
+  }
+  if (underBreakeven.length > 0) {
+    const n = underBreakeven.length;
+    criteriaBuyer.push(
+      `${n} ad${n === 1 ? "" : "s"} past the ${SCALE_TEST_MIN_DELTA_PCT}% bar ${n === 1 ? "is" : "are"} under your breakeven (${breakevenLabel}) — above average, not profitable — and ${n === 1 ? "doesn't" : "don't"} receive budget.`
+    );
+    criteriaClient.push(
+      "Some ads ahead of the rest aren't profitable at your break-even point, so they don't get more budget."
     );
   }
   if (rawScaleEligible && !proxyHeld && topBelowFloor && lead != null && top != null) {
@@ -1602,6 +1645,14 @@ function decide(
       ? [
           {
             label: `Scaling minimum: ≥${minOutcome} ${nouns.many} on the ad being scaled — your criterion`,
+            source: "user" as const,
+          },
+        ]
+      : []),
+    ...(breakeven != null && (analysis.kpi === "roas" || analysis.kpi === "cpa")
+      ? [
+          {
+            label: `Breakeven: ${breakevenLabel} ${analysis.kpi === "roas" ? "ROAS" : "CPA"} — an ad must beat it to receive budget — your criterion`,
             source: "user" as const,
           },
         ]
@@ -1836,7 +1887,9 @@ function decide(
           : `Trim ${loserNames(analysis)}; hold everything else steady.`,
       clientHeadline: "Pause the weakest ads; keep the rest running as is.",
       rationale: `${analysis.belowBenchmarkCount} ads sit ≥${SCALE_TEST_MIN_DELTA_PCT}% below the median ${kpiLabel} at the worst end, holding ${pct(belowShare)}% of judged spend (${money(analysis.belowBenchmarkSpend)}). ${
-        receiverBlocked && top != null
+        breakevenBlocked
+          ? `No ad qualifies to receive budget — every ad past the ${SCALE_TEST_MIN_DELTA_PCT}% bar is under your breakeven (${breakevenLabel}), so the move is trimming the leak, not scaling.`
+          : receiverBlocked && top != null
           ? `No ad qualifies to receive budget — "${top.name}" leads by ${pct(top.deltaPct!)}% but has ${floorGaps(top)}, under the receiver floor (${floorPhrase}) — so the move is trimming the leak, not scaling.`
           : `No winner clears the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar, so the move is stopping the leak — not scaling.`
       }`,
@@ -1905,20 +1958,28 @@ function decide(
         : `Run one test: ${testTitle}. Nothing has earned a budget move yet.`,
       clientHeadline: `Run one focused test next: ${testTitle}.`,
       rationale:
-        receiverBlocked && top != null
+        breakevenBlocked
+          ? `No budget move: the ads past the ${SCALE_TEST_MIN_DELTA_PCT}% bar are under your breakeven (${breakevenLabel}) — above average, not profitable. The strongest evidence-backed move is a test, not a budget change.`
+          : receiverBlocked && top != null
           ? `No budget move: "${top.name}" leads by ${pct(top.deltaPct!)}% but has ${floorGaps(top)}, and no ad past the ${SCALE_TEST_MIN_DELTA_PCT}% bar clears the receiver floor (${floorPhrase}). The strongest evidence-backed move is a test, not a budget change.`
           : `Top ad ${top?.deltaPct != null ? `+${pct(top.deltaPct)}%` : "±0%"} vs the ${SCALE_TEST_MIN_DELTA_PCT}% scale bar; below-median spend ${pct(belowShare)}% vs the ${CUT_MIN_SPEND_SHARE_PCT}% cut bar. Neither clears, so the strongest evidence-backed move is a test, not a budget change.`,
-      clientRationale: receiverBlocked
+      clientRationale: breakevenBlocked
+        ? "The leading ads are ahead of the rest but not profitable at your break-even point — the fastest path to a confident move is one focused test."
+        : receiverBlocked
         ? `The leading ad is ahead, but on too little spend and too few results to safely put more budget behind it — the fastest path to a confident move is one focused test.`
         : "No single ad is far enough ahead or behind to justify moving budget yet — the fastest path to a clear winner is one focused test.",
       avoidNow: {
         buyer: [
-          receiverBlocked
+          breakevenBlocked
+            ? `No budget moves yet — no ad past the ${SCALE_TEST_MIN_DELTA_PCT}% bar beats your breakeven (${breakevenLabel}).`
+            : receiverBlocked
             ? `No budget moves yet — no ad clears the receiver floor (${floorPhrase}).`
             : `No budget moves yet — nothing has cleared the ${SCALE_TEST_MIN_DELTA_PCT}% bar.`,
         ],
         client: [
-          receiverBlocked
+          breakevenBlocked
+            ? "We're not adding budget yet — the ads ahead of the rest aren't profitable at your break-even point."
+            : receiverBlocked
             ? "We're not moving budget yet — no ad has enough spend and results behind it to receive more."
             : "We're not moving budget yet — no ad has separated enough yet.",
         ],

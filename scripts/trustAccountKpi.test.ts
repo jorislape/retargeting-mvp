@@ -88,7 +88,17 @@ try {
   assert.match(tgt.buyerText, /- Unbox_F \| 2\.71x(?: · adj\. [\d.]+x)? \([^)]*\) \| ✗ misses target/);
   assert.match(tgt.buyerText, /\nWINNERS\n/, "with a target, the sections are winners/losers");
   assert.ok([...tgt.memo.winners, ...tgt.memo.losers.rows].every((r) => r.vsTarget != null));
-  assert.deepEqual(tgt.memo.decision, ecom.memo.decision, "target ROAS changes nothing in the decision");
+  /* Bulletproof pass A1: the breakeven is now a business bar — it is
+     listed as the user's criterion and replaces the "relative to the
+     account" line; here every receiver beats it, so the call itself is
+     identical. */
+  const { appliedCriteria: tCrit, profitBasisNote: tNote, ...tRest } = tgt.memo.decision;
+  const { appliedCriteria: eCrit, profitBasisNote: eNote, ...eRest } = ecom.memo.decision;
+  assert.deepEqual(tRest, eRest, "every receiver beats a 3.00x breakeven ⇒ the same call");
+  assert.deepEqual(tCrit.slice(0, eCrit.length), eCrit);
+  assert.deepEqual(tCrit.slice(eCrit.length), [{ label: "Breakeven: 3.00x ROAS — an ad must beat it to receive budget — your criterion", source: "user" }]);
+  assert.equal(tNote, undefined);
+  assert.ok(eNote, "no breakeven ⇒ the move is stated as relative");
   // No target → no column / no summary.
   assert.equal(ecom.memo.scope.targetSummary, undefined);
   assert.ok([...ecom.memo.winners, ...ecom.memo.losers.rows].every((r) => r.vsTarget === undefined));

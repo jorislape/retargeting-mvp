@@ -235,6 +235,12 @@ export interface DecisionCriteria {
    *  applicable to CTR/CPC (no outcome count exists); never a
    *  purchase-only "conversions" generalization. */
   minOutcomeCount?: number | null;
+  /** Bulletproof pass A1 — the user's breakeven for the selected KPI
+   *  (target ROAS for ROAS, target CPA for CPA). When set, an ad that
+   *  doesn't beat it can't receive budget ("Above average, not
+   *  profitable — don't scale"); it can only WITHHOLD a receiver, never
+   *  add one. Absent ⇒ receivers are relative to the median only. */
+  breakeven?: number | null;
   /** Evidence Sufficiency V1 — Brief Readiness (winner side): minimum
    *  outcome count on the LEADING ad before its observed win is treated
    *  as established enough to brief creative against. Deliberately a
@@ -763,6 +769,9 @@ export interface MemoWinnerLoserRow {
   /** Real-account review — below-median rows within FLAT_FIELD_DELTA_PCT
    *  of the median: "Near median — hold". Left out of the trim list. */
   holdNote?: { buyer: string; client: string };
+  /** Bulletproof pass A1 — the business status: median position × the
+   *  user's breakeven (see memo.ts statusFor). Display only. */
+  status?: { key: "scale" | "not_profitable" | "maintain" | "reduce" | "wait" | "hold"; buyer: string; client: string };
   /** Real-account review — above-median rows, ROAS with a purchase count:
    *  evidence-adjusted ROAS (pulled toward the median by few purchases),
    *  the table's sort key. Buyer view only. */
@@ -1200,10 +1209,11 @@ export interface MemoDecision {
      *  move takes from no one). */
     belowSpendLabel?: string;
   };
-  /** Real-account review — present only when no target is set and a
-   *  top-3 Pause / trim ad may still be profitable (trimNote). One line
-   *  on the card; copy only. */
-  trimTargetHint?: { buyer: string; client: string };
+  /** Bulletproof pass A1 — present on a budget move with an outcome KPI
+   *  (ROAS / CPA) and no breakeven/target: the move is relative to the
+   *  account, not profit-based, and how to make it profit-based. Copy
+   *  only. */
+  profitBasisNote?: { buyer: string; client: string };
   headline: string;
   /** Jargon-free counterpart — no "kill/gate/benchmark/median/judged". */
   clientHeadline: string;

@@ -345,27 +345,73 @@ function adjFor(ad: RankedAd, analysis: AnalysisResult, criteria: DecisionCriter
 }
 
 /** Copies each Pause / trim ad's trimNote (short form) onto the card's
- *  list and, with no target set, adds the target hint when one of the
- *  first three may still be profitable. The decision itself is untouched
- *  — same action, same ads, same order. */
+ *  list and — with no breakeven/target on an outcome KPI — states that
+ *  the move is relative to the account, not profit-based (Bulletproof
+ *  pass A1). The decision itself is untouched — same action, same ads,
+ *  same order. */
 function withTrimNotes(d: MemoDecision, analysis: AnalysisResult, context: DebriefContext): MemoDecision {
-  if (!d.budgetMove || d.budgetMove.from.length === 0) return d;
+  if (!d.budgetMove) return d;
   const byName = new Map(analysis.losers.map((a) => [a.name, a]));
   const from = d.budgetMove.from.map((f) => {
     const ad = byName.get(f.name);
     const note = ad ? trimNoteFor(ad, analysis, context).trimNote : undefined;
     return note ? { ...f, note: note.short } : f;
   });
-  const hint =
-    targetFor(analysis, context) == null && from.slice(0, 3).some((f) => f.note)
+  const roas = analysis.kpi === "roas";
+  const basis =
+    targetFor(analysis, context) == null && (roas || analysis.kpi === "cpa")
       ? {
-          trimTargetHint: {
-            buyer: "Set a target ROAS (your breakeven) for a profit-based trim list.",
-            client: "Telling us your break-even return would let us separate ads that lose money from ones that are just below average.",
+          profitBasisNote: {
+            buyer: `This move is relative to the account (each ad vs the median), not profit-based. Set ${roas ? "a target ROAS (your breakeven)" : `a target CPA (your breakeven cost per ${outcomeNounsFor(analysis)?.one ?? "purchase"})`} for a profit-based trim list.`,
+            client: `This compares your ads with each other, not with your break-even point — telling us your break-even ${roas ? "return" : `cost per ${outcomeNounsFor(analysis)?.one === "lead" ? "lead" : "sale"}`} would separate ads that make money from ones that are just above or below average.`,
           },
         }
       : {};
-  return { ...d, budgetMove: { ...d.budgetMove, from }, ...hint };
+  return { ...d, budgetMove: { ...d.budgetMove, from }, ...basis };
+}
+
+/**
+ * Bulletproof pass A1 — the business layer on top of the median read.
+ * Layer 1 (unchanged) places an ad above / near / below the median;
+ * Layer 2 crosses it with the user's breakeven (target ROAS / target
+ * CPA): above & above breakeven = Scale candidate; above & below =
+ * Above average, not profitable — don't scale; below & above = Maintain
+ * (reduce, don't pause); below & below = Reduce candidate; an
+ * above-median ad under the purchase floor = Wait (not enough evidence
+ * to scale); near / at the median = Hold. Without a breakeven the
+ * statuses say "(profitability unknown)". Display only — the decision
+ * still chooses the receivers and trims.
+ */
+export type AdStatusKey = "scale" | "not_profitable" | "maintain" | "reduce" | "wait" | "hold";
+function statusFor(
+  ad: RankedAd,
+  layer: "above" | "at" | "near" | "below",
+  analysis: AnalysisResult,
+  context: DebriefContext,
+  criteria: DecisionCriteria
+): { status: NonNullable<MemoWinnerLoserRow["status"]> } {
+  const target = targetFor(analysis, context);
+  const unknown = target == null;
+  const tag = unknown ? " (profitability unknown)" : "";
+  const clientTag = unknown ? " (break-even not set)" : "";
+  const mk = (key: AdStatusKey, buyer: string, client: string) => ({ status: { key, buyer, client } });
+  if (layer === "at" || layer === "near") {
+    return mk("hold", "Hold — near median", "Close to the middle ad — keeping it as is");
+  }
+  if (layer === "above") {
+    const nouns = outcomeNounsFor(analysis);
+    if (nouns != null && ad.conversions != null && ad.conversions < receiverOutcomeMin(criteria)) {
+      return mk("wait", `Wait — ${ad.conversions} ${ad.conversions === 1 ? nouns.one : nouns.many}, not enough evidence to scale`, "Too early to call — not enough results yet");
+    }
+    if (!unknown && !beatsTarget(ad, analysis, target)) {
+      return mk("not_profitable", "Above average, not profitable — don't scale", "Above average, but not profitable yet — not adding budget");
+    }
+    return mk("scale", `Scale candidate${tag}`, `Candidate for more budget${clientTag}`);
+  }
+  if (!unknown && beatsTarget(ad, analysis, target)) {
+    return mk("maintain", "Maintain (reduce, don't pause)", "Still profitable — reducing, not pausing");
+  }
+  return mk("reduce", `Reduce candidate${tag}`, `Candidate to reduce or pause${clientTag}`);
 }
 
 /** Tester Feedback Fix 6: frequency at or above this gets a buyer-only
@@ -411,13 +457,14 @@ export const AT_MEDIAN_CLIENT_LABEL =
 
 function buildAtMedian(
   analysis: AnalysisResult,
-  context: DebriefContext
+  context: DebriefContext,
+  criteria: DecisionCriteria
 ): { atMedian?: NonNullable<Memo["atMedian"]> } {
   const ads = analysis.rankedAds.filter((a) => a.deltaFromMedian === 0);
   if (ads.length === 0) return {};
   return {
     atMedian: {
-      rows: ads.map((ad) => ({ ...buildRow(ad, analysis, context), vsMedianLabel: "at median" })),
+      rows: ads.map((ad) => ({ ...buildRow(ad, analysis, context), vsMedianLabel: "at median", ...statusFor(ad, "at", analysis, context, criteria) })),
       buyerLabel:
         ads.length === 1 ? AT_MEDIAN_BUYER_LABEL : "At the median — these ads set the benchmark",
       clientLabel:
@@ -2273,6 +2320,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
   // T3 gate, and the avoid lines, so all three read the same bars.
   const criteria: DecisionCriteria = {
     minOutcomeCount: context.minOutcomeCount,
+    breakeven: targetFor(analysis, context),
     minBriefOutcomeCount: context.minBriefOutcomeCount,
     minLossSpendMultiple: context.minLossSpendMultiple,
   };
@@ -2406,14 +2454,16 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     winners: byEvidence(analysis.winners, analysis, criteria).map((ad) => ({
       ...buildRow(ad, analysis, context),
       ...adjFor(ad, analysis, criteria),
+      ...statusFor(ad, "above", analysis, context, criteria),
     })),
-    ...buildAtMedian(analysis, context),
+    ...buildAtMedian(analysis, context, criteria),
     leadingConversion: buildLeadingConversion(analysis, criteria),
     losers: {
       /* Real-account review: listed by money at stake, not by KPI. */
       rows: trimOrder(analysis).map((ad) => ({
         ...buildRow(ad, analysis, context),
         ...(isNearMedian(ad) ? { holdNote: NEAR_MEDIAN_HOLD } : trimNoteFor(ad, analysis, context)),
+        ...statusFor(ad, isNearMedian(ad) ? "near" : "below", analysis, context, criteria),
       })),
       /* Losers Coherence fix (same contract as buildTldr): the cut
          imperative is voiced ONLY when the committed decision actually

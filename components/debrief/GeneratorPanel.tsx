@@ -1791,6 +1791,48 @@ export function GeneratorPanel() {
             );
           })()}
 
+          {/* Bulletproof pass A1 — the breakeven sits next to the KPI,
+              visible by default and never required: it turns "above /
+              below the median" into "profitable or not" (the report's
+              per-ad status). The other target stays under Refine. */}
+          {(fields.kpi === "roas" || fields.kpi === "cpa") && (
+            <div className="mt-4 max-w-sm">
+              <label htmlFor={fields.kpi === "roas" ? "targetRoas" : "targetCpa"} className={fieldLabel}>
+                {fields.kpi === "roas" ? "Breakeven ROAS" : "Target CPA"}
+                <span className="ml-1 font-normal text-zinc-400">(recommended)</span>
+              </label>
+              {fields.kpi === "roas" ? (
+                <input
+                  id="targetRoas"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.1"
+                  value={fields.targetRoas}
+                  onChange={(e) => updateFields({ targetRoas: e.target.value })}
+                  placeholder="e.g. 2.0"
+                  className={`mt-1.5 ${inputBase}`}
+                />
+              ) : (
+                <input
+                  id="targetCpa"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  value={fields.targetCpa}
+                  onChange={(e) => updateFields({ targetCpa: e.target.value })}
+                  placeholder="e.g. 25"
+                  className={`mt-1.5 ${inputBase}`}
+                />
+              )}
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                {fields.kpi === "roas"
+                  ? "The ROAS at which an ad pays for itself. Separates profitable ads from merely above-average ones. Optional."
+                  : "The most you can pay per purchase and still profit. Separates profitable ads from merely cheaper-than-average ones, and sets the minimum spend to judge (3×). Optional."}
+              </p>
+            </div>
+          )}
+
           {/* Input Honesty V1: one compact, always-visible statement of
               what actually drives the analysis vs. what's report
               context only — set once here rather than repeated per
@@ -1916,8 +1958,8 @@ export function GeneratorPanel() {
               preserved either way — collapsing only hides the inputs. */}
           <details
             open={
-              fields.targetCpa.trim() !== "" ||
-              fields.targetRoas.trim() !== "" ||
+              (fields.kpi !== "cpa" && fields.targetCpa.trim() !== "") ||
+              (fields.kpi !== "roas" && fields.targetRoas.trim() !== "") ||
               fields.creativeNotes.trim() !== "" ||
               fields.spendGateOverride.trim() !== "" ||
               fields.minOutcomeCount.trim() !== "" ||
@@ -1938,6 +1980,7 @@ export function GeneratorPanel() {
                 this debrief.
               </p>
               <div className="mt-3 grid gap-4 sm:grid-cols-4">
+                {fields.kpi !== "cpa" && (
                 <div>
                   <label htmlFor="targetCpa" className={fieldLabel}>
                     Target CPA
@@ -1959,6 +2002,8 @@ export function GeneratorPanel() {
                     when set.
                   </p>
                 </div>
+                )}
+                {fields.kpi !== "roas" && (
                 <div>
                   <label htmlFor="targetRoas" className={fieldLabel}>
                     Target ROAS
@@ -1981,6 +2026,7 @@ export function GeneratorPanel() {
                     by ROAS. Never affects the minimum spend.
                   </p>
                 </div>
+                )}
                 <div className="sm:col-span-2">
                   <label htmlFor="creativeNotes" className={fieldLabel}>
                     Creative / brand constraints

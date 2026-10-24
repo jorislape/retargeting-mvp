@@ -84,7 +84,9 @@ try {
     assert.deepEqual(byName(m), { Zero_Big: undefined, Big_Mild: NOTE, Zero_Small: undefined, Tiny_Bad: undefined });
     const pause = m.decision.budgetMove!.from;
     assert.deepEqual(pause.map((x) => x.note?.buyer), [undefined, "below median, not necessarily unprofitable", undefined, undefined], "Pause / trim carries it too");
-    assert.equal(m.decision.trimTargetHint?.buyer, HINT, "a flagged ad is in the top 3");
+    // Bulletproof pass A1: the hint is part of the profit-basis line,
+    // present on every budget move without a breakeven.
+    assert.ok(m.decision.profitBasisNote?.buyer.endsWith(HINT), "no breakeven ⇒ relative-move line ending in the hint");
     assert.ok(r.buyerText.includes(HINT) && r.buyerText.includes(NOTE));
     assert.ok(r.buyerText.includes(`"Big_Mild" (1,000.00 EUR — below median, not necessarily unprofitable)`));
 
@@ -96,14 +98,14 @@ try {
     // Flagged ads only outside the top 3 ⇒ notes, but no hint.
     const deep = run(H + ["A,500,30,2000", "B,500,28,1800", "C,500,25,1700", "D,500,20,1600", "E,500,20,1550", "Z1,500,0,0", "Z2,480,0,0", "Z3,460,0,0", "Mild,240,10,380"].join("\n") + "\n", "roas").memo;
     assert.ok(deep.losers.rows.slice(3).some((x) => x.trimNote) && !deep.losers.rows.slice(0, 3).some((x) => x.trimNote));
-    assert.equal(deep.decision.trimTargetHint, undefined);
+    assert.ok(deep.decision.profitBasisNote?.buyer.endsWith(HINT), "still stated: the move is relative, not profit-based");
 
     // With a target: beat it ⇒ "above target — reduce, don't pause"; no hint.
     const t = run(csv, "roas", { targetRoas: 2 });
     assert.deepEqual(t.memo.losers.rows.map((x) => x.name), order, "the order never changes");
     assert.deepEqual(Object.fromEntries(t.memo.losers.rows.map((x) => [x.name, x.trimNote?.buyer])), { Zero_Big: undefined, Big_Mild: "Above target — reduce, don't pause.", Zero_Small: undefined, Tiny_Bad: undefined });
     assert.equal(t.memo.decision.budgetMove!.from[1].note?.buyer, "above target — reduce, don't pause");
-    assert.equal(t.memo.decision.trimTargetHint, undefined, "a target is already set");
+    assert.equal(t.memo.decision.profitBasisNote, undefined, "a target is already set");
     assert.equal(t.memo.decision.action, m.decision.action);
     assert.equal(t.memo.decision.headline, m.decision.headline, "the call is the same");
 
@@ -117,7 +119,7 @@ try {
 
     // Client: plain words, no buyer jargon.
     for (const memo of [m, t.memo]) {
-      for (const str of [...clientStrings(memo), ...memo.losers.rows.flatMap((x) => (x.trimNote ? [x.trimNote.client, x.trimNote.short.client] : [])), memo.decision.trimTargetHint?.client ?? ""])
+      for (const str of [...clientStrings(memo), ...memo.losers.rows.flatMap((x) => (x.trimNote ? [x.trimNote.client, x.trimNote.short.client] : [])), memo.decision.profitBasisNote?.client ?? ""])
         for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(str), `client "${w}": ${str}`);
     }
 
@@ -125,12 +127,12 @@ try {
     // nothing in the top 3 ⇒ no hint.
     const sample = buildSampleMemo();
     assert.deepEqual(sample.losers.rows.map((x) => Boolean(x.trimNote)), [false, false, false, true, false]);
-    assert.equal(sample.decision.trimTargetHint, undefined);
+    assert.ok(sample.decision.profitBasisNote, "the sample has no breakeven either");
 
     // Report renders all three surfaces.
     const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
     assert.match(report, /\{a\.note \? <span className="text-amber-300\/80"> — \{client \? a\.note\.client : a\.note\.buyer\}<\/span> : null\}/);
-    assert.match(report, /\{client \? d\.trimTargetHint\.client : d\.trimTargetHint\.buyer\}/);
+    assert.match(report, /\{client \? d\.profitBasisNote\.client : d\.profitBasisNote\.buyer\}/);
     assert.match(report, /\{view === "client" \? ad\.trimNote\.client : ad\.trimNote\.buyer\}/);
   }
 
@@ -164,7 +166,7 @@ try {
     assert.match(n.memo.losers.clientInstruction, /^We're reducing or pausing spend on 3 of the ads below — together they spent 1,200\.00 EUR while performing well below the middle ad, .* 2 more sit close to the middle ad and stay as they are\.$/);
     assert.equal(n.memo.spendAllocation?.segments.find((s) => s.id === "below")?.count, 5, "the bar keeps every below-median ad");
     for (const s of clientStrings(n.memo)) for (const w of CLIENT_BANNED) assert.ok(!new RegExp(`\\b${w}\\b`, "i").test(s), `client "${w}": ${s}`);
-    assert.ok(n.buyerText.includes("Near median — hold"));
+    assert.ok(n.buyerText.includes("Hold — near median"), "the near-median status (replaces the hold note)");
     // The cut bar still reads every below-median ad (the decision is unchanged).
     assert.equal(d.budgetVariant, "shift");
     // No hold ⇒ the old wording, unchanged.
@@ -173,7 +175,8 @@ try {
     // The appendix labels them; the report renders the note.
     const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
     assert.match(report, /hold: client \? "Close to the middle ad" : "Near median — hold"/);
-    assert.match(report, /\{view === "client" \? ad\.holdNote\.client : ad\.holdNote\.buyer\}/);
+    // The row shows the business status ("Hold — near median" for these).
+    assert.match(report, /\{ad\.status && <StatusLine status=\{ad\.status\} client=\{view === "client"\} \/>\}/);
     // Client split + per-section list: trims counted, holds one clause.
     assert.match(report, /const trims = memo\.losers\.rows\.filter\(\(r\) => !r\.holdNote\);/);
     assert.match(report, /count: trims\.length,\s*names: trims\.slice\(0, 3\)/);

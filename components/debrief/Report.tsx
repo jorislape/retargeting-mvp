@@ -630,9 +630,9 @@ function DecisionCard({
       {d.budgetMove && <BudgetMoveNames move={d.budgetMove} client={client} budgetVariantLabel={d.budgetVariant} />}
       {/* Real-account review: a top trim candidate may still be
           profitable — ask for the breakeven that makes the list profit-based. */}
-      {d.trimTargetHint && (
+      {d.profitBasisNote && (
         <p className="mt-1 text-xs leading-relaxed text-amber-300/80">
-          {client ? d.trimTargetHint.client : d.trimTargetHint.buyer}
+          {client ? d.profitBasisNote.client : d.profitBasisNote.buyer}
         </p>
       )}
       {/* Trust Pass 4 — a budget move was withheld because this KPI is a
@@ -1061,15 +1061,13 @@ function AdTable({
                     {view === "client" ? ad.lowIntentNote.client : ad.lowIntentNote.buyer}
                   </p>
                 )}
-                {/* Real-account review: below median ≠ unprofitable. */}
-                {ad.trimNote && (
+                {/* Bulletproof pass A1: the business status (median × breakeven). */}
+                {ad.status && <StatusLine status={ad.status} client={view === "client"} />}
+                {/* Real-account review: below median ≠ unprofitable (the
+                    "Maintain" status already says so when a target is set). */}
+                {ad.trimNote && ad.status?.key !== "maintain" && (
                   <p className="mt-0.5 text-[11px] leading-relaxed text-amber-300/80">
                     {view === "client" ? ad.trimNote.client : ad.trimNote.buyer}
-                  </p>
-                )}
-                {ad.holdNote && (
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
-                    {view === "client" ? ad.holdNote.client : ad.holdNote.buyer}
                   </p>
                 )}
               </td>
@@ -1325,11 +1323,9 @@ function ClientAdList({
               {ad.lowIntentNote && (
                 <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">{ad.lowIntentNote.client}</p>
               )}
-              {ad.trimNote && (
+              {ad.status && <StatusLine status={ad.status} client />}
+              {ad.trimNote && ad.status?.key !== "maintain" && (
                 <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">{ad.trimNote.client}</p>
-              )}
-              {ad.holdNote && (
-                <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">{ad.holdNote.client}</p>
               )}
             </div>
             <p className="font-mono text-[15px] font-semibold tabular-nums text-zinc-100">
@@ -1408,6 +1404,7 @@ function AtMedianRows({
                   {client ? ad.lowIntentNote.client : ad.lowIntentNote.buyer}
                 </p>
               )}
+              {ad.status && <StatusLine status={ad.status} client={client} />}
             </div>
             <p className="font-mono text-[13px] font-semibold tabular-nums text-zinc-100">
               {ad.valueLabel}
@@ -1518,6 +1515,24 @@ function ClientStatCards({ memo }: { memo: Memo }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/** Bulletproof pass A1 — one row's business status, colored by intent:
+ *  scale = win, reduce / not-profitable = loss, the rest neutral. */
+const STATUS_TONE: Record<NonNullable<MemoWinnerLoserRow["status"]>["key"], string> = {
+  scale: "print-win text-emerald-400",
+  not_profitable: "print-loss text-red-400",
+  reduce: "print-loss text-red-400",
+  maintain: "text-zinc-300",
+  wait: "text-zinc-400",
+  hold: "text-zinc-400",
+};
+function StatusLine({ status, client }: { status: NonNullable<MemoWinnerLoserRow["status"]>; client: boolean }) {
+  return (
+    <p className={`mt-0.5 text-[11px] font-medium leading-relaxed ${STATUS_TONE[status.key]}`}>
+      {client ? status.client : status.buyer}
+    </p>
   );
 }
 
