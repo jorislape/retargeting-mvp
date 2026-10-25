@@ -13,11 +13,11 @@ import {
   CopyIcon,
   DownloadIcon,
   PlusIcon,
-  PrinterIcon,
   RefreshIcon,
   SlidersIcon,
 } from "@/components/ui/icons";
-import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
+import { btnSecondary } from "@/components/ui/theme";
+import { PrintButton } from "@/components/report/PrintButton";
 import { Wordmark } from "@/components/ui/brand";
 import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
 import { belowSpendLine, clientClarityLine, clientNotes, reduceFigure, testSignalsFor, CLIENT_BRIEF_LEGEND, CONFIDENCE_LABELS, decisionLine, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
@@ -2381,14 +2381,7 @@ export function Report({
               are secondary. Export TXT and New debrief are quieter,
               lower-priority actions — same capabilities as before,
               just less visual weight. */}
-          <button
-            onClick={() => window.print()}
-            title="Choose “Save as PDF” in the print dialog and disable browser headers and footers for the cleanest export."
-            className={`cursor-pointer ${btnPrimarySm}`}
-          >
-            <PrinterIcon className="h-3.5 w-3.5" />
-            Print / Save PDF
-          </button>
+          <PrintButton />
           {/* Customization only ever appears once a report already
               exists — this button lives here, inside Report itself,
               never in the generator form. */}

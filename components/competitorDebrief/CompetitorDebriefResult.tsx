@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { CompetitorDebrief, CompetitorDebriefTest, LearningOutcome } from "@/modules/competitorDebrief";
-import { btnPrimarySm, btnSecondary, card, cardNested, eyebrow } from "@/components/ui/theme";
-import { AlertTriangleIcon, ArrowIcon, CheckIcon, PrinterIcon, SlidersIcon } from "@/components/ui/icons";
+import { btnSecondary, card, cardNested, eyebrow } from "@/components/ui/theme";
+import { AlertTriangleIcon, ArrowIcon, CheckIcon, SlidersIcon } from "@/components/ui/icons";
+import { PrintButton } from "@/components/report/PrintButton";
 import { Wordmark } from "@/components/ui/brand";
 import {
   COMPETITOR_SECTIONS,
@@ -314,15 +315,7 @@ export function CompetitorDebriefResult({
       <div className="print-hidden flex flex-wrap items-center justify-end gap-2">
         {/* Toolbar hierarchy: Print / Save PDF is the one primary
             action; Customize report is secondary. */}
-        <button
-          type="button"
-          onClick={() => window.print()}
-          title="Choose “Save as PDF” in the print dialog and disable browser headers and footers for the cleanest export."
-          className={`cursor-pointer ${btnPrimarySm}`}
-        >
-          <PrinterIcon className="h-3.5 w-3.5" />
-          Print / Save PDF
-        </button>
+        <PrintButton />
         {/* Customization only ever appears once a report already exists —
             this button lives here, inside the result itself, never in the
             input panel. */}
