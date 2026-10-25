@@ -182,11 +182,12 @@ try {
     const tiny = Array.from({ length: 13 }, (_, i) => `T${i},5,0,0`);
     const few = run(dated([...judged, ...tiny]), "roas").memo; // 12 of 25 judged
     assert.equal(few.confidence.level, "high");
-    assert.equal(few.confidence.clientWhy, "Confidence is high because the ads getting more budget each have 30+ sales behind them and the gap to the rest is clear.");
+    // Bulletproof pass C7: a reason clause ("High — …"), verified receiver volume first.
+    assert.equal(few.confidence.clientWhy, "the ads getting more budget each have 30+ sales behind them and the gap to the rest is clear.");
     const most = run(dated(judged), "roas").memo; // 12 of 12 judged
     assert.equal(most.confidence.level, "high");
-    assert.match(most.confidence.clientWhy, /^Confidence is high because most ads had enough spend/);
-    assert.match(buildSampleMemo().confidence.clientWhy, /^Confidence is high because most ads had enough spend/, "sample: 11 of 14 judged");
+    assert.equal(most.confidence.clientWhy, few.confidence.clientWhy, "verified receiver volume leads even when most ads were judged");
+    assert.equal(buildSampleMemo().confidence.clientWhy, "the ads getting more budget each have 30+ sales behind them and the gap to the rest is clear.", "sample: receivers at 34/31/32 sales");
   }
 
   /* ---- Real-account review: which default bars changed the call ----

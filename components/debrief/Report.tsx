@@ -20,7 +20,7 @@ import {
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
-import { belowSpendLine, clientNotes, reduceFigure, testSignalsFor, CLIENT_BRIEF_LEGEND, CONFIDENCE_LABELS, decisionLine, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { belowSpendLine, clientClarityLine, clientNotes, reduceFigure, testSignalsFor, CLIENT_BRIEF_LEGEND, CONFIDENCE_LABELS, decisionLine, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
@@ -747,7 +747,7 @@ function DecisionCard({
           )}
         </span>
         {": "}
-        {evidenceLine(d, memo.scope.adsJudged, view)}
+        {client ? clientClarityLine(memo.confidence) : evidenceLine(d, memo.scope.adsJudged, view)}
       </p>
       {/* Bulletproof pass A2 — how safe the action is, with what caps it. */}
       <p className="mt-1 max-w-3xl text-xs leading-relaxed text-zinc-400">
@@ -3196,11 +3196,9 @@ export function Report({
           />
           {client ? (
             <>
+              {/* Pass C7: "How clear the results are" is said once, on the
+                  Next move card — not repeated here. */}
               <p className="mt-4 max-w-3xl text-sm leading-relaxed text-zinc-300">
-                <span className="font-semibold">{CONFIDENCE_LABELS.evidence.client}:</span>{" "}
-                {memo.confidence.level.charAt(0).toUpperCase() + memo.confidence.level.slice(1)}. {memo.confidence.clientWhy}
-              </p>
-              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-300">
                 <span className="font-semibold">{CONFIDENCE_LABELS.decision.client}:</span>{" "}
                 {decisionLine(memo.confidence, "client")}.
               </p>

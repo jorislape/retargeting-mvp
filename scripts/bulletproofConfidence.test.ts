@@ -31,7 +31,10 @@ try {
   assert.ok(none.buyerText.includes("CONFIDENCE — EVIDENCE: HIGH · DECISION: MEDIUM"));
   assert.ok(none.buyerText.includes("Decision: Medium — profitability unknown — no breakeven set"));
   assert.ok(none.buyerText.includes("\nEvidence: Strong support from this dataset"), "card evidence line");
-  assert.ok(none.clientText.includes("How clear the results are: HIGH."));
+  // Pass C7: said once, on the card — "High — <reason>".
+  assert.ok(none.clientText.includes("How clear the results are: High — the ads getting more budget each have 30+ sales behind them and the gap to the rest is clear."));
+  assert.equal(none.clientText.split("How clear the results are").length - 1, 1, "said once");
+  assert.ok(!/Confidence is (high|medium|low) because/.test(none.clientText));
   assert.ok(none.clientText.includes("How safe the next step is: Medium — your break-even point isn't set"));
 
   /* ---- With a breakeven (every receiver beats it) ⇒ decision follows evidence ---- */

@@ -1400,8 +1400,9 @@ console.log("decision (stage 1 — rules): all assertions passed");
       "buyer text carries the plain-language evidence sentence for the pinned supported/separation sample"
     );
     assert.ok(
-      clientText.includes("How clear the results are: Strong — the available results show a clear enough difference"),
-      "client text carries the plain-language client evidence sentence"
+      // Bulletproof pass C7: the client's one clarity line is "<Level> — <reason>".
+      clientText.includes(`How clear the results are: ${memo.confidence.level.charAt(0).toUpperCase()}${memo.confidence.level.slice(1)} — ${memo.confidence.clientWhy}`),
+      "client text carries the plain-language client clarity line"
     );
     for (const text of [buyerText, clientText]) {
       assert.ok(!text.includes("(separation)") && !/\bflatness\b/.test(text), "no raw evidenceShape enum anywhere in the serialized output");

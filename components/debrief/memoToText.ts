@@ -193,6 +193,14 @@ export const CONFIDENCE_LABELS = {
   decision: { buyer: "Decision", client: "How safe the next step is" },
 } as const;
 
+/** Bulletproof pass C7 — the client's one "How clear the results are"
+ *  line: the confidence level and its reason, said once ("High — the ads
+ *  getting more budget each have 30+ sales behind them and the gap to
+ *  the rest is clear."). */
+export function clientClarityLine(confidence: Memo["confidence"]): string {
+  return `${confidence.level.charAt(0).toUpperCase()}${confidence.level.slice(1)} — ${confidence.clientWhy}`;
+}
+
 export function evidenceLine(
   decision: Memo["decision"],
   adsJudged: number,
@@ -404,7 +412,9 @@ export function memoToText(
   }
   lines.push(view === "client" ? d.clientRationale : d.rationale);
   lines.push(
-    `${CONFIDENCE_LABELS.evidence[view === "client" ? "client" : "buyer"]}: ${evidenceLine(d, scope.adsJudged, view)}`
+    view === "client"
+      ? `${CONFIDENCE_LABELS.evidence.client}: ${clientClarityLine(memo.confidence)}`
+      : `${CONFIDENCE_LABELS.evidence.buyer}: ${evidenceLine(d, scope.adsJudged, view)}`
   );
   lines.push(`${CONFIDENCE_LABELS.decision[view === "client" ? "client" : "buyer"]}: ${decisionLine(memo.confidence, view)}`);
   /* Evidence Confidence V2 — cross-period consistency context, same
@@ -740,7 +750,6 @@ export function memoToText(
 
   if (view === "client") {
     lines.push("CONFIDENCE & DATA USED");
-    lines.push(`How clear the results are: ${memo.confidence.level.toUpperCase()}. ${memo.confidence.clientWhy}`);
     lines.push(`How safe the next step is: ${decisionLine(memo.confidence, "client")}`);
     lines.push(
       `This result is based on ${scope.adsAnalyzed} ads and ${scope.totalSpendLabel} in ad spend${scope.dateRangeLabel ? ` between ${scope.dateRangeLabel}` : ""}. ${clientDataUsedSentence(scope, scope.kpiLabelClient ?? scope.kpiLabel)} Every number comes from the exported ad data.`

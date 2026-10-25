@@ -2423,8 +2423,8 @@ function buildConfidence(
       "Every judged ad sits close to the median — a consistent flat read, not a missing signal."
     );
     clientWhy = mostJudged
-      ? "Confidence is high because most ads had enough spend to compare, and they performed consistently close to one another."
-      : "Confidence is high because the ads with enough spend to compare performed consistently close to one another.";
+      ? "most ads had enough spend to compare, and they performed consistently close to one another."
+      : "the ads with enough spend to compare performed consistently close to one another.";
   } else if (level === "high") {
     reasons.push(
       `${adsJudged} of ${adsAnalyzed} ads reached the minimum spend — a fair sample to judge.`
@@ -2439,11 +2439,13 @@ function buildConfidence(
         `${fmtMoney(belowBenchmarkSpend, currency)} sat below the median — the cut side is material.`
       );
     }
-    clientWhy = mostJudged
-      ? "Confidence is high because most ads had enough spend to judge fairly and the gap between what worked and what didn't is clear."
-      : receiversVerified
-        ? `Confidence is high because the ${receiverCount === 1 ? "ad getting more budget has" : "ads getting more budget each have"} ${highBar}+ ${salesWord} behind ${receiverCount === 1 ? "it" : "them"} and the gap to the rest is clear.`
-        : "Confidence is high because the ads with enough spend to compare show a clear gap between what worked and what didn't.";
+    /* Pass C7: the verified volume behind the move is the clearest
+       reason, so it leads when it holds. */
+    clientWhy = receiversVerified
+      ? `the ${receiverCount === 1 ? "ad getting more budget has" : "ads getting more budget each have"} ${highBar}+ ${salesWord} behind ${receiverCount === 1 ? "it" : "them"} and the gap to the rest is clear.`
+      : mostJudged
+        ? "most ads had enough spend to judge fairly and the gap between what worked and what didn't is clear."
+        : "the ads with enough spend to compare show a clear gap between what worked and what didn't.";
   } else if (level === "medium") {
     if (adsJudged < 10) {
       reasons.push(
@@ -2487,8 +2489,8 @@ function buildConfidence(
     }
     clientWhy =
       belowHighBar && weakest?.conversions != null && !volumeBelowFloor
-        ? "Confidence is medium because the ads getting more budget have a moderate number of sales behind them so far — more results would firm the call up."
-        : "Confidence is medium because the results point one way, but the sample is small enough that the next round of spend could still shift it.";
+        ? "the ads getting more budget have a moderate number of sales behind them so far — more results would firm the call up."
+        : "the results point one way, but the sample is small enough that the next round of spend could still shift it.";
   } else {
     if (median == null) {
       reasons.push(
@@ -2507,8 +2509,8 @@ function buildConfidence(
       "Treat the tests below as ideas to validate, not firm decisions."
     );
     clientWhy = analysis.kpiGaps
-      ? `Confidence is low because too few ads have a ${kpiClientLabelFor(analysis)} figure with enough spend to compare — treat the next steps as ideas to test rather than firm decisions.`
-      : "Confidence is low because too few ads had enough spend to judge — treat the next steps as ideas to test rather than firm decisions.";
+      ? `too few ads have a ${kpiClientLabelFor(analysis)} figure with enough spend to compare — treat the next steps as ideas to test rather than firm decisions.`
+      : "too few ads had enough spend to judge — treat the next steps as ideas to test rather than firm decisions.";
   }
 
   /* Real-account follow-up: a Shift/Scale states the outcome volume
