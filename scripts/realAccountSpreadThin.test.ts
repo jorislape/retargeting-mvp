@@ -35,8 +35,10 @@ try {
   assert.ok(!r.clientText.includes("spread thin"), "never in client TXT");
   /* Bulletproof pass A8: the client sees it as the plan, never as blame. */
   assert.equal(r.memo.spreadThinPlan, "We're concentrating budget into fewer ads so each one gets enough data to judge.");
-  assert.ok(r.clientText.includes(r.memo.spreadThinPlan!), "client TXT, near the top");
-  assert.ok(r.clientText.indexOf(r.memo.spreadThinPlan!) < r.clientText.indexOf("NEXT MOVE"));
+  // Bulletproof pass C4: in the client's one Notes line, under the Next move.
+  const notes = r.clientText.split("\n").find((l) => l.startsWith("Notes: "))!;
+  assert.ok(notes.includes(r.memo.spreadThinPlan!), "client TXT Notes line");
+  assert.ok(r.clientText.indexOf(notes) > r.clientText.indexOf("NEXT MOVE"), "after the Next move");
   assert.ok(!r.buyerText.includes(r.memo.spreadThinPlan!), "the buyer keeps the finding itself");
   assert.ok(!clientStrings(r.memo).some((s) => s.includes("spread thin")), "never in a client string");
 
@@ -74,10 +76,12 @@ try {
   const at = report.indexOf("{!client && memo.spreadThin && (");
   assert.ok(at > 0 && at < report.indexOf("</header>"), "near the top of the buyer view");
   // Bulletproof pass A8: a structural finding in the buyer exec summary
-  // (page 1 of the PDF), and the client plan line in the masthead.
+  // (page 1 of the PDF). Pass C4: the client plan joins the Notes line
+  // under the Next move card.
   assert.match(report, /\{ label: "Structure", value: memo\.spreadThin \}/);
-  const plan = report.indexOf("{client && memo.spreadThinPlan && (");
-  assert.ok(plan > 0 && plan < report.indexOf("</header>"), "client: near the top");
+  const memoToTextSrc = readFileSync(join(ROOT, "components/debrief/memoToText.ts"), "utf8");
+  assert.match(memoToTextSrc, /\[memo\.scope\.stageNote\?\.client, memo\.spreadThinPlan, memo\.scope\.attributionClientLine\]/);
+  assert.ok(report.indexOf("{client && clientNotes(memo).length > 0 && (") > report.indexOf("</header>"), "client: below the masthead, under the card");
 
   console.log("real-account spread thin: all assertions passed");
 } finally {

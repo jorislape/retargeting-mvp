@@ -60,6 +60,15 @@ export function testSignalsFor(view: ReportView, signals: readonly string[]): re
   return view === "client" ? signals.filter((s) => !/^Combined .+ spent below the median across /.test(s)) : signals;
 }
 
+/** Bulletproof pass C4 — the client's page-1 context (how ads were
+ *  grouped, the concentration plan, video attribution) as ONE short
+ *  Notes line directly under the Next move, not ahead of it. */
+export function clientNotes(memo: Memo): string[] {
+  return [memo.scope.stageNote?.client, memo.spreadThinPlan, memo.scope.attributionClientLine].filter(
+    (n): n is string => typeof n === "string" && n !== ""
+  );
+}
+
 export function reduceFigure(
   move: NonNullable<Memo["decision"]["budgetMove"]>
 ): { spendLabel: string; count: number; holds: number } | undefined {
@@ -280,11 +289,10 @@ export function memoToText(
   }
   /* Real-account review: buyer only, near the top. */
   if (view !== "client" && memo.spreadThin) lines.push(memo.spreadThin);
-  if (view === "client" && memo.spreadThinPlan) lines.push(memo.spreadThinPlan);
   if (view !== "client" && scope.attributionWarning) lines.push(scope.attributionWarning);
-  if (view === "client" && scope.attributionClientLine) lines.push(scope.attributionClientLine);
-  /* Bulletproof pass A3: stage medians / the mixed-stage warning. */
-  if (scope.stageNote) lines.push(view === "client" ? scope.stageNote.client : scope.stageNote.buyer);
+  /* Bulletproof pass A3: stage medians / the mixed-stage warning. The
+     client gets them as one Notes line under the Next move (Pass C4). */
+  if (view !== "client" && scope.stageNote) lines.push(scope.stageNote.buyer);
   if (view !== "client" && scope.stageWarning) lines.push(scope.stageWarning);
   lines.push("");
 
@@ -424,6 +432,8 @@ export function memoToText(
     lines.push(`- Watch: ${c(d.nextControlledTest.watch)}`);
   }
   lines.push(view === "client" ? d.reassess.client : d.reassess.buyer);
+  const notes = view === "client" ? clientNotes(memo) : [];
+  if (notes.length > 0) lines.push(`Notes: ${notes.join(" ")}`);
   lines.push("");
 
   /* Expert Commentary V2 — attributed judgment, explicitly labeled so

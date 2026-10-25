@@ -984,11 +984,10 @@ export function buildLimits(
           ? `The export's attribution settings differ only in engaged view (${joinPlain(parts)}), which Meta counts for video ads only — ${abf.staticAds > 0 ? "static ads compare fairly; " : ""}among video/UGC ads (or ads with no format in the name) the windows differ (${joinPlain(windows)}), so their ${kpi} isn't strictly comparable.`
           : `The export's attribution settings differ only in engaged view (${joinPlain(parts)}), which Meta counts for video ads only — the judged video/UGC ads share one window and static ads are unaffected, so results compare fairly.`
       );
-      client.push(
-        abf.mixed
-          ? "Some video ads were measured with a window that also counts people who watched for 5+ seconds, so video results aren't perfectly comparable with each other."
-          : "Results are counted the way the ad account was set to count them when the file was exported; a different setting would change them."
-      );
+      /* Pass C4: when mixed, the client's page-1 Notes line already says
+         it — no second copy here. */
+      if (!abf.mixed)
+        client.push("Results are counted the way the ad account was set to count them when the file was exported; a different setting would change them.");
     } else if (settings && settings.length > 1) {
       const parts = settings.map((s) => `"${s.value}" (${s.rows} row${s.rows === 1 ? "" : "s"})`);
       buyer.push(
@@ -1054,8 +1053,11 @@ export function buildLimits(
           : ""
       }.`
     );
+    /* Pass C4: true for every ad only without fallbacks. */
     client.push(
-      "Ads aimed at new audiences and ads aimed at people who already know the brand are each compared with their own group, so cold and warm traffic aren't measured on one yardstick."
+      sb.fallback > 0
+        ? "Where the data allows, ads aimed at new audiences and ads aimed at people who already know the brand are compared within their own group; the rest are compared with all ads."
+        : "Ads aimed at new audiences and ads aimed at people who already know the brand are each compared with their own group, so cold and warm traffic aren't measured on one yardstick."
     );
   } else if (analysis.funnelMix) {
     const f = analysis.funnelMix;

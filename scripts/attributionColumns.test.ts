@@ -143,7 +143,7 @@ try {
     );
     assert.match(d.windowNote!.client, /wider attribution window than most others/);
     assert.equal(r.memo.scope.attributionWarning, "Video/UGC ads (or ads with no format in the name) use mixed attribution windows: 7d click + 1d view on 8 ads, 7d click + 1d view + 1d engaged view on 3 ads — engaged view (video only: a view of 5+ seconds) counts for some and not others, so their ROAS isn't strictly comparable.");
-    assert.equal(r.memo.scope.attributionClientLine, "Some video ads were measured with a window that also counts people who watched for 5+ seconds, so video results aren't perfectly comparable with each other.");
+    assert.equal(r.memo.scope.attributionClientLine, "Some video ads also count people who watched for 5+ seconds, so video results compare less precisely.");
     assert.ok(r.memo.confidence.decision.caps.buyer.includes("attribution windows differ among video/UGC ads (engaged view counts for video only)"));
     assert.notEqual(r.memo.confidence.decision.level, "high", "capped at medium");
     assert.ok(r.buyerText.includes("(€600.00 · 7d click + 1d view + 1d engaged view)"), "TXT shows the window beside the receiver");
@@ -164,7 +164,8 @@ try {
     assert.match(report, /\{ label: "Attribution", value: memo\.scope\.attributionWarning \}/);
     assert.match(report, /\{a\.window \? ` · \$\{a\.window\}` : ""\}/);
     assert.match(report, /\{client \? d\.windowNote\.client : d\.windowNote\.buyer\}/);
-    assert.match(report, /\{client && memo\.scope\.attributionClientLine && \(/);
+    // Pass C4: the client line lives in the Notes line under the card.
+    assert.ok(r.clientText.includes("Notes: ") && r.clientText.split("\n").find((l) => l.startsWith("Notes: "))!.includes(r.memo.scope.attributionClientLine!));
   }
 
   /* ---- Bulletproof pass C1: attribution by format ---- */

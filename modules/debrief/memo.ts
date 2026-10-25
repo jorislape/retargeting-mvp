@@ -425,7 +425,12 @@ function stageScope(analysis: AnalysisResult): Pick<Memo["scope"], "stageMedians
             ? `; ${sb.fallback} ad${sb.fallback === 1 ? "" : "s"} with no stage (or in a stage with under 5 judged ads) use${sb.fallback === 1 ? "s" : ""} the overall ${overall ?? ""} median`
             : ""
         }.`,
-        client: "Ads aimed at new audiences and ads aimed at people who already know the brand are each compared with their own group.",
+        /* Pass C4: the full sentence only when it is true for every ad;
+           with some ads on the overall median, say so plainly. */
+        client:
+          sb.fallback > 0
+            ? "Ads are compared with their own audience group where the data allows."
+            : "Ads aimed at new audiences and ads aimed at people who already know the brand are each compared with their own group.",
       },
     };
   }
@@ -449,7 +454,7 @@ function attributionScope(analysis: AnalysisResult): Pick<Memo["scope"], "attrib
   if (abf.scope === "video")
     return {
       attributionWarning: `Video/UGC ads (or ads with no format in the name) use mixed attribution windows: ${parts.join(", ")} — engaged view (video only: a view of 5+ seconds) counts for some and not others, so their ${kpiLabelFor(analysis)} isn't strictly comparable.${abf.staticAds > 0 ? " Static ads are unaffected." : ""}`,
-      attributionClientLine: "Some video ads were measured with a window that also counts people who watched for 5+ seconds, so video results aren't perfectly comparable with each other.",
+      attributionClientLine: "Some video ads also count people who watched for 5+ seconds, so video results compare less precisely.",
     };
   return {
     attributionWarning: `Mixed attribution windows: ${parts.join(", ")} — ${kpiLabelFor(analysis)} isn't strictly comparable across them.`,

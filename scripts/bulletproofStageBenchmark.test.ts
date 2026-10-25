@@ -61,6 +61,11 @@ try {
     `Each ad is compared with its own funnel stage's median (TOFU 2.00x, BOFU 4.00x); 3 ads with no stage (or in a stage with under 5 judged ads) use the overall ${r.memo.scope.medianLabel} median.`
   );
   assert.ok(r.buyerText.includes(r.memo.scope.stageNote!.buyer), "TXT");
+  // Bulletproof pass C4: 3 ads use the overall median, so the client note
+  // never claims every ad is compared within its group.
+  assert.equal(r.memo.scope.stageNote?.client, "Ads are compared with their own audience group where the data allows.");
+  assert.ok(d.limits.client.some((l) => l.startsWith("Where the data allows, ads aimed at new audiences")));
+  assert.ok(r.clientText.includes(`Notes: ${r.memo.scope.stageNote!.client}`), "client TXT: the Notes line under the Next move");
   assert.ok(d.limits.buyer.some((l) => l.startsWith("Each ad is compared with its own funnel stage's median (TOFU 2.00x across 6 ads and BOFU 4.00x across 6 ads); 3 ads with no stage")));
   assert.equal(r.memo.scope.stageWarning, undefined, "split ⇒ no mixed-stage warning");
   /* Split and every receiver read within its own stage ⇒ no stage cap. */
@@ -96,7 +101,12 @@ try {
   /* ---- Report: stage medians in the stat row, the note under it ---- */
   const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
   assert.match(report, /\.\.\.\(memo\.scope\.stageMedians \?\? \[\]\)\.map\(\(s\) => \[`\$\{s\.stage\} median`, s\.label\]\)/);
-  assert.match(report, /\{client \? memo\.scope\.stageNote\.client : memo\.scope\.stageNote\.buyer\}/);
+  assert.match(report, /\{!client && memo\.scope\.stageNote && \(\s*<p[^>]*>\{memo\.scope\.stageNote\.buyer\}<\/p>/, "buyer: the note under the stat row");
+  // Pass C4: client page 1 = masthead → stat cards → Next move → one Notes line.
+  const card = report.indexOf("<DecisionCard\n");
+  const notesAt = report.indexOf("{client && clientNotes(memo).length > 0 && (");
+  assert.ok(card > 0 && notesAt > card, "the client Notes line renders after the Next move card");
+  assert.ok(!/client && memo\.spreadThinPlan && \(|client && memo\.scope\.attributionClientLine && \(/.test(report), "no client notes above the card");
   assert.match(report, /\{ label: "Mixed stages", value: memo\.scope\.stageWarning \}/, "unsplittable mix ⇒ exec summary");
 
   console.log("bulletproof stage benchmark: all assertions passed");

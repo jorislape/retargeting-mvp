@@ -20,7 +20,7 @@ import {
 import { btnPrimarySm, btnSecondary } from "@/components/ui/theme";
 import { Wordmark } from "@/components/ui/brand";
 import { Term, TipBubble, useTip, withTerms } from "@/components/ui/Term";
-import { belowSpendLine, reduceFigure, testSignalsFor, CLIENT_BRIEF_LEGEND, CONFIDENCE_LABELS, decisionLine, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
+import { belowSpendLine, clientNotes, reduceFigure, testSignalsFor, CLIENT_BRIEF_LEGEND, CONFIDENCE_LABELS, decisionLine, clientDataUsedSentence, clientSetAsideLine, clientizeText, evidenceLine, memoToText, type ReportView } from "./memoToText";
 import { CreativeEvidenceStrip } from "./CreativeEvidenceStrip";
 import { CreativeGroupsSection } from "./CreativeGroupsSection";
 import type { CreativeAssetRef } from "@/components/workspace/DebriefProvider";
@@ -2602,10 +2602,8 @@ export function Report({
           {sections.executiveSummary && !client && <ExecutiveSummary memo={memo} view={view} />}
           {/* Bulletproof pass A3 — how ads were benchmarked when funnel
               stages were split (visible, both views). */}
-          {memo.scope.stageNote && (
-            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-300">
-              {client ? memo.scope.stageNote.client : memo.scope.stageNote.buyer}
-            </p>
+          {!client && memo.scope.stageNote && (
+            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-300">{memo.scope.stageNote.buyer}</p>
           )}
           {/* Report Clarity Pass — the buyer register's FIRST mention of
               the evidence gate, always above the fold: defined once here
@@ -2640,16 +2638,6 @@ export function Report({
             >
               {memo.spreadThin}
             </p>
-          )}
-          {/* Bulletproof pass A8 — the client sees the plan, not blame. */}
-          {client && memo.spreadThinPlan && (
-            <p className="mt-3 max-w-3xl border-l-2 border-accent/50 pl-3 text-xs leading-relaxed text-zinc-300">
-              {memo.spreadThinPlan}
-            </p>
-          )}
-          {/* Bulletproof A-fix 2 — mixed attribution windows, one plain line. */}
-          {client && memo.scope.attributionClientLine && (
-            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-300">{memo.scope.attributionClientLine}</p>
           )}
           {/* Trust Pass 2 — the user's own target, made visible: how many
               judged ads beat it. Display only; the action ignores it. */}
@@ -2715,6 +2703,14 @@ export function Report({
             memo.decision.appliedCriteria.some((c) => c.source === "user")
           }
         />
+        {/* Bulletproof pass C4 — client page 1 reads masthead → stat cards
+            → Next move; the grouping / concentration / attribution context
+            follows as one short Notes line. */}
+        {client && clientNotes(memo).length > 0 && (
+          <p className="mt-3 max-w-3xl text-xs leading-relaxed text-zinc-400">
+            <span className="font-medium text-zinc-300">Notes:</span> {clientNotes(memo).join(" ")}
+          </p>
+        )}
 
         {/* Period Comparison V2 — change is the context the decision was
             just read in, so it follows immediately under the card
