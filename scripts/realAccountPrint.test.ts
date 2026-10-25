@@ -135,10 +135,13 @@ assert.match(css, /@media print \{[\s\S]*?nextjs-portal \{\s*display: none !impo
   assert.match(split, /shrink-0 whitespace-nowrap font-mono text-\[17px\]/, "split counts never break (\"23 / 0\")");
   assert.match(split, /\{shorten\(name, CARD_NAME_MAX\)\}/, "split names truncated, wrap at spaces only");
   assert.match(report, /const CARD_NAME_MAX = 28;/);
-  // Client stat-card values: clamped font, wrap only at their own spaces.
-  assert.match(report, /print-kv-value mt-1\.5 \[overflow-wrap:normal\] font-mono/);
-  assert.match(report, /text-\[clamp\(13px,3\.4vw,15px\)\]/);
-  assert.match(report, /card\.value\.split\(" "\)\.map\(\(part, i\) => \(\s*<Fragment key=\{i\}>\s*\{i > 0 && " "\}\s*<span className="whitespace-nowrap">\{part\}<\/span>/, "never mid-number");
+  // Bulletproof pass C2: stat values (client cards AND the buyer stat row)
+  // stay on one line and scale to their box — never wrapped, never past it.
+  assert.match(report, /const FIT_BOX = "\[container-type:inline-size\]";/);
+  assert.match(report, /fontSize: `min\(\$\{max\}px, calc\(100cqi \/ \$\{\(Math\.max\(value\.length, 1\) \* 0\.65\)\.toFixed\(2\)\}\)\)`, whiteSpace: "nowrap"/);
+  assert.match(report, /<div className=\{FIT_BOX\}>\s*<p\s*data-card-value[\s\S]*?style=\{fitValueStyle\(card\.value, 19\)\}/, "client card values fit their card");
+  assert.match(report, /<div className=\{FIT_BOX\}>\s*<p\s*className="print-kv-value flex min-h-6[^"]*"\s*style=\{fitValueStyle\(value, 22\)\}/, "buyer stat values fit their cell");
+  assert.ok(!/overflow-wrap:anywhere\] font-mono font-semibold tabular-nums text-zinc-50/.test(report), "no mid-number wrapping left in the stat row");
   assert.match(report, /\{card\.isName \? shorten\(card\.sub, CARD_NAME_MAX\) : card\.sub\}/);
   const table = between("function AdTable(", "function ClientAdList(");
   assert.ok(!/<th className="(?!whitespace-nowrap)/.test(table), "every buyer table header is nowrap (no VALU/E)");

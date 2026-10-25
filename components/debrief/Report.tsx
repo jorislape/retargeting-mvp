@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useId, useMemo, useState } from "react";
+import { Fragment, useId, useMemo, useState, type CSSProperties } from "react";
 import type {
   Memo,
   MemoBrief,
@@ -1501,6 +1501,17 @@ function AtMedianRows({
    dashboard; these blocks just make the client-facing decision faster
    to read. Buyer view renders none of this. */
 
+/** Bulletproof pass C2 — a number never breaks or overflows. The value
+ *  stays on one line (white-space: nowrap) and its font scales to the
+ *  box it sits in: the box is an inline-size container, and the size is
+ *  the smaller of `max` and the container width ÷ (characters × 0.65em —
+ *  Geist Mono's 0.6em advance plus headroom for a fallback "€"). Works at
+ *  every width, on screen and in print, in Chromium and WebKit. */
+const FIT_BOX = "[container-type:inline-size]";
+function fitValueStyle(value: string, max: number): CSSProperties {
+  return { fontSize: `min(${max}px, calc(100cqi / ${(Math.max(value.length, 1) * 0.65).toFixed(2)}))`, whiteSpace: "nowrap" };
+}
+
 /* Executive summary cards — the client's version of the stat row. */
 function ClientStatCards({ memo }: { memo: Memo }) {
   const shorten = useShortName();
@@ -1555,32 +1566,22 @@ function ClientStatCards({ memo }: { memo: Memo }) {
       {cards.map((card) => (
         <div
           key={card.label}
-          className="break-inside-avoid flex flex-col rounded-xl border border-white/[0.06] bg-white/[0.03] p-4"
+          className="break-inside-avoid flex min-w-0 flex-col rounded-xl border border-white/[0.06] bg-white/[0.03] p-4"
         >
           <p className="print-kv-label text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             {card.label}
           </p>
-          {/* Real-account review: a value must fit its card at every width
-              and in print — the font clamps down, and it may wrap ONLY at
-              its spaces ("18,839.37" / "EUR", "73" / "of 303"), never
-              mid-number or past the card edge. */}
-          <p
-            data-card-value
-            className={`print-kv-value mt-1.5 [overflow-wrap:normal] font-mono font-semibold leading-tight tabular-nums ${
-              card.tone ?? "text-zinc-50"
-            } ${
-              card.value.length > 12
-                ? "text-[clamp(13px,3.4vw,15px)]"
-                : "text-[clamp(15px,4.4vw,19px)]"
-            }`}
-          >
-            {card.value.split(" ").map((part, i) => (
-              <Fragment key={i}>
-                {i > 0 && " "}
-                <span className="whitespace-nowrap">{part}</span>
-              </Fragment>
-            ))}
-          </p>
+          {/* Pass C2: one line, scaled to the card — never wrapped, never
+              past the card edge. */}
+          <div className={FIT_BOX}>
+            <p
+              data-card-value
+              className={`print-kv-value mt-1.5 font-mono font-semibold leading-tight tabular-nums ${card.tone ?? "text-zinc-50"}`}
+              style={fitValueStyle(card.value, 19)}
+            >
+              {card.value}
+            </p>
+          </div>
           <p className="mt-1.5 [overflow-wrap:normal] text-[11px] leading-snug text-zinc-400" title={card.sub}>
             {card.isName ? shorten(card.sub, CARD_NAME_MAX) : card.sub}
           </p>
@@ -2572,20 +2573,17 @@ export function Report({
                       : "sm:border-l sm:border-white/10 sm:pl-5"
                 }`}
               >
-                {/* Long values (e.g. "434,288.00 EUR") step down in size
-                    and may wrap as a last resort — they must never spill
-                    into the neighboring stat, on screen or in print. */}
-                <p
-                  className={`print-kv-value flex min-h-6 items-end [overflow-wrap:anywhere] font-mono font-semibold tabular-nums text-zinc-50 ${
-                    value.length > 12
-                      ? "text-[15px] leading-tight"
-                      : value.length > 8
-                        ? "text-[18px] leading-none"
-                        : "text-[22px] leading-none"
-                  }`}
-                >
-                  {value}
-                </p>
+                {/* Pass C2: long values ("€434,288.00") scale down to the
+                    cell on one line — never wrapped, never spilling into
+                    the neighboring stat, on screen or in print. */}
+                <div className={FIT_BOX}>
+                  <p
+                    className="print-kv-value flex min-h-6 items-end font-mono font-semibold leading-none tabular-nums text-zinc-50"
+                    style={fitValueStyle(value, 22)}
+                  >
+                    {value}
+                  </p>
+                </div>
                 <p className="print-kv-label mt-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-400">
                   {statTips[label] ? <Term tip={statTips[label]}>{label}</Term> : label}
                 </p>
