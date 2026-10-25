@@ -67,21 +67,23 @@ const decisionCardSrc = reportSrc.slice(decisionCardStart, decisionCardEnd);
   console.log("printPageOneComposition: 1. outer DecisionCard section no longer blocks the whole card from starting on page 1");
 }
 
-/* ===================== 2. Each multi-line sub-block keeps its own guard ===================== */
+/* ===================== 2. Sub-blocks break between items, never inside one ===================== */
 {
-  // "Decision bars applied" print-only mirror.
-  assert.match(decisionCardSrc, /className="print-only print-avoid-break mt-3"/, "Decision bars applied print-only mirror has print-avoid-break");
-  // "Not yet" / "What we're deliberately not doing yet" list.
-  assert.match(decisionCardSrc, /className="print-avoid-break mt-4">\s*<p className="text-\[10px\][^"]*">\s*\{client \? "What we're deliberately not doing yet" : "Not yet"\}/, "the avoid list wrapper has print-avoid-break");
-  // "Next controlled test" dl wrapper.
+  /* Bulletproof pass C3: a whole-block guard made a long Evidence-limits
+     list jump to the next page and leave this one half empty (WebKit,
+     real export). Each heading now stays with its first item
+     (print-heading = break-after: avoid) and each item stays whole. */
+  assert.match(decisionCardSrc, /className="print-only mt-3">\s*<p className="print-heading text-\[10px\][^"]*">\s*Decision bars applied/, "Decision bars: heading kept with its first bar");
+  assert.match(decisionCardSrc, /className="mt-4">\s*<p className="print-heading text-\[10px\][^"]*">\s*\{client \? "What we're deliberately not doing yet" : "Not yet"\}/, "Not yet: heading kept with its first item");
+  assert.match(decisionCardSrc, /className="print-avoid-break border-l border-amber-300\/40 pl-3/, "each Not-yet item stays whole");
   // Bulletproof A-fix 4: print drops it in both views (T1 carries it).
   assert.match(decisionCardSrc, /className="print-avoid-break mt-4 print:hidden">\s*<p className="text-\[10px\][^"]*">\s*Next controlled test/, "the Next controlled test wrapper is print-hidden (T1 carries it)");
-  // Always-visible "What we don't know" (expandLimits=true) branch.
-  assert.match(decisionCardSrc, /className="print-avoid-break mt-4 border-t border-white\/\[0\.08\] pt-3">\s*<p className="text-\[10px\][^"]*">\s*\{client \? "What we still can't conclude" : "What we don't know"\}/, "the always-visible limits branch has print-avoid-break");
-  // "Evidence limits" print-only mirror.
-  assert.match(decisionCardSrc, /className="print-only print-avoid-break mt-4 border-t border-white\/\[0\.08\] pt-3"/, "Evidence limits print-only mirror has print-avoid-break");
+  assert.match(decisionCardSrc, /className="mt-4 border-t border-white\/\[0\.08\] pt-3">\s*<p className="print-heading text-\[10px\][^"]*">\s*\{client \? "What we still can't conclude" : "What we don't know"\}/, "always-visible limits: heading kept with its first line");
+  assert.match(decisionCardSrc, /className="print-only mt-4 border-t border-white\/\[0\.08\] pt-3">\s*<p className="print-heading/, "Evidence limits print mirror: heading kept with its first line");
+  assert.match(reportSrc, /className=\{`print-avoid-break text-\[12px\] leading-relaxed text-zinc-500 \$\{i >= printLimits/, "each limits line stays whole");
+  assert.match(reportSrc, /className=\{`print-avoid-break flex items-baseline gap-2 text-\[12px\]/, "each decision bar stays whole");
 
-  console.log("printPageOneComposition: 2. all 5 multi-line sub-blocks retain their own print-avoid-break — no mid-list or orphaned-heading breaks");
+  console.log("printPageOneComposition: 2. sub-blocks break between items with headings kept — no mid-item or orphaned-heading breaks");
 }
 
 /* ===================== 3. break-inside:avoid is provably screen-inert ===================== */

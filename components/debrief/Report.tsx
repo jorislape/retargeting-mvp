@@ -613,7 +613,7 @@ function DecisionCard({
           key={i}
           /* Real-account review: print keeps the bars that changed the
              call and every user criterion; the rest are in the appendix. */
-          className={`flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500 ${
+          className={`print-avoid-break flex items-baseline gap-2 text-[12px] leading-relaxed text-zinc-500 ${
             criterionPrinted(criterion) ? "" : "print:hidden"
           }`}
         >
@@ -637,13 +637,18 @@ function DecisionCard({
       {limits.map((line, i) => (
         <li
           key={i}
-          className={`text-[12px] leading-relaxed text-zinc-500 ${i >= printLimits ? "print:hidden" : ""}`}
+          className={`print-avoid-break text-[12px] leading-relaxed text-zinc-500 ${i >= printLimits ? "print:hidden" : ""}`}
         >
           <Names text={line} />
         </li>
       ))}
     </ul>
   );
+  /* Bulletproof pass C3: the card breaks BETWEEN its sections and list
+     items, never inside one — each heading stays with its first item
+     (print-heading), each item stays whole (print-avoid-break), so a
+     long Evidence-limits list no longer jumps whole to the next page and
+     leaves the bottom of this one empty. */
   return (
     <section
       aria-label="Next move"
@@ -791,8 +796,8 @@ function DecisionCard({
           {/* Print-only mirror of the disclosure above — see this
               function's own doc comment. The <details> itself is
               print-hidden, so the two never both render at once. */}
-          <div className="print-only print-avoid-break mt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          <div className="print-only mt-3">
+            <p className="print-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Decision bars applied
             </p>
             {appliedCriteriaList}
@@ -803,15 +808,15 @@ function DecisionCard({
         </>
       )}
       {avoid.length > 0 && (
-        <div className="print-avoid-break mt-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+        <div className="mt-4">
+          <p className="print-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
             {client ? "What we're deliberately not doing yet" : "Not yet"}
           </p>
           <ul className="mt-1.5 space-y-1.5">
             {avoid.map((bullet, i) => (
               <li
                 key={i}
-                className="border-l border-amber-300/40 pl-3 text-[13px] leading-relaxed text-zinc-400"
+                className="print-avoid-break border-l border-amber-300/40 pl-3 text-[13px] leading-relaxed text-zinc-400"
               >
                 <Names text={bullet} />
               </li>
@@ -863,8 +868,8 @@ function DecisionCard({
              criteria in play, the limits carry load-bearing caveats —
              always visible as the "What we don't know" counterpart to
              "What we know" above. */
-          <div className="print-avoid-break mt-4 border-t border-white/[0.08] pt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          <div className="mt-4 border-t border-white/[0.08] pt-3">
+            <p className="print-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               {client ? "What we still can't conclude" : "What we don't know"}
             </p>
             <ul className="mt-2 space-y-1">
@@ -898,8 +903,8 @@ function DecisionCard({
             {/* Print-only mirror — see this function's own doc comment.
                 The <details> above is print-hidden, so the two never
                 both render at once. */}
-            <div className="print-only print-avoid-break mt-4 border-t border-white/[0.08] pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            <div className="print-only mt-4 border-t border-white/[0.08] pt-3">
+              <p className="print-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                 {client ? "What we still can't conclude" : "Evidence limits"}
               </p>
               {limitsList}

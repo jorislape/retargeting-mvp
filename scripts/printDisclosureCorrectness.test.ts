@@ -147,7 +147,9 @@ const decisionCardSrc = reportSrc.slice(decisionCardStart, decisionCardEnd);
   // rendering is untouched) — to stop this multi-line block from
   // splitting awkwardly across a page boundary. That is compatible
   // with, not a regression of, this milestone's own fix.
-  assert.match(alwaysVisibleBlock, /print-avoid-break/, "print-avoid-break was later added for pagination — expected, not a regression");
+  // Bulletproof pass C3 then moved the guard onto the heading (print-heading)
+  // and each list item, so the block splits between items, never inside one.
+  assert.match(alwaysVisibleBlock, /print-heading/, "the block's heading stays with its first item — pagination only, not a regression");
 
   console.log("printDisclosureCorrectness: 6. the always-visible expandLimits branch was never affected by the print-omission bug (print-avoid-break added later, for pagination, is compatible)");
 }
