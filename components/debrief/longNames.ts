@@ -152,7 +152,10 @@ const EXTRA_KEYS = ["HK", "FN", "VAR", "CN", "PR", "STG", "AUD", "PLT", "TP", "C
 function nameTokens(name: string): Map<string, string> {
   const out = new Map<string, string>();
   for (const m of name.matchAll(LABEL_TOKEN)) {
-    const v = m[2].replace(/\s*[-–—]\s*Copy(?:\s*\d+)?\s*$/i, "").replace(/^[\s_\-.]+|[\s_\-.]+$/g, "");
+    /* Pass C6: a trailing file extension isn't part of the value. */
+    const v = stripCopies(m[2])
+      .replace(/\.(?:jpe?g|png|gif|webp|heic|mp4|mov|m4v|webm)$/i, "")
+      .replace(/^[\s_\-.]+|[\s_\-.]+$/g, "");
     if (v !== "" && !out.has(m[1])) out.set(m[1], v);
   }
   return out;
@@ -215,4 +218,71 @@ export function buildClientLabels(universe: readonly string[]): Map<string, stri
     if (!changed) break;
   }
   return new Map(tokened.map((n) => [n, labelOf(n)]));
+}
+
+/**
+ * Bulletproof pass C6 — tidy client names. An untokened name loses its
+ * file extension (".jpg", ".png", ".mp4" …) and trailing "- Copy" /
+ * "– Copy" / "Copy N" suffixes — but only while that stays collision-
+ * safe. Where two names would read the same, each steps back one level
+ * at a time — keep the Copy suffix, then keep the extension, then the
+ * raw name — so only the minimal distinguishing suffix survives.
+ * Tokened names keep their readable label (buildClientLabels).
+ */
+const FILE_EXT = "(?:jpe?g|png|gif|webp|heic|mp4|mov|m4v|webm)";
+const COPY_SUFFIX = /(?:\s*[-–—]\s*Copy(?:\s*\d+)?|\s+Copy\s+\d+)\s*$/i;
+const COPY_TAIL = /(?:(?:\s*[-–—]\s*Copy(?:\s*\d+)?|\s+Copy\s+\d+)\s*)+$/i;
+const EXT_BEFORE_TAIL = new RegExp(`\\.${FILE_EXT}(?=(?:(?:\\s*[-–—]\\s*Copy(?:\\s*\\d+)?|\\s+Copy\\s+\\d+)\\s*)*$)`, "i");
+
+function stripCopies(name: string): string {
+  let out = name;
+  while (COPY_SUFFIX.test(out)) out = out.replace(COPY_SUFFIX, "");
+  return out.trimEnd();
+}
+
+/** Level 0: no extension, no Copy suffix; 1: no extension; 2: no Copy
+ *  suffix; 3: raw. Never empty. */
+function cleanedAt(name: string, level: number): string {
+  const tail = name.match(COPY_TAIL)?.[0] ?? "";
+  const body = name.slice(0, name.length - tail.length);
+  const cand =
+    level === 0 ? stripCopies(name).replace(new RegExp(`\\.${FILE_EXT}$`, "i"), "")
+    : level === 1 ? name.replace(EXT_BEFORE_TAIL, "")
+    : level === 2 ? body.trimEnd()
+    : name;
+  return cand.trim() === "" ? name : cand;
+}
+
+/** raw name → the base the client sees: its label when tokened, else
+ *  the tidied name — distinct for every distinct raw name. */
+export function buildClientNames(universe: readonly string[]): Map<string, string> {
+  const names = [...new Set(universe)];
+  const labels = buildClientLabels(names);
+  const plain = names.filter((n) => !labels.has(n));
+  const labelValues = new Set(labels.values());
+  const level = new Map(plain.map((n) => [n, 0]));
+  for (let round = 0; round < 4; round++) {
+    const by = new Map<string, string[]>();
+    for (const n of plain) {
+      const c = cleanedAt(n, level.get(n)!);
+      by.set(c, [...(by.get(c) ?? []), n]);
+    }
+    let changed = false;
+    for (const [c, group] of by) {
+      if (group.length === 1 && !labelValues.has(c)) continue;
+      for (const n of group) {
+        if (level.get(n)! < 3) {
+          level.set(n, level.get(n)! + 1);
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
+  }
+  const out = new Map(names.map((n) => [n, labels.get(n) ?? cleanedAt(n, level.get(n) ?? 3)]));
+  /* Final guard: any display still shared → those names show raw. */
+  const seen = new Map<string, string[]>();
+  for (const [n, d] of out) seen.set(d, [...(seen.get(d) ?? []), n]);
+  for (const [, shared] of seen) if (shared.length > 1) for (const n of shared) if (!labels.has(n)) out.set(n, n);
+  return out;
 }

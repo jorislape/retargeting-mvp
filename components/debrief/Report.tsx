@@ -33,7 +33,7 @@ import { PERFORMANCE_PRESET_OPTIONS, PERFORMANCE_PRESETS, performanceModeDefault
 import { PerformanceRankingChart } from "./PerformanceRankingChart";
 import { SpendAllocationChart } from "./SpendAllocationChart";
 import { MovementChart } from "./MovementChart";
-import { buildClientLabels, buildNameShortener, NAME_DISPLAY_MAX, NAME_PRINT_MAX, splitLongNames } from "./longNames";
+import { buildClientLabels, buildClientNames, buildNameShortener, NAME_DISPLAY_MAX, NAME_PRINT_MAX, splitLongNames } from "./longNames";
 import { NameDisplayContext, useLabelAll, useShortName } from "./NameDisplay";
 
 /* ------------------------------------------------------------------ */
@@ -2327,8 +2327,16 @@ export function Report({
     ];
     const shortener = buildNameShortener(universe);
     if (!client) return { short: shortener, labelAll: false };
+    /* Pass C6: labels for tokened names; tidied names (no extension, no
+       trailing Copy, where collision-safe) for the rest — shortened over
+       the tidied universe so truncation stays collision-safe too. */
     const labels = buildClientLabels(universe);
-    return { short: (name: string, max?: number) => labels.get(name) ?? shortener(name, max), labelAll: true };
+    const tidy = buildClientNames(universe);
+    const tidyShort = buildNameShortener([...tidy.entries()].filter(([n]) => !labels.has(n)).map(([, d]) => d));
+    return {
+      short: (name: string, max?: number) => labels.get(name) ?? (tidy.has(name) ? tidyShort(tidy.get(name)!, max) : shortener(name, max)),
+      labelAll: true,
+    };
   }, [memo, client]);
 
   return (

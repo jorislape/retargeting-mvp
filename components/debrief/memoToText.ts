@@ -3,7 +3,7 @@
 // webpack path aliases) to test the serialized decision block against
 // the real engine. Type-only, so it changes nothing at runtime.
 import type { Memo } from "../../modules/debrief";
-import { buildClientLabels } from "./longNames.ts";
+import { buildClientLabels, buildClientNames } from "./longNames.ts";
 
 export type ReportView = "buyer" | "client";
 
@@ -759,7 +759,15 @@ export function memoToText(
      (longest first, so a name never corrupts its "- Copy" twin). */
   if (view !== "client") return text;
   const labels = buildClientLabels(memo.scope.adNames ?? []);
-  return [...labels.entries()]
+  const labelled = [...labels.entries()]
     .sort((a, b) => b[0].length - a[0].length)
     .reduce((out, [name, label]) => out.split(name).join(label), text);
+  /* Pass C6: untokened names read tidied (no extension, no trailing
+     Copy, where collision-safe). Only names that change are replaced —
+     each carries an extension or Copy suffix, so it is distinctive —
+     longest first, so a name never corrupts its own twin. */
+  return [...buildClientNames(memo.scope.adNames ?? []).entries()]
+    .filter(([name, shown]) => !labels.has(name) && shown !== name)
+    .sort((a, b) => b[0].length - a[0].length)
+    .reduce((out, [name, shown]) => out.split(name).join(shown), labelled);
 }
