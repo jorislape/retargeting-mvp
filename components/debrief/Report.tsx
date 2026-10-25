@@ -529,7 +529,8 @@ function BudgetMoveNames({
         {ads.map((a, i) => (
           <span key={a.name + i} className={i >= SHOWN && !expanded && !showAll ? "hidden" : ""}>
             {i > 0 ? ", " : ""}&ldquo;<AdName name={a.name} />&rdquo; ({a.spendLabel}
-            {a.window ? ` · ${a.window}` : ""}
+            {/* Pass C5: no attribution-window text beside ads for the client. */}
+            {a.window && !client ? ` · ${a.window}` : ""}
             {a.note ? <span className="text-amber-300/80"> — {client ? a.note.client : a.note.buyer}</span> : null})
           </span>
         ))}
@@ -829,7 +830,7 @@ function DecisionCard({
            carries the same preserve / change / watch. */
         <div className="print-avoid-break mt-4 print:hidden">
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-            Next controlled test
+            {client ? "Next test" : "Next controlled test"}
           </p>
           <dl className="mt-1.5 space-y-1 text-[13px] leading-relaxed text-zinc-300">
             {/* Report Density & Sequencing Coherence V1 — 320px overflow
@@ -1766,7 +1767,7 @@ function ClientTestCards({ tests }: { tests: MemoTest[] }) {
             </span>
           </div>
           <p className="mt-3 [overflow-wrap:anywhere] text-[13px] font-semibold leading-snug text-zinc-100">
-            <Names text={clientizeText(test.test)} />
+            <Names text={test.clientTest ?? clientizeText(test.test)} />
           </p>
           {/* Evidence Sufficiency V1 — same plain-language readiness
               read as the buyer badge, jargon-free by construction

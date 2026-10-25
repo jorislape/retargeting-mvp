@@ -326,7 +326,7 @@ function trimNoteFor(
     trimNote: {
       buyer: "Below median, not necessarily unprofitable — check against your breakeven ROAS before cutting.",
       client: "Below the middle ad, but not necessarily losing money — worth checking against your break-even point before pausing.",
-      short: { buyer: "below median, not necessarily unprofitable", client: "below average, not necessarily losing money" },
+      short: { buyer: "below median, not necessarily unprofitable", client: "below the middle ad, not necessarily losing money" },
     },
   };
 }
@@ -520,7 +520,7 @@ function withTrimNotes(d: MemoDecision, analysis: AnalysisResult, context: Debri
       ? {
           profitBasisNote: {
             buyer: `This move is relative to the account (each ad vs the median), not profit-based. Set ${roas ? "a target ROAS (your breakeven)" : `a target CPA (your breakeven cost per ${outcomeNounsFor(analysis)?.one ?? "purchase"})`} for a profit-based trim list.`,
-            client: `This compares your ads with each other, not with your break-even point — telling us your break-even ${roas ? "return" : `cost per ${outcomeNounsFor(analysis)?.one === "lead" ? "lead" : "sale"}`} would separate ads that make money from ones that are just above or below average.`,
+            client: `This compares your ads with each other, not with your break-even point — telling us your break-even ${roas ? "return" : `cost per ${outcomeNounsFor(analysis)?.one === "lead" ? "lead" : "sale"}`} would separate ads that make money from ones that are just above or below the middle ad.`,
           },
         }
       : {};
@@ -607,9 +607,9 @@ function statusFor(
     }
     if (receivers.has(ad.name)) return mk("scale", `Scale candidate${tag}`, `Candidate for more budget${clientTag}`);
     if (!unknown && !beatsTarget(ad, analysis, target)) {
-      return mk("not_profitable", "Above average, not profitable — don't scale", "Above average, but not profitable yet — not adding budget");
+      return mk("not_profitable", "Above average, not profitable — don't scale", "Above the middle ad, but not profitable yet — not adding budget");
     }
-    return mk("keep", "Above average — keep", "Above average — keeping its budget as is");
+    return mk("keep", "Above average — keep", "Above the middle ad — keeping its budget as is");
   }
   if (!unknown && beatsTarget(ad, analysis, target)) {
     return mk("maintain", "Maintain (reduce, don't pause)", "Still profitable — reducing, not pausing");
@@ -1105,6 +1105,13 @@ const FORMAT_FAMILY: Record<string, "static" | "motion"> = { static: "static", u
 const OPPOSITE_FORMATS: Record<"static" | "motion", readonly ChallengerFormat[]> = {
   static: ["ugc", "video"],
   motion: ["static"],
+};
+/** Bulletproof pass C5 — the client's plain-language challenger. */
+const CLIENT_CHALLENGER: Record<ChallengerFormat, string> = {
+  ugc: "a creator-filmed version",
+  video: "a video version",
+  static: "a still-image version",
+  carousel: "a carousel version",
 };
 const CHALLENGER_PHRASE: Record<ChallengerFormat, string> = {
   ugc: "a creator-shot UGC version of the control's message",
@@ -1814,6 +1821,12 @@ function buildNextTests(
     );
     tests.push({
       test: `Test the strongest naming contrast — ${c.label} "${c.best.value}" vs "${c.worst.value}": matched ads that differ only in the ${c.label}.`,
+      /* Pass C5: plain language for the client — the codes stay visible
+         so the agency can map them back to the ad names. */
+      clientTest:
+        c.label === "angle"
+          ? `Test which message angle works better, using the two angles with the biggest gap (codes ${c.best.value} vs ${c.worst.value} from the ad names)`
+          : `Test which ${c.label} works better, using the two with the biggest gap (codes ${c.best.value} vs ${c.worst.value} from the ad names)`,
       why: `The weakest ad, "${worst.name}", spent ${spent} — under ${REBUILD_MIN_CPP_MULTIPLE}× the account's ${fmtMoney(bars.cpp as number, currency)} cost per ${nouns.one}, too little to justify a rebuild. The naming table asks a sharper question: across this export, "${c.best.value}" ads ${verb} ${fmt(c.best.kpiValue as number)} on ${fmtCount(c.best.outcomes as number)} ${nouns.many} vs ${fmt(c.worst.kpiValue as number)} on ${fmtCount(c.worst.outcomes as number)} for "${c.worst.value}" — a pattern, not proof the ${c.label} caused it.`,
       setup: `Build one pair of ads that share format, offer, and audience and differ only in the ${c.label} ("${c.best.value}" vs "${c.worst.value}"); matched budget until both clear the success bars.`,
       winningLooksLike: bars.success,
@@ -1853,6 +1866,7 @@ function buildNextTests(
     );
     tests.push({
       test: `Test ${challenger} against your current best ad as control.`,
+      clientTest: `Test ${CLIENT_CHALLENGER[pick.format as ChallengerFormat] ?? "a version in a different format"} of your best ad's message against the original`,
       why: hasNameSignal
         ? `Nothing is clearly failing, so the next signal comes from challenging the dominant format rather than fixing losers.`
         : `Nothing is clearly failing and no format pattern is visible yet — a controlled format test creates the pattern data future debriefs need.`,
@@ -2009,6 +2023,7 @@ function buildNextTests(
     );
     tests.push({
       test: `Test ${challenger} against ${controlLabel}.`,
+      clientTest: `Test ${CLIENT_CHALLENGER[pick.format as ChallengerFormat] ?? "a version in a different format"} of ${control.fromLead && top != null ? "the leading ad's" : "your best ad's"} message against the original`,
       why: shiftCommitted
         ? `The shift above is this debrief's one budget move — it already moves budget into ${receiverList}. Alongside it, a structured challenger against it as the control builds the next comparison; launch it once the shift has run ≥${TEST_MIN_DAYS} days.`
         : leadPastBar
@@ -2147,7 +2162,7 @@ function buildAvoid(
         `Do not scale anything except ${who} yet — the clearest budget signal is concentrated in ${to.length === 1 ? "that ad" : "those ads"}; investigate the remaining gaps through controlled creative tests before broader budget moves.`
       );
       client.push(
-        `We're only increasing budget behind ${to.length === 1 ? "the ad" : `the ${to.length} ads`} listed in the next step for now. For the remaining ads, controlled creative tests are safer than broader budget changes.`
+        `We're only increasing budget behind ${to.length === 1 ? "the ad" : `the ${to.length} ads`} listed in the next step for now. For the remaining ads, careful one-change creative tests are safer than broader budget changes.`
       );
     } else if (top.deltaPct >= SCALE_TEST_MIN_DELTA_PCT) {
       buyer.push(

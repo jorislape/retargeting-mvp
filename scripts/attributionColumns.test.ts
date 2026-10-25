@@ -162,7 +162,7 @@ try {
     // Report: exec summary, receiver window, card line, client line.
     const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8");
     assert.match(report, /\{ label: "Attribution", value: memo\.scope\.attributionWarning \}/);
-    assert.match(report, /\{a\.window \? ` · \$\{a\.window\}` : ""\}/);
+    assert.match(report, /\{a\.window && !client \? ` · \$\{a\.window\}` : ""\}/, "buyer only (Pass C5)");
     assert.match(report, /\{client \? d\.windowNote\.client : d\.windowNote\.buyer\}/);
     // Pass C4: the client line lives in the Notes line under the card.
     assert.ok(r.clientText.includes("Notes: ") && r.clientText.split("\n").find((l) => l.startsWith("Notes: "))!.includes(r.memo.scope.attributionClientLine!));

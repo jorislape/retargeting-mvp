@@ -58,7 +58,7 @@ const report = readFileSync(join(ROOT, "components/debrief/Report.tsx"), "utf8")
 assert.match(report, /<Names text=\{client \? d\.clientHeadline : d\.headline\} \/>/, "Next move headline");
 assert.match(report, /&ldquo;<AdName name=\{a\.name\} \/>&rdquo;/, "Pause / Receives lists");
 assert.match(report, /<Names text=\{c\(test\.test\)\} \/>/, "buyer test titles");
-assert.match(report, /<Names text=\{clientizeText\(test\.test\)\} \/>/, "client test cards");
+assert.match(report, /<Names text=\{test\.clientTest \?\? clientizeText\(test\.test\)\} \/>/, "client test cards (plain title when set — Pass C5)");
 assert.match(report, /<span key=\{i\} title=\{part\.name\}>/, "full name in a tooltip");
 assert.match(report, /<article className="\[overflow-wrap:anywhere\]">/, "report text wraps anywhere");
 assert.ok(!/\bbreak-words\b/.test(report), "no break-words left: it doesn't shrink min-content");

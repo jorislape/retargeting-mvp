@@ -91,6 +91,10 @@ export function clientizeText(text: string): string {
     /* Trust Pass 2: the client register calls the median "the middle
        ad" — never "typical ROAS/CPA", which read as the account's own
        result (a 2.31x median can sit beside a 1.32x account ROAS). */
+    /* Pass C5: a stage median reads as the client's audience group
+       (never "the TOFU the middle ad"). */
+    .replace(/\bthe (?:TOFU|MOFU|BOFU) median\b/g, "the middle ad in its audience group")
+    .replace(/\b(?:TOFU|MOFU|BOFU) median\b/g, "middle ad in its audience group")
     .replace(/\bthe ([^\s()]+(?: [A-Z]{3})?) median (ROAS|CPA|CPL|CTR|CPC|Leads|Purchases)\b/g, "the middle ad's $2 ($1)")
     .replace(/\b[Mm]edian (ROAS|CPA|CPL|CTR|CPC|Leads|Purchases)\b/g, "middle ad's $1")
     /* CPA Leads Label: buyer-register "CPL" reads as plain cost per lead. */
@@ -103,7 +107,15 @@ export function clientizeText(text: string): string {
     .replace(/\bwas set aside, not judged\b/g, "isn't included yet — too little spend")
     .replace(/\bset aside, not judged\b/g, "not included yet — too little spend")
     .replace(/\bjudged ads\b/g, "ads with enough spend to judge fairly")
-    .replace(/\bjudged ad\b/g, "ad with enough spend to judge fairly");
+    .replace(/\bjudged ad\b/g, "ad with enough spend to judge fairly")
+    /* Pass C5: no "control" in the client register. */
+    .replace(/\bagainst it as the control\b/g, "against it")
+    .replace(/\bthe current control\b/g, "the original")
+    .replace(/\bthe control ad's\b/g, "the original ad's")
+    .replace(/\bthe control's\b/g, "the original's")
+    .replace(/\b(?:as )?the control\b/g, (m) => (m.startsWith("as ") ? "as the original" : "the original"))
+    .replace(/\bcontrolled\b/g, "side-by-side")
+    .replace(/\bcontrol\b/g, "original");
 }
 
 /** The client set-aside line under the underperformers list — shared
@@ -372,7 +384,7 @@ export function memoToText(
   if (d.budgetMove) {
     const list = (ads: { name: string; spendLabel: string; window?: string; note?: { buyer: string; client: string } }[]) =>
       ads
-        .map((a) => `"${a.name}" (${a.spendLabel}${a.window ? ` · ${a.window}` : ""}${a.note ? ` — ${view === "client" ? a.note.client : a.note.buyer}` : ""})`)
+        .map((a) => `"${a.name}" (${a.spendLabel}${a.window && view !== "client" ? ` · ${a.window}` : ""}${a.note ? ` — ${view === "client" ? a.note.client : a.note.buyer}` : ""})`)
         .join(", ");
     if (d.budgetMove.from.length > 0)
       lines.push(`${view === "client" ? "Pausing or reducing" : "Pause or trim"}: ${list(d.budgetMove.from)}`);
@@ -426,7 +438,7 @@ export function memoToText(
   // — no space constraint, and a copy-pasted handoff benefits from the
   // complete reasoning.
   if (d.nextControlledTest) {
-    lines.push("Next controlled test:");
+    lines.push(view === "client" ? "Next test:" : "Next controlled test:");
     lines.push(`- ${view === "client" ? "Keep the same" : "Preserve"}: ${c(d.nextControlledTest.preserve)}`);
     lines.push(`- Change: ${c(d.nextControlledTest.change)}`);
     lines.push(`- Watch: ${c(d.nextControlledTest.watch)}`);
@@ -654,7 +666,7 @@ export function memoToText(
   }
   if (view === "client") lines.push("We'll test variations based on the strongest observed results.");
   memo.nextTests.forEach((t, i) => {
-    lines.push(`${i + 1}. ${c(t.test)}`);
+    lines.push(`${i + 1}. ${view === "client" ? t.clientTest ?? c(t.test) : t.test}`);
     if (t.briefReadiness) {
       // "Early signal" (not "Directional") is the rendered label for
       // state "directional" — matches Report.tsx's TestRow badge;

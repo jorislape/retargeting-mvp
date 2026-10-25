@@ -1098,6 +1098,9 @@ export interface MemoEvidenceDiagnostic {
 
 export interface MemoTest {
   test: string;
+  /** Bulletproof pass C5 — the test in plain client language (no
+   *  "control", no buyer shorthand), when the buyer title needs it. */
+  clientTest?: string;
   why: string;
   setup: string;
   winningLooksLike: string;

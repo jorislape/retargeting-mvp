@@ -77,7 +77,7 @@ const decisionCardSrc = reportSrc.slice(decisionCardStart, decisionCardEnd);
   assert.match(decisionCardSrc, /className="mt-4">\s*<p className="print-heading text-\[10px\][^"]*">\s*\{client \? "What we're deliberately not doing yet" : "Not yet"\}/, "Not yet: heading kept with its first item");
   assert.match(decisionCardSrc, /className="print-avoid-break border-l border-amber-300\/40 pl-3/, "each Not-yet item stays whole");
   // Bulletproof A-fix 4: print drops it in both views (T1 carries it).
-  assert.match(decisionCardSrc, /className="print-avoid-break mt-4 print:hidden">\s*<p className="text-\[10px\][^"]*">\s*Next controlled test/, "the Next controlled test wrapper is print-hidden (T1 carries it)");
+  assert.match(decisionCardSrc, /className="print-avoid-break mt-4 print:hidden">\s*<p className="text-\[10px\][^"]*">\s*\{client \? "Next test" : "Next controlled test"\}/, "the Next controlled test wrapper is print-hidden (T1 carries it); the client label says \"Next test\" (Pass C5)");
   assert.match(decisionCardSrc, /className="mt-4 border-t border-white\/\[0\.08\] pt-3">\s*<p className="print-heading text-\[10px\][^"]*">\s*\{client \? "What we still can't conclude" : "What we don't know"\}/, "always-visible limits: heading kept with its first line");
   assert.match(decisionCardSrc, /className="print-only mt-4 border-t border-white\/\[0\.08\] pt-3">\s*<p className="print-heading/, "Evidence limits print mirror: heading kept with its first line");
   assert.match(reportSrc, /className=\{`print-avoid-break text-\[12px\] leading-relaxed text-zinc-500 \$\{i >= printLimits/, "each limits line stays whole");
