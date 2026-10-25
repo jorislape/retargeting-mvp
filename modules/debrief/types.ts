@@ -621,6 +621,19 @@ export interface AnalysisResult {
    *  (rows with spend per value), most-used first. Absent without that
    *  column. Copy only. */
   attributionSettings?: { value: string; rows: number }[];
+  /** Bulletproof pass C1 — which judged ads a mixed attribution setting
+   *  actually affects (adFormat.ts). When the file's settings differ only
+   *  in engaged view (video-only), `scope` is "video": only video/UGC ads
+   *  and ads whose format the export doesn't show; otherwise "all".
+   *  `windows` lists those ads' settings ("mixed" = merged rows on
+   *  different settings) with ad counts; `mixed` = they differ. Present
+   *  only when the file mixes settings. Copy and confidence caps only. */
+  attributionByFormat?: {
+    scope: "video" | "all";
+    windows: { value: string; ads: number }[];
+    mixed: boolean;
+    staticAds: number;
+  };
   /** Attribution & Intent 4 — judged ads flagged Low Intent. Present only
    *  when ≥ MIN_ADS_FOR_INTENT judged ads have the needed columns. */
   lowIntent?: string[];

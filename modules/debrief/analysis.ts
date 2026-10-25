@@ -7,6 +7,7 @@ import { detectLowIntent } from "./intentFlags";
 import { computeAccountKpi } from "./accountKpi";
 import { fmtKpiValue } from "./format";
 import { extractAds } from "./extract";
+import { adFormatClass, differOnlyInEngagedView } from "./adFormat";
 import { parseNumericCell } from "./csv";
 import {
   AnalysisResult,
@@ -394,7 +395,7 @@ export function analyze(
     /* Bulletproof pass A7: Meta's "Attribution setting" column, when the
        export has it — each setting with how many rows with spend used
        it. Exact header match only (split headers embed the same words). */
-    ...((): { attributionSettings?: NonNullable<AnalysisResult["attributionSettings"]> } => {
+    ...((): Pick<AnalysisResult, "attributionSettings" | "attributionByFormat"> => {
       const header = Object.keys(rawRows[0] ?? {}).find((h) => h.trim().toLowerCase() === "attribution setting");
       if (!header) return {};
       const counts = new Map<string, number>();
@@ -404,7 +405,24 @@ export function analyze(
         if (value && (spend ?? 0) > 0) counts.set(value, (counts.get(value) ?? 0) + 1);
       }
       if (counts.size === 0) return {};
-      return { attributionSettings: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value, rows]) => ({ value, rows })) };
+      const attributionSettings = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value, rows]) => ({ value, rows }));
+      if (attributionSettings.length < 2) return { attributionSettings };
+      /* Bulletproof pass C1: engaged view counts for video only, so a
+         difference in it leaves static ads comparable. */
+      const scope: "video" | "all" = differOnlyInEngagedView(attributionSettings.map((x) => x.value)) ? "video" : "all";
+      const affected = ranked.filter((a) => scope === "all" || adFormatClass(a) !== "static");
+      const byWindow = new Map<string, number>();
+      for (const a of affected) if (a.attributionSetting) byWindow.set(a.attributionSetting, (byWindow.get(a.attributionSetting) ?? 0) + 1);
+      const windows = [...byWindow.entries()].sort((a, b) => b[1] - a[1]).map(([value, ads]) => ({ value, ads }));
+      return {
+        attributionSettings,
+        attributionByFormat: {
+          scope,
+          windows,
+          mixed: windows.length > 1 || windows.some((w) => w.value === "mixed"),
+          staticAds: ranked.length - ranked.filter((a) => adFormatClass(a) !== "static").length,
+        },
+      };
     })(),
     ...(lowIntent ? { lowIntent } : {}),
     /* Attribution & Intent 2: ranked on click-only (absent ⇒ blended). */

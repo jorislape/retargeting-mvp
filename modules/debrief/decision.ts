@@ -973,7 +973,23 @@ export function buildLimits(
     /* Bulletproof pass A7: which attribution window the numbers use. */
     const kpi = kpiLabelFor(analysis);
     const settings = analysis.attributionSettings;
-    if (settings && settings.length > 1) {
+    const abf = analysis.attributionByFormat;
+    if (settings && settings.length > 1 && abf?.scope === "video") {
+      /* Bulletproof pass C1: the settings differ only in engaged view,
+         which Meta counts for video ads only (a view of 5+ seconds). */
+      const parts = settings.map((s) => `"${s.value}" (${s.rows} row${s.rows === 1 ? "" : "s"})`);
+      const windows = abf.windows.map((w) => `${w.value === "mixed" ? "mixed" : `"${w.value}"`} on ${w.ads} ad${w.ads === 1 ? "" : "s"}`);
+      buyer.push(
+        abf.mixed
+          ? `The export's attribution settings differ only in engaged view (${joinPlain(parts)}), which Meta counts for video ads only — ${abf.staticAds > 0 ? "static ads compare fairly; " : ""}among video/UGC ads (or ads with no format in the name) the windows differ (${joinPlain(windows)}), so their ${kpi} isn't strictly comparable.`
+          : `The export's attribution settings differ only in engaged view (${joinPlain(parts)}), which Meta counts for video ads only — the judged video/UGC ads share one window and static ads are unaffected, so results compare fairly.`
+      );
+      client.push(
+        abf.mixed
+          ? "Some video ads were measured with a window that also counts people who watched for 5+ seconds, so video results aren't perfectly comparable with each other."
+          : "Results are counted the way the ad account was set to count them when the file was exported; a different setting would change them."
+      );
+    } else if (settings && settings.length > 1) {
       const parts = settings.map((s) => `"${s.value}" (${s.rows} row${s.rows === 1 ? "" : "s"})`);
       buyer.push(
         `Results use the attribution setting stored in the export, and it is mixed: ${joinPlain(parts)} — ${kpi} isn't strictly comparable between ads on different windows.`
