@@ -1,4 +1,4 @@
-import { adFormatClass } from "./adFormat";
+import { adFormatClass, type FormatClass } from "./adFormat";
 import {
   holdTotal,
   analysisWindowDays,
@@ -1335,8 +1335,26 @@ const ASSET_DIRECTION: Record<string, string[]> = {
   ],
 };
 
+/* Batch D6: an ad whose format the export doesn't show gets direction
+   that fits either a video or a static — never a video assumption. */
+const NEUTRAL_DIRECTION: string[] = [
+  "Lead with the angle's core line — the first thing anyone reads or hears.",
+  "One idea per creative; the product appears early and clearly.",
+  "If it's video: burned-in captions, no logo or title card up front. If it's static: ~10 words of copy, hook line first.",
+  "End on the product + the offer exactly as it exists today.",
+];
 const directionFor = (tag: string | null | undefined): string[] =>
-  (tag && ASSET_DIRECTION[tag]) || ASSET_DIRECTION.video;
+  (tag && ASSET_DIRECTION[tag]) || NEUTRAL_DIRECTION;
+
+/** Batch D6 — the "hook" of an ad in its own format: a static's
+ *  headline / first visual, a video's opening seconds, and — when the
+ *  export doesn't show the format — a neutral phrase, never a video
+ *  assumption. */
+const HOOK_UNIT: Record<FormatClass, string> = {
+  static: "headline / first visual",
+  video: "opening 3 seconds / first frame",
+  unknown: "hook (opening seconds or headline/first visual)",
+};
 
 /**
  * Next tests are CREATIVE tests. Budget movement lives in the verdict
@@ -1407,14 +1425,16 @@ function buildNextTests(
   const skipRebuild = worstCandidate != null && worst == null;
   /* Real-account fix 7: a static ad has no "opening 3 seconds" — its
      opening is the headline and first visual. */
-  const openingUnit = (name: string) =>
-    analysis.rankedAds.find((a) => a.name === name)?.nameTags.includes("static")
-      ? "headline / first visual"
-      : "opening 3 seconds / first frame";
+  /* Batch D6: the format is read from name tags, [FOR] tokens, confirmed
+     formats and file extensions (adFormat.ts); unknown stays neutral. */
+  const formatOf = (name: string): FormatClass => {
+    const ad = analysis.rankedAds.find((a) => a.name === name);
+    return ad ? adFormatClass(ad) : "unknown";
+  };
+  const openingUnit = (name: string) => HOOK_UNIT[formatOf(name)];
   /* Bulletproof pass A5: T1's wording follows the ad's format — a
      static has a headline / first visual, not an "opening". */
-  const openWord = (name: string) =>
-    openingUnit(name) === "headline / first visual" ? "headline / first visual" : "opening";
+  const openWord = (name: string) => (formatOf(name) === "video" ? "opening" : HOOK_UNIT[formatOf(name)]);
   const winnerTag = dominantTag(winners);
 
   /* Evidence Sufficiency V1 — Brief Readiness. Computed once (per test
@@ -1855,11 +1875,15 @@ function buildNextTests(
         belowSignal,
         problemFirst && "Market notes flag problem-first hooks — directional."
       );
+      /* Batch D6: the hook in the worst ad's own format (static ⇒
+         headline / first visual; unknown ⇒ neutral; video ⇒ opening). */
+      const worstFormat = formatOf(worst.name);
+      const hook = worstFormat === "video" ? "opening hook" : HOOK_UNIT[worstFormat];
       tests.push({
         test: problemFirst
-          ? `Rebuild "${worst.name}" with a problem-first opening hook (observed market pattern) before writing the angle off.`
-          : `Rebuild "${worst.name}" with a new opening hook before writing the angle off.`,
-        why: `At ${worstStats} it's the account's weakest judged ad. One way to test whether the angle is worth keeping: rebuild only the opening and see whether the result moves. ${openingEvidence}${
+          ? `Rebuild "${worst.name}" with a problem-first ${hook} (observed market pattern) before writing the angle off.`
+          : `Rebuild "${worst.name}" with a new ${hook} before writing the angle off.`,
+        why: `At ${worstStats} it's the account's weakest judged ad. One way to test whether the angle is worth keeping: rebuild only the ${worstFormat === "video" ? "opening" : hook} and see whether the result moves. ${openingEvidence}${
           problemFirst
             ? " Your market notes flag problem-first hooks as a repeating pattern — directional, and the cheapest place to test it."
             : ""
@@ -1867,7 +1891,7 @@ function buildNextTests(
         setup: `Reduce the original's spend. One rebuild at matched budget, changing only the hook — same body, audience, and offer.`,
         winningLooksLike: bars.success,
         signals,
-        hypothesis: `If we change only the opening hook while holding "${worst.name}"'s body, audience, offer, and placement constant, ${loserThin ? "we want to test whether it beats" : "we expect it to beat"} the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} ${LIFT} — because at ${worstStats} it's the account's weakest judged ad, and changing only the opening is the cheapest controlled way to learn whether the result moves with it.`,
+        hypothesis: `If we change only the ${hook} while holding "${worst.name}"'s body, audience, offer, and placement constant, ${loserThin ? "we want to test whether it beats" : "we expect it to beat"} the original's ${fmtKpiValue(worst.kpiValue as number, kpi, currency)} ${kpiLabel} ${LIFT} — because at ${worstStats} it's the account's weakest judged ad, and changing only the opening is the cheapest controlled way to learn whether the result moves with it.`,
         briefReadiness: loserReadiness ?? undefined,
         brief: {
           title: `Hook rebuild of "${worst.name}"`,
@@ -1878,13 +1902,17 @@ function buildNextTests(
           hooks: [
             problemFirst
               ? "Problem-first open: state the pain point plainly before the product appears (market notes — directional)."
-              : "Payoff-first open: move the ad's strongest moment into second one.",
+              : worstFormat === "video"
+                ? "Payoff-first open: move the ad's strongest moment into second one."
+                : "Payoff-first: lead with the ad's strongest line or moment.",
             `Question open: the angle's promise for ${product} as a direct question.`,
-            "Text-led open: the core existing line as bold on-screen text before any footage.",
+            worstFormat === "video"
+              ? "Text-led open: the core existing line as bold on-screen text before any footage."
+              : "Text-led: the core existing line as bold text, read first.",
           ],
           assetDirection: directionFor(worst.nameTags[0]),
           keepConstant: `Everything after the opening — body, audience, placement, and ${offerLabel}.`,
-          change: "Only the opening hook.",
+          change: `Only the ${hook}.`,
           successMetric,
           guardrails: briefGuardrails(problemFirst),
           basisNote: basisNote(problemFirst),

@@ -43,15 +43,17 @@ try {
   const all = [t.buyerText, t.clientText, JSON.stringify(t.memo)];
   for (const txt of all) for (const re of CAUSAL) assert.ok(!re.test(txt), `causal hook wording: ${re}`);
   const t1 = t.memo.nextTests[0];
-  assert.match(t1.test, /vary only the opening to test whether the angle has more headroom/);
-  assert.match(t1.why, /One way to test whether the angle has more headroom: vary only the opening\./);
+  // Batch D6: "Ad_D" shows no format ⇒ the neutral hook wording, never a video assumption.
+  assert.match(t1.test, /vary only the hook \(opening seconds or headline\/first visual\) to test whether the angle has more headroom/);
+  assert.match(t1.why, /One way to test whether the angle has more headroom: vary only the hook \(opening seconds or headline\/first visual\)\./);
   assert.match(t1.why, /This export has no hook-level metric \(3-second video plays, ThruPlays\)/);
   const t2 = t.memo.nextTests[1];
-  assert.match(t2.why, /One way to test whether the angle is worth keeping: rebuild only the opening/);
+  assert.match(t2.why, /One way to test whether the angle is worth keeping: rebuild only the hook \(opening seconds or headline\/first visual\)/);
+  assert.match(t2.test, /^Rebuild "[^"]+" with a new hook \(opening seconds or headline\/first visual\) before writing the angle off\.$/, "Batch D6: no 'opening hook' on an ad of unknown format");
   assert.match(t2.hypothesis, /cheapest controlled way to learn whether the result moves with it/);
   // Both registers (client text passes the same strings through clientizeText).
   assert.match(t.clientText, /One way to test whether the angle has more headroom/);
-  assert.match(t.memo.decision.headline, /vary only the opening/);
+  assert.match(t.memo.decision.headline, /vary only the hook \(opening seconds or headline\/first visual\)/);
 
   /* Hook metric present → cited by its real header; cost-per never counts. */
   const h = run(withHookColumns(TESTER_CSV), "cpa");
