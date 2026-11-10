@@ -196,6 +196,8 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
     { label: "Mixed stages", value: memo.scope.stageWarning },
     /* Bulletproof pass A8: a structural finding, on page 1. */
     { label: "Structure", value: memo.spreadThin },
+    /* Batch D1: 0-outcome ads past 1× the cost of one — display only. */
+    { label: "Burning spend", value: client ? undefined : memo.burningSpend?.buyer.replace(/^Burning spend: /, "") },
     /* Bulletproof A-fix 2: a comparability finding, on page 1. */
     { label: "Attribution", value: memo.scope.attributionWarning },
     /* Bulletproof pass A2: two labels — how clearly the data separates
@@ -2926,6 +2928,12 @@ export function Report({
               memo.losers.killInstruction
             )}
           </p>
+          {/* Batch D1 — display only; the decision is unchanged. */}
+          {memo.burningSpend && (
+            <p className="mt-2 max-w-3xl border-l-2 border-amber-300/50 pl-3 text-xs leading-relaxed text-zinc-300">
+              <Names text={client ? memo.burningSpend.client : memo.burningSpend.buyer} />
+            </p>
+          )}
           {memo.losers.rows.length > 0 && (
             <div className="mt-4">
               {client ? (

@@ -454,6 +454,26 @@ export function analyze(
     /* Bulletproof pass A5: what one outcome costs this account — the
        test success bars (≥ 10× it per variant). Display/copy only. */
     costPerOutcome: outcomeNounsForKpi(kpi) != null ? accountCostPerOutcome(ads) : null,
+    /* Batch D1: 0-outcome ads already past 1× what one outcome costs —
+       display only; the 2× judging rule and the decision are unchanged. */
+    ...((): Pick<AnalysisResult, "burningSpend"> => {
+      if (outcomeNounsForKpi(kpi) == null) return {};
+      const target = kpi === "cpa" && targetCpa != null && targetCpa > 0 ? targetCpa : null;
+      const bar = target ?? accountCostPerOutcome(ads);
+      if (bar == null || !(bar > 0)) return {};
+      const burning = ads
+        .filter((a) => (a.zeroConversions === true || a.conversions === 0) && a.spend > 0 && a.spend >= bar)
+        .sort((x, y) => y.spend - x.spend);
+      if (burning.length === 0) return {};
+      return {
+        burningSpend: {
+          ads: burning.map((a) => ({ name: a.name, spend: a.spend })),
+          bar,
+          basis: target != null ? "target_cpa" : "cost_per_outcome",
+          total: burning.reduce((s, a) => s + a.spend, 0),
+        },
+      };
+    })(),
     /* Trust Pass 2: the blended account result (display-only). */
     ...((): { accountKpi?: NonNullable<AnalysisResult["accountKpi"]> } => {
       const acct = computeAccountKpi(ads, kpi);

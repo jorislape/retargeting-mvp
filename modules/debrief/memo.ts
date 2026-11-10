@@ -941,6 +941,27 @@ function buildSpreadThin(analysis: AnalysisResult): { spreadThin?: string; sprea
   };
 }
 
+/** Batch D1 — "Burning spend": 0-outcome ads already past 1× the cost
+ *  of one outcome. Buyers pause these well before the 2× judging bar,
+ *  so the report lists them — display only; the decision is unchanged. */
+function buildBurningSpend(analysis: AnalysisResult): { burningSpend?: { buyer: string; client: string } } {
+  const b = analysis.burningSpend;
+  const nouns = outcomeNounsFor(analysis);
+  if (!b || !nouns) return {};
+  const money = (v: number) => fmtMoney(v, analysis.currency);
+  const n = b.ads.length;
+  const named = b.ads.slice(0, 3).map((a) => `"${a.name}" (${money(a.spend)})`);
+  const more = n > 3 ? ` and ${n - 3} more` : "";
+  const barLabel = b.basis === "target_cpa" ? "your target CPA" : `the account's cost per ${nouns.one}`;
+  const sale = nouns.one === "lead" ? "lead" : nouns.one === "conversation" ? "conversation" : "sale";
+  return {
+    burningSpend: {
+      buyer: `Burning spend: ${n} ad${n === 1 ? "" : "s"} with 0 ${nouns.many} already spent ≥ ${money(b.bar)} (1× ${barLabel}) — ${money(b.total)} in total: ${named.join(", ")}${more}. Worth pausing or fixing now; the report still judges an ad only at 2×, so the decision is unchanged.`,
+      client: `${n} ad${n === 1 ? " has" : "s have"} spent at least what one ${sale} usually costs without a ${sale} yet (${money(b.total)} in total) — we're reviewing ${n === 1 ? "it" : "them"} early.`,
+    },
+  };
+}
+
 /** Real-account fix 8 — formats analysis.namingPatterns for the report
  *  and TXT. Absent key when there's no convention (byte-identical). */
 function buildNamingPatterns(analysis: AnalysisResult): { namingPatterns?: MemoNamingPatterns } {
@@ -2853,6 +2874,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     patterns: buildPatterns(analysis),
     ...buildNamingPatterns(analysis),
     ...buildSpreadThin(analysis),
+    ...buildBurningSpend(analysis),
     ...buildNamingClientLine(analysis),
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,

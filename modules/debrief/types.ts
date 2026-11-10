@@ -672,6 +672,17 @@ export interface AnalysisResult {
    *  account cost per purchase/lead (null for CTR/CPC or no outcomes).
    *  Display only — one insight line near the top of the buyer view. */
   spreadThin?: { thin: number; total: number; avgSpend: number; costPerOutcome: number | null };
+  /** Batch D1 — "Burning spend": ads with 0 outcomes that already spent
+   *  ≥ 1× the account's cost per outcome (or 1× the target CPA when set).
+   *  Buyers pause these well before the 2× judging bar; DISPLAY ONLY —
+   *  never read by the gate, median, ranking or decision. Most spend
+   *  first. */
+  burningSpend?: {
+    ads: { name: string; spend: number }[];
+    bar: number;
+    basis: "target_cpa" | "cost_per_outcome";
+    total: number;
+  };
   /** Trust Pass 2 (accountKpi.ts): the account's real result for the
    *  KPI from totals across every analyzed ad, with coverage. Display
    *  only — never read by the gate, median, ranking or decision. */
@@ -1430,6 +1441,10 @@ export interface Memo {
   /** Bulletproof pass A8 — the client's version of spreadThin, framed as
    *  the plan, never as blame. Present exactly when spreadThin is. */
   spreadThinPlan?: string;
+  /** Batch D1 — the Burning spend list as one line per register
+   *  (buyer: exec summary + Below median; client: one plain line).
+   *  Display only. */
+  burningSpend?: { buyer: string; client: string };
   /** Real-account review — client "What worked" only: the strongest vs
    *  weakest value of up to 2 naming keys in plain words. Absent
    *  without a naming convention. Display only. */

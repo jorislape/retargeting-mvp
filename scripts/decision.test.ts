@@ -1371,8 +1371,9 @@ console.log("decision (stage 1 — rules): all assertions passed");
     const keys = Object.keys(memo);
     assert.deepEqual(
       keys.filter((k) => k !== "decision"),
-      ["comparison", "creativeGroups", "spendAllocation", "scope", "tldr", "clientSummary", "winners", "atMedian", "leadingConversion", "losers", "patterns", "marketSignal", "nextTests", "avoid", "confidence"],
-      "only the additive comparison/creativeGroups/spendAllocation/leadingConversion/atMedian fields exist; nothing else reordered"
+      // Batch D1 added `burningSpend` (the sample's one $24.15 zero-purchase ad).
+      ["comparison", "creativeGroups", "spendAllocation", "scope", "tldr", "clientSummary", "winners", "atMedian", "leadingConversion", "losers", "patterns", "burningSpend", "marketSignal", "nextTests", "avoid", "confidence"],
+      "only the additive comparison/creativeGroups/spendAllocation/leadingConversion/atMedian/burningSpend fields exist; nothing else reordered"
     );
     assert.equal(memo.creativeGroups, null, "generateMemo always sets creativeGroups: null on its own (the route attaches it, like comparison)");
     assert.equal(memo.comparison, null, "single-period run carries comparison: null");
