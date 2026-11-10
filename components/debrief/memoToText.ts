@@ -717,6 +717,14 @@ export function memoToText(
       signals.forEach((s) => lines.push(`   - ${c(s)}`));
     }
   });
+  if (memo.fairTest) {
+    if (view === "client") lines.push(memo.fairTest.client);
+    else {
+      lines.push(memo.fairTest.buyer.intro);
+      memo.fairTest.buyer.items.forEach((item) => lines.push(`- ${item}`));
+      lines.push(memo.fairTest.buyer.how);
+    }
+  }
   lines.push("");
 
   if (view === "buyer" && briefIndices.length > 0) {

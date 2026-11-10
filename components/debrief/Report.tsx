@@ -3054,6 +3054,8 @@ export function Report({
                 success looks like.
               </p>
               <ClientTestCards tests={memo.nextTests} />
+              {/* Batch D2 — one plain sentence; the details are buyer-only. */}
+              {memo.fairTest && <p className="mt-4 max-w-3xl text-[13px] leading-relaxed text-zinc-300">{memo.fairTest.client}</p>}
             </>
           ) : (
           <>
@@ -3093,6 +3095,21 @@ export function Report({
               />
             ))}
           </ol>
+          {/* Batch D2 — low-spend ads with strong early signals: a
+              hypothesis to give a fair read, never a result. */}
+          {memo.fairTest && (
+            <div className="print-avoid-break mt-6 max-w-3xl rounded-lg border border-white/[0.08] bg-white/[0.02] p-4">
+              <p className="print-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">{memo.fairTest.buyer.intro}</p>
+              <ul className="mt-2 space-y-1">
+                {memo.fairTest.buyer.items.map((item, i) => (
+                  <li key={i} className="text-[13px] leading-relaxed text-zinc-300">
+                    <Names text={item} />
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">{memo.fairTest.buyer.how}</p>
+            </div>
+          )}
           </>
           )}
 

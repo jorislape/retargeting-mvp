@@ -8,6 +8,7 @@ import { computeAccountKpi } from "./accountKpi";
 import { fmtKpiValue } from "./format";
 import { extractAds } from "./extract";
 import { adFormatClass, differOnlyInEngagedView } from "./adFormat";
+import { detectFairTest } from "./fairTest";
 import { parseNumericCell } from "./csv";
 import {
   AnalysisResult,
@@ -59,6 +60,25 @@ export function accountCostPerOutcome(ads: readonly ParsedAd[]): number | null {
   const outcomes = ads.reduce((sum, a) => sum + (a.conversions ?? 0), 0);
   if (!(outcomes > 0)) return null;
   return ads.reduce((sum, a) => sum + a.spend, 0) / outcomes;
+}
+
+/** Batch D1 — 0-outcome ads already past 1× the cost of one outcome
+ *  (1× the target CPA on a CPA run when set), most spend first. */
+function burningSpendFor(ads: readonly ParsedAd[], kpi: KpiKey, targetCpa: number | null): AnalysisResult["burningSpend"] {
+  if (outcomeNounsForKpi(kpi) == null) return undefined;
+  const target = kpi === "cpa" && targetCpa != null && targetCpa > 0 ? targetCpa : null;
+  const bar = target ?? accountCostPerOutcome(ads);
+  if (bar == null || !(bar > 0)) return undefined;
+  const burning = ads
+    .filter((a) => (a.zeroConversions === true || a.conversions === 0) && a.spend > 0 && a.spend >= bar)
+    .sort((x, y) => y.spend - x.spend);
+  if (burning.length === 0) return undefined;
+  return {
+    ads: burning.map((a) => ({ name: a.name, spend: a.spend })),
+    bar,
+    basis: target != null ? "target_cpa" : "cost_per_outcome",
+    total: burning.reduce((sum, a) => sum + a.spend, 0),
+  };
 }
 
 function computeSpendGate(
@@ -264,6 +284,7 @@ export function analyze(
      judged ads; absent ⇒ one overall median, byte-identical to before. */
   const stageSplit = benchmark != null ? stageBenchmarks(judged) : null;
   const ranked = benchmark != null ? rankJudged(judged, kpi, benchmark, stageSplit?.byStage) : [];
+  const burning = burningSpendFor(ads, kpi, targetCpa ?? null);
   /* With stage benchmarks, absolute gaps aren't comparable across stages
      (a TOFU and a BOFU median differ) — order by the relative gap. */
   const gap = (a: RankedAd) => (stageSplit ? (a.deltaPct ?? 0) : a.deltaFromMedian);
@@ -456,23 +477,12 @@ export function analyze(
     costPerOutcome: outcomeNounsForKpi(kpi) != null ? accountCostPerOutcome(ads) : null,
     /* Batch D1: 0-outcome ads already past 1× what one outcome costs —
        display only; the 2× judging rule and the decision are unchanged. */
-    ...((): Pick<AnalysisResult, "burningSpend"> => {
-      if (outcomeNounsForKpi(kpi) == null) return {};
-      const target = kpi === "cpa" && targetCpa != null && targetCpa > 0 ? targetCpa : null;
-      const bar = target ?? accountCostPerOutcome(ads);
-      if (bar == null || !(bar > 0)) return {};
-      const burning = ads
-        .filter((a) => (a.zeroConversions === true || a.conversions === 0) && a.spend > 0 && a.spend >= bar)
-        .sort((x, y) => y.spend - x.spend);
-      if (burning.length === 0) return {};
-      return {
-        burningSpend: {
-          ads: burning.map((a) => ({ name: a.name, spend: a.spend })),
-          bar,
-          basis: target != null ? "target_cpa" : "cost_per_outcome",
-          total: burning.reduce((s, a) => s + a.spend, 0),
-        },
-      };
+    ...(burning ? { burningSpend: burning } : {}),
+    /* Batch D2: low-spend ads whose early signals beat the account
+       median — a hypothesis, never a result; display only. */
+    ...((): Pick<AnalysisResult, "fairTest"> => {
+      const picks = detectFairTest(gated, new Set(burning?.ads.map((a) => a.name) ?? []));
+      return picks.length > 0 ? { fairTest: picks } : {};
     })(),
     /* Trust Pass 2: the blended account result (display-only). */
     ...((): { accountKpi?: NonNullable<AnalysisResult["accountKpi"]> } => {

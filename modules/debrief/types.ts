@@ -677,6 +677,11 @@ export interface AnalysisResult {
    *  Buyers pause these well before the 2× judging bar; DISPLAY ONLY —
    *  never read by the gate, median, ranking or decision. Most spend
    *  first. */
+  /** Batch D2 — up to 3 low-spend set-aside ads whose early signals
+   *  beat the account median on ≥ 2 of CTR / hook rate / CPC / adds to
+   *  cart (≥ 1,000 impressions; fairTest.ts). A hypothesis from early
+   *  signals, never a result; display only. */
+  fairTest?: import("./fairTest").FairTestPick[];
   burningSpend?: {
     ads: { name: string; spend: number }[];
     bar: number;
@@ -1445,6 +1450,10 @@ export interface Memo {
    *  (buyer: exec summary + Below median; client: one plain line).
    *  Display only. */
   burningSpend?: { buyer: string; client: string };
+  /** Batch D2 — "Give a fair test" (analysis.fairTest): buyer intro +
+   *  one line per ad + how to push delivery; one client sentence.
+   *  Always a hypothesis from early signals. Display only. */
+  fairTest?: { buyer: { intro: string; items: string[]; how: string }; client: string };
   /** Real-account review — client "What worked" only: the strongest vs
    *  weakest value of up to 2 naming keys in plain words. Absent
    *  without a naming convention. Display only. */

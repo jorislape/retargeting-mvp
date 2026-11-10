@@ -22,6 +22,8 @@ import {
   SCALE_STEP_MAX_PCT,
   testBars,
   TEST_MIN_DAYS,
+  TEST_MIN_OUTCOMES,
+  TEST_SPEND_CPP_MULTIPLE,
   trimOrder,
   trimCandidates,
   isNearMedian,
@@ -958,6 +960,47 @@ function buildBurningSpend(analysis: AnalysisResult): { burningSpend?: { buyer: 
     burningSpend: {
       buyer: `Burning spend: ${n} ad${n === 1 ? "" : "s"} with 0 ${nouns.many} already spent ≥ ${money(b.bar)} (1× ${barLabel}) — ${money(b.total)} in total: ${named.join(", ")}${more}. Worth pausing or fixing now; the report still judges an ad only at 2×, so the decision is unchanged.`,
       client: `${n} ad${n === 1 ? " has" : "s have"} spent at least what one ${sale} usually costs without a ${sale} yet (${money(b.total)} in total) — we're reviewing ${n === 1 ? "it" : "them"} early.`,
+    },
+  };
+}
+
+/** Batch D2 — "Give a fair test": low-spend ads whose early signals beat
+ *  the account median. Buyer copy names each ad with the signals that
+ *  beat the median and how to give it a fair read; the client gets one
+ *  sentence. Always a hypothesis from early signals, never a result. */
+function buildFairTest(analysis: AnalysisResult): { fairTest?: NonNullable<Memo["fairTest"]> } {
+  const picks = analysis.fairTest;
+  if (!picks || picks.length === 0) return {};
+  const money = (v: number) => fmtMoney(v, analysis.currency);
+  const signal = (s: NonNullable<AnalysisResult["fairTest"]>[number]["signals"][number]): string => {
+    switch (s.key) {
+      case "ctr":
+        return `link CTR ${s.value.toFixed(2)}% vs ${s.median.toFixed(2)}% median`;
+      case "hookRate":
+        return `3-sec hook rate ${s.value.toFixed(1)}% vs ${s.median.toFixed(1)}%`;
+      case "cpc":
+        return `CPC ${money(s.value)} vs ${money(s.median)}`;
+      case "atcRate":
+        return `adds to cart ${s.value.toFixed(1)} per 1,000 impressions vs ${s.median.toFixed(1)}`;
+    }
+  };
+  const nouns = outcomeNounsFor(analysis);
+  const cpp = analysis.costPerOutcome;
+  const bar =
+    nouns && cpp != null
+      ? `≥${TEST_MIN_OUTCOMES} ${nouns.many} or ${TEST_SPEND_CPP_MULTIPLE}× cost per ${nouns.one} — ${money(TEST_SPEND_CPP_MULTIPLE * cpp)}`
+      : `the minimum spend to judge — ${money(analysis.spendGate)}`;
+  const n = picks.length;
+  return {
+    fairTest: {
+      buyer: {
+        intro: "Give a fair test — a hypothesis from early signals, not results:",
+        items: picks.map(
+          (p) => `"${p.name}" (${money(p.spend)} spent, ${fmtCount(p.impressions)} impressions): ${p.signals.map(signal).join("; ")}.`
+        ),
+        how: `If your account has 'Push delivery to this ad', push ~10-20% of the ad set budget for ${TEST_MIN_DAYS} days until it reaches the evidence bar (${bar}); otherwise duplicate it into a test ad set.`,
+      },
+      client: `We're giving ${n === 1 ? "1 promising new ad" : `${n} promising new ads`} a fair test.`,
     },
   };
 }
@@ -2875,6 +2918,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     ...buildNamingPatterns(analysis),
     ...buildSpreadThin(analysis),
     ...buildBurningSpend(analysis),
+    ...buildFairTest(analysis),
     ...buildNamingClientLine(analysis),
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,
