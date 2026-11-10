@@ -6,7 +6,7 @@
 // extensionless imports and is NOT directly Node-importable; that is
 // why buildDecision takes a money formatter as an argument instead of
 // importing format.ts (whose own internal import is extensionless).
-import { KPI_LABELS, kpiClientLabelFor, kpiLabelFor, outcomeNounsFor } from "./types.ts";
+import { KPI_LABELS, kpiClientLabelFor, kpiLabelFor, outcomeNounsFor, saleWords } from "./types.ts";
 import type {
   AnalysisResult,
   AppliedCriterion,
@@ -458,7 +458,7 @@ export function testBars(analysis: AnalysisResult, money: MoneyFormatter) {
     cpp != null && nouns != null
       ? `≥${TEST_MIN_DAYS} days with ≥${TEST_MIN_OUTCOMES} ${nouns.many} (or ≥ ${money(spendBar)} spend) on the changed ad sets`
       : `≥${TEST_MIN_DAYS} days with ≥ ${money(spendBar)} spend on the changed ad sets`;
-  const sales = nouns?.many === "leads" ? "leads" : "sales";
+  const sales = saleWords(nouns).many;
   return {
     spendBar,
     cpp,
@@ -625,6 +625,8 @@ const SOURCE_NOUN: Record<KpiColumnSource["field"], { noun: string; plural: bool
   purchaseRoas: { noun: "ROAS", plural: false },
   costPerPurchase: { noun: "cost per purchase", plural: false },
   costPerLead: { noun: "cost per lead", plural: false },
+  conversations: { noun: "conversations", plural: true },
+  costPerConversation: { noun: "cost per conversation", plural: false },
 };
 
 function quotedList(headers: string[]): string {
@@ -720,7 +722,7 @@ function gapParts(gaps: KpiGaps, kpiLabel: string, kpiClient: string, outcomeMan
     parts.push({
       n: gaps.zeroLowSpend,
       buyer: `had no ${outcomeMany} yet on low spend`,
-      client: `haven't made a sale yet on little spend`,
+      client: `haven't made a ${saleWords({ one: outcomeMany.replace(/s$/, ""), many: outcomeMany }).one} yet on little spend`,
     });
   }
   if (gaps.belowOutcomeFloor && outcomeMany) {
@@ -1012,7 +1014,11 @@ export function buildLimits(
     const label = kpiLabelFor(analysis);
     const clientLabel = kpiClientLabelFor(analysis);
     const lead = analysis.cpaBasis === "leads";
-    const differs = lead ? "lead quality or value differs" : "order value or margin differs";
+    const differs = lead
+      ? "lead quality or value differs"
+      : analysis.cpaBasis === "conversations"
+        ? "conversation quality or close rate differs"
+        : "order value or margin differs";
     const roas = analysis.cpaWithoutTarget.roasAvailable;
     buyer.push(
       `No target CPA set — ads are ranked against this account's median ${label}, not against what's profitable. A higher ${label} isn't automatically worse if ${differs}.${

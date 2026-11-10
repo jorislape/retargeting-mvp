@@ -98,6 +98,11 @@ const ALIASES = {
   ],
   leads: ["website leads", "on facebook leads", "leads"],
   costPerLead: ["cost per lead"],
+  /* Batch D4: messaging conversations (WhatsApp / Messenger / DM sales)
+     — read only when the run asks for Cost per conversation. */
+  conversations: ["messaging conversations started", "messaging conversation started", "conversations started"],
+  costPerConversation: ["cost per messaging conversation started", "cost per messaging conversations started", "cost per conversation started"],
+  resultIndicator: ["result indicator", "result type"],
   reportingStarts: ["reporting starts"],
   reportingEnds: ["reporting ends"],
   /* Evidence Diagnostic V1: upstream funnel signals, resolved the same
@@ -152,6 +157,8 @@ const CONVERSION_FIELDS: readonly ConversionField[] = [
   "purchaseRoas",
   "costPerPurchase",
   "costPerLead",
+  "conversations",
+  "costPerConversation",
 ];
 
 /** A header that matches a MORE specific field is never listed as an
@@ -289,6 +296,13 @@ export interface ColumnMap {
   costPerPurchase: string | null;
   leads: string | null;
   costPerLead: string | null;
+  /** Batch D4 — messaging conversations started (count), its cost
+   *  column, and Meta's "Result indicator" + raw "Results" header (a
+   *  Results row counts conversations when its indicator is messaging). */
+  conversations: string | null;
+  costPerConversation: string | null;
+  resultIndicator: string | null;
+  results: string | null;
   reportingStarts: string | null;
   reportingEnds: string | null;
   /** Evidence Diagnostic V1 — optional upstream funnel columns. */
@@ -365,6 +379,10 @@ export function resolveColumns(allHeaders: string[]): ColumnMap {
     purchaseRoas: findHeader(headers, ALIASES.purchaseRoas),
     costPerPurchase: findHeader(headers, ALIASES.costPerPurchase),
     leads: findHeader(headers, ALIASES.leads),
+    conversations: findHeader(headers.filter((h) => !/cost per/i.test(h)), ALIASES.conversations),
+    costPerConversation: findHeader(headers, ALIASES.costPerConversation),
+    resultIndicator: findHeader(headers, ALIASES.resultIndicator),
+    results: headers.find((h) => normalize(h) === "results") ?? null,
     costPerLead: findHeader(headers, ALIASES.costPerLead),
     reportingStarts: findHeader(headers, ALIASES.reportingStarts),
     reportingEnds: findHeader(headers, ALIASES.reportingEnds),
@@ -476,6 +494,14 @@ export function kpiReadFields(
   cpaBasis?: CpaBasis
 ): ConversionField[] {
   const has = (f: ConversionField) => columns[f] != null;
+  /* Batch D4: conversation-based CPA reads its own cost column, else
+     spend ÷ conversations. */
+  if (kpi === "cpa" && cpaBasis === "conversations") {
+    const out: ConversionField[] = [];
+    if (has("costPerConversation")) out.push("costPerConversation");
+    if (has("conversations")) out.push("conversations");
+    return out;
+  }
   if (kpi === "cpa" && cpaBasis === "leads") {
     const out: ConversionField[] = [];
     if (!has("costPerPurchase") && has("costPerLead")) out.push("costPerLead");
@@ -566,6 +592,17 @@ export function requiredColumnsFor(kpi: KpiKey, columns: ColumnMap): string[] {
   return missing;
 }
 
+/** Batch D4 — what a Cost-per-conversation run needs: spend plus a
+ *  conversations count (or its cost column, or "Results" with a
+ *  "Result indicator" saying which rows are messaging). */
+export function conversationColumnsMissing(columns: ColumnMap): string[] {
+  const missing: string[] = [];
+  if (!columns.spend) missing.push("Amount spent");
+  if (!columns.conversations && !columns.costPerConversation && !(columns.results && columns.resultIndicator))
+    missing.push("Messaging conversations started (or Results with a messaging Result indicator)");
+  return missing;
+}
+
 const PREVIEW_LABEL: Record<ConversionField, string> = {
   purchases: "Purchases",
   leads: "Leads",
@@ -573,6 +610,8 @@ const PREVIEW_LABEL: Record<ConversionField, string> = {
   purchaseRoas: "ROAS",
   costPerPurchase: "Cost per purchase",
   costPerLead: "Cost per lead",
+  conversations: "Conversations",
+  costPerConversation: "Cost per conversation",
 };
 
 function quoted(headers: string[]): string {
@@ -626,7 +665,7 @@ export function clickBasisFor(kpi: KpiKey, columns: ColumnMap): ClickBasis | nul
 /** The attribution fields relevant to a KPI (none for CTR/CPC). */
 export function attributionFieldsFor(kpi: KpiKey, cpaBasis?: CpaBasis): AttributionField[] {
   if (kpi === "roas") return ["purchaseValue", "purchases"];
-  if (kpi === "cpa") return cpaBasis === "leads" ? ["leads"] : ["purchases", "leads"];
+  if (kpi === "cpa") return cpaBasis === "conversations" ? [] : cpaBasis === "leads" ? ["leads"] : ["purchases", "leads"];
   if (kpi === "purchases") return ["purchases"];
   if (kpi === "leads") return ["leads"];
   return [];

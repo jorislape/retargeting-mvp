@@ -12,7 +12,7 @@
  *   checkExportKpi(structure, kpi)        — spend + selected KPI columns
  */
 import { parseCsvDetailed, toTable, type CsvDelimiter } from "./csv";
-import { EXPORT_AT_AD_LEVEL, requiredColumnsFor, resolveColumns, type ColumnMap } from "./columns";
+import { EXPORT_AT_AD_LEVEL, conversationColumnsMissing, requiredColumnsFor, resolveColumns, type ColumnMap } from "./columns";
 import { DebriefApiError, KPI_LABELS, KpiKey } from "./types";
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -114,9 +114,15 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
 
 /** The KPI-dependent part: a spend column, and the selected KPI's
  *  columns — with the KPIs this exact file WOULD support suggested. */
-export function checkExportKpi(structure: ExportStructure, kpi: KpiKey): CheckResult<ExportStructure> {
+export function checkExportKpi(
+  structure: ExportStructure,
+  kpi: KpiKey,
+  /** Batch D4 — Cost per conversation needs a conversations column. */
+  cpaOutcome?: "conversation" | null
+): CheckResult<ExportStructure> {
   const { columns, detectedColumns } = structure;
-  const missing = requiredColumnsFor(kpi, columns);
+  const conversation = kpi === "cpa" && cpaOutcome === "conversation";
+  const missing = conversation ? conversationColumnsMissing(columns) : requiredColumnsFor(kpi, columns);
   if (missing.length === 0) return { ok: true, value: structure };
   if (missing.includes("Amount spent")) {
     return {
@@ -129,7 +135,7 @@ export function checkExportKpi(structure: ExportStructure, kpi: KpiKey): CheckRe
       },
     };
   }
-  const kpiLabel = KPI_LABELS[kpi];
+  const kpiLabel = conversation ? "Cost per conversation" : KPI_LABELS[kpi];
   const suggestedKpis = KPI_VALUES.filter((k) => k !== kpi && requiredColumnsFor(k, columns).length === 0);
   const suggestionText =
     suggestedKpis.length > 0
@@ -148,7 +154,12 @@ export function checkExportKpi(structure: ExportStructure, kpi: KpiKey): CheckRe
 }
 
 /** Both checks, in order — what the API route runs. */
-export function checkExport(text: string, kpi: KpiKey, sizeBytes?: number): CheckResult<ExportStructure> {
+export function checkExport(
+  text: string,
+  kpi: KpiKey,
+  sizeBytes?: number,
+  cpaOutcome?: "conversation" | null
+): CheckResult<ExportStructure> {
   const structure = checkExportStructure(text, sizeBytes);
-  return structure.ok ? checkExportKpi(structure.value, kpi) : structure;
+  return structure.ok ? checkExportKpi(structure.value, kpi, cpaOutcome) : structure;
 }

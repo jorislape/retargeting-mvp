@@ -122,6 +122,16 @@ function cpaBasisForRow(
   return null;
 }
 
+/** Batch D4 — a row's messaging conversations: the conversations
+ *  column, else Meta's "Results" when that row's Result indicator is a
+ *  messaging event. null when neither is readable (missing ≠ 0). */
+function conversationsForRow(row: Record<string, string>, columns: ColumnMap): number | null {
+  if (columns.conversations) return parseNumericCell(row[columns.conversations]);
+  if (columns.results && columns.resultIndicator && /messag|conversation/i.test(row[columns.resultIndicator] ?? ""))
+    return parseNumericCell(row[columns.results]);
+  return null;
+}
+
 /** Tester Feedback Fix 2: true when a CPA row has no computable value
  *  because its conversion count is a real 0 — mirrors the count
  *  kpiValueForRow's "cpa" branch divides by (purchases ?? leads). A
@@ -239,8 +249,12 @@ function upstreamFieldsForRow(row: Record<string, string>, columns: ColumnMap) {
 export function extractAds(
   rows: Record<string, string>[],
   columns: ColumnMap,
-  kpi: KpiKey
+  kpi: KpiKey,
+  /** Batch D4 — "conversation": CPA is cost per messaging conversation
+   *  started, counted in conversations. Unset ⇒ unchanged. */
+  cpaOutcome?: "conversation" | null
 ): ParsedAd[] {
+  const conversationMode = kpi === "cpa" && cpaOutcome === "conversation";
   /* Attribution & Intent 2: click-only basis for ROAS/CPA/CPL when the
      export has it (7-day preferred); null ⇒ blended, as before. */
   const click = clickBasisFor(kpi, columns);
@@ -314,6 +328,9 @@ export function extractAds(
                 : null
               : cpaBasisForRow(row, columns)
             : null,
+        /* Batch D4 — internal, stripped below. */
+        convCount: conversationMode ? conversationsForRow(row, columns) : null,
+        convCost: conversationMode && columns.costPerConversation ? parseNumericCell(row[columns.costPerConversation]) : null,
         leadCount:
           kpi === "cpa"
             ? click
@@ -331,14 +348,35 @@ export function extractAds(
      A mixed or purchase-based export keeps the existing purchase count. */
   const valued = ads.filter((a) => a.kpiValue != null);
   const leadBased =
-    kpi === "cpa" && valued.length > 0 && valued.every((a) => a.cpaRowBasis === "lead");
+    !conversationMode && kpi === "cpa" && valued.length > 0 && valued.every((a) => a.cpaRowBasis === "lead");
 
   const perRow = ads.map(({ fileRow, ...withMeta }) => {
     const ad: Partial<typeof withMeta> = { ...withMeta };
     const leadCount = withMeta.leadCount;
+    const { convCount, convCost } = withMeta;
     delete ad.cpaRowBasis;
     delete ad.leadCount;
+    delete ad.convCount;
+    delete ad.convCost;
     const parsed = ad as ParsedAd;
+    if (conversationMode) {
+      /* Batch D4: the export's own cost per conversation, else spend ÷
+         conversations; a real 0 conversations is a zero-outcome ad
+         (the CPA zero rule), a blank stays missing. */
+      const kpiValue = convCost != null && convCost > 0 ? convCost : convCount != null && convCount > 0 ? withMeta.spend / convCount : null;
+      const { zeroConversions: _drop, ...rest } = parsed;
+      void _drop;
+      return {
+        fileRow,
+        ad: {
+          ...rest,
+          kpiValue,
+          conversions: convCount,
+          cpaBasis: "conversation" as const,
+          ...(kpiValue == null && convCount === 0 ? { zeroConversions: true as const } : {}),
+        },
+      };
+    }
     return {
       fileRow,
       ad: leadBased ? { ...parsed, conversions: leadCount, cpaBasis: "lead" as const } : parsed,

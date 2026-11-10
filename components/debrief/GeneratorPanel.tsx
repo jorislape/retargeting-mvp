@@ -20,6 +20,7 @@ import {
   parseCsv,
   parseNumericCell,
   checkExportKpi,
+  conversationColumnsMissing,
   checkExportStructure,
   MAX_FILE_BYTES,
   chooseAutoKpi,
@@ -96,13 +97,15 @@ import {
 /* Stage completion is real state, not decoration.                     */
 /* ------------------------------------------------------------------ */
 
-const KPI_OPTIONS: { value: KpiKey; label: string }[] = [
+const KPI_OPTIONS: { value: KpiKey; label: string; outcome?: "conversation" }[] = [
   { value: "roas", label: "ROAS" },
   { value: "cpa", label: "CPA" },
   { value: "ctr", label: "CTR" },
   { value: "cpc", label: "CPC" },
   { value: "leads", label: "Leads" },
   { value: "purchases", label: "Purchases" },
+  /* Batch D4 — CPA on messaging conversations (WhatsApp / DM sales). */
+  { value: "cpa", label: "Cost per conversation", outcome: "conversation" },
 ];
 
 /** The alias groups documented in the "CSV requirements" helper —
@@ -112,6 +115,7 @@ const KPI_ALIAS_DOC: [string, string][] = [
   ["CPA", "CPA · Cost per purchase · Cost per lead · Cost per result"],
   ["CTR", "CTR · Link CTR · Click-through rate"],
   ["CPC", "CPC · Cost per click · Link CPC"],
+  ["Cost per conversation", "Messaging conversations started · Cost per messaging conversation started · Results with a messaging Result indicator"],
   ["Spend", "Amount spent · Spend · Amount Spent (USD) · Amount Spent (EUR)"],
   ["Ad name", "Ad name · Ad · Creative name"],
 ];
@@ -589,10 +593,10 @@ export function GeneratorPanel() {
     kpiRef.current = fields.kpi;
   }, [fields.kpi]);
   const [kpiNotice, setKpiNotice] = useState<{ from: KpiKey; to: KpiKey } | null>(null);
-  const chooseKpiManually = (k: KpiKey) => {
+  const chooseKpiManually = (k: KpiKey, outcome: "conversation" | null = null) => {
     kpiManualRef.current = true;
     setKpiNotice(null);
-    updateFields({ kpi: k });
+    updateFields({ kpi: k, cpaOutcome: outcome });
   };
 
   useEffect(() => {
@@ -710,7 +714,7 @@ export function GeneratorPanel() {
         const current = kpiRef.current;
         const next = chooseAutoKpi(current, usability, kpiManualRef.current);
         if (next) {
-          updateFields({ kpi: next });
+          updateFields({ kpi: next, cpaOutcome: null });
           setKpiNotice({ from: current, to: next });
         } else {
           setKpiNotice(null);
@@ -735,18 +739,23 @@ export function GeneratorPanel() {
 
   const preview =
     file && previewState?.forFile === file ? previewState : null;
-  const previewKpiOk = preview?.kpisFound.includes(fields.kpi) ?? true;
+  const conversationRun = fields.kpi === "cpa" && fields.cpaOutcome === "conversation";
+  const previewKpiOk = preview
+    ? conversationRun
+      ? conversationColumnsMissing(preview.columnMap).length === 0
+      : preview.kpisFound.includes(fields.kpi)
+    : true;
   /* CPA Leads Label: for this file, does CPA mean cost per lead? Then
      the preview, the notice and the source line say so. */
   const cplInPreview = preview?.usability.cpa.cpaLeadBased ?? false;
-  const previewCpl = fields.kpi === "cpa" && cplInPreview;
+  const previewCpl = fields.kpi === "cpa" && cplInPreview && !conversationRun;
   const kpiDisplay = (k: KpiKey, longForm = false) =>
     k === "cpa" && cplInPreview ? (longForm ? "CPA (cost per lead)" : "cost per lead") : KPI_LABELS[k];
   /* KPI Source Column Disclosure: which column the selected KPI's
      conversion data comes from (and any competing variants ignored). */
   const previewKpiSource =
     preview && previewKpiOk
-      ? kpiSourcePreview(fields.kpi, preview.columnMap, previewCpl ? "leads" : undefined)
+      ? kpiSourcePreview(fields.kpi, preview.columnMap, conversationRun ? "conversations" : previewCpl ? "leads" : undefined)
       : null;
   const previewSparse = preview
     ? sparseKpiWarning(preview.usability[fields.kpi], KPI_LABELS[fields.kpi])
@@ -1116,7 +1125,7 @@ export function GeneratorPanel() {
   const fileError: DebriefApiError | null = fileCheck
     ? fileCheck.error ??
       (fileCheck.structure
-        ? ((r) => (r.ok ? null : r.error))(checkExportKpi(fileCheck.structure, fields.kpi))
+        ? ((r) => (r.ok ? null : r.error))(checkExportKpi(fileCheck.structure, fields.kpi, fields.cpaOutcome))
         : null)
     : null;
   const fileUsable = fileCheck != null && fileError == null;
@@ -1717,16 +1726,16 @@ export function GeneratorPanel() {
             <legend className="sr-only">Primary KPI</legend>
             <div
               role="group"
-              className="grid grid-cols-3 border-b border-white/[0.08] sm:grid-cols-6"
+              className="grid grid-cols-3 border-b border-white/[0.08] sm:grid-cols-7"
             >
               {KPI_OPTIONS.map((opt) => {
-                const active = fields.kpi === opt.value;
+                const active = fields.kpi === opt.value && (fields.cpaOutcome ?? null) === (opt.outcome ?? null);
                 return (
                   <button
-                    key={opt.value}
+                    key={`${opt.value}-${opt.outcome ?? ""}`}
                     type="button"
                     aria-pressed={active}
-                    onClick={() => chooseKpiManually(opt.value)}
+                    onClick={() => chooseKpiManually(opt.value, opt.outcome ?? null)}
                     className={`relative cursor-pointer px-2 pb-2.5 pt-1.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       active
                         ? "text-zinc-100"
@@ -3331,7 +3340,7 @@ export function GeneratorPanel() {
                   <>
                     <span className="font-mono text-zinc-200">{file.name}</span>
                     {" · "}
-                    {KPI_OPTIONS.find((o) => o.value === fields.kpi)?.label}
+                    {KPI_OPTIONS.find((o) => o.value === fields.kpi && (o.outcome ?? null) === (fields.cpaOutcome ?? null))?.label}
                     {fileUsable ? " · ready" : fileError ? " · fix the file in stage 1 first" : " · checking…"}
                   </>
                 ) : (

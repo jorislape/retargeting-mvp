@@ -44,6 +44,9 @@ export interface CreativeAssetRef {
 
 export interface GeneratorFields {
   kpi: KpiKey;
+  /** Batch D4 — with kpi "cpa": "conversation" runs Cost per
+   *  conversation (messaging conversations started). */
+  cpaOutcome: "conversation" | null;
   /** Decision Queue / Multi-Account V1 — an OPTIONAL local label for
    *  this account in the session's Decision Queue only. Never sent to
    *  /api/debrief, never analyzed, never required — leaving it blank
@@ -109,6 +112,7 @@ export type GeneratorStatus = "idle" | "processing" | "ready";
 
 const DEFAULT_FIELDS: GeneratorFields = {
   kpi: "roas",
+  cpaOutcome: null,
   accountLabel: "",
   product: "",
   offer: "",
@@ -402,6 +406,8 @@ export function DebriefProvider({ children }: { children: ReactNode }) {
     const body = new FormData();
     body.append("csv", file);
     body.append("kpi", kpi);
+    /* Batch D4: a KPI switch (override) always leaves conversation mode. */
+    if (kpi === "cpa" && !overrides?.kpi && fields.cpaOutcome === "conversation") body.append("cpaOutcome", "conversation");
     body.append("product", fields.product);
     body.append("offer", fields.offer);
     if (fields.targetCpa.trim() !== "") body.append("targetCpa", fields.targetCpa);

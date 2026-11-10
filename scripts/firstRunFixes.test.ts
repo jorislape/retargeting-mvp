@@ -282,7 +282,8 @@ try {
   assert.match(gen, /\(optional\)/);
 
   // Manual choice guard: both user paths go through chooseKpiManually.
-  assert.match(gen, /onClick=\{\(\) => chooseKpiManually\(opt\.value\)\}/, "KPI selector marks a manual choice");
+  // Batch D4: the option may also carry the conversation outcome.
+  assert.match(gen, /onClick=\{\(\) => chooseKpiManually\(opt\.value, opt\.outcome \?\? null\)\}/, "KPI selector marks a manual choice");
   assert.match(gen, /chooseKpiManually\(k\);\s*clearError\(\);/, "error one-click switch marks a manual choice");
   assert.match(gen, /chooseAutoKpi\(current, usability, kpiManualRef\.current\)/, "auto-switch respects the manual flag");
   assert.match(gen, /No \{KPI_LABELS\[kpiNotice\.from\]\} values in this export —\s*switched to \{kpiDisplay\(kpiNotice\.to\)\}\./);

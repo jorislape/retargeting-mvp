@@ -18,6 +18,7 @@ import {
   GatedAd,
   HIGHER_IS_BETTER,
   KpiGaps,
+  CpaBasis,
   KpiKey,
   ParsedAd,
   RankedAd,
@@ -212,11 +213,13 @@ export function analyze(
   const { kpi, targetCpa } = context;
   /* CPA Leads Label: extract.ts tags every ad when all CPA values are
      lead-based; the analysis carries that as cpaBasis for wording. */
-  const cpaBasis: "leads" | undefined =
-    kpi === "cpa" && ads.some((a) => a.kpiValue != null) &&
-    ads.every((a) => a.kpiValue == null || a.cpaBasis === "lead")
-      ? "leads"
-      : undefined;
+  const cpaBasis: CpaBasis | undefined =
+    kpi === "cpa" && ads.some((a) => a.kpiValue != null || a.zeroConversions) && ads.every((a) => a.cpaBasis === "conversation")
+      ? "conversations"
+      : kpi === "cpa" && ads.some((a) => a.kpiValue != null) &&
+          ads.every((a) => a.kpiValue == null || a.cpaBasis === "lead")
+        ? "leads"
+        : undefined;
   const kpiSources = kpiColumnSourcesFor(kpi, columns, cpaBasis);
   const hookColumns = hookMetricColumns(columns);
   /* Attribution & Intent 1: the attribution-split columns relevant to

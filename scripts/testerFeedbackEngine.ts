@@ -37,7 +37,7 @@ export function loadEngine() {
     const ctx = { kpi, product: "", offer: "", targetCpa: null, creativeNotes: "", marketContext: "", ...extra };
     const { headers, rows } = toTable(parseCsv(csv));
     const columns = resolveColumns(headers);
-    const ads = extractAds(rows, columns, kpi);
+    const ads = extractAds(rows, columns, kpi, (ctx as { cpaOutcome?: string | null }).cpaOutcome ?? null);
     const analysis = analyze(ads, rows, columns, ctx);
     const memo = generateMemo(analysis, ctx);
     return {

@@ -181,7 +181,8 @@ try {
   const gen = readFileSync(join(ROOT, "components/debrief/GeneratorPanel.tsx"), "utf8");
   assert.match(gen, /switched to \{kpiDisplay\(kpiNotice\.to\)\}/, "notice names cost per lead when that's what CPA is");
   assert.match(gen, /\(longForm \? "CPA \(cost per lead\)" : "cost per lead"\)/);
-  assert.match(gen, /kpiSourcePreview\(fields\.kpi, preview\.columnMap, previewCpl \? "leads" : undefined\)/);
+  // Batch D4: a Cost-per-conversation run names its own source first.
+  assert.match(gen, /kpiSourcePreview\(fields\.kpi, preview\.columnMap, conversationRun \? "conversations" : previewCpl \? "leads" : undefined\)/);
   console.log("cpaLeadsLabel: generator notice, preview label, source line");
 }
 {

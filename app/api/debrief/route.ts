@@ -11,6 +11,7 @@ import {
   KPI_LABELS,
   KpiKey,
   parseCsv,
+  conversationColumnsMissing,
   requiredColumnsFor,
   EXPORT_AT_AD_LEVEL,
   kpiClientLabelFor,
@@ -92,7 +93,8 @@ type PreviousPeriodParse =
 
 async function parsePreviousPeriod(
   file: File,
-  kpi: KpiKey
+  kpi: KpiKey,
+  cpaOutcome: "conversation" | null
 ): Promise<PreviousPeriodParse> {
   const bad = (error: DebriefApiError): PreviousPeriodParse => ({
     ok: false,
@@ -171,7 +173,7 @@ async function parsePreviousPeriod(
       fix: "Export the previous period at ad level with Ad name included.",
     });
   }
-  const missing = requiredColumnsFor(kpi, columns);
+  const missing = kpi === "cpa" && cpaOutcome === "conversation" ? conversationColumnsMissing(columns) : requiredColumnsFor(kpi, columns);
   if (missing.length > 0) {
     return bad({
       title: `Previous period: ${KPI_LABELS[kpi]} column not found`,
@@ -179,7 +181,7 @@ async function parsePreviousPeriod(
       fix: `Export the previous period with ${missing.join(", ")} included — both files must support the same KPI.`,
     });
   }
-  const ads = extractAds(rows, columns, kpi);
+  const ads = extractAds(rows, columns, kpi, cpaOutcome);
   if (ads.length === 0) {
     return bad({
       title: "Previous period: no ad rows found",
@@ -366,8 +368,11 @@ export async function POST(request: NextRequest) {
   const parseObjective = (v: FormDataEntryValue | null): Objective | undefined =>
     v === "efficiency" || v === "growth" || v === "learning" ? v : undefined;
 
+  /* Batch D4: "Cost per conversation" = CPA on messaging conversations. */
+  const cpaOutcome: "conversation" | null = kpi === "cpa" && form.get("cpaOutcome") === "conversation" ? "conversation" : null;
   const context = {
     kpi: kpi as KpiKey,
+    cpaOutcome,
     product: String(form.get("product") ?? "").trim().slice(0, 200),
     offer: String(form.get("offer") ?? "").trim().slice(0, 200),
     targetCpa,
@@ -480,7 +485,7 @@ export async function POST(request: NextRequest) {
      separator), too many rows, no header/rows, no Ad name, no spend, no
      column for the selected KPI (with switch suggestions). Semicolon/tab
      separators and decimal commas are normalized while parsing. */
-  const checked = checkExport(text, context.kpi);
+  const checked = checkExport(text, context.kpi, undefined, context.cpaOutcome);
   if (!checked.ok) return fail(400, checked.error);
   const { headers, rows, columns, detectedColumns } = checked.value;
 
@@ -488,7 +493,7 @@ export async function POST(request: NextRequest) {
      values, the gate, the median, and ranking read the same numbers
      either way. */
   const ads = applyFormatOverrides(
-    extractAds(rows, columns, context.kpi),
+    extractAds(rows, columns, context.kpi, context.cpaOutcome),
     formatOverrides
   );
   if (ads.length === 0) {
@@ -509,7 +514,7 @@ export async function POST(request: NextRequest) {
   let previous: { ads: ParsedAd[]; rows: Record<string, string>[]; columns: ReturnType<typeof resolveColumns> } | null =
     null;
   if (previousFileRaw instanceof File) {
-    const parsed = await parsePreviousPeriod(previousFileRaw, context.kpi);
+    const parsed = await parsePreviousPeriod(previousFileRaw, context.kpi, context.cpaOutcome);
     if (!parsed.ok) return fail(parsed.status, parsed.error);
     if (
       parsed.columns.currency != null &&

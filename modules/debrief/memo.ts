@@ -63,6 +63,7 @@ import {
   kpiExplainerFor,
   kpiLabelFor,
   outcomeNounsFor,
+  saleWords,
   RankedAd,
 } from "./types";
 
@@ -522,7 +523,7 @@ function withTrimNotes(d: MemoDecision, analysis: AnalysisResult, context: Debri
       ? {
           profitBasisNote: {
             buyer: `This move is relative to the account (each ad vs the median), not profit-based. Set ${roas ? "a target ROAS (your breakeven)" : `a target CPA (your breakeven cost per ${outcomeNounsFor(analysis)?.one ?? "purchase"})`} for a profit-based trim list.`,
-            client: `This compares your ads with each other, not with your break-even point — telling us your break-even ${roas ? "return" : `cost per ${outcomeNounsFor(analysis)?.one === "lead" ? "lead" : "sale"}`} would separate ads that make money from ones that are just above or below the middle ad.`,
+            client: `This compares your ads with each other, not with your break-even point — telling us your break-even ${roas ? "return" : `cost per ${saleWords(outcomeNounsFor(analysis)).one}`} would separate ads that make money from ones that are just above or below the middle ad.`,
           },
         }
       : {};
@@ -955,7 +956,7 @@ function buildBurningSpend(analysis: AnalysisResult): { burningSpend?: { buyer: 
   const named = b.ads.slice(0, 3).map((a) => `"${a.name}" (${money(a.spend)})`);
   const more = n > 3 ? ` and ${n - 3} more` : "";
   const barLabel = b.basis === "target_cpa" ? "your target CPA" : `the account's cost per ${nouns.one}`;
-  const sale = nouns.one === "lead" ? "lead" : nouns.one === "conversation" ? "conversation" : "sale";
+  const sale = saleWords(nouns).one;
   return {
     burningSpend: {
       buyer: `Burning spend: ${n} ad${n === 1 ? "" : "s"} with 0 ${nouns.many} already spent ≥ ${money(b.bar)} (1× ${barLabel}) — ${money(b.total)} in total: ${named.join(", ")}${more}. Worth pausing or fixing now; the report still judges an ad only at 2×, so the decision is unchanged.`,
@@ -2495,7 +2496,7 @@ function buildConfidence(
   const receiversVerified =
     receiverCount > 0 &&
     budgetReceivers(analysis, criteria).every((r) => r.conversions != null && r.conversions >= highBar);
-  const salesWord = outcomeNounsFor(analysis)?.many === "leads" ? "leads" : "sales";
+  const salesWord = saleWords(outcomeNounsFor(analysis)).many;
 
   if (level === "high" && flat) {
     reasons.push(
@@ -2571,7 +2572,7 @@ function buildConfidence(
     }
     clientWhy =
       belowHighBar && weakest?.conversions != null && !volumeBelowFloor
-        ? "the ads getting more budget have a moderate number of sales behind them so far — more results would firm the call up."
+        ? `the ads getting more budget have a moderate number of ${saleWords(outcomeNounsFor(analysis)).many} behind them so far — more results would firm the call up.`
         : "the results point one way, but the sample is small enough that the next round of spend could still shift it.";
   } else {
     if (median == null) {

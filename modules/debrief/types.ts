@@ -58,20 +58,25 @@ export function outcomeNounsForKpi(
 /* gate, median, ranking and decision rules are the same CPA.          */
 /* ------------------------------------------------------------------ */
 
-export type CpaBasis = "leads";
+export type CpaBasis = "leads" | "conversations";
 
 type KpiWithBasis = { kpi: KpiKey; cpaBasis?: CpaBasis };
 
 const isCpl = (a: KpiWithBasis) => a.kpi === "cpa" && a.cpaBasis === "leads";
+/** Batch D4 — CPA on messaging conversations started (WhatsApp / DM
+ *  sales): "Cost per conversation", counted in conversations. Same CPA
+ *  rules (gate, median, receivers by count) — wording only. */
+const isCpConv = (a: KpiWithBasis) => a.kpi === "cpa" && a.cpaBasis === "conversations";
 
-/** Buyer-register KPI label: "CPL" for lead-based CPA, else KPI_LABELS. */
+/** Buyer-register KPI label: "CPL" for lead-based CPA, "Cost per
+ *  conversation" for conversation-based CPA, else KPI_LABELS. */
 export function kpiLabelFor(a: KpiWithBasis): string {
-  return isCpl(a) ? "CPL" : KPI_LABELS[a.kpi];
+  return isCpl(a) ? "CPL" : isCpConv(a) ? "Cost per conversation" : KPI_LABELS[a.kpi];
 }
 
-/** Client-register KPI label: "cost per lead" for lead-based CPA. */
+/** Client-register KPI label: "cost per lead" / "cost per conversation". */
 export function kpiClientLabelFor(a: KpiWithBasis): string {
-  return isCpl(a) ? "cost per lead" : KPI_LABELS[a.kpi];
+  return isCpl(a) ? "cost per lead" : isCpConv(a) ? "cost per conversation" : KPI_LABELS[a.kpi];
 }
 
 /** Bulletproof pass B6 — the export's own currency symbol (from the spend
@@ -87,6 +92,7 @@ export function currencySymbol(currency: string | null | undefined): string | nu
 
 export function kpiExplainerFor(a: KpiWithBasis & { currency?: string | null }): string {
   if (isCpl(a)) return "Cost per lead — what one lead costs in ad spend";
+  if (isCpConv(a)) return "Cost per conversation — what one started messaging conversation costs in ad spend";
   if (a.kpi === "roas") {
     const sym = currencySymbol(a.currency);
     const unit = sym ? `${sym}1` : a.currency ? `1 ${a.currency}` : "unit of currency";
@@ -95,8 +101,17 @@ export function kpiExplainerFor(a: KpiWithBasis & { currency?: string | null }):
   return KPI_EXPLAINERS[a.kpi];
 }
 
+/** Batch D4 — the client register's outcome words: "sale(s)" for
+ *  purchases, but leads and conversations keep their own name. */
+export function saleWords(nouns: { one: string; many: string } | null | undefined): { one: string; many: string } {
+  if (nouns?.one === "lead") return { one: "lead", many: "leads" };
+  if (nouns?.one === "conversation") return { one: "conversation", many: "conversations" };
+  return { one: "sale", many: "sales" };
+}
+
 /** outcomeNounsForKpi, basis-aware: lead-based CPA counts leads. */
 export function outcomeNounsFor(a: KpiWithBasis): { one: string; many: string } | null {
+  if (isCpConv(a)) return { one: "conversation", many: "conversations" };
   return isCpl(a) ? { one: "lead", many: "leads" } : outcomeNounsForKpi(a.kpi);
 }
 
@@ -112,7 +127,9 @@ export type ConversionField =
   | "purchaseValue"
   | "purchaseRoas"
   | "costPerPurchase"
-  | "costPerLead";
+  | "costPerLead"
+  | "conversations"
+  | "costPerConversation";
 
 /** "exact": a standard Meta header. "partial": the header only CONTAINS
  *  an alias (e.g. "Qualified leads" → leads). "results": Meta's
@@ -294,6 +311,10 @@ export interface AppliedCriterion {
 /** Context the user fills in alongside the CSV — never stored. */
 export interface DebriefContext extends DecisionInputContext {
   kpi: KpiKey;
+  /** Batch D4 — with kpi "cpa": "conversation" reads CPA as cost per
+   *  messaging conversation started (the picker's "Cost per
+   *  conversation"). Unset ⇒ purchase/lead CPA, unchanged. */
+  cpaOutcome?: "conversation" | null;
   /** First-Run Robustness 2 — the user's OWN minimum purchases/leads
    *  before an ad is judged (outcome KPIs only: ROAS, CPA, Purchases,
    *  Leads). Unset/null ⇒ today's behaviour exactly. Different from
@@ -428,7 +449,7 @@ export interface ParsedAd {
   zeroConversions?: true;
   /** CPA Leads Label: set ONLY when the KPI is CPA and every CPA value in
    *  the export came from lead data (cost per lead / spend ÷ leads). */
-  cpaBasis?: "lead";
+  cpaBasis?: "lead" | "conversation";
   /** Best-effort lowercase keyword tags pulled from the ad name, used
    *  only for structural pattern hints — never presented as certainty.
    *  When the user confirms a format, this holds exactly that one tag

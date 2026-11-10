@@ -78,7 +78,8 @@ try {
 
   /* ---- Wiring: route + generator use the shared check ---- */
   const route = readFileSync(join(ROOT, "app/api/debrief/route.ts"), "utf8");
-  assert.match(route, /const checked = checkExport\(text, context\.kpi\);\s*if \(!checked\.ok\) return fail\(400, checked\.error\);/);
+  // Batch D4: the conversation outcome is part of the KPI check.
+  assert.match(route, /const checked = checkExport\(text, context\.kpi, undefined, context\.cpaOutcome\);\s*if \(!checked\.ok\) return fail\(400, checked\.error\);/);
   const gen = readFileSync(join(ROOT, "components/debrief/GeneratorPanel.tsx"), "utf8");
   assert.match(gen, /const checked = checkExportStructure\(text, file\.size\);/, "checked on drop");
   assert.match(gen, /const canSubmit = !!file && fileUsable;/, "Generate disabled for an unusable file");
