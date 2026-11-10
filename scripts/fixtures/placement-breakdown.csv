@@ -1,0 +1,25 @@
+Reporting starts,Reporting ends,Ad name,Platform,Placement,Amount spent (EUR),Impressions,Link clicks,Purchases,Purchases conversion value
+2025-04-01,2025-04-30,Hero_UGC_V1,Facebook,"Feed",220.00,22000,264,13,1092.00
+2025-04-01,2025-04-30,Hero_UGC_V1,Instagram,"Feed",242.00,24200,319,14,1176.00
+2025-04-01,2025-04-30,Hero_UGC_V1,Instagram,"Stories",198.00,19800,213,11,924.00
+2025-04-01,2025-04-30,Hero_UGC_V1,Audience Network,"Native, banner and interstitial",40.00,6000,1320,1,60.00
+2025-04-01,2025-04-30,Review_Static_V2,Facebook,"Feed",220.00,22000,264,11,792.00
+2025-04-01,2025-04-30,Review_Static_V2,Instagram,"Feed",242.00,24200,319,12,864.00
+2025-04-01,2025-04-30,Review_Static_V2,Instagram,"Stories",198.00,19800,213,10,720.00
+2025-04-01,2025-04-30,Review_Static_V2,Audience Network,"Native, banner and interstitial",40.00,6000,1320,0,0.00
+2025-04-01,2025-04-30,Demo_Video_V3,Facebook,"Feed",220.00,22000,264,9,540.00
+2025-04-01,2025-04-30,Demo_Video_V3,Instagram,"Feed",242.00,24200,319,10,600.00
+2025-04-01,2025-04-30,Demo_Video_V3,Instagram,"Stories",198.00,19800,213,8,480.00
+2025-04-01,2025-04-30,Demo_Video_V3,Audience Network,"Native, banner and interstitial",40.00,6000,1320,0,0.00
+2025-04-01,2025-04-30,Bundle_Static_V4,Facebook,"Feed",220.00,22000,264,8,432.00
+2025-04-01,2025-04-30,Bundle_Static_V4,Instagram,"Feed",242.00,24200,319,9,486.00
+2025-04-01,2025-04-30,Bundle_Static_V4,Instagram,"Stories",198.00,19800,213,7,378.00
+2025-04-01,2025-04-30,Bundle_Static_V4,Audience Network,"Native, banner and interstitial",40.00,6000,1320,0,0.00
+2025-04-01,2025-04-30,Promo_Static_V5,Facebook,"Feed",220.00,22000,264,6,252.00
+2025-04-01,2025-04-30,Promo_Static_V5,Instagram,"Feed",242.00,24200,319,7,294.00
+2025-04-01,2025-04-30,Promo_Static_V5,Instagram,"Stories",198.00,19800,213,6,252.00
+2025-04-01,2025-04-30,Promo_Static_V5,Audience Network,"Native, banner and interstitial",40.00,6000,1320,0,0.00
+2025-04-01,2025-04-30,Meme_Static_V6,Facebook,"Feed",220.00,22000,264,4,120.00
+2025-04-01,2025-04-30,Meme_Static_V6,Instagram,"Feed",242.00,24200,319,5,150.00
+2025-04-01,2025-04-30,Meme_Static_V6,Instagram,"Stories",198.00,19800,213,4,120.00
+2025-04-01,2025-04-30,Meme_Static_V6,Audience Network,"Native, banner and interstitial",40.00,6000,1320,0,0.00

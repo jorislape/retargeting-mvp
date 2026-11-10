@@ -682,6 +682,11 @@ export interface AnalysisResult {
    *  cart (≥ 1,000 impressions; fairTest.ts). A hypothesis from early
    *  signals, never a result; display only. */
   fairTest?: import("./fairTest").FairTestPick[];
+  /** Batch D3 — placements (with a placement column) or ads whose link
+   *  CTR is ≥ 3× the account / median ad's while clicks convert below
+   *  the median (clickOutliers.ts). Likely accidental clicks; display
+   *  only. */
+  clickOutliers?: import("./clickOutliers").ClickOutliers;
   burningSpend?: {
     ads: { name: string; spend: number }[];
     bar: number;
@@ -1454,6 +1459,9 @@ export interface Memo {
    *  one line per ad + how to push delivery; one client sentence.
    *  Always a hypothesis from early signals. Display only. */
   fairTest?: { buyer: { intro: string; items: string[]; how: string }; client: string };
+  /** Batch D3 — the click-outlier finding, buyer only (exec summary +
+   *  TXT). Display only. */
+  clickOutliers?: string;
   /** Real-account review — client "What worked" only: the strongest vs
    *  weakest value of up to 2 naming keys in plain words. Absent
    *  without a naming convention. Display only. */

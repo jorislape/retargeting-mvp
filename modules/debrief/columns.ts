@@ -329,6 +329,7 @@ export interface ColumnMap {
 const BREAKDOWN_HEADERS = new Set([
   "day", "week", "month", "date", "hour of day", "time of day",
   "age", "gender", "placement", "platform", "position", "device platform", "impression device",
+  "publisher platform", "platform position",
   "country", "region", "dma region", "dma", "business locations",
 ]);
 

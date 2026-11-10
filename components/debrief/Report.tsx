@@ -198,6 +198,8 @@ function ExecutiveSummary({ memo, view }: { memo: Memo; view: ReportView }) {
     { label: "Structure", value: memo.spreadThin },
     /* Batch D1: 0-outcome ads past 1× the cost of one — display only. */
     { label: "Burning spend", value: client ? undefined : memo.burningSpend?.buyer.replace(/^Burning spend: /, "") },
+    /* Batch D3: likely accidental clicks — display only. */
+    { label: "Click outliers", value: client ? undefined : memo.clickOutliers },
     /* Bulletproof A-fix 2: a comparability finding, on page 1. */
     { label: "Attribution", value: memo.scope.attributionWarning },
     /* Bulletproof pass A2: two labels — how clearly the data separates

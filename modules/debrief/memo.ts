@@ -1005,6 +1005,24 @@ function buildFairTest(analysis: AnalysisResult): { fairTest?: NonNullable<Memo[
   };
 }
 
+/** Batch D3 — likely accidental clicks: one buyer line. */
+function buildClickOutliers(analysis: AnalysisResult): { clickOutliers?: string } {
+  const o = analysis.clickOutliers;
+  if (!o) return {};
+  const pct = (v: number, d: number) => `${v.toFixed(d)}%`;
+  const parts = o.items.map((i) => {
+    const what = o.basis === "placement" ? i.label : `"${i.label}"`;
+    const vs = o.basis === "placement" ? "account CTR" : "median ad's CTR";
+    return `${what}: CTR ${pct(i.ctr, 2)} vs ${pct(o.ctrBar, 2)} ${vs} (${(i.ctr / o.ctrBar).toFixed(1)}×), but ${pct(i.convRate, 1)} of clicks converted vs ${pct(o.medianConvRate, 1)} median`;
+  });
+  return {
+    clickOutliers:
+      o.basis === "placement"
+        ? `${parts.join("; ")} — likely accidental clicks; consider excluding ${o.items.length === 1 ? "this placement" : "these placements"}.`
+        : `${parts.join("; ")} — likely accidental clicks; check ${o.items.length === 1 ? "its" : "their"} placement breakdown before scaling.`,
+  };
+}
+
 /** Real-account fix 8 — formats analysis.namingPatterns for the report
  *  and TXT. Absent key when there's no convention (byte-identical). */
 function buildNamingPatterns(analysis: AnalysisResult): { namingPatterns?: MemoNamingPatterns } {
@@ -2919,6 +2937,7 @@ export function generateMemo(analysis: AnalysisResult, context: DebriefContext):
     ...buildSpreadThin(analysis),
     ...buildBurningSpend(analysis),
     ...buildFairTest(analysis),
+    ...buildClickOutliers(analysis),
     ...buildNamingClientLine(analysis),
     marketSignal: buildMarketSignal(analysis, context),
     nextTests,

@@ -310,6 +310,7 @@ export function memoToText(
   /* Real-account review: buyer only, near the top. */
   if (view !== "client" && memo.spreadThin) lines.push(memo.spreadThin);
   if (view !== "client" && memo.burningSpend) lines.push(memo.burningSpend.buyer);
+  if (view !== "client" && memo.clickOutliers) lines.push(`Click outliers: ${memo.clickOutliers}`);
   if (view !== "client" && scope.attributionWarning) lines.push(scope.attributionWarning);
   /* Bulletproof pass A3: stage medians / the mixed-stage warning. The
      client gets them as one Notes line under the Next move (Pass C4). */

@@ -9,6 +9,7 @@ import { fmtKpiValue } from "./format";
 import { extractAds } from "./extract";
 import { adFormatClass, differOnlyInEngagedView } from "./adFormat";
 import { detectFairTest } from "./fairTest";
+import { detectClickOutliers } from "./clickOutliers";
 import { parseNumericCell } from "./csv";
 import {
   AnalysisResult,
@@ -483,6 +484,14 @@ export function analyze(
     ...((): Pick<AnalysisResult, "fairTest"> => {
       const picks = detectFairTest(gated, new Set(burning?.ads.map((a) => a.name) ?? []));
       return picks.length > 0 ? { fairTest: picks } : {};
+    })(),
+    /* Batch D3: placements (or ads) with ≥ 3× the CTR and below-median
+       conversion rate — likely accidental clicks; display only. */
+    ...((): Pick<AnalysisResult, "clickOutliers"> => {
+      const outcomeColumn =
+        kpi === "leads" || cpaBasis === "leads" ? columns.leads : (columns.purchases ?? columns.leads);
+      const found = detectClickOutliers(rawRows, columns, ads, outcomeColumn);
+      return found ? { clickOutliers: found } : {};
     })(),
     /* Trust Pass 2: the blended account result (display-only). */
     ...((): { accountKpi?: NonNullable<AnalysisResult["accountKpi"]> } => {
