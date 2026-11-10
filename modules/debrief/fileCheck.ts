@@ -103,8 +103,44 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
       ok: false,
       error: {
         title: "Ad name column not found",
-        message: "I couldn't find an Ad name / Creative name column.",
-        fix: "Export at ad level and include Ad name.",
+        /* Batch D5: say what the file is, and where to export from. */
+        message: "This is a campaign-level export — export from the Ads tab.",
+        fix: "In Ads Manager, open the Ads tab, select the ads, and export with Ad name included.",
+        detectedColumns,
+      },
+    };
+  }
+  /* Batch D5: one ad account and one currency per file — mixed files
+     would be compared on one median and summed into one total. */
+  const distinct = (header: string | null) =>
+    header ? new Set(rows.map((r) => (r[header] ?? "").trim()).filter((v) => v !== "")).size : 0;
+  const accounts = Math.max(distinct(columns.accountId), distinct(columns.accountName));
+  if (accounts > 1) {
+    return {
+      ok: false,
+      error: {
+        title: "More than one ad account",
+        message: `This file has ${accounts} ad accounts — export one account at a time.`,
+        fix: "In Ads Manager, switch to one ad account and export its ads again.",
+        detectedColumns,
+      },
+    };
+  }
+  const currencyHeader = headers.find((h) => h.trim().toLowerCase() === "currency") ?? null;
+  const spendCodes = new Set(
+    headers.filter((h) => /^\s*(amount spent|spend)\b/i.test(h)).flatMap((h) => {
+      const code = h.match(/\(([A-Za-z]{3})\)/)?.[1];
+      return code ? [code.toUpperCase()] : [];
+    })
+  );
+  const currencies = Math.max(distinct(currencyHeader), spendCodes.size);
+  if (currencies > 1) {
+    return {
+      ok: false,
+      error: {
+        title: "More than one currency",
+        message: `This file has ${currencies} currencies — export one account at a time.`,
+        fix: "In Ads Manager, switch to one ad account and export its ads again.",
         detectedColumns,
       },
     };

@@ -410,7 +410,7 @@ export function mergedRowsNote(merged: {
   const head = `${folded} row${folded === 1 ? "" : "s"} merged into ${merged.creatives} creative${merged.creatives === 1 ? "" : "s"}`;
   const n = merged.names;
   return merged.breakdowns.length > 0
-    ? `Broken down by ${merged.breakdowns.join(", ")}: ${head} — one per ad name (spend, purchases and value summed).`
+    ? `Breakdown rows combined (${merged.breakdowns.join(", ")}): ${head} — one per ad name (spend, purchases and value summed).`
     : `${head} — ${n} ad name${n === 1 ? " appears" : "s appear"} on more than one row with spend${
         merged.adSetColumn ? " (the same creative in several ad sets)" : ""
       }; spend, purchases and value are summed. Names that differ, like "- Copy", stay separate.`;

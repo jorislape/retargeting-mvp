@@ -189,7 +189,15 @@ function extractDateRange(
   rawRows: Record<string, string>[],
   columns: ColumnMap
 ): { start: string; end: string } | null {
-  if (!columns.reportingStarts || !columns.reportingEnds) return null;
+  if (!columns.reportingStarts || !columns.reportingEnds) {
+    /* Batch D5: a Day/Date breakdown with no Reporting columns still
+       says which days the export covers — the short-window check reads
+       that span. */
+    const day = Object.keys(rawRows[0] ?? {}).find((h) => ["day", "date"].includes(h.trim().toLowerCase()));
+    if (!day) return null;
+    const days = rawRows.map((r) => r[day]).filter((v) => v && v.trim() !== "").map(isoDate).sort();
+    return days.length > 0 ? { start: days[0], end: days[days.length - 1] } : null;
+  }
   const starts = rawRows
     .map((r) => r[columns.reportingStarts!])
     .filter((v) => v && v.trim() !== "")

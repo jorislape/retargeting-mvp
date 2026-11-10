@@ -1174,7 +1174,7 @@ export function buildLimits(
     const breakdowns = analysis.mergedRows?.breakdowns ?? [];
     const why =
       breakdowns.length > 0
-        ? `the export is broken down by ${breakdowns.join(", ")}`
+        ? `breakdown rows combined — the export is split by ${breakdowns.join(", ")}`
         : analysis.mergedRows?.adSetColumn
           ? "the same creative ran in several ad sets"
           : "the same name appears more than once in this export";

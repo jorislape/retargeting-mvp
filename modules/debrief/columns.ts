@@ -139,6 +139,8 @@ const ALIASES = {
   adSetName: ["ad set name"],
   campaignName: ["campaign name"],
   accountName: ["account name"],
+  /* Batch D5: upload guards — one account, one currency per file. */
+  accountId: ["account id"],
 } as const;
 
 /** Meta's per-campaign optimisation-event columns. They're resolved as
@@ -323,6 +325,8 @@ export interface ColumnMap {
   campaignName: string | null;
   /** Real-account fix 7 — "Account name", when exported: the report title. */
   accountName: string | null;
+  /** Batch D5 — "Account ID" (structural; the one-account guard). */
+  accountId: string | null;
   /** 3-letter currency code pulled from the spend header, if present. */
   currency: string | null;
   /** KPI Source Column Disclosure: for each RESOLVED conversion field,
@@ -395,6 +399,7 @@ export function resolveColumns(allHeaders: string[]): ColumnMap {
     adSetName: findHeader(headers, ALIASES.adSetName),
     campaignName: findHeader(headers, ALIASES.campaignName),
     accountName: findHeader(headers, ALIASES.accountName),
+    accountId: findHeader(headers, ALIASES.accountId),
     currency: currencyMatch ? currencyMatch[1].toUpperCase() : null,
     sources: resolveSources(headers),
     attributionSplits: resolveAttributionSplits(allHeaders),

@@ -90,10 +90,10 @@ try {
     assert.deepEqual(b.analysis.mergedRows, { rows: 5, breakdowns: ["Day"], adSetColumn: false, adIdColumn: false });
     const a = b.memo.winners.find((x) => x.name === "A") ?? b.memo.losers.rows.find((x) => x.name === "A");
     assert.equal(a?.runsInLabel, "appears 3 times in this export", "a breakdown repeats ads; it doesn't prove ad sets");
-    assert.ok(b.memo.decision.limits.buyer.some((l) => l.includes("(the export is broken down by Day)")));
+    assert.ok(b.memo.decision.limits.buyer.some((l) => l.includes("(breakdown rows combined — the export is split by Day)")));
     assert.equal(
       mergedRowsNote({ names: 2, spendRows: 5, creatives: 2, breakdowns: ["Day"] }),
-      "Broken down by Day: 3 rows merged into 2 creatives — one per ad name (spend, purchases and value summed)."
+      "Breakdown rows combined (Day): 3 rows merged into 2 creatives — one per ad name (spend, purchases and value summed)."
     );
   }
   /* ---- An ad set column counts real ad sets ---- */
