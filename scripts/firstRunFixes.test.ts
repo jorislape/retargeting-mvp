@@ -285,8 +285,11 @@ try {
   // Batch D4: the option may also carry the conversation outcome.
   assert.match(gen, /onClick=\{\(\) => chooseKpiManually\(opt\.value, opt\.outcome \?\? null\)\}/, "KPI selector marks a manual choice");
   assert.match(gen, /chooseKpiManually\(k\);\s*clearError\(\);/, "error one-click switch marks a manual choice");
-  assert.match(gen, /chooseAutoKpi\(current, usability, kpiManualRef\.current\)/, "auto-switch respects the manual flag");
-  assert.match(gen, /No \{KPI_LABELS\[kpiNotice\.from\]\} values in this export —\s*switched to \{kpiDisplay\(kpiNotice\.to\)\}\./);
+  // Batch D fix 2: a manual choice belongs to the file it was made on; a
+  // new file gets a fresh detection.
+  assert.match(gen, /const pick = kpiManualRef\.current === file \? null : autoKpiForFile\(usability, conversationsFound\);/, "auto-switch respects the manual flag for this file");
+  assert.match(gen, /if \(kpiManualRef\.current === "pending"\) kpiManualRef\.current = file;\s*else if \(kpiManualRef\.current !== file\) kpiManualRef\.current = null;/, "a choice made for the previous file doesn't carry over");
+  assert.match(gen, /No \{KPI_LABELS\[kpiNotice\.from\]\} values in this export —\s*switched to \{kpiNotice\.toOutcome === "conversation" \? "Cost per conversation" : kpiDisplay\(kpiNotice\.to\)\}\./);
 
   // Early Generate button: a second submit button in the same form — the
   // form's single onSubmit is the only handler.

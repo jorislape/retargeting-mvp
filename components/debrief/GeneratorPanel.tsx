@@ -23,7 +23,7 @@ import {
   conversationColumnsMissing,
   checkExportStructure,
   MAX_FILE_BYTES,
-  chooseAutoKpi,
+  autoKpiForFile,
   EXPORT_AT_AD_LEVEL,
   kpiSourcePreview,
   kpiUsability,
@@ -585,24 +585,31 @@ export function GeneratorPanel() {
   );
   const showAllFormats = expandedFormatsFor !== null && expandedFormatsFor === file;
 
-  /* First-Run Fixes: KPI auto-selection. kpiManualRef flips the first
-     time the user picks a KPI (selector or an error's one-click switch)
-     and from then on the data never changes their choice. kpiRef lets
-     the file-read effect see the current KPI without re-running on it. */
-  const kpiManualRef = useRef(false);
+  /* First-Run Fixes: KPI auto-selection. Batch D fix 2: a manual choice
+     belongs to the file it was made on — kpiManualRef holds that File
+     ("pending" when made before any file, so it applies to the next
+     one). A newly loaded file gets a fresh detection unless the user
+     picks a KPI after it loads. kpiRef / outcomeRef let the file-read
+     effect see the current KPI without re-running on it. */
+  const kpiManualRef = useRef<File | "pending" | null>(null);
   const kpiRef = useRef(fields.kpi);
+  const outcomeRef = useRef(fields.cpaOutcome);
   useEffect(() => {
     kpiRef.current = fields.kpi;
-  }, [fields.kpi]);
-  const [kpiNotice, setKpiNotice] = useState<{ from: KpiKey; to: KpiKey } | null>(null);
+    outcomeRef.current = fields.cpaOutcome;
+  }, [fields.kpi, fields.cpaOutcome]);
+  const [kpiNotice, setKpiNotice] = useState<{ from: KpiKey; to: KpiKey; toOutcome: "conversation" | null } | null>(null);
   const chooseKpiManually = (k: KpiKey, outcome: "conversation" | null = null) => {
-    kpiManualRef.current = true;
+    kpiManualRef.current = file ?? "pending";
     setKpiNotice(null);
     updateFields({ kpi: k, cpaOutcome: outcome });
   };
 
   useEffect(() => {
     if (!file) return;
+    /* A choice made for the previous file doesn't carry over. */
+    if (kpiManualRef.current === "pending") kpiManualRef.current = file;
+    else if (kpiManualRef.current !== file) kpiManualRef.current = null;
     let cancelled = false;
     /* An oversized file is never read — the size check fails first. */
     (file.size > MAX_FILE_BYTES ? Promise.resolve("") : file.text())
@@ -713,13 +720,18 @@ export function GeneratorPanel() {
           groupKeyByName,
           merged,
         });
-        /* First-Run Fixes: the KPI follows the data — but only until the
-           user picks one themselves; a manual choice is never overridden. */
+        /* First-Run Fixes: the KPI follows the data — but never overrides
+           a KPI the user picked for this file. Batch D fix 2: each new
+           file gets a fresh detection; the "switched" notice shows only
+           when the previous KPI doesn't work for this file. */
         const current = kpiRef.current;
-        const next = chooseAutoKpi(current, usability, kpiManualRef.current);
-        if (next) {
-          updateFields({ kpi: next, cpaOutcome: null });
-          setKpiNotice({ from: current, to: next });
+        const currentOutcome = outcomeRef.current;
+        const pick = kpiManualRef.current === file ? null : autoKpiForFile(usability, conversationsFound);
+        if (pick && (pick.kpi !== current || pick.cpaOutcome !== currentOutcome)) {
+          const currentWorks =
+            current === "cpa" && currentOutcome === "conversation" ? conversationsFound : usability[current]?.usable;
+          updateFields({ kpi: pick.kpi, cpaOutcome: pick.cpaOutcome });
+          setKpiNotice(currentWorks ? null : { from: current, to: pick.kpi, toOutcome: pick.cpaOutcome });
         } else {
           setKpiNotice(null);
         }
@@ -1497,7 +1509,7 @@ export function GeneratorPanel() {
                 {kpiNotice && kpiNotice.to === fields.kpi && (
                   <p role="status" className="mt-1.5 text-xs leading-relaxed text-accent-soft">
                     No {KPI_LABELS[kpiNotice.from]} values in this export —
-                    switched to {kpiDisplay(kpiNotice.to)}.{" "}
+                    switched to {kpiNotice.toOutcome === "conversation" ? "Cost per conversation" : kpiDisplay(kpiNotice.to)}.{" "}
                     <button
                       type="button"
                       onClick={() => {

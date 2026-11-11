@@ -98,6 +98,20 @@ export function chooseAutoKpi(
   return preferredUsableKpi(usability, current);
 }
 
+/** Batch D fix 2 — a fresh KPI pick for a newly loaded file (the
+ *  previous file's KPI is not carried over): the best usable KPI; and
+ *  when the file's only outcome column is messaging conversations
+ *  (nothing better than CTR/CPC), Cost per conversation. null ⇒ nothing
+ *  usable, the missing-column guidance applies. */
+export function autoKpiForFile(
+  usability: Record<KpiKey, KpiUsability>,
+  conversationsFound: boolean
+): { kpi: KpiKey; cpaOutcome: "conversation" | null } | null {
+  const best = preferredUsableKpi(usability);
+  if (conversationsFound && (best == null || best === "ctr" || best === "cpc")) return { kpi: "cpa", cpaOutcome: "conversation" };
+  return best ? { kpi: best, cpaOutcome: null } : null;
+}
+
 /** Preview warning: the selected KPI's column exists but most ads have
  *  no value in it (fewer than half). null when it doesn't apply. */
 export function sparseKpiWarning(u: KpiUsability, label: string): string | null {

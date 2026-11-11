@@ -58,6 +58,22 @@ try {
   assert.equal(noConv.error?.title, "Cost per conversation column not found");
   assert.match(noConv.error?.message ?? "", /Messaging conversations started/);
 
+  /* Fix 2: a fresh KPI pick per file — conversations-only ⇒ Cost per
+     conversation; a purchase export ⇒ ROAS, never the previous file's KPI. */
+  const { kpiUsability, autoKpiForFile } = requireCompiled("modules/debrief/kpiUsability.js") as {
+    kpiUsability: (rows: Record<string, string>[], columns: unknown) => Record<string, { usable: boolean }>;
+    autoKpiForFile: (u: Record<string, { usable: boolean }>, conversationsFound: boolean) => { kpi: string; cpaOutcome: string | null } | null;
+  };
+  const { parseCsv, toTable } = requireCompiled("modules/debrief/csv.js") as { parseCsv: (t: string) => string[][]; toTable: (m: string[][]) => { headers: string[]; rows: Record<string, string>[] } };
+  const { resolveColumns, conversationColumnsMissing } = requireCompiled("modules/debrief/columns.js") as { resolveColumns: (h: string[]) => unknown; conversationColumnsMissing: (c: unknown) => string[] };
+  const pickFor = (csv: string) => {
+    const { headers, rows } = toTable(parseCsv(csv));
+    const cols = resolveColumns(headers);
+    return autoKpiForFile(kpiUsability(rows, cols), conversationColumnsMissing(cols).length === 0);
+  };
+  assert.deepEqual(pickFor(MSG), { kpi: "cpa", cpaOutcome: "conversation" });
+  assert.deepEqual(pickFor(readFileSync(join(ROOT, "scripts/fixtures/day-age-breakdown.csv"), "utf8")), { kpi: "roas", cpaOutcome: null });
+
   /* UI + route wiring. */
   const panel = readFileSync(join(ROOT, "components/debrief/GeneratorPanel.tsx"), "utf8");
   assert.match(panel, /\{ value: "cpa", label: "Cost per conversation", outcome: "conversation" \}/);
