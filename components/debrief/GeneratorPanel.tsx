@@ -539,6 +539,8 @@ export function GeneratorPanel() {
     rows: number;
     cols: number;
     kpisFound: KpiKey[];
+    /** Batch D fix 1 — the export can run Cost per conversation. */
+    conversationsFound: boolean;
     /** KPI Source Column Disclosure: the resolved column map, kept so
      *  the source line follows the KPI selector without re-reading the
      *  file. Display only. */
@@ -615,9 +617,10 @@ export function GeneratorPanel() {
         const matrix = parseCsv(text);
         const headers = matrix[0] ?? [];
         const columns = resolveColumns(headers);
-        const kpisFound = KPI_OPTIONS.map((o) => o.value).filter(
+        const kpisFound = [...new Set(KPI_OPTIONS.map((o) => o.value))].filter(
           (k) => requiredColumnsFor(k, columns).length === 0
         );
+        const conversationsFound = conversationColumnsMissing(columns).length === 0;
         const usability = kpiUsability(toTable(matrix).rows, columns);
         const nameIdx = columns.adName ? headers.indexOf(columns.adName) : -1;
         const seen = new Set<string>();
@@ -700,6 +703,7 @@ export function GeneratorPanel() {
           rows: Math.max(0, matrix.length - 1),
           cols: headers.length,
           kpisFound,
+          conversationsFound,
           columnMap: columns,
           usability,
           spendTotal,
@@ -749,8 +753,14 @@ export function GeneratorPanel() {
      the preview, the notice and the source line say so. */
   const cplInPreview = preview?.usability.cpa.cpaLeadBased ?? false;
   const previewCpl = fields.kpi === "cpa" && cplInPreview && !conversationRun;
+  /* Batch D fix 1: the file card names the KPI actually selected and
+     lists the conversations column among the KPIs this file supports. */
+  const previewKpiLabels = preview
+    ? [...preview.kpisFound.map((k) => KPI_LABELS[k]), ...(preview.conversationsFound ? ["Cost per conversation"] : [])]
+    : [];
   const kpiDisplay = (k: KpiKey, longForm = false) =>
     k === "cpa" && cplInPreview ? (longForm ? "CPA (cost per lead)" : "cost per lead") : KPI_LABELS[k];
+  const selectedKpiLabel = conversationRun ? "Cost per conversation" : kpiDisplay(fields.kpi, true);
   /* KPI Source Column Disclosure: which column the selected KPI's
      conversion data comes from (and any competing variants ignored). */
   const previewKpiSource =
@@ -1467,14 +1477,9 @@ export function GeneratorPanel() {
                         preview.dateRange
                           ? ` · ${preview.dateRange.start} → ${preview.dateRange.stop}`
                           : ""
-                      }. KPI columns: ${
-                        preview.kpisFound.map((k) => KPI_LABELS[k]).join(", ") ||
-                        "none detected"
-                      } — ${kpiDisplay(fields.kpi, true)} selected.`
-                    : `${KPI_LABELS[fields.kpi]} was selected, but no ${KPI_LABELS[fields.kpi]}-like column was detected. You can still run, but Debrief may return a missing-column error.${
-                        preview.kpisFound.length > 0
-                          ? ` Columns found for: ${preview.kpisFound.map((k) => KPI_LABELS[k]).join(", ")}.`
-                          : ""
+                      }. KPI columns: ${previewKpiLabels.join(", ") || "none detected"} — ${selectedKpiLabel} selected.`
+                    : `${selectedKpiLabel} was selected, but no ${selectedKpiLabel}-like column was detected. You can still run, but Debrief may return a missing-column error.${
+                        previewKpiLabels.length > 0 ? ` Columns found for: ${previewKpiLabels.join(", ")}.` : ""
                       }`}
                 </p>
                 {previewKpiSource && (

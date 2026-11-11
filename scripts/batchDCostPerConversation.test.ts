@@ -61,6 +61,10 @@ try {
   /* UI + route wiring. */
   const panel = readFileSync(join(ROOT, "components/debrief/GeneratorPanel.tsx"), "utf8");
   assert.match(panel, /\{ value: "cpa", label: "Cost per conversation", outcome: "conversation" \}/);
+  /* Fix 1: the file card names the selected KPI and lists the conversations column. */
+  assert.match(panel, /const selectedKpiLabel = conversationRun \? "Cost per conversation" : kpiDisplay\(fields\.kpi, true\);/);
+  assert.match(panel, /\.\.\.\(preview\.conversationsFound \? \["Cost per conversation"\] : \[\]\)/);
+  assert.match(panel, /KPI columns: \$\{previewKpiLabels\.join\(", "\) \|\| "none detected"\} — \$\{selectedKpiLabel\} selected\./);
   const provider = readFileSync(join(ROOT, "components/workspace/DebriefProvider.tsx"), "utf8");
   assert.match(provider, /body\.append\("cpaOutcome", "conversation"\)/);
   const route = readFileSync(join(ROOT, "app/api/debrief/route.ts"), "utf8");
