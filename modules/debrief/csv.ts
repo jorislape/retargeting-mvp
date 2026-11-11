@@ -154,14 +154,32 @@ export function toTable(matrix: string[][]): CsvTable {
   if (matrix.length === 0) return { headers: [], rows: [] };
   const [headerRow, ...dataRows] = matrix;
   const headers = headerRow.map((h) => h.trim());
+  /* Robustness 2: when a header repeats, the FIRST column is the one
+     read. Keyed by header, a later column used to overwrite it silently
+     — a "Purchase ROAS" column followed by a second column with the
+     same header showed the second column's numbers. duplicateHeaders()
+     below feeds the file card's line about it. */
+  const firstIndex = new Map<string, number>();
+  headers.forEach((h, i) => {
+    if (!firstIndex.has(h)) firstIndex.set(h, i);
+  });
   const rows = dataRows.map((r) => {
     const obj: Record<string, string> = {};
-    headers.forEach((h, i) => {
-      obj[h] = (r[i] ?? "").trim();
-    });
+    for (const [h, i] of firstIndex) obj[h] = (r[i] ?? "").trim();
     return obj;
   });
   return { headers, rows };
+}
+
+/** Headers that appear more than once (blank headers ignored), with
+ *  their counts, in file order. */
+export function duplicateHeaders(headers: readonly string[]): { header: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const raw of headers) {
+    const h = raw.trim();
+    if (h !== "") counts.set(h, (counts.get(h) ?? 0) + 1);
+  }
+  return [...counts].filter(([, n]) => n > 1).map(([header, count]) => ({ header, count }));
 }
 
 /** Strips currency/thousands formatting ("$1,234.50", "12%", "--") to a

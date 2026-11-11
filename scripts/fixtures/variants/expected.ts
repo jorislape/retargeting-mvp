@@ -283,7 +283,6 @@ export const PENDING: Record<string, string> = {
   "11-website-value-and-roas-without-count": "purchase count read from the conversion-value column",
   "15-results-mixed-indicator": "Results counted as purchases whatever the Result indicator says",
   "17-results-cpa-mixed-indicator": "Results counted as purchases whatever the Result indicator says",
-  "23-duplicate-roas-header": "a repeated header silently reads the LAST column",
   "33-eu-whole-numbers-dot-thousands": "dot thousands read as decimals when the file has no decimals",
   "51-localized-lt": "a non-English export is called a campaign-level export",
   "52-localized-es": "a non-English export is called a campaign-level export",

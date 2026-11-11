@@ -11,7 +11,7 @@
  *   checkExportStructure(text, sizeBytes) — KPI-independent
  *   checkExportKpi(structure, kpi)        — spend + selected KPI columns
  */
-import { parseCsvDetailed, toTable, type CsvDelimiter } from "./csv";
+import { duplicateHeaders, parseCsvDetailed, toTable, type CsvDelimiter } from "./csv";
 import { EXPORT_AT_AD_LEVEL, conversationColumnsMissing, requiredColumnsFor, resolveColumns, type ColumnMap } from "./columns";
 import { summaryRowFlags, summaryRowsNote } from "./extract";
 import { DebriefApiError, KPI_LABELS, KpiKey } from "./types";
@@ -119,6 +119,18 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
      "Total" line) is a total, not an ad — dropped here, once, so the
      file card, the API and the report all count the same rows. */
   const notes: string[] = [];
+  /* Robustness 2: a header that repeats is read from its first column
+     — said here, never decided silently. */
+  const repeated = duplicateHeaders(headers);
+  if (repeated.length > 0) {
+    const shown = repeated.slice(0, 3).map((d) => `'${d.header}' appears ${d.count} times`);
+    const more = repeated.length - shown.length;
+    notes.push(
+      `${shown.join(", ")}${more > 0 ? ` (+${more} more repeated column${more === 1 ? "" : "s"})` : ""} in this file — the first column${
+        repeated.length === 1 ? "" : " of each"
+      } is read. If the second holds different numbers (another attribution window, another account), remove one and upload again.`
+    );
+  }
   const summary = summaryRowFlags(allRows, columns);
   const summaryNote = summaryRowsNote(allRows, columns, summary);
   if (summaryNote) notes.push(summaryNote);
