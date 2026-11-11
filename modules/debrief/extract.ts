@@ -1,5 +1,6 @@
 import { ClickBasis, ColumnMap, clickBasisFor } from "./columns";
 import { parseNumericCell } from "./csv";
+import { fmtMoney } from "./format";
 import {
   CREATIVE_FORMAT_LABELS,
   CreativeFormatOverrides,
@@ -243,6 +244,70 @@ function upstreamFieldsForRow(row: Record<string, string>, columns: ColumnMap) {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Robustness 1 — summary rows are totals, not ads                     */
+/* ------------------------------------------------------------------ */
+
+/** A total row someone labelled ("Total", "Grand total", "Results from
+ *  12 ads") — treated as a summary only when its spend also equals the
+ *  sum of the other rows, so an ad that is really named "Total" stays. */
+const TOTAL_LABEL = /^(?:grand\s+)?totals?:?$|^summary$|^all ads$|^(?:results|totals?)\s+(?:from|for)\s+[\d.,\s]+ads?$/i;
+
+/**
+ * Flags the rows of an ad-level export that are not ads: Ads Manager's
+ * optional summary row ("Include summary row" — the dimension cells are
+ * blank, the metric cells hold the totals) and a hand-added "Total"
+ * line. Counted as an ad, such a row doubled the total spend, became
+ * the biggest "ad" in the report and moved the median.
+ *
+ *  - a row whose Ad name cell is blank (while other rows have names) is
+ *    never an ad — Ads Manager names every ad;
+ *  - a row named like a total is one only when its spend equals the sum
+ *    of the other ad rows (within 0.5%).
+ *
+ * One flag per input row, in order. Needs an Ad name column; with none
+ * resolved nothing is flagged.
+ */
+export function summaryRowFlags(rows: readonly Record<string, string>[], columns: ColumnMap): boolean[] {
+  const flags = rows.map(() => false);
+  const nameCol = columns.adName;
+  if (!nameCol) return flags;
+  const names = rows.map((r) => (r[nameCol] ?? "").trim());
+  if (!names.some((n) => n !== "")) return flags;
+  names.forEach((n, i) => {
+    if (n === "") flags[i] = true;
+  });
+  const spendCol = columns.spend;
+  if (!spendCol) return flags;
+  const spend = rows.map((r) => parseNumericCell(r[spendCol]) ?? 0);
+  names.forEach((n, i) => {
+    if (flags[i] || !TOTAL_LABEL.test(n)) return;
+    const others = spend.reduce((sum, v, j) => (j === i || flags[j] ? sum : sum + v), 0);
+    if (others > 0 && Math.abs(spend[i] - others) <= Math.max(0.02, others * 0.005)) flags[i] = true;
+  });
+  return flags;
+}
+
+/** The file card's line about skipped summary rows — null when the file
+ *  has none. Blank filler rows (no spend) are dropped without a line. */
+export function summaryRowsNote(
+  rows: readonly Record<string, string>[],
+  columns: ColumnMap,
+  flags: readonly boolean[] = summaryRowFlags(rows, columns)
+): string | null {
+  const spendCol = columns.spend;
+  const nameCol = columns.adName;
+  const skipped = rows.filter((r, i) => flags[i] && spendCol != null && (parseNumericCell(r[spendCol]) ?? 0) > 0);
+  if (skipped.length === 0 || !spendCol || !nameCol) return null;
+  const spend = skipped.reduce((sum, r) => sum + (parseNumericCell(r[spendCol]) ?? 0), 0);
+  const labels = [...new Set(skipped.map((r) => (r[nameCol] ?? "").trim()).filter((n) => n !== ""))];
+  const what = labels.length > 0 ? `named ${labels.map((l) => `'${l}'`).join(", ")}` : "with no ad name";
+  const n = skipped.length;
+  return `Summary row${n === 1 ? "" : "s"} skipped: ${n} row${n === 1 ? "" : "s"} ${what} (${fmtMoney(spend, columns.currency)} spend) ${
+    n === 1 ? "is a total, not an ad" : "are totals, not ads"
+  } — not counted.`;
+}
+
 /** Converts raw CSV rows into ParsedAd[]. Rows with no ad-name column
  *  get a positional fallback label so the flow still works, but the
  *  caller should surface that as a confidence note. */
@@ -272,8 +337,11 @@ export function extractAds(
         value: hasNumber(click ? click.value : columns.purchaseValue),
       }
     : null;
+  /* Robustness 1: a summary / total row is not an ad. */
+  const summary = summaryRowFlags(rows, columns);
   const ads = rows
-    .map((row, index) => {
+    .flatMap((row, index) => (summary[index] ? [] : [{ row, index }]))
+    .map(({ row, index }) => {
       const spend = columns.spend ? (parseNumericCell(row[columns.spend]) ?? 0) : 0;
       const name = columns.adName && row[columns.adName]
         ? row[columns.adName]

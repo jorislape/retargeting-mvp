@@ -17,7 +17,6 @@ import {
   mergeCompetitorSourcesIntoNotes,
   normalizeGroupLabel,
   outcomeNounsForKpi,
-  parseCsv,
   parseNumericCell,
   checkExportKpi,
   conversationColumnsMissing,
@@ -28,7 +27,6 @@ import {
   kpiSourcePreview,
   kpiUsability,
   sparseKpiWarning,
-  toTable,
   requiredColumnsFor,
   resolveColumns,
   SAMPLE_CONTEXT,
@@ -567,6 +565,9 @@ export function GeneratorPanel() {
     /** Real-account fix 3 — file-card disclosure: names on several rows
      *  (merged into one creative each) and any breakdown columns. */
     merged: { names: number; spendRows: number; creatives: number; breakdowns: string[]; adSetColumn: boolean };
+    /** Robustness sweep — what the shared file check decided about this
+     *  file (a skipped summary row, …). Display only. */
+    notes: string[];
   } | null>(null);
   /* First-Run Robustness: the shared file check (fileCheck.ts), run on
      drop — the SAME checks and copy the API runs. Keyed to the File so a
@@ -621,14 +622,16 @@ export function GeneratorPanel() {
           return;
         }
         setFileCheckState({ forFile: file, structure: checked.value, error: null });
-        const matrix = parseCsv(text);
-        const headers = matrix[0] ?? [];
-        const columns = resolveColumns(headers);
+        /* Robustness sweep: the card reads the SAME rows and columns the
+           shared check produced (summary rows already dropped) — never a
+           second parse that could count a total row as an ad. */
+        const { headers, columns } = checked.value;
+        const matrix = [headers, ...checked.value.rows.map((r) => headers.map((h) => r[h] ?? ""))];
         const kpisFound = [...new Set(KPI_OPTIONS.map((o) => o.value))].filter(
           (k) => requiredColumnsFor(k, columns).length === 0
         );
         const conversationsFound = conversationColumnsMissing(columns).length === 0;
-        const usability = kpiUsability(toTable(matrix).rows, columns);
+        const usability = kpiUsability(checked.value.rows, columns);
         const nameIdx = columns.adName ? headers.indexOf(columns.adName) : -1;
         const seen = new Set<string>();
         const ads: { name: string; tags: string[] }[] = [];
@@ -719,6 +722,7 @@ export function GeneratorPanel() {
           ads,
           groupKeyByName,
           merged,
+          notes: checked.value.notes,
         });
         /* First-Run Fixes: the KPI follows the data — but never overrides
            a KPI the user picked for this file. Batch D fix 2: each new
@@ -1504,6 +1508,13 @@ export function GeneratorPanel() {
                     {mergedRowsNote(preview.merged)}
                   </p>
                 )}
+                {/* Robustness sweep: nothing about the file is decided
+                    silently — each choice is one line here. */}
+                {preview.notes.map((note) => (
+                  <p key={note} data-file-note className="mt-1 text-xs leading-relaxed text-zinc-300">
+                    {note}
+                  </p>
+                ))}
                 {/* First-Run Fixes: the KPI followed the data — say so,
                     with a one-click way back to the selector. */}
                 {kpiNotice && kpiNotice.to === fields.kpi && (

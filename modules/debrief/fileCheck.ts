@@ -13,6 +13,7 @@
  */
 import { parseCsvDetailed, toTable, type CsvDelimiter } from "./csv";
 import { EXPORT_AT_AD_LEVEL, conversationColumnsMissing, requiredColumnsFor, resolveColumns, type ColumnMap } from "./columns";
+import { summaryRowFlags, summaryRowsNote } from "./extract";
 import { DebriefApiError, KPI_LABELS, KpiKey } from "./types";
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -34,6 +35,10 @@ export interface ExportStructure {
   delimiter: CsvDelimiter;
   decimalComma: boolean;
   detectedColumns: string[];
+  /** Robustness sweep — things Debrief decided about this file that the
+   *  user should see on the file card (a skipped summary row, …). Empty
+   *  for an ordinary export. Display only. */
+  notes: string[];
 }
 
 export type CheckResult<T> = { ok: true; value: T } | { ok: false; error: DebriefApiError };
@@ -86,12 +91,12 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
       },
     };
   }
-  const { headers, rows } = toTable(matrix);
+  const { headers, rows: allRows } = toTable(matrix);
   if (headers.length === 0) {
     return { ok: false, error: { ...NOT_A_CSV, message: "Debrief couldn't find a header row in this file." } };
   }
   const detectedColumns = headers.slice(0, MAX_ECHOED_COLUMNS);
-  if (rows.length === 0) {
+  if (allRows.length === 0) {
     return {
       ok: false,
       error: { title: "No ad rows found", message: "The CSV appears to have headers but no ad rows.", fix: EXPORT_AT_AD_LEVEL, detectedColumns },
@@ -108,6 +113,20 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
         fix: "In Ads Manager, open the Ads tab, select the ads, and export with Ad name included.",
         detectedColumns,
       },
+    };
+  }
+  /* Robustness 1: Ads Manager's optional summary row (and a hand-added
+     "Total" line) is a total, not an ad — dropped here, once, so the
+     file card, the API and the report all count the same rows. */
+  const notes: string[] = [];
+  const summary = summaryRowFlags(allRows, columns);
+  const summaryNote = summaryRowsNote(allRows, columns, summary);
+  if (summaryNote) notes.push(summaryNote);
+  const rows = allRows.filter((_, i) => !summary[i]);
+  if (rows.length === 0) {
+    return {
+      ok: false,
+      error: { title: "No ad rows found", message: "The CSV has a summary row but no ad rows.", fix: EXPORT_AT_AD_LEVEL, detectedColumns },
     };
   }
   /* Batch D5: one ad account and one currency per file — mixed files
@@ -145,7 +164,7 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
       },
     };
   }
-  return { ok: true, value: { headers, rows, columns, delimiter, decimalComma, detectedColumns } };
+  return { ok: true, value: { headers, rows, columns, delimiter, decimalComma, detectedColumns, notes } };
 }
 
 /** The KPI-dependent part: a spend column, and the selected KPI's
