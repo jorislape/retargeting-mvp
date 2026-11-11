@@ -72,31 +72,41 @@ const ALIASES = {
   linkClicks: ["link clicks", "clicks all", "clicks"],
   ctr: ["ctr link click through rate", "ctr all", "ctr", "click through rate"],
   cpc: ["cpc cost per link click", "cpc all", "cpc", "cost per click"],
+  /* Robustness 4: Ads Manager's own all-channel columns ("Purchases",
+     "Purchases conversion value", "Purchase ROAS") come FIRST, the
+     website-only variants second — for the count, the value, the ROAS
+     and the cost alike, so one report never mixes the two scopes. An
+     account with shop, app or offline purchases has a far lower
+     Website purchase ROAS than the Purchase ROAS its buyer sees (0.07x
+     against 0.85x); the old website-first order showed the former. The
+     Meta pull reads omni_purchase first too (modules/meta/graph.ts).
+     With only the website columns in the export they are still read,
+     and the file card always names the column used and the one left. */
   purchases: [
+    "purchases",
     "website purchases",
     "on facebook purchases",
-    "purchases",
     "results",
   ],
   purchaseValue: [
-    "website purchases conversion value",
     "purchases conversion value",
+    "website purchases conversion value",
     "conversion value",
   ],
   purchaseRoas: [
-    "website purchase roas return on ad spend",
     "purchase roas return on ad spend",
+    "website purchase roas return on ad spend",
     "roas",
     "return on ad spend",
   ],
   costPerPurchase: [
-    "cost per website purchase",
     "cost per purchase",
+    "cost per website purchase",
     "cost per result",
     "cost per action",
     "cpa",
   ],
-  leads: ["website leads", "on facebook leads", "leads"],
+  leads: ["leads", "website leads", "on facebook leads"],
   costPerLead: ["cost per lead"],
   /* Batch D4: messaging conversations (WhatsApp / Messenger / DM sales)
      — read only when the run asks for Cost per conversation. */

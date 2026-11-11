@@ -109,7 +109,7 @@ const KPI_OPTIONS: { value: KpiKey; label: string; outcome?: "conversation" }[] 
 /** The alias groups documented in the "CSV requirements" helper —
  *  mirrors what columns.ts actually resolves. */
 const KPI_ALIAS_DOC: [string, string][] = [
-  ["ROAS", "ROAS · Website purchase ROAS · Return on ad spend"],
+  ["ROAS", "Purchase ROAS · Website purchase ROAS · ROAS · Return on ad spend"],
   ["CPA", "CPA · Cost per purchase · Cost per lead · Cost per result"],
   ["CTR", "CTR · Link CTR · Click-through rate"],
   ["CPC", "CPC · Cost per click · Link CPC"],
@@ -1694,8 +1694,7 @@ export function GeneratorPanel() {
                   <p className="font-semibold text-zinc-200">Recommended</p>
                   <p className="mt-1 font-mono text-[11px] leading-relaxed text-zinc-400">
                     Campaign name · Ad set name · Impressions · Clicks ·
-                    Purchases or Leads · Cost per result · Website purchase
-                    ROAS
+                    Purchases or Leads · Cost per result · Purchase ROAS
                   </p>
                 </div>
                 <div>

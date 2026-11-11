@@ -47,7 +47,10 @@ try {
   // Campaign / ad set names are read since Mixed Segment Warning — no longer unused.
   assert.deepEqual(e, { headers: ["Landing page views", "Video plays at 25%"], total: 2 });
   const ex = run(extra, "cpa");
-  assert.ok(ex.columns.sources && JSON.stringify(ex.columns.sources).includes('"ignored":["Purchases"]'),
+  /* Robustness 4: "Purchases" (all channels) is read; the website-only
+     variant is the competing one. */
+  assert.equal(ex.columns.purchases, "Purchases");
+  assert.ok(ex.columns.sources && JSON.stringify(ex.columns.sources).includes('"ignored":["Website purchases"]'),
     "the competing variant is the one reported as 'also found, not used' — so it isn't listed twice");
   assert.equal(ex.columns.videoPlays, null, "a retention checkpoint is never cited as a hook-level metric");
   assert.ok(!/Video plays at 25%/.test(ex.buyerText), "and the memo never cites it");
