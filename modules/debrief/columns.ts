@@ -355,6 +355,15 @@ export function breakdownColumns(headers: readonly string[]): string[] {
   return headers.filter((h) => BREAKDOWN_HEADERS.has(h.trim().toLowerCase().replace(/\s+/g, " ")));
 }
 
+/** Robustness 3 — headers that can never be a purchase / lead COUNT: a
+ *  value, a ROAS, a cost or a rate. "Purchases conversion value"
+ *  contains "purchases", and with no count column in the export the
+ *  substring pass used to read the count from it (4,800 "purchases"). */
+const NOT_A_COUNT = /\bvalue\b|roas|return on ad spend|\bcost per\b|\brate\b/i;
+function countHeaders(headers: string[]): string[] {
+  return headers.filter((h) => !NOT_A_COUNT.test(h));
+}
+
 export function resolveColumns(allHeaders: string[]): ColumnMap {
   /* Attribution & Intent 1: split columns ("Purchases (7-day click)")
      are resolved on their own and kept out of every normal alias lookup
@@ -378,11 +387,11 @@ export function resolveColumns(allHeaders: string[]): ColumnMap {
     linkClicks: findHeader(headers, ALIASES.linkClicks),
     ctr: findHeader(headers, ALIASES.ctr),
     cpc: findHeader(headers, ALIASES.cpc),
-    purchases: findHeader(headers, ALIASES.purchases),
+    purchases: findHeader(countHeaders(headers), ALIASES.purchases),
     purchaseValue: findHeader(headers, ALIASES.purchaseValue),
     purchaseRoas: findHeader(headers, ALIASES.purchaseRoas),
     costPerPurchase: findHeader(headers, ALIASES.costPerPurchase),
-    leads: findHeader(headers, ALIASES.leads),
+    leads: findHeader(countHeaders(headers), ALIASES.leads),
     conversations: findHeader(headers.filter((h) => !/cost per/i.test(h)), ALIASES.conversations),
     costPerConversation: findHeader(headers, ALIASES.costPerConversation),
     resultIndicator: findHeader(headers, ALIASES.resultIndicator),
@@ -458,10 +467,12 @@ function resolveSources(headers: string[]): ColumnMap["sources"] {
   const sources: ColumnMap["sources"] = {};
   for (const field of CONVERSION_FIELDS) {
     const aliases = ALIASES[field];
-    const hit = findHeaderMatch(headers, aliases);
+    /* Same header pool resolveColumns reads the field from. */
+    const pool = field === "purchases" || field === "leads" ? countHeaders(headers) : headers;
+    const hit = findHeaderMatch(pool, aliases);
     if (!hit) continue;
     const excluded = (MORE_SPECIFIC[field] ?? []).flatMap((f) => [...ALIASES[f]]);
-    const ignored = headers.filter(
+    const ignored = pool.filter(
       (h) => h !== hit.header && matchesAny(h, aliases) && !matchesAny(h, excluded)
     );
     /* A trailing currency code ("Cost per purchase (USD)") is how Meta

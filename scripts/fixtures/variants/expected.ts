@@ -279,8 +279,6 @@ export const EXPECTED: Record<string, Expectation> = {
 export const PENDING: Record<string, string> = {
   "04-roas-purchase-and-website-differ": "website-only columns win over Ads Manager's Purchase ROAS",
   "05-roas-website-columns-first": "website-only columns win over Ads Manager's Purchase ROAS",
-  "10-value-and-roas-without-count": "purchase count read from the conversion-value column",
-  "11-website-value-and-roas-without-count": "purchase count read from the conversion-value column",
   "15-results-mixed-indicator": "Results counted as purchases whatever the Result indicator says",
   "17-results-cpa-mixed-indicator": "Results counted as purchases whatever the Result indicator says",
   "33-eu-whole-numbers-dot-thousands": "dot thousands read as decimals when the file has no decimals",
