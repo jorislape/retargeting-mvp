@@ -65,7 +65,7 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
   /* Control characters in the first chunk mean XLSX/zip/binary. */
   if (/[\u0000-\u0008\u000E-\u001F]/.test(text.slice(0, 2000))) return { ok: false, error: NOT_A_CSV };
 
-  const { matrix, delimiter, decimalComma } = parseCsvDetailed(text);
+  const { matrix, delimiter, decimalComma, assumedDotThousands } = parseCsvDetailed(text);
   if (matrix.length === 0) return { ok: false, error: NOT_A_CSV };
   /* A real Ads Manager export always has several columns. One column
      means the separator wasn't recognised (or it isn't a CSV) — every
@@ -122,6 +122,12 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
   const notes: string[] = [];
   /* Robustness 2: a header that repeats is read from its first column
      — said here, never decided silently. */
+  /* Robustness 6: the one number-format call no cell could prove. */
+  if (assumedDotThousands) {
+    notes.push(
+      `Numbers like '${assumedDotThousands}' are read as thousands (${assumedDotThousands.replace(/\./g, ",")}), not decimals — this semicolon-separated file has no decimal commas to confirm it. If they are decimals, export with a decimal point and a comma separator.`
+    );
+  }
   const repeated = duplicateHeaders(headers);
   if (repeated.length > 0) {
     const shown = repeated.slice(0, 3).map((d) => `'${d.header}' appears ${d.count} times`);

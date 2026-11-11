@@ -229,7 +229,9 @@ export const EXPECTED: Record<string, Expectation> = {
   "30-currency-dollar-in-cell": base,
   "31-currency-code-in-cell": base,
   "32-percent-sign-cells": base,
-  "33-eu-whole-numbers-dot-thousands": INTS,
+  /* No cell proves the style; a semicolon file reads 1.200 as 1,200 —
+     and says so on the card. */
+  "33-eu-whole-numbers-dot-thousands": { ...INTS, card: [/read as thousands/] },
   "34-decimal-comma-in-comma-file": base,
   "35-eu-three-decimal-roas": base,
   "36-us-whole-numbers-comma-thousands": INTS,
@@ -277,7 +279,6 @@ export const EXPECTED: Record<string, Expectation> = {
  * the same commit, turning the variant into a regression test.
  */
 export const PENDING: Record<string, string> = {
-  "33-eu-whole-numbers-dot-thousands": "dot thousands read as decimals when the file has no decimals",
   "51-localized-lt": "a non-English export is called a campaign-level export",
   "52-localized-es": "a non-English export is called a campaign-level export",
   "53-localized-ar": "a non-English export is called a campaign-level export",

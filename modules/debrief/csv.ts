@@ -43,6 +43,10 @@ const COMMA_DECIMAL = /^-?(?:\d{1,3}(?:\.\d{3})+|\d+),\d+$/;
 const DOT_DECIMAL = /^-?(?:\d{1,3}(?:,\d{3})+|\d+)\.\d+$/;
 /** "1,234" / "1.234" — thousands in one style, a decimal in the other. */
 const AMBIGUOUS_GROUPS = /^-?\d{1,3}([.,])\d{3}$/;
+/** Two or more groups can only be thousands: "1.234.567" (decimal-comma
+ *  style) / "1,234,567" (decimal-point style). */
+const DOT_THOUSANDS = /^-?\d{1,3}(?:\.\d{3}){2,}$/;
+const COMMA_THOUSANDS = /^-?\d{1,3}(?:,\d{3}){2,}$/;
 /** Shapes rewritten in decimal-comma mode: optional dot-thousands
  *  groups, optional comma decimal. Never a date like "01.06.2026". */
 const COMMA_MODE_NUMBER = /^-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?$/;
@@ -54,18 +58,42 @@ const COMMA_MODE_NUMBER = /^-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?$/;
  * numeric shape and pass through untouched. Returns the matrix unchanged
  * for decimal-point files.
  */
-export function normalizeDecimalCommas(matrix: string[][]): { matrix: string[][]; decimalComma: boolean } {
+export function normalizeDecimalCommas(
+  matrix: string[][],
+  /** The file's separator. Robustness 6: a semicolon is itself the sign
+   *  of a decimal-comma locale (spreadsheets use ";" exactly when "," is
+   *  the decimal mark), so it settles a file with no other evidence. */
+  delimiter?: CsvDelimiter
+): {
+  matrix: string[][];
+  decimalComma: boolean;
+  /** Set when the style was NOT proven by any cell: a semicolon file
+   *  whose only dotted numbers look like "1.200" was read with the dot
+   *  as a thousands separator. Holds one such cell, for disclosure. */
+  assumedDotThousands?: string;
+} {
   let comma = 0;
   let dot = 0;
+  let ambiguousDot: string | null = null;
   for (const row of matrix.slice(1)) {
     for (const cell of row) {
       const core = numericCore(cell);
-      if (core === "" || AMBIGUOUS_GROUPS.test(core)) continue;
-      if (COMMA_DECIMAL.test(core)) comma += 1;
-      else if (DOT_DECIMAL.test(core)) dot += 1;
+      if (core === "") continue;
+      if (AMBIGUOUS_GROUPS.test(core)) {
+        if (ambiguousDot == null && core.includes(".")) ambiguousDot = core;
+        continue;
+      }
+      if (COMMA_DECIMAL.test(core) || DOT_THOUSANDS.test(core)) comma += 1;
+      else if (DOT_DECIMAL.test(core) || COMMA_THOUSANDS.test(core)) dot += 1;
     }
   }
-  if (comma <= dot) return { matrix, decimalComma: false };
+  /* Robustness 6: no cell proves either style. In a semicolon file,
+     "1.200" is then 1,200 — every dotted number having exactly three
+     digits after the dot is what thousands grouping looks like, and a
+     whole-number export (no cents) has nothing else to go on. It used
+     to be read as 1.2. The caller discloses the assumption. */
+  const assumed = comma === 0 && dot === 0 && delimiter === ";" && ambiguousDot != null;
+  if (comma <= dot && !assumed) return { matrix, decimalComma: false };
   const out = matrix.map((row, i) =>
     i === 0
       ? row
@@ -76,7 +104,7 @@ export function normalizeDecimalCommas(matrix: string[][]): { matrix: string[][]
             : cell;
         })
   );
-  return { matrix: out, decimalComma: true };
+  return { matrix: out, decimalComma: true, ...(assumed && ambiguousDot != null ? { assumedDotThousands: ambiguousDot } : {}) };
 }
 
 /** Parses with the detected delimiter and decimal style; reports both. */
@@ -84,10 +112,11 @@ export function parseCsvDetailed(text: string): {
   matrix: string[][];
   delimiter: CsvDelimiter;
   decimalComma: boolean;
+  assumedDotThousands?: string;
 } {
   const delimiter = detectDelimiter(text);
-  const { matrix, decimalComma } = normalizeDecimalCommas(parseWith(text, delimiter));
-  return { matrix, delimiter, decimalComma };
+  const { matrix, decimalComma, assumedDotThousands } = normalizeDecimalCommas(parseWith(text, delimiter), delimiter);
+  return { matrix, delimiter, decimalComma, ...(assumedDotThousands ? { assumedDotThousands } : {}) };
 }
 
 /** Delimiter- and decimal-aware parse (see parseCsvDetailed). */
