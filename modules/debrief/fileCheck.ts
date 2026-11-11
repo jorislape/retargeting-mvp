@@ -14,6 +14,7 @@
 import { duplicateHeaders, parseCsvDetailed, toTable, type CsvDelimiter } from "./csv";
 import { EXPORT_AT_AD_LEVEL, conversationColumnsMissing, requiredColumnsFor, resolveColumns, type ColumnMap } from "./columns";
 import { summaryRowFlags, summaryRowsNote } from "./extract";
+import { applyResultIndicator, resultsTypingNote } from "./resultRows";
 import { DebriefApiError, KPI_LABELS, KpiKey } from "./types";
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -102,8 +103,8 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
       error: { title: "No ad rows found", message: "The CSV appears to have headers but no ad rows.", fix: EXPORT_AT_AD_LEVEL, detectedColumns },
     };
   }
-  const columns = resolveColumns(headers);
-  if (!columns.adName) {
+  const resolved = resolveColumns(headers);
+  if (!resolved.adName) {
     return {
       ok: false,
       error: {
@@ -131,10 +132,18 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
       } is read. If the second holds different numbers (another attribution window, another account), remove one and upload again.`
     );
   }
-  const summary = summaryRowFlags(allRows, columns);
-  const summaryNote = summaryRowsNote(allRows, columns, summary);
+  const summary = summaryRowFlags(allRows, resolved);
+  const summaryNote = summaryRowsNote(allRows, resolved, summary);
   if (summaryNote) notes.push(summaryNote);
-  const rows = allRows.filter((_, i) => !summary[i]);
+  /* Robustness 5: Results / Cost per results are read by each row's
+     Result indicator — typed here once, so the file card, the API and
+     the report read the same columns the same way. */
+  const { rows, columns } = applyResultIndicator(
+    allRows.filter((_, i) => !summary[i]),
+    resolved
+  );
+  const typingNote = resultsTypingNote(columns);
+  if (typingNote) notes.push(typingNote);
   if (rows.length === 0) {
     return {
       ok: false,

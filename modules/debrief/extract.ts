@@ -1,6 +1,7 @@
 import { ClickBasis, ColumnMap, clickBasisFor } from "./columns";
 import { parseNumericCell } from "./csv";
 import { fmtMoney } from "./format";
+import { RESULT_ROW_NOT_READ, RESULT_ROW_RAW, applyResultIndicator } from "./resultRows";
 import {
   CREATIVE_FORMAT_LABELS,
   CreativeFormatOverrides,
@@ -128,8 +129,10 @@ function cpaBasisForRow(
  *  messaging event. null when neither is readable (missing ≠ 0). */
 function conversationsForRow(row: Record<string, string>, columns: ColumnMap): number | null {
   if (columns.conversations) return parseNumericCell(row[columns.conversations]);
+  /* Robustness 5: a row typed out of the purchase / lead read keeps its
+     raw Results count under RESULT_ROW_RAW. */
   if (columns.results && columns.resultIndicator && /messag|conversation/i.test(row[columns.resultIndicator] ?? ""))
-    return parseNumericCell(row[columns.results]);
+    return parseNumericCell(row[RESULT_ROW_RAW] ?? row[columns.results]);
   return null;
 }
 
@@ -163,7 +166,13 @@ function roasZeroPurchases(
   const value = valueHeader ? parseNumericCell(row[valueHeader]) : null;
   if (count === 0 || value === 0) return true;
   if (count != null || value != null) return false;
-  return populated.count || populated.value;
+  /* Robustness 5: a row whose Results are another result type (leads,
+     messaging) has no purchase numbers in a Results column — that blank
+     is "not measured", never "0 purchases". */
+  const notRead = row[RESULT_ROW_NOT_READ] === "1";
+  const countBlankMeansZero = populated.count && !(notRead && countHeader === columns.results);
+  const valueBlankMeansZero = populated.value && !(notRead && valueHeader === columns.resultsValue);
+  return countBlankMeansZero || valueBlankMeansZero;
 }
 
 /** Evidence Inputs V1: the raw conversion count behind a purchase-based
@@ -312,13 +321,16 @@ export function summaryRowsNote(
  *  get a positional fallback label so the flow still works, but the
  *  caller should surface that as a confidence note. */
 export function extractAds(
-  rows: Record<string, string>[],
-  columns: ColumnMap,
+  rawRows: Record<string, string>[],
+  rawColumns: ColumnMap,
   kpi: KpiKey,
   /** Batch D4 — "conversation": CPA is cost per messaging conversation
    *  started, counted in conversations. Unset ⇒ unchanged. */
   cpaOutcome?: "conversation" | null
 ): ParsedAd[] {
+  /* Robustness 5: Meta's Results columns are read by each row's Result
+     indicator (a no-op without one, or when already typed upstream). */
+  const { rows, columns } = applyResultIndicator(rawRows, rawColumns);
   const conversationMode = kpi === "cpa" && cpaOutcome === "conversation";
   /* Attribution & Intent 2: click-only basis for ROAS/CPA/CPL when the
      export has it (7-day preferred); null ⇒ blended, as before. */

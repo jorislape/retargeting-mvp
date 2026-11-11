@@ -43,3 +43,4 @@ export {
 export * from "./types";
 export { checkExport, checkExportKpi, checkExportStructure, MAX_FILE_BYTES, MAX_DATA_ROWS, type ExportStructure, type CheckResult } from "./fileCheck";
 export { detectDelimiter, parseCsvDetailed, type CsvDelimiter } from "./csv";
+export { applyResultIndicator, resultKind, resultsTypingNote, type ResultKind, type ResultsTyping } from "./resultRows";

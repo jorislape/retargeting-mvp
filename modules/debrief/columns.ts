@@ -91,11 +91,15 @@ const ALIASES = {
   purchaseValue: [
     "purchases conversion value",
     "website purchases conversion value",
+    /* Robustness 5: Meta's "Results value" — last resort, typed per row
+       by Result indicator (resultRows.ts) and always disclosed. */
+    "results value",
     "conversion value",
   ],
   purchaseRoas: [
     "purchase roas return on ad spend",
     "website purchase roas return on ad spend",
+    "results roas",
     "roas",
     "return on ad spend",
   ],
@@ -157,7 +161,7 @@ const ALIASES = {
  *  purchases / cost per purchase (unchanged behaviour), but "Results"
  *  counts whatever each campaign optimises for — so a match through
  *  these aliases is always disclosed, exact or not. */
-const RESULTS_ALIASES: readonly string[] = ["results", "cost per result"];
+const RESULTS_ALIASES: readonly string[] = ["results", "cost per result", "results value", "results roas"];
 
 /** The conversion fields whose source header is recorded. Other fields
  *  (spend, CTR, dates, …) are standard, unambiguous Meta columns and
@@ -315,6 +319,13 @@ export interface ColumnMap {
   costPerConversation: string | null;
   resultIndicator: string | null;
   results: string | null;
+  /** Robustness 5 — the rest of Meta's "Results" family (exact headers,
+   *  a trailing currency code allowed) and how the family was typed by
+   *  Result indicator (resultRows.ts; absent until typed). */
+  costPerResult: string | null;
+  resultsValue: string | null;
+  resultsRoas: string | null;
+  resultsTyping?: import("./resultRows").ResultsTyping;
   reportingStarts: string | null;
   reportingEnds: string | null;
   /** Evidence Diagnostic V1 — optional upstream funnel columns. */
@@ -406,6 +417,9 @@ export function resolveColumns(allHeaders: string[]): ColumnMap {
     costPerConversation: findHeader(headers, ALIASES.costPerConversation),
     resultIndicator: findHeader(headers, ALIASES.resultIndicator),
     results: headers.find((h) => normalize(h) === "results") ?? null,
+    costPerResult: headers.find((h) => /^cost per results?$/.test(normalize(h.replace(/\s*\([A-Za-z]{3}\)\s*$/, "")))) ?? null,
+    resultsValue: headers.find((h) => normalize(h.replace(/\s*\([A-Za-z]{3}\)\s*$/, "")) === "results value") ?? null,
+    resultsRoas: headers.find((h) => normalize(h) === "results roas") ?? null,
     costPerLead: findHeader(headers, ALIASES.costPerLead),
     reportingStarts: findHeader(headers, ALIASES.reportingStarts),
     reportingEnds: findHeader(headers, ALIASES.reportingEnds),
