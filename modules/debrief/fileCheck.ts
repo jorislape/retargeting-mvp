@@ -105,6 +105,25 @@ export function checkExportStructure(text: string, sizeBytes?: number): CheckRes
   }
   const resolved = resolveColumns(headers);
   if (!resolved.adName) {
+    /* Robustness 7: no Ad name AND none of Ads Manager's English
+       structure columns (Amount spent, Campaign name, Ad set name) means
+       the headers aren't English — not a campaign-level export. A
+       localised export ("Skelbimo pavadinimas", "Importe gastado",
+       "Anzeigenname", "اسم الإعلان") used to be told to export from the
+       Ads tab, which doesn't help. Debrief doesn't guess translated
+       column names; it says what it needs. */
+    if (!resolved.spend && !resolved.campaignName && !resolved.adSetName) {
+      return {
+        ok: false,
+        error: {
+          title: "Column names not recognised",
+          message:
+            "Debrief reads Ads Manager's English column names (Ad name, Amount spent, Purchases…) and found none of them — this export looks like it is in another language.",
+          fix: "In Ads Manager, switch the language to English (US) and export the ads again, or rename the columns to their English names. Decimal commas and semicolons are fine as they are.",
+          detectedColumns,
+        },
+      };
+    }
     return {
       ok: false,
       error: {

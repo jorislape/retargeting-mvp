@@ -278,9 +278,4 @@ export const EXPECTED: Record<string, Expectation> = {
  * every other variant to pass; a fix removes its entries from here in
  * the same commit, turning the variant into a regression test.
  */
-export const PENDING: Record<string, string> = {
-  "51-localized-lt": "a non-English export is called a campaign-level export",
-  "52-localized-es": "a non-English export is called a campaign-level export",
-  "53-localized-ar": "a non-English export is called a campaign-level export",
-  "54-localized-de": "a non-English export is called a campaign-level export",
-};
+export const PENDING: Record<string, string> = {};
