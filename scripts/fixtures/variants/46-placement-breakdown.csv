@@ -1,0 +1,15 @@
+Platform,Placement,Ad name,Amount spent (USD),Impressions,Link clicks,Purchases,Purchases conversion value,Purchase ROAS (return on ad spend)
+Facebook,Feed,Hero_UGC_V1,720.00,72000,900,26,3120.00,4.333333
+Instagram,Instagram Reels,Hero_UGC_V1,480.00,48000,600,14,1680.00,3.500000
+Facebook,Feed,Review_Static_V2,570.30,57030,456,15,1425.75,2.500000
+Instagram,Instagram Reels,Review_Static_V2,380.20,38020,304,10,950.50,2.500000
+Facebook,Feed,Founder_Video_V3,1407.40,140740,1140,21,1395.67,0.991665
+Instagram,Instagram Reels,Founder_Video_V3,938.27,93827,760,9,598.15,0.637503
+Facebook,Feed,Carousel_Sale_V4,1092.00,109200,984,12,1219.40,1.116667
+Instagram,Instagram Reels,Carousel_Sale_V4,728.00,72800,656,,,
+Facebook,Feed,Demo_Video_V5,384.15,38415,307,,,
+Instagram,Instagram Reels,Demo_Video_V5,256.10,25610,205,,,
+Facebook,Feed,Testimonial_V6,846.00,84600,761,13,2182.14,2.579362
+Instagram,Instagram Reels,Testimonial_V6,564.00,56400,508,8,1342.86,2.380957
+Facebook,Feed,Promo_Static_V7,621.24,62124,652,10,1095.00,1.762604
+Instagram,Instagram Reels,Promo_Static_V7,414.16,41416,435,6,657.00,1.586343

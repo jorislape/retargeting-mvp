@@ -1,0 +1,15 @@
+Campaign name,Ad set name,Ad name,Amount spent (USD),Impressions,Purchases,Purchases conversion value,Purchase ROAS (return on ad spend)
+Sales - Evergreen,Prospecting - Broad,Hero_UGC_V1,900.00,90000,26,3120.00,3.466667
+Sales - Evergreen,Retargeting - 30d,Hero_UGC_V1,300.00,30000,14,1680.00,5.600000
+Sales - Evergreen,Prospecting - Broad,Review_Static_V2,712.88,71288,15,1425.75,1.999986
+Sales - Evergreen,Retargeting - 30d,Review_Static_V2,237.62,23762,10,950.50,4.000084
+Sales - Evergreen,Prospecting - Broad,Founder_Video_V3,1759.25,175925,21,1395.67,0.793332
+Sales - Evergreen,Retargeting - 30d,Founder_Video_V3,586.42,58642,9,598.15,1.020003
+Sales - Evergreen,Prospecting - Broad,Carousel_Sale_V4,1365.00,136500,12,1219.40,0.893333
+Sales - Evergreen,Retargeting - 30d,Carousel_Sale_V4,455.00,45500,,,
+Sales - Evergreen,Prospecting - Broad,Demo_Video_V5,480.19,48019,,,
+Sales - Evergreen,Retargeting - 30d,Demo_Video_V5,160.06,16006,,,
+Sales - Evergreen,Prospecting - Broad,Testimonial_V6,1057.50,105750,13,2182.14,2.063489
+Sales - Evergreen,Retargeting - 30d,Testimonial_V6,352.50,35250,8,1342.86,3.809532
+Sales - Evergreen,Prospecting - Broad,Promo_Static_V7,776.55,77655,10,1095.00,1.410083
+Sales - Evergreen,Retargeting - 30d,Promo_Static_V7,258.85,25885,6,657.00,2.538150

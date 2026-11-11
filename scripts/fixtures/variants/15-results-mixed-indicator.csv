@@ -1,0 +1,8 @@
+Ad name,Amount spent (USD),Results,Result indicator,Cost per results,Results value,Results ROAS,Attribution setting
+Hero_UGC_V1,1200.00,40,actions:offsite_conversion.fb_pixel_purchase,30.000000,4800.00,4.000000,7-day click or 1-day view
+Review_Static_V2,950.50,25,actions:offsite_conversion.fb_pixel_purchase,38.020000,2376.25,2.500000,7-day click or 1-day view
+Founder_Video_V3,2345.67,30,actions:offsite_conversion.fb_pixel_purchase,78.189000,1993.82,0.850000,7-day click or 1-day view
+Carousel_Sale_V4,1820.00,12,actions:offsite_conversion.fb_pixel_purchase,151.666667,1219.40,0.670000,7-day click or 1-day view
+LeadForm_Guide_V8,1500.00,120,actions:lead,12.500000,,,7-day click or 1-day view
+LeadForm_Quiz_V9,900.00,45,actions:lead,20.000000,,,7-day click or 1-day view
+WhatsApp_Offer_V10,800.00,64,actions:onsite_conversion.messaging_conversation_started_7d,12.500000,,,7-day click or 1-day view

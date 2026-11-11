@@ -1,0 +1,8 @@
+Ad name,Amount spent (USD),Impressions,Results,Result indicator,Cost per results
+Hero_UGC_V1,1200.00,120000,40,actions:offsite_conversion.fb_pixel_purchase,30.000000
+Review_Static_V2,950.50,95050,25,actions:offsite_conversion.fb_pixel_purchase,38.020000
+Founder_Video_V3,2345.67,234567,30,actions:offsite_conversion.fb_pixel_purchase,78.189000
+Carousel_Sale_V4,1820.00,182000,12,actions:offsite_conversion.fb_pixel_purchase,151.666667
+LeadForm_Guide_V8,1500.00,150000,120,actions:lead,12.500000
+LeadForm_Quiz_V9,900.00,90000,45,actions:lead,20.000000
+WhatsApp_Offer_V10,800.00,80000,64,actions:onsite_conversion.messaging_conversation_started_7d,12.500000

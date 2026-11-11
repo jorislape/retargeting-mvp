@@ -1,0 +1,8 @@
+Ad name,Amount spent (USD),Impressions,Link clicks,CTR (link click-through rate),Purchases,Purchases conversion value,Purchase ROAS (return on ad spend)
+Hero_UGC_V1,"1,200.00","120,000","1,500",1.25%,40,"4,800.00",4.00
+Review_Static_V2,950.50,"95,050",760,0.80%,25,"2,376.25",2.50
+Founder_Video_V3,"2,345.67","234,567","1,900",0.81%,30,"1,993.82",0.85
+Carousel_Sale_V4,"1,820.00","182,000","1,640",0.90%,12,"1,219.40",0.67
+Demo_Video_V5,640.25,"64,025",512,0.80%,,,
+Testimonial_V6,"1,410.00","141,000","1,269",0.90%,21,"3,525.00",2.50
+Promo_Static_V7,"1,035.40","103,540","1,087",1.05%,16,"1,752.00",1.69
