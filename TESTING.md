@@ -342,3 +342,15 @@ Run `scripts/fixtures/agency-naming-convention.csv` (ROAS).
       prints only its title, Hypothesis and Win (client: title + Success);
       the client PDF names ads once, in the Summary split. Repeat in
       Safari's print preview — its pagination differs from Chromium's.
+
+## Robustness sweep (export variants)
+
+Upload from `scripts/fixtures/variants/` and read the file card (below the dropzone):
+
+- [ ] **04-roas-purchase-and-website-differ.csv**: card says "ROAS from column 'Purchase ROAS (return on ad spend)' — 'Website purchase ROAS (return on ad spend)' also found, not used". Report shows Founder_Video_V3 at 0.85x and Carousel_Sale_V4 at 0.67x (not 0.07x / 0.22x).
+- [ ] **38-summary-row-first.csv**: card says "Summary row skipped: 1 row with no ad name ($9,401.82 spend) is a total, not an ad — not counted."; 7 rows, $9,401.82 total spend, no "Ad 1" in the report.
+- [ ] **23-duplicate-roas-header.csv**: card says "'Purchase ROAS (return on ad spend)' appears 2 times in this file — the first column is read."
+- [ ] **15-results-mixed-indicator.csv**: card says "Results read by Result indicator: 4 purchase rows counted as purchases; 3 rows with another result (2 lead, 1 messaging conversation) …"; the lead and WhatsApp ads are set aside with no ROAS, never shown with 120 purchases.
+- [ ] **33-eu-whole-numbers-dot-thousands.csv**: card says "Numbers like '1.200' are read as thousands (1,200) …"; total spend 6,317.
+- [ ] **51-localized-lt.csv**: refused — "Column names not recognised", fix says to switch Ads Manager to English (US).
+- [ ] A messaging-only Results export (Results + Result indicator = messaging conversations, no Purchases columns) auto-selects **Cost per conversation**.

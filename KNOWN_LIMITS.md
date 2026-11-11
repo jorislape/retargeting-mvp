@@ -23,6 +23,31 @@ user-facing versions of some of these.
   types in themselves. The one approved automated fetch (Competitor
   Landing Page Fetch V1) explicitly refuses Ads Library URLs by policy.
 
+## Reading exports
+
+- **English column names only.** Debrief reads Ads Manager's English
+  headers. An export in another language is refused with "Column names
+  not recognised" and the fix (switch Ads Manager to English (US) and
+  export again) — translated headers are never guessed. Regional
+  number formats (semicolons, decimal commas, dot / space thousands,
+  currency in the cell) are read.
+- **Attribution-window columns.** Split columns are recognised in the
+  shapes `Purchases (7-day click)` / `Purchases [1-day view]` (1-day and
+  7-day click, 1-day / 7-day view, 1-day engaged-view). Meta doesn't
+  document its export spelling; a window column in another shape (e.g.
+  28-day click) is not treated as a split — if it is the only purchase
+  column it is read, and the file card names it with "check it's the
+  conversion you mean".
+- **A ROAS column with nothing else.** With only a ROAS column (no
+  purchases, no purchase value), a blank ROAS cell stays "no ROAS
+  value" — it can't be told apart from "not measured" — and an ad
+  whose breakdown rows include one is set aside rather than given a
+  guessed ROAS. Include Purchases or Purchases conversion value.
+- **Two purchase scopes in one file.** When an export has both
+  "Purchase ROAS" and "Website purchase ROAS" (or the matching count /
+  value columns), the all-channel one is read and the file card names
+  both. To judge website purchases only, export only those columns.
+
 ## Report output
 
 - **Browser print-to-PDF limitations.** PDF export goes through the
