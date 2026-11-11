@@ -64,6 +64,7 @@ import {
   kpiLabelFor,
   outcomeNounsFor,
   saleWords,
+  targetCpaLabelFor,
   RankedAd,
 } from "./types";
 
@@ -314,7 +315,7 @@ function trimNoteFor(
   const target = targetFor(analysis, context);
   if (target != null) {
     if (!beatsTarget(ad, analysis, target)) return {};
-    const label = analysis.kpi === "roas" ? "above target" : "beats your target CPA";
+    const label = analysis.kpi === "roas" ? "above target" : `beats your ${targetCpaLabelFor(analysis)}`;
     return {
       trimNote: {
         buyer: `${label.charAt(0).toUpperCase()}${label.slice(1)} — reduce, don't pause.`,
@@ -522,7 +523,7 @@ function withTrimNotes(d: MemoDecision, analysis: AnalysisResult, context: Debri
     targetFor(analysis, context) == null && (roas || analysis.kpi === "cpa")
       ? {
           profitBasisNote: {
-            buyer: `This move is relative to the account (each ad vs the median), not profit-based. Set ${roas ? "a target ROAS (your breakeven)" : `a target CPA (your breakeven cost per ${outcomeNounsFor(analysis)?.one ?? "purchase"})`} for a profit-based trim list.`,
+            buyer: `This move is relative to the account (each ad vs the median), not profit-based. Set ${roas ? "a target ROAS (your breakeven)" : analysis.cpaBasis === "conversations" ? "a target cost per conversation (your breakeven)" : `a target CPA (your breakeven cost per ${outcomeNounsFor(analysis)?.one ?? "purchase"})`} for a profit-based trim list.`,
             client: `This compares your ads with each other, not with your break-even point — telling us your break-even ${roas ? "return" : `cost per ${saleWords(outcomeNounsFor(analysis)).one}`} would separate ads that make money from ones that are just above or below the middle ad.`,
           },
         }
@@ -944,6 +945,9 @@ function buildSpreadThin(analysis: AnalysisResult): { spreadThin?: string; sprea
   };
 }
 
+/** First letter up — for a KPI label that opens a sentence. */
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 /** Batch D1 — "Burning spend": 0-outcome ads already past 1× the cost
  *  of one outcome. Buyers pause these well before the 2× judging bar,
  *  so the report lists them — display only; the decision is unchanged. */
@@ -955,7 +959,7 @@ function buildBurningSpend(analysis: AnalysisResult): { burningSpend?: { buyer: 
   const n = b.ads.length;
   const named = b.ads.slice(0, 3).map((a) => `"${a.name}" (${money(a.spend)})`);
   const more = n > 3 ? ` and ${n - 3} more` : "";
-  const barLabel = b.basis === "target_cpa" ? "your target CPA" : `the account's cost per ${nouns.one}`;
+  const barLabel = b.basis === "target_cpa" ? `your ${targetCpaLabelFor(analysis)}` : `the account's cost per ${nouns.one}`;
   const sale = saleWords(nouns).one;
   return {
     burningSpend: {
@@ -2045,7 +2049,7 @@ function buildNextTests(
       test: `Raise the budget on the ad set running "${top.name}" by ≤${SCALE_STEP_MAX_PCT}% every 2–3 days.`,
       why: `The one budget move this data strongly supports: ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)} on ${fmtMoney(top.spend, currency)} already spent. The clearest budget signal is concentrated in the leading ad; investigate the remaining gaps through controlled creative tests before making broader budget moves.`,
       setup: `Budget lives at ad set level: raise the ad set running it by ≤${SCALE_STEP_MAX_PCT}% every 2–3 days, re-reading after each step — larger jumps can restart Meta's learning phase. No creative or audience edits while measuring, so scaling is the only variable.`,
-      winningLooksLike: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
+      winningLooksLike: `${capitalize(kpiLabel)} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
       signals,
       hypothesis: `If we raise the budget on the ad set running "${top.name}" in ≤${SCALE_STEP_MAX_PCT}% steps while holding its creative, audience, and placements constant, we expect ${kpiLabel} to stay within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} — because it already leads this dataset ${fmtDeltaVsMedian(top.deltaFromMedian, top.deltaPct, top.stageBenchmark?.stage)} on ${fmtMoney(top.spend, currency)} of real spend, past the ${SCALE_TEST_MIN_DELTA_PCT}% bar this memo requires before any budget move.`,
       brief: {
@@ -2067,7 +2071,7 @@ function buildNextTests(
         ],
         keepConstant: "Everything about the live ad — this is a budget test, not a creative one.",
         change: `The ad set's daily budget only, in ≤${SCALE_STEP_MAX_PCT}% steps.`,
-        successMetric: `${kpiLabel} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
+        successMetric: `${capitalize(kpiLabel)} stays within 15% of ${fmtKpiValue(top.kpiValue as number, kpi, currency)} at the higher spend.`,
         guardrails: [
           "Do not change creative or audience during the 5–7 day window — scaling must stay the only variable.",
           `If ${kpiLabel} drifts more than 15%, step the budget back — no chasing with edits mid-window.`,

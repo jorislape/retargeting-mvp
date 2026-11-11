@@ -17,7 +17,15 @@ try {
   const r = run(MSG, "cpa", { cpaOutcome: "conversation" });
   const a = r.analysis;
   assert.equal(a.cpaBasis, "conversations");
-  assert.equal(r.memo.scope.kpiLabel, "Cost per conversation");
+  // Fix 3: lowercase — the label sits mid-sentence.
+  assert.equal(r.memo.scope.kpiLabel, "cost per conversation");
+  assert.match(r.buyerText, /Past cost per conversation doesn't guarantee/);
+  assert.ok(r.buyerText.includes("Set a target cost per conversation (your breakeven) for a profit-based trim list."));
+  assert.ok(r.buyerText.includes("No target cost per conversation set — ads are ranked against this account's median cost per conversation"));
+  const withTarget = run(MSG, "cpa", { cpaOutcome: "conversation", targetCpa: 40 });
+  for (const [label, text] of [["no target", r.buyerText + r.clientText], ["target", withTarget.buyerText + withTarget.clientText]] as const)
+    assert.ok(!/\bCPA\b/.test(text), `${label}: no "CPA" in conversation mode: ${text.match(/.{0,60}\bCPA\b.{0,30}/)?.[0]}`);
+  assert.ok(withTarget.buyerText.includes("(3× your target cost per conversation)"));
   assert.equal(r.memo.scope.kpiExplainer, "Cost per conversation — what one started messaging conversation costs in ad spend");
   /* CPA rules: value = spend ÷ conversations, lower is better, count-based receivers. */
   const founder = r.ads.find((x) => x.name === "WA_Founder_Video_V1")!;
@@ -78,6 +86,7 @@ try {
   const panel = readFileSync(join(ROOT, "components/debrief/GeneratorPanel.tsx"), "utf8");
   assert.match(panel, /\{ value: "cpa", label: "Cost per conversation", outcome: "conversation" \}/);
   /* Fix 1: the file card names the selected KPI and lists the conversations column. */
+  assert.match(panel, /conversationRun \? "Target cost per conversation" : "Target CPA"/, "fix 3: the target input label");
   assert.match(panel, /const selectedKpiLabel = conversationRun \? "Cost per conversation" : kpiDisplay\(fields\.kpi, true\);/);
   assert.match(panel, /\.\.\.\(preview\.conversationsFound \? \["Cost per conversation"\] : \[\]\)/);
   assert.match(panel, /KPI columns: \$\{previewKpiLabels\.join\(", "\) \|\| "none detected"\} — \$\{selectedKpiLabel\} selected\./);

@@ -127,7 +127,7 @@ try {
   /* ---- Generator: the breakeven sits next to the KPI, never required ---- */
   const panel = readFileSync(join(ROOT, "components/debrief/GeneratorPanel.tsx"), "utf8");
   const near = panel.slice(panel.indexOf("Bulletproof pass A1 — the breakeven sits next to the KPI"), panel.indexOf("Input Honesty V1: one compact"));
-  assert.match(near, /\{fields\.kpi === "roas" \? "Breakeven ROAS" : "Target CPA"\}\s*<span className="ml-1 font-normal text-zinc-400">\(recommended\)<\/span>/);
+  assert.match(near, /\{fields\.kpi === "roas" \? "Breakeven ROAS" : conversationRun \? "Target cost per conversation" : "Target CPA"\}\s*<span className="ml-1 font-normal text-zinc-400">\(recommended\)<\/span>/);
   assert.ok(!/required/.test(near.replace(/never required/g, "")), "never required");
   assert.ok(panel.indexOf("Bulletproof pass A1 — the breakeven") < panel.indexOf("Refine analysis"), "visible by default, outside Refine");
   assert.match(panel, /\{fields\.kpi !== "roas" && \(\s*<div>\s*<label htmlFor="targetRoas"/, "Refine keeps only the other target");

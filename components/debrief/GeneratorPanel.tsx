@@ -1824,7 +1824,7 @@ export function GeneratorPanel() {
           {(fields.kpi === "roas" || fields.kpi === "cpa") && (
             <div className="mt-4 max-w-sm">
               <label htmlFor={fields.kpi === "roas" ? "targetRoas" : "targetCpa"} className={fieldLabel}>
-                {fields.kpi === "roas" ? "Breakeven ROAS" : "Target CPA"}
+                {fields.kpi === "roas" ? "Breakeven ROAS" : conversationRun ? "Target cost per conversation" : "Target CPA"}
                 <span className="ml-1 font-normal text-zinc-400">(recommended)</span>
               </label>
               {fields.kpi === "roas" ? (

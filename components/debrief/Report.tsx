@@ -2236,6 +2236,9 @@ export function Report({
   /* CPA Leads Label: "CPL" in Buyer view, "cost per lead" in Client view
      (scope.kpiLabelClient exists only when the two differ). */
   const viewKpiLabel = client ? memo.scope.kpiLabelClient ?? memo.scope.kpiLabel : memo.scope.kpiLabel;
+  /* Batch D fix 3: the label is lowercase mid-sentence ("cost per
+     conversation"); where it starts a line, it starts with a capital. */
+  const viewKpiLabelStart = viewKpiLabel.charAt(0).toUpperCase() + viewKpiLabel.slice(1);
   /* Report Clarity Pass — buyer stat-row explanations (see TIP_*). */
   const statTips: Record<string, string> = {
     /* Tester Feedback Fix 4: the tooltip says where the minimum comes from. */
@@ -2525,7 +2528,7 @@ export function Report({
           {/* Meta line: mono facts separated by hairline rules. */}
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 font-mono text-[11px] tabular-nums text-zinc-400">
             <span title={memo.scope.kpiExplainer} className="text-zinc-300">
-              KPI · {viewKpiLabel}
+              KPI · {viewKpiLabelStart}
             </span>
             {memo.scope.dateRangeLabel && (
               <>
@@ -2547,7 +2550,7 @@ export function Report({
           {client && (
             <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-400">
               <span className="font-semibold text-zinc-300">
-                {viewKpiLabel}
+                {viewKpiLabelStart}
               </span>{" "}
               = {memo.scope.kpiExplainer}.
             </p>

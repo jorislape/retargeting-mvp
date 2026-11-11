@@ -6,7 +6,7 @@
 // extensionless imports and is NOT directly Node-importable; that is
 // why buildDecision takes a money formatter as an argument instead of
 // importing format.ts (whose own internal import is extensionless).
-import { KPI_LABELS, kpiClientLabelFor, kpiLabelFor, outcomeNounsFor, saleWords } from "./types.ts";
+import { KPI_LABELS, kpiClientLabelFor, kpiLabelFor, outcomeNounsFor, saleWords, targetCpaLabelFor } from "./types.ts";
 import type {
   AnalysisResult,
   AppliedCriterion,
@@ -893,16 +893,20 @@ export function spendGateSource(
   money: MoneyFormatter
 ): { short: string; buyer: string; client: string } {
   const notGuarantee = "a default, not a statistical guarantee";
-  const setTarget = "Set a target CPA to base it on 3× your CPA instead.";
+  const target = targetCpaLabelFor(analysis);
+  const setTarget =
+    analysis.cpaBasis === "conversations"
+      ? "Set a target cost per conversation to base it on 3× that target instead."
+      : "Set a target CPA to base it on 3× your CPA instead.";
   switch (analysis.spendGateBasis) {
     case "user_gate":
       return { short: "the minimum you set", buyer: "the minimum you set", client: "the minimum you set" };
     case "target_cpa": {
-      const target = money(analysis.spendGate / 3);
+      const amount = money(analysis.spendGate / 3);
       return {
-        short: "3× your target CPA",
-        buyer: `3× your ${target} target CPA`,
-        client: `three times your ${target} cost target`,
+        short: `3× your ${target}`,
+        buyer: `3× your ${amount} ${target}`,
+        client: `three times your ${amount} cost target`,
       };
     }
     default: {
@@ -1021,7 +1025,7 @@ export function buildLimits(
         : "order value or margin differs";
     const roas = analysis.cpaWithoutTarget.roasAvailable;
     buyer.push(
-      `No target CPA set — ads are ranked against this account's median ${label}, not against what's profitable. A higher ${label} isn't automatically worse if ${differs}.${
+      `No ${targetCpaLabelFor(analysis)} set — ads are ranked against this account's median ${label}, not against what's profitable. A higher ${label} isn't automatically worse if ${differs}.${
         roas ? " ROAS is available in this export and accounts for order value." : ""
       }`
     );
@@ -1771,7 +1775,7 @@ function decide(
       label: userGate
         ? `Minimum spend to judge: ${gateLabel} per ad — your criterion`
         : analysis.spendGateBasis === "target_cpa"
-          ? `Minimum spend to judge: ${gateLabel} per ad (3× your target CPA) — Debrief default rule`
+          ? `Minimum spend to judge: ${gateLabel} per ad (3× your ${targetCpaLabelFor(analysis)}) — Debrief default rule`
           : `Minimum spend to judge: ${gateLabel} per ad — Debrief default: ${spendGateSource(analysis, money).buyer}`,
       source: userGate ? "user" : "debrief_default",
     }),
@@ -1814,7 +1818,7 @@ function decide(
     ...(breakeven != null && (analysis.kpi === "roas" || analysis.kpi === "cpa")
       ? [
           {
-            label: `Breakeven: ${breakevenLabel} ${analysis.kpi === "roas" ? "ROAS" : "CPA"} — an ad must beat it to receive budget — your criterion`,
+            label: `Breakeven: ${breakevenLabel} ${analysis.kpi === "roas" ? "ROAS" : analysis.cpaBasis === "conversations" ? "cost per conversation" : "CPA"} — an ad must beat it to receive budget — your criterion`,
             source: "user" as const,
           },
         ]

@@ -9,7 +9,7 @@ import {
   RECEIVER_MIN_GATE_MULTIPLE,
   SCALE_TEST_MIN_DELTA_PCT,
 } from "./decision.ts";
-import { outcomeNounsFor } from "./types.ts";
+import { outcomeNounsFor, targetCpaLabelFor } from "./types.ts";
 import type {
   AnalysisResult,
   AppliedCriterion,
@@ -207,22 +207,24 @@ export function deriveLossConfidenceReadiness(
       : null;
   const bar = userBar ?? LOSS_CONFIDENT_SPEND_MULTIPLE;
   const isUserBar = userBar != null;
+  /* Batch D fix 3: "target cost per conversation" in conversation mode. */
+  const tc = targetCpaLabelFor(analysis);
 
   if (targetCpa != null && targetCpa > 0) {
     const multiple = worst.spend / targetCpa;
     const criterion = criterionLabel(
-      `Loss confidence: ≥${bar}× target CPA spent on a losing ad — Debrief default (practitioner-informed, not a universal threshold)`,
-      `Loss confidence: ≥${bar}× target CPA spent on a losing ad — your criterion`,
+      `Loss confidence: ≥${bar}× ${tc} spent on a losing ad — Debrief default (practitioner-informed, not a universal threshold)`,
+      `Loss confidence: ≥${bar}× ${tc} spent on a losing ad — your criterion`,
       isUserBar
     );
     const gateNote =
       analysis.spendGateBasis === "target_cpa"
-        ? " This account's minimum spend already requires 3× target CPA before any ad is judged at all, so this bar is already assured for every judged ad here."
+        ? ` This account's minimum spend already requires 3× ${tc} before any ad is judged at all, so this bar is already assured for every judged ad here.`
         : "";
     if (multiple >= bar) {
       return {
         state: "ready",
-        buyer: `Ready — "${worst.name}" has spent ${multiple.toFixed(1)}× your ${money(targetCpa)} target CPA, past the ${bar}× bar this read uses before calling underperformance confident (${isUserBar ? "your criterion" : "Debrief default"}).${gateNote}`,
+        buyer: `Ready — "${worst.name}" has spent ${multiple.toFixed(1)}× your ${money(targetCpa)} ${tc}, past the ${bar}× bar this read uses before calling underperformance confident (${isUserBar ? "your criterion" : "Debrief default"}).${gateNote}`,
         client: `"${worst.name}" has had a fair amount of spend relative to your cost target without turning around — we're confident this is a real underperformance, not noise.`,
         criterion,
         disclosureNote: gateNote ? gateNote.trim() : undefined,
@@ -230,7 +232,7 @@ export function deriveLossConfidenceReadiness(
     }
     return {
       state: "insufficient",
-      buyer: `Not enough evidence — "${worst.name}" has spent only ${multiple.toFixed(1)}× your ${money(targetCpa)} target CPA, under the ${bar}× bar this read uses before calling a loss confident.`,
+      buyer: `Not enough evidence — "${worst.name}" has spent only ${multiple.toFixed(1)}× your ${money(targetCpa)} ${tc}, under the ${bar}× bar this read uses before calling a loss confident.`,
       client: `We haven't spent enough relative to your cost target yet to be confident this ad is truly underperforming — we're giving it more time before calling it a loss.`,
       criterion,
     };
@@ -241,21 +243,21 @@ export function deriveLossConfidenceReadiness(
   // equivalent to a real cost target, and never allowed to reach "ready".
   const proxyMultiple = analysis.spendGate > 0 ? worst.spend / analysis.spendGate : 0;
   const criterion = criterionLabel(
-    `Loss confidence: ≥${bar}× this account's minimum spend, spent on a losing ad (no target CPA set) — Debrief default (practitioner-informed, not a universal threshold)`,
-    `Loss confidence: ≥${bar}× this account's minimum spend, spent on a losing ad (no target CPA set) — your criterion`,
+    `Loss confidence: ≥${bar}× this account's minimum spend, spent on a losing ad (no ${tc} set) — Debrief default (practitioner-informed, not a universal threshold)`,
+    `Loss confidence: ≥${bar}× this account's minimum spend, spent on a losing ad (no ${tc} set) — your criterion`,
     isUserBar
   );
   if (proxyMultiple >= bar) {
     return {
       state: "directional",
-      buyer: `Directional — no target CPA was set, so this uses this account's ${money(analysis.spendGate)} minimum spend as a stand-in: "${worst.name}" has spent ${proxyMultiple.toFixed(1)}× that minimum, past the ${bar}× bar. Treat this as suggestive, not a confirmed loss, until a target CPA is set for a fully confident read.`,
+      buyer: `Directional — no ${tc} was set, so this uses this account's ${money(analysis.spendGate)} minimum spend as a stand-in: "${worst.name}" has spent ${proxyMultiple.toFixed(1)}× that minimum, past the ${bar}× bar. Treat this as suggestive, not a confirmed loss, until a target CPA is set for a fully confident read.`,
       client: `We're treating "${worst.name}" as a likely underperformer based on how much it's spent relative to typical spend in this account — set a cost target for a more confident read.`,
       criterion,
     };
   }
   return {
     state: "insufficient",
-    buyer: `Not enough evidence — "${worst.name}" has spent only ${proxyMultiple.toFixed(1)}× this account's ${money(analysis.spendGate)} minimum spend (no target CPA set), under the ${bar}× bar this read requires.`,
+    buyer: `Not enough evidence — "${worst.name}" has spent only ${proxyMultiple.toFixed(1)}× this account's ${money(analysis.spendGate)} minimum spend (no ${tc} set), under the ${bar}× bar this read requires.`,
     client: `This ad hasn't spent enough yet, relative to typical spend in this account, for us to be confident it's truly underperforming.`,
     criterion,
   };

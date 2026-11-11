@@ -275,7 +275,7 @@ export function memoToText(
 
   const viewKpiLabel = view === "client" ? scope.kpiLabelClient ?? scope.kpiLabel : scope.kpiLabel;
   lines.push(`${scope.product} — ${viewKpiLabel} ${view === "client" ? "PERFORMANCE REPORT" : "DEBRIEF"}`);
-  if (view === "client") lines.push(`${viewKpiLabel}: ${scope.kpiExplainer}`);
+  if (view === "client") lines.push(`${viewKpiLabel.charAt(0).toUpperCase()}${viewKpiLabel.slice(1)}: ${scope.kpiExplainer}`);
   if (scope.dateRangeLabel) lines.push(scope.dateRangeLabel);
   lines.push(
     view === "client"

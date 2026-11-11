@@ -68,10 +68,18 @@ const isCpl = (a: KpiWithBasis) => a.kpi === "cpa" && a.cpaBasis === "leads";
  *  rules (gate, median, receivers by count) — wording only. */
 const isCpConv = (a: KpiWithBasis) => a.kpi === "cpa" && a.cpaBasis === "conversations";
 
-/** Buyer-register KPI label: "CPL" for lead-based CPA, "Cost per
- *  conversation" for conversation-based CPA, else KPI_LABELS. */
+/** Buyer-register KPI label: "CPL" for lead-based CPA, "cost per
+ *  conversation" for conversation-based CPA (lowercase: it sits
+ *  mid-sentence — "Past cost per conversation doesn't guarantee…"),
+ *  else KPI_LABELS. */
 export function kpiLabelFor(a: KpiWithBasis): string {
-  return isCpl(a) ? "CPL" : isCpConv(a) ? "Cost per conversation" : KPI_LABELS[a.kpi];
+  return isCpl(a) ? "CPL" : isCpConv(a) ? "cost per conversation" : KPI_LABELS[a.kpi];
+}
+
+/** Batch D fix 3 — the user's CPA target, named for what it targets:
+ *  "target cost per conversation" in conversation mode, else "target CPA". */
+export function targetCpaLabelFor(a: KpiWithBasis): string {
+  return isCpConv(a) ? "target cost per conversation" : "target CPA";
 }
 
 /** Client-register KPI label: "cost per lead" / "cost per conversation". */
